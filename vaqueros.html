@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>El Prado 1 — Vaqueros</title>
+<style>
+:root {
+  --bg: #0f1a0b;
+  --bg2: #162010;
+  --card: #1c2916;
+  --card2: #223218;
+  --border: #2e4020;
+  --border2: #3a5228;
+  --green: #6dba3a;
+  --green2: #4e9024;
+  --green-soft: #a8d878;
+  --gold: #c9a227;
+  --gold2: #e8bc40;
+  --red: #e05a4a;
+  --text: #d8e8c8;
+  --text2: #9ab888;
+  --text3: #607850;
+  --white: #f0f8e8;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 15px;
+}
+
+/* ── HEADER ── */
+.topbar {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.topbar-back {
+  background: rgba(109,186,58,.12);
+  border: 1px solid rgba(109,186,58,.3);
+  color: var(--green);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.topbar-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--white);
+  letter-spacing: 1px;
+}
+.topbar-sub {
+  font-size: 11px;
+  color: var(--text3);
+  margin-left: auto;
+}
+
+/* ── PÁGINAS ── */
+.pag { display: none; padding: 16px; max-width: 500px; margin: 0 auto; }
+.pag.activo { display: block; }
+
+/* ── SPLASH ── */
+.splash {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  gap: 8px;
+}
+.splash-logo {
+  font-size: 11px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--green);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.splash-titulo {
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--white);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  font-family: Georgia, serif;
+}
+.splash-sub {
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: var(--text3);
+  text-transform: uppercase;
+  margin-bottom: 24px;
+}
+.splash-label {
+  font-size: 12px;
+  color: var(--text2);
+  margin-bottom: 12px;
+  letter-spacing: 1px;
+}
+
+/* ── LISTA VAQUEROS ── */
+.vaquero-btn {
+  width: 100%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--green);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  transition: background .2s;
+}
+.vaquero-btn:hover, .vaquero-btn:active { background: var(--card2); }
+.vaquero-avatar {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: rgba(109,186,58,.15);
+  border: 2px solid rgba(109,186,58,.3);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; flex-shrink: 0;
+}
+.vaquero-nombre { font-size: 16px; font-weight: 600; color: var(--white); }
+.vaquero-grupos { font-size: 12px; color: var(--text3); margin-top: 2px; }
+
+/* ── LISTA GRUPOS ── */
+.grupo-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: background .2s;
+}
+.grupo-card:active { background: var(--card2); }
+.grupo-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(109,186,58,.15);
+  color: var(--green-soft);
+  border: 1px solid rgba(109,186,58,.2);
+  display: inline-block;
+  margin-bottom: 6px;
+}
+.grupo-nombre { font-size: 16px; font-weight: 700; color: var(--white); margin-bottom: 4px; }
+.grupo-ubicacion { font-size: 13px; color: var(--text2); }
+.grupo-ubicacion strong { color: var(--green-soft); font-size: 15px; }
+
+/* ── DETALLE ── */
+.detalle-header {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.detalle-avatar {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: rgba(109,186,58,.15);
+  border: 2px solid rgba(109,186,58,.3);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; flex-shrink: 0;
+}
+.detalle-nombre { font-size: 15px; font-weight: 700; color: var(--white); }
+.detalle-meta { font-size: 12px; color: var(--text3); margin-top: 2px; }
+
+.parcela-hoy {
+  background: rgba(109,186,58,.08);
+  border: 1px solid rgba(109,186,58,.25);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.parcela-tag {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--green);
+  margin-bottom: 10px;
+  display: block;
+}
+.parcela-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.parcela-campo { }
+.parcela-campo-lbl {
+  font-size: 10px;
+  color: var(--text3);
+  margin-bottom: 2px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.parcela-campo-val {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--green-soft);
+}
+.parcela-campo-val.sm { font-size: 14px; color: var(--text); }
+
+.prox-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--text3);
+  text-transform: uppercase;
+  margin: 16px 0 8px;
+}
+.prox-item {
+  background: var(--card2);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.prox-num {
+  width: 30px; height: 30px;
+  border-radius: 6px;
+  background: rgba(201,162,39,.15);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700;
+  color: var(--gold);
+  flex-shrink: 0;
+}
+.prox-info { flex: 1; }
+.prox-potpar { font-size: 13px; font-weight: 600; color: var(--text); }
+.prox-fecha { font-size: 11px; color: var(--text3); margin-top: 1px; }
+.prox-metros { font-size: 11px; color: var(--green-soft); margin-top: 2px; }
+
+.sin-plan {
+  text-align: center;
+  padding: 20px;
+  color: var(--text3);
+  font-size: 13px;
+  border: 1px dashed var(--border2);
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+/* ── PEDIDOS ── */
+.pedidos-section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 16px;
+}
+.pedidos-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--text3);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+.pedido-item {
+  background: var(--bg2);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--text2);
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.pedido-fecha { font-size: 10px; color: var(--text3); margin-top: 2px; }
+
+.pedido-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+.pedido-input {
+  flex: 1;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--white);
+  font-size: 14px;
+  font-family: 'Segoe UI', Arial, sans-serif;
+}
+.pedido-input::placeholder { color: var(--text3); }
+.pedido-input:focus { outline: none; border-color: var(--green2); }
+.pedido-send {
+  background: var(--green2);
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pedido-send:active { background: var(--green); }
+
+/* ── NOTIF ── */
+#notifV {
+  display: none;
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--green2);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 200;
+  white-space: nowrap;
+}
+#notifV.error { background: var(--red); }
+
+/* ── ESTADOS VACÍOS ── */
+.vacio {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text3);
+  font-size: 13px;
+}
+.vacio-icon { font-size: 36px; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<!-- BARRA SUPERIOR -->
+<div class="topbar" id="topbar" style="display:none;">
+  <button class="topbar-back" id="btnVolver" onclick="volver()">← Volver</button>
+  <span class="topbar-title" id="topbarTitulo">El Prado 1</span>
+  <span class="topbar-sub" id="topbarFecha"></span>
+</div>
+
+<!-- PÁGINA 0: SPLASH / SELECCIÓN VAQUERO -->
+<div id="pag0" class="pag activo">
+  <div class="splash">
+    <div class="splash-logo">Hacienda Ganadera</div>
+    <div class="splash-titulo">El Prado</div>
+    <div class="splash-sub">San Ignacio de Velazco · Bolivia</div>
+    <div class="splash-label">¿Quién sos?</div>
+    <div id="listaVaquerosV" style="width:100%; max-width:320px;"></div>
+    <div id="sinVaqueros" style="display:none;" class="vacio">
+      <div class="vacio-icon">🤠</div>
+      No hay vaqueros configurados.<br>Pedí al administrador que los cargue.
+    </div>
+  </div>
+</div>
+
+<!-- PÁGINA 1: GRUPOS DEL VAQUERO -->
+<div id="pag1" class="pag">
+  <div id="listaGruposV"></div>
+</div>
+
+<!-- PÁGINA 2: DETALLE DEL GRUPO -->
+<div id="pag2" class="pag">
+  <div id="detalleGrupoV"></div>
+</div>
+
+<div id="notifV"></div>
+
+<script>
+// ── STORAGE (mismo que elprado_actividades) ──
+function getData(key, def) {
+  try { return JSON.parse(localStorage.getItem('elprado_' + key)) || def; }
+  catch(e) { return def; }
+}
+function setData(key, val) {
+  localStorage.setItem('elprado_' + key, JSON.stringify(val));
+}
+function getVaqueros() { return getData('vaqueros', []); }
+function getPlan() { return getData('plan', []); }
+function getPedidos() { return getData('pedidos', []); }
+function setPedidos(p) { setData('pedidos', p); }
+function uuid() { return Date.now().toString(36) + Math.random().toString(36).substr(2,5); }
+function fmt(n,d=1) { if(n===null||n===undefined||isNaN(n)) return '—'; return parseFloat(n.toFixed(d)).toString(); }
+
+// ── ESTADO ──
+let vaqueroActual = null;
+let grupoActual = null;
+let histPag = ['pag0'];
+
+function pagActual() { return histPag[histPag.length-1]; }
+
+function irA(id) {
+  document.querySelectorAll('.pag').forEach(p=>p.classList.remove('activo'));
+  document.getElementById(id).classList.add('activo');
+  histPag.push(id);
+  actualizarTopbar();
+  window.scrollTo(0,0);
+}
+
+function volver() {
+  if(histPag.length <= 1) return;
+  histPag.pop();
+  const anterior = pagActual();
+  document.querySelectorAll('.pag').forEach(p=>p.classList.remove('activo'));
+  document.getElementById(anterior).classList.add('activo');
+  actualizarTopbar();
+  window.scrollTo(0,0);
+}
+
+function actualizarTopbar() {
+  const pag = pagActual();
+  const tb = document.getElementById('topbar');
+  const titulo = document.getElementById('topbarTitulo');
+  const fecha = document.getElementById('topbarFecha');
+  const hoy = new Date().toLocaleDateString('es-BO',{day:'2-digit',month:'short'});
+  fecha.textContent = hoy;
+  if(pag === 'pag0') {
+    tb.style.display = 'none';
+  } else {
+    tb.style.display = 'flex';
+    if(pag === 'pag1') titulo.textContent = vaqueroActual?.nombre || 'Mis grupos';
+    if(pag === 'pag2') titulo.textContent = grupoActual ? grupoActual.split('|')[2] : 'Detalle';
+  }
+}
+
+// ── PÁGINA 0: VAQUEROS ──
+function renderVaquerosV() {
+  const vaqueros = getVaqueros();
+  const cont = document.getElementById('listaVaquerosV');
+  const sinV = document.getElementById('sinVaqueros');
+  if(!vaqueros.length) {
+    cont.style.display = 'none';
+    sinV.style.display = 'block';
+    return;
+  }
+  cont.style.display = 'block';
+  sinV.style.display = 'none';
+  cont.innerHTML = vaqueros.map((v,i) => {
+    const nGrupos = (v.grupos||[]).length;
+    return `<div class="vaquero-btn" onclick="selVaquero(${i})">
+      <div class="vaquero-avatar">🤠</div>
+      <div>
+        <div class="vaquero-nombre">${v.nombre}</div>
+        <div class="vaquero-grupos">${nGrupos} grupo${nGrupos!==1?'s':''} asignado${nGrupos!==1?'s':''}</div>
+      </div>
+      <div style="margin-left:auto;color:var(--text3);font-size:18px;">›</div>
+    </div>`;
+  }).join('');
+}
+
+// ── PÁGINA 1: GRUPOS DEL VAQUERO ──
+function selVaquero(i) {
+  vaqueroActual = getVaqueros()[i];
+  renderGruposV();
+  irA('pag1');
+}
+
+function renderGruposV() {
+  const plan = getPlan();
+  const today = new Date().toISOString().split('T')[0];
+  const cont = document.getElementById('listaGruposV');
+  const grupos = vaqueroActual?.grupos || [];
+
+  if(!grupos.length) {
+    cont.innerHTML = '<div class="vacio"><div class="vacio-icon">🐄</div>Sin grupos asignados</div>';
+    return;
+  }
+
+  cont.innerHTML = '<div style="font-size:13px;color:var(--text3);margin-bottom:12px;text-align:center;">Tocá un grupo para ver el detalle</div>' +
+  grupos.map(lote => {
+    const parts = lote.split('|');
+    const tipo = parts[0]||''; const cat = parts[1]||''; const nombre = parts[2]||lote;
+    // Buscar parcela hoy
+    const planHoy = plan.filter(p => p.lote===lote && p.fi<=today && (!p.fs||p.fs>today));
+    const hoy = planHoy.length ? planHoy[0] : null;
+    const ubicacionHTML = hoy
+      ? `<strong>${hoy.potrero}</strong> · Parcela ${hoy.parcela} · ${hoy.anchoM?hoy.anchoM+'m':'—'}`
+      : '<span style="color:var(--text3);">Sin planificación hoy</span>';
+    return `<div class="grupo-card" onclick="selGrupo('${lote}')">
+      <div class="grupo-badge">${tipo} · ${cat}</div>
+      <div class="grupo-nombre">${nombre}</div>
+      <div class="grupo-ubicacion">📍 ${ubicacionHTML}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── PÁGINA 2: DETALLE DEL GRUPO ──
+function selGrupo(lote) {
+  grupoActual = lote;
+  renderDetalleV();
+  irA('pag2');
+}
+
+function renderDetalleV() {
+  const lote = grupoActual;
+  const parts = lote.split('|');
+  const tipo = parts[0]||''; const cat = parts[1]||''; const nombre = parts[2]||lote;
+  const plan = getPlan();
+  const today = new Date().toISOString().split('T')[0];
+  const pedidos = getPedidos().filter(p=>p.lote===lote && p.vaquero===vaqueroActual?.nombre);
+
+  // Planificación ordenada para este grupo, desde hoy
+  const planGrupo = plan
+    .filter(p=>p.lote===lote)
+    .sort((a,b)=>a.fi>b.fi?1:-1);
+
+  const planHoy = planGrupo.filter(p=>p.fi<=today && (!p.fs||p.fs>today));
+  const planFuturo = planGrupo.filter(p=>p.fi>today).slice(0,3);
+
+  // Detectar próximo potrero (diferente al actual)
+  const potreroActual = planHoy.length ? planHoy[0].potrero : null;
+  const proximoPotrero = planGrupo.find(p=>p.fi>today && p.potrero !== potreroActual);
+
+  // Bloque HOY
+  let hoyHTML = '';
+  if(planHoy.length) {
+    const h = planHoy[0];
+    const metrosHTML = h.anchoM && h.largoM
+      ? `${h.anchoM} × ${h.largoM} m`
+      : h.anchoM ? `${h.anchoM} m ancho` : '—';
+    hoyHTML = `<div class="parcela-hoy">
+      <span class="parcela-tag">📍 HOY — PARCELA ACTUAL</span>
+      <div class="parcela-grid">
+        <div class="parcela-campo">
+          <div class="parcela-campo-lbl">Potrero · Parcela</div>
+          <div class="parcela-campo-val">${h.potrero} · N° ${h.parcela}</div>
+        </div>
+        <div class="parcela-campo">
+          <div class="parcela-campo-lbl">Medida</div>
+          <div class="parcela-campo-val">${metrosHTML}</div>
+        </div>
+        <div class="parcela-campo">
+          <div class="parcela-campo-lbl">Entrada</div>
+          <div class="parcela-campo-val sm">${formatFecha(h.fi)}</div>
+        </div>
+        <div class="parcela-campo">
+          <div class="parcela-campo-lbl">Salida</div>
+          <div class="parcela-campo-val sm">${h.fs?formatFecha(h.fs):'—'}</div>
+        </div>
+        ${h.obs?`<div class="parcela-campo" style="grid-column:1/-1;"><div class="parcela-campo-lbl">Observación</div><div style="font-size:13px;color:var(--gold2);">⚠ ${h.obs}</div></div>`:''}
+      </div>
+    </div>`;
+  } else {
+    hoyHTML = `<div class="sin-plan">📅 Sin parcela planificada para hoy</div>`;
+  }
+
+  // Próximas parcelas
+  let proxHTML = '';
+  if(planFuturo.length) {
+    proxHTML = '<div class="prox-label">Próximas parcelas</div>' +
+    planFuturo.map((p,i) => {
+      const metros = p.anchoM && p.largoM ? `${p.anchoM}×${p.largoM}m` : p.anchoM ? `${p.anchoM}m ancho` : '—';
+      return `<div class="prox-item">
+        <div class="prox-num">${i+1}</div>
+        <div class="prox-info">
+          <div class="prox-potpar">${p.potrero} · Parcela ${p.parcela}</div>
+          <div class="prox-fecha">${formatFecha(p.fi)}${p.fs?' → '+formatFecha(p.fs):''} · ${p.dias||1} día${(p.dias||1)!==1?'s':''}</div>
+          <div class="prox-metros">${metros}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // Próximo potrero
+  let proxPotreroHTML = '';
+  if(proximoPotrero && potreroActual) {
+    proxPotreroHTML = `<div class="prox-item" style="opacity:0.7;margin-top:4px;">
+      <div class="prox-num" style="color:var(--text3);background:rgba(96,120,80,.1);">→</div>
+      <div class="prox-info">
+        <div style="font-size:12px;color:var(--text3);">Próximo potrero: <strong style="color:var(--text2);">${proximoPotrero.potrero}</strong> · aprox. ${formatFecha(proximoPotrero.fi)}</div>
+      </div>
+    </div>`;
+  }
+
+  // Pedidos previos
+  let pedidosPrevHTML = '';
+  if(pedidos.length) {
+    pedidosPrevHTML = '<div style="margin-bottom:10px;">' +
+      pedidos.slice(0,3).map(p=>`<div class="pedido-item">
+        <span>📝</span>
+        <div>
+          <div>${p.mensaje}</div>
+          <div class="pedido-fecha">${new Date(p.ts).toLocaleString('es-BO')}</div>
+        </div>
+      </div>`).join('') + '</div>';
+  }
+
+  document.getElementById('detalleGrupoV').innerHTML = `
+    <div class="detalle-header">
+      <div class="detalle-avatar">🐄</div>
+      <div>
+        <div class="detalle-nombre">${nombre}</div>
+        <div class="detalle-meta">${tipo} · ${cat} · Resp: ${vaqueroActual?.nombre||'—'}</div>
+      </div>
+    </div>
+
+    ${hoyHTML}
+    ${proxHTML}
+    ${proxPotreroHTML}
+
+    <div class="pedidos-section">
+      <div class="pedidos-label">📬 Pedidos y Observaciones</div>
+      ${pedidosPrevHTML}
+      <div class="pedido-form">
+        <input type="text" class="pedido-input" id="pedidoInput" placeholder="Escribí tu pedido o comentario..." maxlength="200">
+        <button class="pedido-send" onclick="enviarPedido()">Enviar</button>
+      </div>
+    </div>
+  `;
+}
+
+function enviarPedido() {
+  const inp = document.getElementById('pedidoInput');
+  const msg = inp?.value?.trim();
+  if(!msg) { notifV('Escribí un mensaje primero', true); return; }
+  const pedidos = getPedidos();
+  pedidos.unshift({
+    id: uuid(),
+    ts: Date.now(),
+    vaquero: vaqueroActual?.nombre||'—',
+    lote: grupoActual,
+    mensaje: msg,
+    leido: false
+  });
+  setPedidos(pedidos);
+  inp.value = '';
+  notifV('✓ Pedido enviado al administrador');
+  renderDetalleV();
+}
+
+function formatFecha(iso) {
+  if(!iso) return '—';
+  const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const p = iso.split('-');
+  return parseInt(p[2])+' '+meses[parseInt(p[1])-1];
+}
+
+function notifV(msg, error=false) {
+  const el = document.getElementById('notifV');
+  el.textContent = msg;
+  el.className = error ? 'error' : '';
+  el.style.display = 'block';
+  setTimeout(()=>el.style.display='none', 3000);
+}
+
+// ── INIT ──
+renderVaquerosV();
+actualizarTopbar();
+
+// Actualizar fecha cada minuto
+setInterval(()=>{ document.getElementById('topbarFecha').textContent = new Date().toLocaleDateString('es-BO',{day:'2-digit',month:'short'}); }, 60000);
+</script>
+</body>
+</html>

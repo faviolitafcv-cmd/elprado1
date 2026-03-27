@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte de Actividades - El Prado 1</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 15px; background-color: #f4f4f9; }
+        .barra-superior { display: flex; justify-content: space-between; align-items: center; max-width: 1400px; margin: auto; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }
+        .btn { padding: 10px 18px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; color: white; font-size: 13px; }
+        .btn-menu { background: #757575; }
+        .btn-print { background: #1565c0; }
+        header { background: linear-gradient(135deg, #2e7d32, #1b5e20); color: white; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px; max-width: 1400px; margin-left: auto; margin-right: auto; }
+        header h2 { margin: 0; font-size: 20px; }
+        header p { margin: 5px 0 0 0; font-size: 13px; opacity: 0.9; }
+        .contenedor { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); max-width: 1400px; margin: auto; margin-bottom: 20px; }
+        h3 { color: #2e7d32; border-bottom: 2px solid #4caf50; padding-bottom: 5px; margin-top: 0; }
+
+        /* SELECTOR DE GESTIÓN */
+        .selector-gestion { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 20px; background: #e8f5e9; padding: 12px 15px; border-radius: 8px; }
+        .selector-gestion label { font-weight: bold; color: #2e7d32; }
+        .selector-gestion select { padding: 8px 12px; border-radius: 5px; border: 1px solid #a5d6a7; font-size: 14px; font-weight: bold; color: #2e7d32; background: white; cursor: pointer; }
+        .badge-gestion { background: #2e7d32; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 13px; }
+
+        /* TABLA PRINCIPAL */
+        .scroll-tabla { overflow-x: auto; border: 1px solid #ddd; border-radius: 5px; }
+        table.reporte { width: 100%; border-collapse: collapse; font-size: 12px; }
+        table.reporte th { background: #2e7d32; color: white; padding: 10px 8px; text-align: center; white-space: nowrap; }
+        table.reporte th.th-act { text-align: left; min-width: 200px; }
+        table.reporte td { border: 1px solid #ddd; padding: 8px; text-align: right; }
+        table.reporte td.td-nombre { text-align: left; font-weight: bold; background: #f9f9f9; position: sticky; left: 0; z-index: 1; min-width: 200px; }
+        table.reporte td.td-tipo { font-size: 10px; color: white; padding: 2px 6px; border-radius: 10px; display: inline-block; font-weight: bold; }
+        table.reporte tr:hover td { background: #f1f8e9; }
+        table.reporte tr:hover td.td-nombre { background: #e8f5e9; }
+        table.reporte td.td-total { background: #fff8e1; font-weight: bold; color: #e65100; font-size: 13px; }
+        table.reporte td.td-cero { color: #ccc; }
+        table.reporte tfoot td { background: #e8f5e9; font-weight: bold; color: #1b5e20; font-size: 13px; }
+        table.reporte tfoot td.td-gran-total { background: #2e7d32; color: white; font-size: 14px; }
+
+        /* MES ACTUAL */
+        th.mes-actual { background: #1b5e20 !important; border-bottom: 3px solid #a5d6a7; }
+        td.mes-actual { background: #f1f8e9 !important; font-weight: bold; }
+
+        /* TARJETAS RESUMEN */
+        .tarjetas { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .tarjeta-resumen { background: white; border-radius: 8px; padding: 15px; border-left: 5px solid #4caf50; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+        .tarjeta-resumen .label { font-size: 12px; color: #666; margin-bottom: 5px; }
+        .tarjeta-resumen .valor { font-size: 20px; font-weight: bold; color: #2e7d32; }
+        .tarjeta-resumen .sub { font-size: 11px; color: #999; margin-top: 3px; }
+
+        /* ACTIVIDAD CULMINADA */
+        .culminada-badge { font-size: 10px; background: #2e7d32; color: white; padding: 1px 6px; border-radius: 8px; margin-left: 5px; }
+
+        .sin-datos { text-align: center; padding: 40px; color: #999; font-size: 14px; }
+
+        @media print {
+            .barra-superior, .selector-gestion { display: none; }
+            body { background: white; padding: 0; }
+            .contenedor { box-shadow: none; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="barra-superior">
+    <button class="btn btn-menu" onclick="window.location.href='index.html'">&#8592; Menu</button>
+    <button class="btn btn-print" onclick="window.print()">Imprimir / PDF</button>
+</div>
+
+<header>
+    <h2>Reporte de Costos por Actividad</h2>
+    <p id="subtitulo-header">Hacienda El Prado 1</p>
+</header>
+
+<div class="contenedor">
+    <div class="selector-gestion">
+        <label>Gestion:</label>
+        <select id="sel-gestion" onchange="renderReporte()"></select>
+        <span id="badge-gestion" class="badge-gestion"></span>
+        <div style="margin-left:auto; display:flex; gap:8px; flex-wrap:wrap;">
+            <button id="btn-ambos" onclick="setFiltroTipo('ambos')" style="padding:7px 16px;border:2px solid #2e7d32;border-radius:5px;cursor:pointer;font-weight:bold;background:#2e7d32;color:white;font-size:12px;">Todos</button>
+            <button id="btn-desarrollo" onclick="setFiltroTipo('desarrollo')" style="padding:7px 16px;border:2px solid #4caf50;border-radius:5px;cursor:pointer;font-weight:bold;background:white;color:#2e7d32;font-size:12px;">Solo Desarrollo</button>
+            <button id="btn-mantenimiento" onclick="setFiltroTipo('mantenimiento')" style="padding:7px 16px;border:2px solid #1565c0;border-radius:5px;cursor:pointer;font-weight:bold;background:white;color:#1565c0;font-size:12px;">Solo Mantenimiento</button>
+        </div>
+    </div>
+
+    <!-- TARJETAS RESUMEN -->
+    <div class="tarjetas" id="tarjetas-resumen"></div>
+
+    <!-- TABLA -->
+    <h3>Costo Total por Actividad y Mes</h3>
+    <div class="scroll-tabla">
+        <table class="reporte" id="tabla-reporte">
+            <thead id="thead-reporte"></thead>
+            <tbody id="tbody-reporte"></tbody>
+            <tfoot id="tfoot-reporte"></tfoot>
+        </table>
+    </div>
+</div>
+
+<script>
+var COSTO_ALIM = 30;
+var COSTO_HERR = 40;
+var filtroTipoActivo = 'ambos';
+var meses = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+var mesesCortos = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+
+function setFiltroTipo(tipo) {
+    filtroTipoActivo = tipo;
+    // Actualizar estilos botones
+    document.getElementById('btn-ambos').style.background        = tipo==='ambos'        ? '#2e7d32' : 'white';
+    document.getElementById('btn-ambos').style.color             = tipo==='ambos'        ? 'white'   : '#2e7d32';
+    document.getElementById('btn-desarrollo').style.background   = tipo==='desarrollo'   ? '#4caf50' : 'white';
+    document.getElementById('btn-desarrollo').style.color        = tipo==='desarrollo'   ? 'white'   : '#2e7d32';
+    document.getElementById('btn-mantenimiento').style.background= tipo==='mantenimiento'? '#1565c0' : 'white';
+    document.getElementById('btn-mantenimiento').style.color     = tipo==='mantenimiento'? 'white'   : '#1565c0';
+    renderReporte();
+}
+
+// Gestión: agosto (7) a julio (6) del año siguiente
+// Ej: Gestion 2024-2025 = Ago 2024 a Jul 2025
+function getMesesGestion(anioInicio) {
+    var lista = [];
+    // Ago(7), Sep(8), Oct(9), Nov(10), Dic(11) del anioInicio
+    for(var m=7; m<=11; m++) lista.push({mes:m, anio:anioInicio});
+    // Ene(0)..Jul(6) del anioInicio+1
+    for(var m=0; m<=6; m++) lista.push({mes:m, anio:anioInicio+1});
+    return lista;
+}
+
+function getPersonal()    { return JSON.parse(localStorage.getItem('personalEventualDB'))  || []; }
+function getActividades() { return JSON.parse(localStorage.getItem('actividadesDB'))        || []; }
+
+function kA(ci,a,m,d)   { return 'evAsist_'+ci+'_'+a+'_'+m+'_'+d; }
+function kAct(ci,a,m,d) { return 'evAct_'+ci+'_'+a+'_'+m+'_'+d;   }
+function kMoto(ci,a,m,d){ return 'evMoto_'+ci+'_'+a+'_'+m+'_'+d;  }
+
+function calcularCostoActividadMes(nombreAct, mes, anio) {
+    var personal = getPersonal();
+    var totalJ=0, costoMO=0, costoMoto=0;
+    var diasMes = new Date(anio, mes+1, 0).getDate();
+    personal.forEach(function(p) {
+        var jornal  = parseFloat(p.pagoJornal)||0;
+        var bonoDia = parseFloat(p.bonoMovilidad)||0;
+        for(var d=1; d<=diasMes; d++) {
+            if(localStorage.getItem(kA(p.ci,anio,mes,d))==='P') {
+                var act = localStorage.getItem(kAct(p.ci,anio,mes,d));
+                if(act===nombreAct) {
+                    totalJ++;
+                    costoMO += jornal;
+                    if(localStorage.getItem(kMoto(p.ci,anio,mes,d))==='1') costoMoto += bonoDia;
+                }
+            }
+        }
+    });
+    var costoAlim = COSTO_ALIM * totalJ;
+    var costoHerr = COSTO_HERR * totalJ;
+    return costoMO + costoMoto + costoAlim + costoHerr;
+}
+
+function poblarSelectorGestion() {
+    var sel = document.getElementById('sel-gestion');
+    sel.innerHTML = '';
+    var hoy = new Date();
+    var anioHoy = hoy.getFullYear();
+    var mesHoy  = hoy.getMonth();
+    // Gestión actual: si estamos en ago-dic, la gestión empieza este año; si ene-jul, empezó el año pasado
+    var anioGestionActual = (mesHoy >= 7) ? anioHoy : anioHoy - 1;
+
+    // Mostrar las últimas 4 gestiones
+    for(var i=0; i<=3; i++) {
+        var ag = anioGestionActual - i;
+        var opt = document.createElement('option');
+        opt.value = ag;
+        opt.text  = 'Gestion '+ag+'-'+(ag+1);
+        if(i===0) opt.selected = true;
+        sel.appendChild(opt);
+    }
+}
+
+function renderReporte() {
+    var anioGestion = parseInt(document.getElementById('sel-gestion').value);
+    var mesesGestion = getMesesGestion(anioGestion);
+    var actividades  = getActividades();
+    var hoy = new Date();
+
+    document.getElementById('badge-gestion').innerText = '1 Ago '+anioGestion+' - 31 Jul '+(anioGestion+1);
+    document.getElementById('subtitulo-header').innerText = 'Gestion '+anioGestion+'-'+(anioGestion+1)+' | Hacienda El Prado 1';
+
+    if(!actividades.length) {
+        document.getElementById('tbody-reporte').innerHTML = '<tr><td colspan="20" class="sin-datos">No hay actividades registradas.</td></tr>';
+        document.getElementById('tarjetas-resumen').innerHTML = '';
+        return;
+    }
+
+    // Calcular costos por actividad x mes
+    var costos = {}; // costos[actNombre][mesIdx] = monto
+    actividades.forEach(function(act) {
+        costos[act.nombre] = {};
+        mesesGestion.forEach(function(mg, idx) {
+            costos[act.nombre][idx] = calcularCostoActividadMes(act.nombre, mg.mes, mg.anio);
+        });
+    });
+
+    // CABECERA
+    var thead = '<tr>'
+        +'<th class="th-act">Actividad</th>';
+    mesesGestion.forEach(function(mg, idx) {
+        var esMesActual = (mg.mes===hoy.getMonth() && mg.anio===hoy.getFullYear());
+        thead += '<th'+(esMesActual?' class="mes-actual"':'')+'>'+mesesCortos[mg.mes]+'<br><small>'+(mg.anio.toString().slice(2))+'</small></th>';
+    });
+    thead += '<th style="background:#e65100;">TOTAL</th></tr>';
+    document.getElementById('thead-reporte').innerHTML = thead;
+
+    // FILAS
+    var tbody = '';
+    var totalPorMes = {};
+    mesesGestion.forEach(function(mg,idx){ totalPorMes[idx]=0; });
+    var granTotal = 0;
+
+    actividades.forEach(function(act) {
+        // Aplicar filtro de tipo
+        var esDesarrollo   = act.tipo==='Desarrollo y Estructura';
+        var esMantenimiento= act.tipo==='Mantenimiento y Operaciones';
+        if(filtroTipoActivo==='desarrollo'    && !esDesarrollo)    return;
+        if(filtroTipoActivo==='mantenimiento' && !esMantenimiento) return;
+
+        var totalAct = 0;
+        mesesGestion.forEach(function(mg,idx){ totalAct += costos[act.nombre][idx]||0; });
+        granTotal += totalAct;
+
+        var tipoBadge = esDesarrollo
+            ? '<span class="td-tipo" style="background:#4caf50;">Desarrollo</span>'
+            : '<span class="td-tipo" style="background:#1565c0;">Mantenimiento</span>';
+        var culminadaBadge = act.culminada ? '<span class="culminada-badge">CULMINADA</span>' : '';
+
+        tbody += '<tr>';
+        tbody += '<td class="td-nombre">'+act.nombre+' '+tipoBadge+' '+culminadaBadge+'</td>';
+
+        mesesGestion.forEach(function(mg,idx) {
+            var val = costos[act.nombre][idx]||0;
+            var esMesActual = (mg.mes===hoy.getMonth() && mg.anio===hoy.getFullYear());
+            totalPorMes[idx] += val;
+            if(val===0) {
+                tbody += '<td class="td-cero'+(esMesActual?' mes-actual':'')+'">-</td>';
+            } else {
+                tbody += '<td'+(esMesActual?' class="mes-actual"':'')+'>'+val.toFixed(0)+' Bs.</td>';
+            }
+        });
+        tbody += '<td class="td-total">'+(totalAct>0?totalAct.toFixed(0)+' Bs.':'-')+'</td>';
+        tbody += '</tr>';
+    });
+    document.getElementById('tbody-reporte').innerHTML = tbody;
+
+    // PIE DE TABLA
+    var tfoot = '<tr>';
+    tfoot += '<td class="td-nombre" style="background:#e8f5e9;font-weight:bold;color:#1b5e20;">TOTAL POR MES</td>';
+    mesesGestion.forEach(function(mg,idx) {
+        var val = totalPorMes[idx]||0;
+        var esMesActual = (mg.mes===hoy.getMonth() && mg.anio===hoy.getFullYear());
+        tfoot += '<td'+(esMesActual?' class="mes-actual"':'')+' style="font-weight:bold;color:#1b5e20;">'+(val>0?val.toFixed(0)+' Bs.':'-')+'</td>';
+    });
+    tfoot += '<td class="td-gran-total">'+granTotal.toFixed(0)+' Bs.</td>';
+    tfoot += '</tr>';
+    document.getElementById('tfoot-reporte').innerHTML = tfoot;
+
+    // TARJETAS RESUMEN
+    var actsCon = actividades.filter(function(a){
+        var tot=0; mesesGestion.forEach(function(mg,idx){ tot+=costos[a.nombre][idx]||0; }); return tot>0;
+    });
+    var actsActivas   = actividades.filter(function(a){ return !a.culminada; }).length;
+    var actsCulminadas= actividades.filter(function(a){ return !!a.culminada; }).length;
+
+    // Actividad más costosa
+    var masCaraAct = null, masCaraCosto = 0;
+    actividades.forEach(function(act) {
+        var tot=0; mesesGestion.forEach(function(mg,idx){ tot+=costos[act.nombre][idx]||0; });
+        if(tot>masCaraCosto){ masCaraCosto=tot; masCaraAct=act; }
+    });
+
+    // Mes más caro
+    var mesMasCaro = 0, costoMesMasCaro = 0;
+    mesesGestion.forEach(function(mg,idx){ if(totalPorMes[idx]>costoMesMasCaro){ costoMesMasCaro=totalPorMes[idx]; mesMasCaro=idx; } });
+
+    document.getElementById('tarjetas-resumen').innerHTML =
+        '<div class="tarjeta-resumen">'
+        +'<div class="label">Costo Total Gestion</div>'
+        +'<div class="valor">'+granTotal.toFixed(0)+' Bs.</div>'
+        +'<div class="sub">Suma todos los meses</div>'
+        +'</div>'
+        +'<div class="tarjeta-resumen" style="border-color:#1565c0;">'
+        +'<div class="label">Actividades Activas</div>'
+        +'<div class="valor" style="color:#1565c0;">'+actsActivas+'</div>'
+        +'<div class="sub">'+actsCulminadas+' culminadas</div>'
+        +'</div>'
+        +(masCaraAct?
+        '<div class="tarjeta-resumen" style="border-color:#e65100;">'
+        +'<div class="label">Actividad Mas Costosa</div>'
+        +'<div class="valor" style="color:#e65100;font-size:15px;">'+masCaraCosto.toFixed(0)+' Bs.</div>'
+        +'<div class="sub">'+masCaraAct.nombre+'</div>'
+        +'</div>':'')
+        +(costoMesMasCaro>0?
+        '<div class="tarjeta-resumen" style="border-color:#880e4f;">'
+        +'<div class="label">Mes Mas Costoso</div>'
+        +'<div class="valor" style="color:#880e4f;font-size:15px;">'+costoMesMasCaro.toFixed(0)+' Bs.</div>'
+        +'<div class="sub">'+meses[mesesGestion[mesMasCaro].mes]+' '+mesesGestion[mesMasCaro].anio+'</div>'
+        +'</div>':'');
+}
+
+window.onload = function() {
+    poblarSelectorGestion();
+    renderReporte();
+};
+</script>
+</body>
+</html>

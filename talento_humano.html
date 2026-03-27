@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Talento Humano - El Prado 1</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 15px; background: #f4f4f9; }
+        .barra-sup { display:flex; justify-content:space-between; align-items:center; max-width:1300px; margin:auto; margin-bottom:15px; flex-wrap:wrap; gap:10px; }
+        .btn { padding:10px 18px; border:none; border-radius:5px; cursor:pointer; font-weight:bold; color:white; font-size:13px; }
+        .btn-menu { background:#757575; }
+        header { background:linear-gradient(135deg,#1a237e,#283593); color:white; padding:15px; border-radius:8px; text-align:center; margin-bottom:20px; max-width:1300px; margin-left:auto; margin-right:auto; }
+        header h2 { margin:0; font-size:20px; }
+        header p  { margin:4px 0 0 0; font-size:13px; opacity:0.85; }
+        .contenedor { background:white; padding:20px; border-radius:8px; box-shadow:0 4px 10px rgba(0,0,0,0.1); max-width:1300px; margin:auto; margin-bottom:20px; }
+        h3 { color:#1a237e; border-bottom:2px solid #3949ab; padding-bottom:5px; margin-top:0; }
+
+        /* TABS */
+        .tabs { display:flex; gap:5px; margin-bottom:20px; border-bottom:3px solid #1a237e; flex-wrap:wrap; }
+        .tab { padding:10px 20px; border:none; border-radius:5px 5px 0 0; cursor:pointer; font-weight:bold; font-size:13px; background:#e0e0e0; color:#555; }
+        .tab.activo { background:#1a237e; color:white; }
+
+        /* KPI CARDS */
+        .kpi-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:15px; margin-bottom:25px; }
+        .kpi-card { background:white; border-radius:10px; padding:18px; border-left:5px solid #3949ab; box-shadow:0 2px 8px rgba(0,0,0,0.07); }
+        .kpi-label { font-size:12px; color:#888; margin-bottom:6px; text-transform:uppercase; letter-spacing:1px; }
+        .kpi-valor { font-size:30px; font-weight:900; color:#1a237e; line-height:1; }
+        .kpi-sub   { font-size:11px; color:#999; margin-top:5px; }
+
+        /* TABLA STATS */
+        table.tb { width:100%; border-collapse:collapse; font-size:13px; margin-top:10px; }
+        table.tb th { background:#1a237e; color:white; padding:10px; text-align:left; }
+        table.tb td { border:1px solid #ddd; padding:9px; vertical-align:middle; }
+        table.tb tr:nth-child(even) { background:#e8eaf6; }
+        table.tb tr:hover td { background:#c5cae9; }
+        .badge { font-size:10px; font-weight:bold; padding:2px 8px; border-radius:10px; color:white; }
+        .badge-fijo     { background:#2e7d32; }
+        .badge-eventual { background:#e65100; }
+
+        /* BARRA DE DISTRIBUCION */
+        .dist-barra { height:14px; border-radius:7px; margin:3px 0; transition:width 0.4s; display:inline-block; }
+
+        /* ORGANIGRAMA */
+        .org-contenedor { overflow-x:auto; padding:20px 10px; }
+        .org-nivel { display:flex; justify-content:center; gap:20px; margin-bottom:0; flex-wrap:wrap; }
+        .org-linea { display:flex; justify-content:center; gap:20px; margin-bottom:0; }
+        .org-nodo {
+            background:white; border:2px solid #3949ab; border-radius:10px;
+            padding:12px 16px; text-align:center; min-width:160px; max-width:200px;
+            box-shadow:0 2px 8px rgba(0,0,0,0.1); position:relative;
+        }
+        .org-nodo.nivel-1 { border-color:#1a237e; background:#1a237e; color:white; }
+        .org-nodo.nivel-2 { border-color:#283593; background:#e8eaf6; }
+        .org-nodo.nivel-3 { border-color:#3949ab; background:#f5f5f5; }
+        .org-nodo.nivel-4 { border-color:#5c6bc0; background:#fafafa; font-size:12px; }
+        .org-cargo { font-size:10px; color:#888; text-transform:uppercase; letter-spacing:1px; margin-bottom:3px; }
+        .org-nodo.nivel-1 .org-cargo { color:rgba(255,255,255,0.7); }
+        .org-nodo.nivel-2 .org-cargo { color:#1a237e; }
+        .org-nombre { font-size:13px; font-weight:bold; color:#1a237e; }
+        .org-nodo.nivel-1 .org-nombre { color:white; font-size:14px; }
+        .org-tipo { font-size:10px; margin-top:4px; }
+        .conector-v { width:2px; background:#c5cae9; height:25px; margin:0 auto; }
+        .conector-h-cont { display:flex; justify-content:center; align-items:flex-start; gap:0; }
+        .conector-h { border-top:2px solid #c5cae9; flex:1; margin-top:0; height:1px; align-self:flex-start; margin-top:12px; }
+        .rama { display:flex; flex-direction:column; align-items:center; }
+        .ramas { display:flex; gap:15px; justify-content:center; flex-wrap:wrap; }
+        .sin-datos { text-align:center; padding:30px; color:#999; }
+
+        /* RETIROS */
+        .form-retiro { background:#fff3e0; border:1px solid #ffb74d; border-radius:8px; padding:20px; margin-bottom:20px; }
+        .form-row { display:flex; gap:15px; flex-wrap:wrap; margin-bottom:12px; }
+        .form-grupo { flex:1; min-width:180px; display:flex; flex-direction:column; gap:4px; }
+        .form-grupo label { font-size:12px; font-weight:bold; color:#e65100; }
+        .form-grupo input, .form-grupo select, .form-grupo textarea { padding:8px; border:1px solid #ffcc80; border-radius:5px; font-size:13px; }
+        .btn-guardar-retiro { background:#d32f2f; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer; font-weight:bold; }
+        .tasa-box { background:#e8eaf6; border-radius:8px; padding:15px 20px; margin-bottom:20px; display:flex; gap:30px; flex-wrap:wrap; align-items:center; }
+        .tasa-item { text-align:center; }
+        .tasa-num { font-size:28px; font-weight:900; color:#1a237e; }
+        .tasa-label { font-size:12px; color:#666; }
+    </style>
+</head>
+<body>
+
+<div class="barra-sup">
+    <button class="btn btn-menu" onclick="window.location.href='index.html'">&#8592; Menu</button>
+</div>
+
+<header>
+    <h2>Gestión de Talento Humano</h2>
+    <p>Hacienda Ganadera El Prado 1 — San Ignacio de Velazco, Bolivia</p>
+</header>
+
+<div class="contenedor">
+    <div class="tabs">
+        <button class="tab activo" onclick="setTab('estadisticas',this)">Estadísticas</button>
+        <button class="tab" onclick="setTab('organigrama',this)">Organigrama</button>
+        <button class="tab" onclick="setTab('retiros',this)">Retiros y Rotación</button>
+    </div>
+
+    <div id="panel-estadisticas"></div>
+    <div id="panel-organigrama" style="display:none;"></div>
+    <div id="panel-retiros" style="display:none;"></div>
+</div>
+
+<script>
+var meses = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+
+function getPersonalFijo()     { return JSON.parse(localStorage.getItem('personalFijoDB'))     || []; }
+function getPersonalEventual() { return JSON.parse(localStorage.getItem('personalEventualDB')) || []; }
+function getRetiros()          { return JSON.parse(localStorage.getItem('retirosDB'))           || []; }
+
+function getTodos() {
+    var fijos = getPersonalFijo().map(function(p) {
+        p._tipo = 'fijo';
+        if(!p.nombre) p.nombre = p.nombreCompleto || (p.nombres+' '+p.paterno+' '+(p.materno||'')).trim();
+        if(!p.nacimiento && p.fechaNacimiento) p.nacimiento = p.fechaNacimiento;
+        return p;
+    });
+    var ev = getPersonalEventual().map(function(p) {
+        p._tipo = 'eventual'; return p;
+    });
+    return fijos.concat(ev);
+}
+
+function getEdad(fechaStr) {
+    if(!fechaStr) return null;
+    var hoy = new Date();
+    var nac = new Date(fechaStr);
+    var edad = hoy.getFullYear() - nac.getFullYear();
+    var m = hoy.getMonth() - nac.getMonth();
+    if(m < 0 || (m===0 && hoy.getDate() < nac.getDate())) edad--;
+    return edad;
+}
+
+function getAntiguedad(fechaStr) {
+    if(!fechaStr) return null;
+    var hoy = new Date();
+    var ing = new Date(fechaStr);
+    var anios = hoy.getFullYear() - ing.getFullYear();
+    var m = hoy.getMonth() - ing.getMonth();
+    if(m < 0 || (m===0 && hoy.getDate() < ing.getDate())) anios--;
+    return anios;
+}
+
+function setTab(tab, btn) {
+    document.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('activo'); });
+    if(btn) btn.classList.add('activo');
+    ['estadisticas','organigrama','retiros'].forEach(function(t){
+        document.getElementById('panel-'+t).style.display = t===tab ? 'block' : 'none';
+    });
+    if(tab==='estadisticas') renderEstadisticas();
+    else if(tab==='organigrama') renderOrganigrama();
+    else if(tab==='retiros') renderRetiros();
+}
+
+// ===================== ESTADÍSTICAS =====================
+function renderEstadisticas() {
+    var todos    = getTodos();
+    var fijos    = todos.filter(function(p){ return p._tipo==='fijo'; });
+    var eventuales = todos.filter(function(p){ return p._tipo==='eventual'; });
+
+    // Excluir accionistas y supervisión externa de todos los cálculos
+    var cargosExcluidos = ['Accionista', 'Supervisión Externa'];
+    var fijosOp    = fijos.filter(function(p){ return cargosExcluidos.indexOf(p.cargo) === -1; });
+    var todosOp    = todos.filter(function(p){ return cargosExcluidos.indexOf(p.cargo) === -1; });
+
+    function promedioEdad(lista) {
+        var con = lista.filter(function(p){ return getEdad(p.nacimiento)!==null; });
+        if(!con.length) return '-';
+        var sum = con.reduce(function(a,p){ return a + getEdad(p.nacimiento); }, 0);
+        return (sum/con.length).toFixed(1);
+    }
+    function promedioAntiguedad(lista) {
+        var con = lista.filter(function(p){ return getAntiguedad(p.ingreso)!==null; });
+        if(!con.length) return '-';
+        var sum = con.reduce(function(a,p){ return a + getAntiguedad(p.ingreso); }, 0);
+        return (sum/con.length).toFixed(1);
+    }
+
+    var edadFijo    = promedioEdad(fijosOp);
+    var edadGeneral = promedioEdad(todosOp);
+    var antFijo     = promedioAntiguedad(fijosOp);
+
+    // Distribución por cargo
+    var cargos = {};
+    todos.forEach(function(p) {
+        var c = (p.cargo||p.categoriaLaboral||'Sin cargo').toUpperCase();
+        if(!cargos[c]) cargos[c] = { fijo:0, eventual:0 };
+        cargos[c][p._tipo==='fijo'?'fijo':'eventual']++;
+    });
+
+    // Distribución por rango de edad
+    var rangos = { '18-25':0, '26-35':0, '36-45':0, '46-55':0, '55+':0 };
+    todos.forEach(function(p) {
+        var e = getEdad(p.nacimiento);
+        if(e===null) return;
+        if(e<=25) rangos['18-25']++;
+        else if(e<=35) rangos['26-35']++;
+        else if(e<=45) rangos['36-45']++;
+        else if(e<=55) rangos['46-55']++;
+        else rangos['55+']++;
+    });
+
+    var retiros = getRetiros();
+    var html = '';
+
+    // KPIs
+    html += '<div class="kpi-grid">';
+    html += kpi('Personal Operativo', todosOp.length, 'Fijo + Eventual (sin accionistas)', '#1a237e');
+    html += kpi('Personal Fijo', fijosOp.length, 'Con contrato permanente', '#2e7d32');
+    html += kpi('Personal Eventual', eventuales.length, 'Por actividad/quincena', '#e65100');
+    html += kpi('Edad Prom. Fijo', edadFijo+' años', 'Solo personal fijo operativo', '#1565c0');
+    html += kpi('Edad Prom. General', edadGeneral+' años', 'Fijo operativo + eventual', '#6a1b9a');
+    html += kpi('Antigüedad Prom.', antFijo+' años', 'Personal fijo operativo', '#00695c');
+    html += kpi('Total Retiros', retiros.length, 'Registrados en el sistema', '#c62828');
+    html += '</div>';
+
+    // Distribución por cargo
+    html += '<h3>Distribución por Cargo</h3>';
+    html += '<table class="tb"><thead><tr><th>Cargo</th><th>Fijo</th><th>Eventual</th><th>Total</th><th>Distribución</th></tr></thead><tbody>';
+    var cargos = {};
+    todosOp.forEach(function(p) {
+        var c = (p.cargo||'Sin cargo');
+        if(!cargos[c]) cargos[c] = { fijo:0, eventual:0 };
+        cargos[c][p._tipo==='fijo'?'fijo':'eventual']++;
+    });
+    var maxCargo = Math.max.apply(null, Object.keys(cargos).map(function(c){ return cargos[c].fijo+cargos[c].eventual; }));
+    Object.keys(cargos).sort().forEach(function(c) {
+        var f = cargos[c].fijo; var e = cargos[c].eventual; var t = f+e;
+        var pct = maxCargo>0 ? Math.round((t/maxCargo)*100) : 0;
+        html += '<tr>'
+            +'<td><strong>'+c+'</strong></td>'
+            +'<td><span class="badge badge-fijo">'+f+'</span></td>'
+            +'<td><span class="badge badge-eventual">'+e+'</span></td>'
+            +'<td style="font-weight:bold;">'+t+'</td>'
+            +'<td><span class="dist-barra" style="width:'+pct+'%;background:#3949ab;min-width:4px;">&nbsp;</span></td>'
+            +'</tr>';
+    });
+    html += '</tbody></table>';
+
+    // Distribución por rango de edad
+    html += '<h3 style="margin-top:25px;">Distribución por Rango de Edad</h3>';
+    html += '<table class="tb"><thead><tr><th>Rango</th><th>Cantidad</th><th>Distribución</th></tr></thead><tbody>';
+    var rangos = { '18-25':0, '26-35':0, '36-45':0, '46-55':0, '55+':0 };
+    todosOp.forEach(function(p) {
+        var e = getEdad(p.nacimiento);
+        if(e===null) return;
+        if(e<=25) rangos['18-25']++;
+        else if(e<=35) rangos['26-35']++;
+        else if(e<=45) rangos['36-45']++;
+        else if(e<=55) rangos['46-55']++;
+        else rangos['55+']++;
+    });
+    var maxRango = Math.max.apply(null, Object.values(rangos));
+    Object.keys(rangos).forEach(function(r) {
+        var v = rangos[r];
+        var pct = maxRango>0 ? Math.round((v/maxRango)*100) : 0;
+        var color = r==='18-25'?'#43a047':r==='26-35'?'#1e88e5':r==='36-45'?'#8e24aa':r==='46-55'?'#f4511e':'#757575';
+        html += '<tr>'
+            +'<td><strong>'+r+' años</strong></td>'
+            +'<td style="font-weight:bold;font-size:16px;">'+v+'</td>'
+            +'<td><span class="dist-barra" style="width:'+(pct||4)+'%;background:'+color+';min-width:4px;">&nbsp;</span> '+v+'</td>'
+            +'</tr>';
+    });
+    html += '</tbody></table>';
+
+    // Listado completo (todos incluido accionistas para referencia)
+    html += '<h3 style="margin-top:25px;">Plantel Completo</h3>';
+    html += '<table class="tb"><thead><tr><th>Nombre</th><th>Tipo</th><th>Cargo</th><th>Edad</th><th>Antigüedad</th><th>Ingreso</th></tr></thead><tbody>';
+    todos.sort(function(a,b){ return (a.nombre||a.nombreCompleto||'').localeCompare(b.nombre||b.nombreCompleto||''); }).forEach(function(p) {
+        var edad = getEdad(p.nacimiento);
+        var ant  = getAntiguedad(p.ingreso);
+        var esExterno = cargosExcluidos.indexOf(p.cargo) > -1;
+        html += '<tr style="'+(esExterno?'opacity:0.5;':'')+'">'
+            +'<td><strong>'+(p.nombre||p.nombreCompleto||'-')+'</strong>'+(esExterno?' <span style="font-size:10px;color:#888;">(externo)</span>':'')+'</td>'
+            +'<td><span class="badge badge-'+(p._tipo==='fijo'?'fijo':'eventual')+'">'+(p._tipo==='fijo'?'Fijo':'Eventual')+'</span></td>'
+            +'<td>'+(p.cargo||'-')+'</td>'
+            +'<td>'+(edad!==null?edad+' años':'-')+'</td>'
+            +'<td>'+(ant!==null?(ant===0?'Menos de 1 año':ant+' año'+(ant!==1?'s':'')):'-')+'</td>'
+            +'<td>'+(p.ingreso||'-')+'</td>'
+            +'</tr>';
+    });
+    html += '</tbody></table>';
+
+    document.getElementById('panel-estadisticas').innerHTML = html;
+}
+
+function kpi(label, valor, sub, color) {
+    return '<div class="kpi-card" style="border-color:'+color+';">'
+        +'<div class="kpi-label">'+label+'</div>'
+        +'<div class="kpi-valor" style="color:'+color+';">'+valor+'</div>'
+        +'<div class="kpi-sub">'+sub+'</div>'
+        +'</div>';
+}
+
+// ===================== ORGANIGRAMA =====================
+function renderOrganigrama() {
+    var fijos = getPersonalFijo();
+    var eventuales = getPersonalEventual();
+    var html = '<h3>Organigrama — Hacienda El Prado 1</h3>';
+
+    if(!fijos.length) {
+        html += '<div class="sin-datos">No hay personal fijo registrado. Registrá el personal desde Registro de Personal Fijo.</div>';
+        document.getElementById('panel-organigrama').innerHTML = html;
+        return;
+    }
+
+    // Abreviar nombre: primer nombre + primer apellido
+    function abreviarNombre(nombreCompleto) {
+        if(!nombreCompleto) return '-';
+        var partes = nombreCompleto.trim().split(/\s+/);
+        if(partes.length === 1) return partes[0];
+        // Asumir formato: NOMBRES PATERNO MATERNO
+        // Tomar primer token como nombre y último token antes del final como apellido
+        if(partes.length === 2) return partes[0]+' '+partes[1];
+        // 3+ palabras: primer nombre + segundo token (primer apellido)
+        return partes[0]+' '+partes[1];
+    }
+
+    // Función para obtener personas por cargo
+    function porCargo(cargo) {
+        return fijos.filter(function(p) {
+            return (p.cargo||'') === cargo;
+        }).map(function(p) {
+            var nombre = p.nombreCompleto || p.nombre || (p.nombres+' '+p.paterno).trim();
+            return abreviarNombre(nombre);
+        });
+    }
+
+    function nodo(cargo, nombres, color, bg, textColor) {
+        if(!nombres || !nombres.length) {
+            nombres = ['(Vacante)'];
+        }
+        return nombres.map(function(n) {
+            return '<div class="org-nodo" style="border-color:'+color+';background:'+bg+';min-width:155px;max-width:195px;">'
+                +'<div class="org-cargo" style="color:'+textColor+';opacity:0.85;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;">'+cargo+'</div>'
+                +'<div class="org-nombre" style="color:'+textColor+';font-size:13px;font-weight:bold;">'+n+'</div>'
+                +'</div>';
+        }).join('');
+    }
+
+    function fila(nodos) {
+        return '<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">'+nodos+'</div>';
+    }
+    function conector() {
+        return '<div style="width:2px;background:#c5cae9;height:22px;margin:0 auto;"></div>';
+    }
+    function lineaH() {
+        return '<div style="height:1px;background:#c5cae9;width:60%;margin:0 auto;"></div>';
+    }
+
+    // Nodo unificado: fijo o eventual por cargo
+    // Retorna {nombre, esEventual} para un cargo dado
+    function porCargoUnificado(cargo) {
+        // Buscar en fijo primero
+        var fijoMatch = fijos.filter(function(p){ return p.cargo === cargo; })
+            .map(function(p){ 
+                var n = p.nombreCompleto||p.nombre||(p.nombres+' '+p.paterno).trim();
+                return { nombre: abreviarNombre(n), esEventual: false }; 
+            });
+        if(fijoMatch.length) return fijoMatch;
+        // Si no hay fijo, buscar en eventual
+        var evMatch = eventuales.filter(function(p){ return p.cargo === cargo; })
+            .map(function(p){ return { nombre: abreviarNombre(p.nombre||'-'), esEventual: true }; });
+        return evMatch;
+    }
+
+    function nodoUnificado(cargo, color, bg, textColor) {
+        var personas = porCargoUnificado(cargo);
+        if(!personas.length) {
+            return '<div class="org-nodo" style="border-color:'+color+';background:'+bg+';min-width:155px;max-width:195px;">'
+                +'<div class="org-cargo" style="color:'+textColor+';opacity:0.85;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;">'+cargo+'</div>'
+                +'<div class="org-nombre" style="color:#999;font-size:13px;">(Vacante)</div>'
+                +'</div>';
+        }
+        return personas.map(function(p) {
+            var bgNodo  = p.esEventual ? '#FFF8E1' : bg;
+            var border  = p.esEventual ? '1px dashed #FFB74D' : '2px solid '+color;
+            var badge   = p.esEventual
+                ? '<div style="font-size:9px;background:#FFB74D;color:#BF360C;padding:1px 6px;border-radius:8px;display:inline-block;margin-top:3px;font-weight:bold;">EN PRUEBA</div>'
+                : '';
+            return '<div class="org-nodo" style="border:'+border+';background:'+bgNodo+';min-width:155px;max-width:195px;">'
+                +'<div class="org-cargo" style="color:'+(p.esEventual?'#E65100':textColor)+';opacity:0.85;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;">'+cargo+'</div>'
+                +'<div class="org-nombre" style="color:'+(p.esEventual?'#BF360C':textColor)+';font-size:13px;font-weight:bold;">'+p.nombre+'</div>'
+                +badge
+                +'</div>';
+        }).join('');
+    }
+
+    // Eventuales por puesto (para reemplazos)
+    function evPorPuesto(puesto) {
+        return eventuales.filter(function(p){ return p.cargo === puesto; })
+            .map(function(p){ return abreviarNombre(p.nombre||'-'); });
+    }
+    function nodosEv(lista, label) {
+        if(!lista.length) return '';
+        label = label || 'Reemplazo';
+        var html2 = '<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:4px;">';
+        lista.forEach(function(n){
+            html2 += '<div style="border:1px dashed #FFB74D;border-radius:8px;padding:5px 8px;background:#FFF8E1;min-width:100px;text-align:center;">'
+                +'<div style="font-size:9px;color:#E65100;text-transform:uppercase;">'+label+'</div>'
+                +'<div style="font-size:11px;font-weight:bold;color:#BF360C;">'+n+'</div>'
+                +'</div>';
+        });
+        html2 += '</div>';
+        return html2;
+    }
+
+    // EXTERNOS
+    var accionistas = porCargo('Accionista');
+    var asesores    = porCargo('Supervisión Externa');
+
+    html += '<div style="display:flex;gap:20px;justify-content:center;margin-bottom:15px;flex-wrap:wrap;">';
+    if(accionistas.length) {
+        html += '<div style="border:1px dashed #B4B2A9;border-radius:8px;padding:10px 16px;background:#F1EFE8;text-align:center;min-width:160px;">'
+            +'<div style="font-size:10px;color:#888;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px;">Accionistas</div>'
+            + accionistas.map(function(n){ return '<div style="font-size:12px;font-weight:bold;color:#444;">'+n+'</div>'; }).join('')
+            +'</div>';
+    }
+    if(asesores.length) {
+        html += '<div style="border:1px dashed #B4B2A9;border-radius:8px;padding:10px 16px;background:#F1EFE8;text-align:center;min-width:160px;">'
+            +'<div style="font-size:10px;color:#888;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px;">Supervisión Externa</div>'
+            + asesores.map(function(n){ return '<div style="font-size:12px;font-weight:bold;color:#444;">'+n+'</div>'; }).join('')
+            +'</div>';
+    }
+    html += '</div>';
+
+    // NIVEL 1 - ENCARGADA DE CAMPO
+    html += fila(nodo('Encargada de Campo', porCargo('Encargada de Campo'), '#0F6E56', '#1D9E75', 'white'));
+    html += conector();
+
+    // LÍNEA Y 3 PILARES
+    html += '<div style="display:flex;gap:0;justify-content:center;">';
+
+    // PILAR 1
+    html += '<div style="display:flex;flex-direction:column;align-items:center;flex:1;">';
+    html += '<div style="height:1px;background:#c5cae9;width:100%;"></div>';
+    html += conector();
+    html += fila(nodo('Jefe de Almacén y Maquinaria', porCargo('Jefe de Almacén y Maquinaria'), '#185FA5', '#E6F1FB', '#0C447C'));
+    html += conector();
+    // Tractoristas — fijo o eventual por cargo
+    html += '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">';
+    ['Tractorista 1','Tractorista 2','Tractorista 3'].forEach(function(c){
+        html += nodoUnificado(c, '#B5D4F4', '#F5F5F5', '#185FA5');
+    });
+    html += '</div>';
+    var evTrac = evPorPuesto('Tractorista de Reemplazo');
+    if(evTrac.length) html += nodosEv(evTrac, 'Reemplazo');
+    html += '</div>';
+
+    // PILAR 2
+    html += '<div style="display:flex;flex-direction:column;align-items:center;flex:1;">';
+    html += '<div style="height:1px;background:#c5cae9;width:100%;"></div>';
+    html += conector();
+    html += fila(nodo('Capataz', porCargo('Capataz'), '#185FA5', '#E6F1FB', '#0C447C'));
+    html += conector();
+    // Vaqueros — fijo o eventual por cargo
+    html += '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">';
+    ['Vaquero 1','Vaquero 2','Vaquero 3','Vaquero 4','Vaquero 5','Vaquero 6','Vaquero 7'].forEach(function(c){
+        html += nodoUnificado(c, '#B5D4F4', '#F5F5F5', '#185FA5');
+    });
+    html += '</div>';
+    var evVaq = evPorPuesto('Vaquero de Reemplazo');
+    if(evVaq.length) html += nodosEv(evVaq, 'Reemplazo');
+    // Pasantes
+    var pasantes = porCargo('Pasante');
+    if(pasantes.length) {
+        html += conector();
+        html += '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">';
+        pasantes.forEach(function(n){
+            html += '<div class="org-nodo" style="border-color:#D3D1C7;background:#F1EFE8;min-width:130px;">'
+                +'<div class="org-cargo" style="color:#888;font-size:10px;text-transform:uppercase;">Pasante</div>'
+                +'<div class="org-nombre" style="color:#444;font-size:12px;">'+n+'</div>'
+                +'</div>';
+        });
+        html += '</div>';
+    }
+    html += '</div>';
+
+    // PILAR 3
+    html += '<div style="display:flex;flex-direction:column;align-items:center;flex:1;">';
+    html += '<div style="height:1px;background:#c5cae9;width:100%;"></div>';
+    html += conector();
+    html += fila(nodo('Supervisor de Operaciones', porCargo('Supervisor de Operaciones'), '#185FA5', '#E6F1FB', '#0C447C'));
+    html += conector();
+
+    // Línea horizontal hacia Portero y Coord. Alimentación
+    html += '<div style="display:flex;gap:20px;justify-content:center;align-items:flex-start;flex-wrap:wrap;">';
+
+    // Sub-columna PORTERO
+    html += '<div style="display:flex;flex-direction:column;align-items:center;">';
+    html += nodoUnificado('Portero', '#D3D1C7', '#F5F5F5', '#444441');
+    var evPortero = evPorPuesto('Portero de Reemplazo');
+    if(evPortero.length) {
+        html += '<div style="width:2px;background:#FFB74D;height:16px;margin:0 auto;"></div>';
+        html += nodosEv(evPortero, 'Reemplazo');
+    }
+    html += '</div>';
+
+    // Sub-columna COORD. ALIMENTACIÓN → COCINERA REPRESA → REEMPLAZO
+    html += '<div style="display:flex;flex-direction:column;align-items:center;">';
+    var coordAlim = porCargo('Coordinadora de Alimentación');
+    coordAlim.forEach(function(n){
+        html += '<div class="org-nodo" style="border-color:#F0997B;background:#FAECE7;min-width:130px;">'
+            +'<div class="org-cargo" style="color:#993C1D;font-size:10px;text-transform:uppercase;">Coord. Alimentación</div>'
+            +'<div class="org-nombre" style="color:#712B13;font-size:12px;">'+n+'</div>'
+            +'<div style="font-size:10px;color:#993C1D;margin-top:2px;">Camp. Principal</div>'
+            +'</div>';
+    });
+    if(!coordAlim.length) {
+        html += nodoUnificado('Coordinadora de Alimentación', '#F0997B', '#FAECE7', '#712B13');
+    }
+    // Cocinera Represa debajo de Alfonsina
+    var cocRepresaUnif = porCargoUnificado('Cocinera Campamento Represa');
+    var evCocReemplazo = evPorPuesto('Cocinera de Reemplazo');
+    if(cocRepresaUnif.length || evCocReemplazo.length) {
+        html += '<div style="width:2px;background:#c5cae9;height:16px;margin:0 auto;"></div>';
+        html += nodoUnificado('Cocinera Campamento Represa', '#F5C4B3', '#FFF5F2', '#712B13');
+        if(evCocReemplazo.length) {
+            html += '<div style="width:2px;background:#FFB74D;height:16px;margin:0 auto;"></div>';
+            html += nodosEv(evCocReemplazo, 'Reemplazo');
+        }
+    }
+    html += '</div>';
+
+    html += '</div>'; // fin fila portero + alimentación
+    html += '</div>'; // fin pilar 3
+    html += '</div>'; // fin 3 pilares
+
+    // PERSONAL EVENTUAL - Desarrollo y Mantenimiento (sin puesto fijo asignado)
+    var evDesarrollo = evPorPuesto('Desarrollo');
+    var evMant = evPorPuesto('Mantenimiento');
+    var evSinPuesto = eventuales.filter(function(p){ return !p.cargo; });
+    if(evDesarrollo.length || evMant.length || evSinPuesto.length) {
+        html += '<div style="margin-top:25px;border-top:2px dashed #FFB74D;padding-top:15px;">';
+        html += '<h3 style="color:#E65100;border-color:#FFB74D;">Personal Eventual — Desarrollo y Mantenimiento</h3>';
+        html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">';
+        if(evDesarrollo.length) {
+            html += '<div style="background:#FFF3E0;border:1px solid #FFB74D;border-radius:8px;padding:10px 14px;">'
+                +'<div style="font-size:10px;color:#E65100;font-weight:bold;text-transform:uppercase;margin-bottom:4px;">Desarrollo de Campo</div>'
+                + evDesarrollo.map(function(n){ return '<div style="font-size:12px;font-weight:bold;color:#BF360C;">'+n+'</div>'; }).join('')
+                +'</div>';
+        }
+        if(evMant.length) {
+            html += '<div style="background:#FFF3E0;border:1px solid #FFB74D;border-radius:8px;padding:10px 14px;">'
+                +'<div style="font-size:10px;color:#E65100;font-weight:bold;text-transform:uppercase;margin-bottom:4px;">Mantenimiento</div>'
+                + evMant.map(function(n){ return '<div style="font-size:12px;font-weight:bold;color:#BF360C;">'+n+'</div>'; }).join('')
+                +'</div>';
+        }
+        if(evSinPuesto.length) {
+            html += '<div style="background:#F5F5F5;border:1px solid #DDD;border-radius:8px;padding:10px 14px;">'
+                +'<div style="font-size:10px;color:#888;font-weight:bold;text-transform:uppercase;margin-bottom:4px;">Sin puesto asignado</div>'
+                + evSinPuesto.map(function(p){ return '<div style="font-size:12px;color:#555;">'+( p.nombre||'-')+'</div>'; }).join('')
+                +'</div>';
+        }
+        html += '</div></div>';
+    }
+
+    document.getElementById('panel-organigrama').innerHTML = html;
+}
+
+// ===================== RETIROS =====================
+function renderRetiros() {
+    var todos   = getTodos();
+    var retiros = getRetiros();
+    var hoy     = new Date();
+
+    // Tasa de rotación anual = (retiros del año / promedio personal) * 100
+    var retirosAnio = retiros.filter(function(r) {
+        return r.fecha && new Date(r.fecha).getFullYear() === hoy.getFullYear();
+    }).length;
+    var promedioPersonal = Math.max(todos.length + retiros.length, 1);
+    var tasaRotacion = ((retirosAnio / promedioPersonal) * 100).toFixed(1);
+
+    var html = '';
+
+    // Tasa de rotación
+    html += '<div class="tasa-box">'
+        +'<div class="tasa-item"><div class="tasa-num" style="color:#1a237e;">'+retiros.length+'</div><div class="tasa-label">Total retiros registrados</div></div>'
+        +'<div class="tasa-item"><div class="tasa-num" style="color:#d32f2f;">'+retirosAnio+'</div><div class="tasa-label">Retiros en '+hoy.getFullYear()+'</div></div>'
+        +'<div class="tasa-item"><div class="tasa-num" style="color:'+(parseFloat(tasaRotacion)>20?'#d32f2f':parseFloat(tasaRotacion)>10?'#f57c00':'#2e7d32')+';">'+tasaRotacion+'%</div><div class="tasa-label">Tasa de rotación '+hoy.getFullYear()+'</div></div>'
+        +'<div class="tasa-item"><div class="tasa-num" style="color:#1565c0;">'+todos.length+'</div><div class="tasa-label">Personal activo actual</div></div>'
+        +'</div>';
+
+    // Formulario nuevo retiro
+    html += '<div class="form-retiro">'
+        +'<h3 style="color:#e65100;border-color:#ffb74d;margin-top:0;">Registrar Retiro</h3>'
+        +'<div class="form-row">'
+        +'<div class="form-grupo"><label>Trabajador</label>'
+        +'<select id="ret-persona" style="padding:8px;border:1px solid #ffcc80;border-radius:5px;">'
+        +'<option value="">Seleccionar...</option>';
+
+    todos.forEach(function(p) {
+        var nombre = p.nombre || p.nombreCompleto || '-';
+        html += '<option value="'+p.ci+'|'+nombre+'|'+p._tipo+'">'+nombre+' ('+(p._tipo==='fijo'?'Fijo':'Eventual')+')</option>';
+    });
+
+    html += '</select></div>'
+        +'<div class="form-grupo"><label>Fecha de Retiro</label><input type="date" id="ret-fecha"></div>'
+        +'<div class="form-grupo"><label>Motivo</label>'
+        +'<select id="ret-motivo" style="padding:8px;border:1px solid #ffcc80;border-radius:5px;">'
+        +'<option>Renuncia voluntaria</option>'
+        +'<option>Fin de contrato</option>'
+        +'<option>Despido</option>'
+        +'<option>Abandono de trabajo</option>'
+        +'<option>Fallecimiento</option>'
+        +'<option>Jubilación</option>'
+        +'<option>Otro</option>'
+        +'</select></div>'
+        +'</div>'
+        +'<div class="form-row">'
+        +'<div class="form-grupo"><label>¿Se pagaron beneficios?</label>'
+        +'<select id="ret-beneficios" style="padding:8px;border:1px solid #ffcc80;border-radius:5px;"><option>Sí</option><option>No</option><option>Parcial</option></select></div>'
+        +'<div class="form-grupo" style="flex:2;"><label>Observaciones</label><input type="text" id="ret-obs" placeholder="Notas adicionales..."></div>'
+        +'</div>'
+        +'<button class="btn-guardar-retiro" onclick="guardarRetiro()">Registrar Retiro</button>'
+        +'</div>';
+
+    // Historial
+    html += '<h3>Historial de Retiros</h3>';
+    if(!retiros.length) {
+        html += '<div class="sin-datos">No hay retiros registrados.</div>';
+    } else {
+        html += '<table class="tb"><thead><tr><th>Trabajador</th><th>Tipo</th><th>Fecha Retiro</th><th>Motivo</th><th>Beneficios</th><th>Observaciones</th><th></th></tr></thead><tbody>';
+        retiros.slice().reverse().forEach(function(r, idx) {
+            html += '<tr>'
+                +'<td><strong>'+r.nombre+'</strong></td>'
+                +'<td><span class="badge badge-'+(r.tipo==='fijo'?'fijo':'eventual')+'">'+(r.tipo==='fijo'?'Fijo':'Eventual')+'</span></td>'
+                +'<td>'+r.fecha+'</td>'
+                +'<td>'+r.motivo+'</td>'
+                +'<td>'+(r.beneficios||'-')+'</td>'
+                +'<td>'+(r.obs||'-')+'</td>'
+                +'<td><button onclick="eliminarRetiro('+r.id+')" style="background:#d32f2f;color:white;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;">Eliminar</button></td>'
+                +'</tr>';
+        });
+        html += '</tbody></table>';
+    }
+
+    document.getElementById('panel-retiros').innerHTML = html;
+}
+
+function guardarRetiro() {
+    var sel = document.getElementById('ret-persona').value;
+    var fecha = document.getElementById('ret-fecha').value;
+    if(!sel || !fecha) { alert('Seleccioná el trabajador y la fecha.'); return; }
+    var partes = sel.split('|');
+    var retiros = getRetiros();
+    retiros.push({
+        id: Date.now(),
+        ci: partes[0],
+        nombre: partes[1],
+        tipo: partes[2],
+        fecha: fecha,
+        motivo: document.getElementById('ret-motivo').value,
+        beneficios: document.getElementById('ret-beneficios').value,
+        obs: document.getElementById('ret-obs').value
+    });
+    localStorage.setItem('retirosDB', JSON.stringify(retiros));
+    alert('Retiro registrado.');
+    renderRetiros();
+}
+
+function eliminarRetiro(id) {
+    if(!confirm('¿Eliminar este registro?')) return;
+    var retiros = getRetiros().filter(function(r){ return r.id!==id; });
+    localStorage.setItem('retirosDB', JSON.stringify(retiros));
+    renderRetiros();
+}
+
+window.onload = function() { renderEstadisticas(); };
+</script>
+</body>
+</html>

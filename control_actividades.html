@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Actividades - El Prado 1</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; }
+        header { background-color: #2e7d32; color: white; padding: 15px; border-radius: 5px; text-align: center; margin-bottom: 20px; }
+        .btn-volver { background-color: #757575; color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; margin-bottom: 20px; text-decoration: none; display: inline-block; }
+        .contenedor { background: white; padding: 25px; border-radius: 5px; box-shadow: 0px 0px 10px rgba(0,0,0,0.1); max-width: 900px; margin: auto; }
+        h3 { color: #2e7d32; border-bottom: 2px solid #4caf50; padding-bottom: 5px; }
+        
+        .fila { display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap; }
+        .grupo { flex: 1; min-width: 200px; display: flex; flex-direction: column; }
+        label { font-weight: bold; font-size: 13px; margin-bottom: 5px; color: #333; }
+        input, select { padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+        button.btn-guardar { padding: 12px; background-color: #1976d2; color: white; border: none; border-radius: 5px; font-size: 15px; font-weight: bold; cursor: pointer; margin-top: 10px; width: 100%;}
+        button.btn-guardar:hover { background-color: #1565c0; }
+
+        .grid-actividades { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 15px; margin-top: 20px; }
+        .tarjeta { border: 1px solid #ddd; border-radius: 8px; padding: 15px; background-color: #fff; border-left: 5px solid #4caf50; position: relative; }
+        .tarjeta h4 { margin: 0 0 10px 0; color: #333; font-size: 16px; }
+        .etiqueta-tipo { font-size: 11px; background: #e0e0e0; padding: 3px 8px; border-radius: 10px; display: inline-block; margin-bottom: 10px; font-weight: bold;}
+        .datos-progreso { font-size: 13px; margin-bottom: 8px; color: #555; }
+        .datos-fechas { font-size: 12px; color: #666; background: #f9f9f9; padding: 8px; border-radius: 4px; margin-bottom: 10px; border: 1px dashed #ccc;}
+        
+        .barra-fondo { width: 100%; background-color: #e0e0e0; border-radius: 5px; height: 10px; margin-bottom: 5px; overflow: hidden; }
+        .barra-llena { height: 100%; background-color: #4caf50; transition: width 0.3s; }
+        
+        .alerta-peligro { border-left-color: #f44336; background-color: #ffebee; }
+        .alerta-peligro .barra-llena { background-color: #f44336; }
+        .alerta-peligro .texto-alerta { color: #d32f2f; font-weight: bold; font-size: 13px; margin-top: 5px; }
+        .alerta-warning { border-left-color: #ff9800; }
+        .alerta-warning .barra-llena { background-color: #ff9800; }
+        .alerta-warning .texto-alerta { color: #e65100; font-weight: bold; font-size: 13px; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+    <a href="index.html" class="btn-volver">⬅ Volver al Menú Principal</a>
+
+    <div class="contenedor">
+        <header>
+            <h2>📊 Gestión de Actividades y Presupuesto de Jornales</h2>
+        </header>
+
+        <form id="form-actividad">
+            <h3>Nueva Actividad / Frente de Trabajo</h3>
+            <div class="fila">
+                <div class="grupo">
+                    <label>Nombre de la Actividad</label>
+                    <input type="text" id="nombre-act" placeholder="Ej. Construcción Callejón C6 y C7" required>
+                </div>
+                <div class="grupo">
+                    <label>Clasificación</label>
+                    <select id="tipo-act" required>
+                        <option value="Desarrollo y Estructura">Desarrollo y Estructura</option>
+                        <option value="Mantenimiento y Operaciones">Mantenimiento u Operaciones</option>
+                    </select>
+                </div>
+            </div>
+            <div class="fila">
+                <div class="grupo">
+                    <label>Tipo de actividad</label>
+                    <div style="display:flex; gap:15px; margin-top:5px;">
+                        <label style="font-weight:normal; display:flex; align-items:center; gap:6px; cursor:pointer;">
+                            <input type="radio" name="tipo-presupuesto" id="radio-presupuestada" value="presupuestada" checked onchange="toggleTipoActividad()">
+                            Con presupuesto de jornales
+                        </label>
+                        <label style="font-weight:normal; display:flex; align-items:center; gap:6px; cursor:pointer;">
+                            <input type="radio" name="tipo-presupuesto" id="radio-abierta" value="abierta" onchange="toggleTipoActividad()">
+                            Abierta (sin limite de jornales)
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="fila" id="fila-presupuesto">
+                <div class="grupo">
+                    <label>Presupuesto (Jornales)</label>
+                    <input type="number" id="presupuesto-act" placeholder="Ej. 20" min="1" oninput="calcularFechaFin()">
+                </div>
+                <div class="grupo">
+                    <label>Fecha de Inicio</label>
+                    <input type="date" id="fecha-inicio-act" onchange="calcularFechaFin()">
+                </div>
+                <div class="grupo">
+                    <label>Fecha Final Estimada (Sin domingos)</label>
+                    <input type="date" id="fecha-fin-act" readonly style="background-color: #e8f5e9; color: #2e7d32; font-weight: bold; border-color: #4caf50;">
+                </div>
+            </div>
+            <div class="fila" id="fila-abierta" style="display:none;">
+                <div class="grupo">
+                    <label>Fecha de Inicio</label>
+                    <input type="date" id="fecha-inicio-abierta">
+                </div>
+                <div class="grupo" style="align-self:flex-end;">
+                    <div style="background:#fff3e0; padding:10px; border-radius:5px; border-left:4px solid #ff9800; font-size:13px; color:#e65100;">
+                        Esta actividad no tiene limite de jornales. Se registra el costo acumulado sin fecha de fin.
+                    </div>
+                </div>
+            </div>
+            <button type="submit" class="btn-guardar" id="btn-submit-act">➕ Crear Actividad</button>
+            <button type="button" id="btn-cancelar-act" style="display:none; padding:12px; background:#757575; color:white; border:none; border-radius:5px; font-size:15px; font-weight:bold; cursor:pointer; margin-top:8px; width:100%;" onclick="cancelarEdicionAct()">✖ Cancelar edición</button>
+        </form>
+
+        <h3 style="margin-top: 40px;">Panel de Monitoreo (Activas)</h3>
+        <div id="lista-actividades" class="grid-actividades"></div>
+    </div>
+
+    <script>
+        function toggleTipoActividad() {
+            var esAbierta = document.getElementById('radio-abierta').checked;
+            document.getElementById('fila-presupuesto').style.display = esAbierta ? 'none' : 'flex';
+            document.getElementById('fila-abierta').style.display     = esAbierta ? 'flex' : 'none';
+        }
+
+        // --- MAGIA PARA CALCULAR LA FECHA FINAL SIN DOMINGOS ---
+        function calcularFechaFin() {
+            const jornalesInput = document.getElementById('presupuesto-act').value;
+            const fechaInicioInput = document.getElementById('fecha-inicio-act').value;
+            const fechaFinInput = document.getElementById('fecha-fin-act');
+
+            if (!jornalesInput || !fechaInicioInput || jornalesInput <= 0) {
+                fechaFinInput.value = '';
+                return;
+            }
+
+            let jornales = parseInt(jornalesInput);
+            
+            // Convertimos la fecha de inicio (Evitando problemas de zona horaria)
+            let partes = fechaInicioInput.split('-');
+            let fechaCalculo = new Date(partes[0], partes[1] - 1, partes[2]);
+
+            // Si el día de inicio cae domingo (0 en Javascript), lo pateamos para el lunes
+            if (fechaCalculo.getDay() === 0) {
+                fechaCalculo.setDate(fechaCalculo.getDate() + 1);
+            }
+
+            // Restamos 1 porque el primer jornal se gasta el mismo día que arranca
+            let jornalesRestantes = jornales - 1;
+
+            while (jornalesRestantes > 0) {
+                fechaCalculo.setDate(fechaCalculo.getDate() + 1); // Sumamos un día
+                // 0 es Domingo. Si NO es domingo, descontamos un jornal de la bolsa
+                if (fechaCalculo.getDay() !== 0) { 
+                    jornalesRestantes--;
+                }
+            }
+
+            // Armamos la fecha final para mostrarla en pantalla
+            let mes = (fechaCalculo.getMonth() + 1).toString().padStart(2, '0');
+            let dia = fechaCalculo.getDate().toString().padStart(2, '0');
+            fechaFinInput.value = `${fechaCalculo.getFullYear()}-${mes}-${dia}`;
+        }
+
+        // --- BASE DE DATOS con localStorage ---
+        let actividadesBD = JSON.parse(localStorage.getItem('actividadesDB')) || [];
+
+        function renderizarActividades() {
+            const contenedor = document.getElementById('lista-actividades');
+            contenedor.innerHTML = ''; 
+
+            actividadesBD.forEach(act => {
+                let porcentaje = (act.jornalesConsumidos / act.presupuestoJornales) * 100;
+                let claseAlerta = '';
+                let mensajeAlerta = '';
+                let anchoBarra = porcentaje > 100 ? 100 : porcentaje;
+
+                if (act.abierta) {
+                    claseAlerta = '';
+                    mensajeAlerta = '';
+                } else if (porcentaje >= 100) {
+                    claseAlerta = 'alerta-peligro';
+                    mensajeAlerta = `⚠️ ALERTA: Excedido por ${act.jornalesConsumidos - act.presupuestoJornales} jornal(es).`;
+                } else if (porcentaje >= 85) {
+                    claseAlerta = 'alerta-warning';
+                    mensajeAlerta = `⚠️ Atención: Avance al ${porcentaje.toFixed(0)}%.`;
+                }
+
+                // Formateamos fechas para que se vean bonitas (DD/MM/YYYY)
+                const formatoFecha = (fechaObj) => {
+                    if(!fechaObj) return 'N/A';
+                    let p = fechaObj.split('-');
+                    return `${p[2]}/${p[1]}/${p[0]}`;
+                };
+
+                const div = document.createElement('div');
+                div.className = `tarjeta ${claseAlerta}`;
+                div.innerHTML = `
+                    <h4>${act.nombre}</h4>
+                    <span class="etiqueta-tipo">${act.tipo}</span>
+                    <div class="datos-fechas">
+                        📅 <strong>Inicio:</strong> ${formatoFecha(act.fechaInicio)} <br>
+                        🏁 <strong>Fin est.:</strong> ${formatoFecha(act.fechaFinEstimada)}
+                    </div>
+                    <div class="datos-progreso">
+                        ${act.abierta
+                            ? '<span style="background:#fff3e0;color:#e65100;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:bold;">ACTIVIDAD ABIERTA</span>'
+                            : '<strong>Jornales:</strong> '+act.jornalesConsumidos+' gastados de '+act.presupuestoJornales
+                        }
+                    </div>
+                    ${!act.abierta ? '<div class="barra-fondo"><div class="barra-llena" style="width: '+anchoBarra+'%;"></div></div>' : ''}
+                    <div class="texto-alerta">${mensajeAlerta}</div>
+                    <div style="margin-top:10px; display:flex; gap:8px;">
+                        <button onclick="editarActividad(${act.id})" style="background:#1565c0;color:white;border:none;border-radius:4px;padding:5px 12px;cursor:pointer;font-size:12px;">✏️ Editar</button>
+                        <button onclick="eliminarActividad(${act.id})" style="background:#d32f2f;color:white;border:none;border-radius:4px;padding:5px 12px;cursor:pointer;font-size:12px;">🗑️ Eliminar</button>
+                    </div>
+                `;
+                contenedor.appendChild(div);
+            });
+        }
+
+        let idEditando = null;
+
+        function resetFormulario() {
+            document.getElementById('form-actividad').reset();
+            document.getElementById('fecha-fin-act').value = '';
+            document.getElementById('radio-presupuestada').checked = true;
+            toggleTipoActividad();
+            document.getElementById('btn-submit-act').innerText = '➕ Crear Actividad';
+            document.getElementById('btn-submit-act').style.background = '';
+            document.getElementById('btn-cancelar-act').style.display = 'none';
+            idEditando = null;
+        }
+
+        function cancelarEdicionAct() {
+            resetFormulario();
+        }
+
+        document.getElementById('form-actividad').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var esAbierta = document.getElementById('radio-abierta').checked;
+            var fechaIni  = esAbierta
+                ? document.getElementById('fecha-inicio-abierta').value
+                : document.getElementById('fecha-inicio-act').value;
+            if(!fechaIni) { alert('Ingresa la fecha de inicio.'); return; }
+            var presupuesto = esAbierta ? 0 : parseFloat(document.getElementById('presupuesto-act').value)||0;
+            if(!esAbierta && presupuesto <= 0) { alert('Ingresa el presupuesto de jornales.'); return; }
+            const datos = {
+                nombre: document.getElementById('nombre-act').value,
+                tipo: document.getElementById('tipo-act').value,
+                fechaInicio: fechaIni,
+                fechaFinEstimada: esAbierta ? null : document.getElementById('fecha-fin-act').value,
+                presupuestoJornales: presupuesto,
+                abierta: esAbierta,
+            };
+            if (idEditando !== null) {
+                actividadesBD = actividadesBD.map(a => a.id === idEditando ? {...a, ...datos} : a);
+            } else {
+                actividadesBD.push({ id: Date.now(), ...datos, jornalesConsumidos: 0 });
+            }
+            localStorage.setItem('actividadesDB', JSON.stringify(actividadesBD));
+            renderizarActividades();
+            resetFormulario();
+        });
+
+        function editarActividad(id) {
+            const act = actividadesBD.find(a => a.id === id);
+            if (!act) return;
+            idEditando = id;
+            document.getElementById('nombre-act').value = act.nombre;
+            document.getElementById('tipo-act').value   = act.tipo;
+            // Tipo de actividad
+            if(act.abierta) {
+                document.getElementById('radio-abierta').checked = true;
+                document.getElementById('fecha-inicio-abierta').value = act.fechaInicio||'';
+            } else {
+                document.getElementById('radio-presupuestada').checked = true;
+                document.getElementById('fecha-inicio-act').value    = act.fechaInicio||'';
+                document.getElementById('fecha-fin-act').value        = act.fechaFinEstimada||'';
+                document.getElementById('presupuesto-act').value      = act.presupuestoJornales||'';
+            }
+            toggleTipoActividad();
+            document.getElementById('btn-submit-act').innerText      = '💾 Guardar Cambios';
+            document.getElementById('btn-submit-act').style.background = '#1565c0';
+            document.getElementById('btn-cancelar-act').style.display  = 'block';
+            window.scrollTo(0, 0);
+        }
+
+        function eliminarActividad(id) {
+            if(confirm("¿Eliminar esta actividad?")) {
+                actividadesBD = actividadesBD.filter(a => a.id !== id);
+                localStorage.setItem('actividadesDB', JSON.stringify(actividadesBD));
+                renderizarActividades();
+            }
+        }
+
+        window.onload = renderizarActividades;
+    </script>
+</body>
+</html>

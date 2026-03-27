@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro Personal Eventual - El Prado 1</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; }
+        header { color: white; padding: 15px; border-radius: 5px; text-align: center; margin-bottom: 20px; background-color: #f57c00; }
+        .formulario-contenedor { background: white; padding: 25px; border-radius: 5px; box-shadow: 0px 0px 10px rgba(0,0,0,0.1); max-width: 1050px; margin: auto; }
+        h3 { color: #e65100; border-bottom: 2px solid #ff9800; padding-bottom: 5px; margin-top: 25px; }
+        .fila { display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap; }
+        .grupo { flex: 1; min-width: 200px; display: flex; flex-direction: column; }
+        label { font-weight: bold; font-size: 13px; margin-bottom: 5px; color: #333; }
+        input, select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+        button.guardar { width: 100%; padding: 15px; background-color: #f57c00; color: white; border: none; border-radius: 5px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 20px; }
+        button.volver { background-color: #757575; color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; margin-bottom: 20px; }
+        .familiar-contenedor { background-color: #fff3e0; padding: 15px; border-radius: 5px; border: 1px dashed #ff9800; }
+        .btn-agregar-familiar { background-color: #1976d2; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; margin-bottom: 15px; font-weight: bold; }
+        .familiar-item { border-bottom: 1px solid #ffcc80; padding-bottom: 15px; margin-bottom: 15px; background: white; padding: 10px; border-radius: 4px; }
+        .seccion-pago { background-color: #e8f5e9; border: 1px solid #4caf50; padding: 15px; border-radius: 5px; }
+        .info-box { background: #fff3e0; border-left: 4px solid #ff9800; padding: 10px 15px; border-radius: 5px; font-size: 13px; color: #e65100; margin-bottom: 15px; }
+        table.tabla-personal { width:100%; border-collapse:collapse; font-size:13px; }
+        table.tabla-personal th { background:#f57c00; color:white; padding:10px; text-align:left; }
+        table.tabla-personal td { border:1px solid #ddd; padding:8px; }
+    </style>
+</head>
+<body>
+    <button class="volver" onclick="window.location.href='index.html'">&#8592; Volver al Menu Principal</button>
+
+    <div class="formulario-contenedor">
+        <header><h2 id="titulo-principal">Nuevo Registro: Personal Eventual</h2></header>
+
+        <div class="info-box">
+            Todo el personal eventual es flexible — cada dia en la planilla de asistencia se asigna la tarea del dia (Desarrollo, Mantenimiento o Reemplazo de puesto).
+        </div>
+
+        <form id="formulario-personal">
+            <h3>1. Identificacion</h3>
+            <div class="fila">
+                <div class="grupo"><label>Nombre Completo</label><input type="text" id="nombre" placeholder="Ej. Pedro Suarez" required></div>
+                <div class="grupo"><label>Carnet de Identidad (C.I.)</label><input type="text" id="ci" required></div>
+            </div>
+            <div class="fila">
+                <div class="grupo"><label>Fecha de Nacimiento</label><input type="date" id="fecha-nacimiento"></div>
+                <div class="grupo"><label>Descripcion del cargo</label><input type="text" id="cargo-desc" placeholder="Ej. Jornalero, Albanil..."></div>
+                <div class="grupo"><label>Fecha de Ingreso</label><input type="date" id="fecha-ingreso" required></div>
+            </div>
+            <div class="fila">
+                <div class="grupo">
+                    <label>Puesto en Organigrama</label>
+                    <select id="cargo">
+                        <option value="">Seleccionar cargo...</option>
+                    </select>
+                    <small style="color:#e65100;font-size:11px;margin-top:3px;">Los cargos ya ocupados aparecen deshabilitados</small>
+                </div>
+            </div>
+            <div class="fila">
+                <div class="grupo"><label>Telefono Celular</label><input type="text" id="celular"></div>
+                <div class="grupo"><label>Contacto de Emergencia</label><input type="text" id="emergencia" placeholder="Nombre y Telefono"></div>
+                <div class="grupo">
+                    <label>Estado Civil</label>
+                    <select id="estado-civil">
+                        <option>Soltero/a</option><option>Casado/a</option><option>Concubinato</option>
+                        <option>Divorciado/a</option><option>Viudo/a</option>
+                    </select>
+                </div>
+            </div>
+
+            <h3>2. Condiciones de Pago</h3>
+            <div class="seccion-pago">
+                <div class="fila">
+                    <div class="grupo">
+                        <label>Pago por Jornal (Bs./dia)</label>
+                        <input type="number" id="pago-jornal" placeholder="Ej. 120" required min="1">
+                    </div>
+                    <div class="grupo">
+                        <label>Usa movilidad propia (Moto)?</label>
+                        <select id="usa-movilidad" onchange="habilitarBonoMoto()">
+                            <option value="No">No</option>
+                            <option value="Si">Si</option>
+                        </select>
+                    </div>
+                    <div class="grupo">
+                        <label>Bono por movilidad (Bs./dia)</label>
+                        <input type="number" id="bono-movilidad" value="0" disabled style="background:#eeeeee;">
+                    </div>
+                </div>
+            </div>
+
+            <h3>3. Censo Familiar</h3>
+            <div class="familiar-contenedor">
+                <button type="button" class="btn-agregar-familiar" onclick="agregarFamiliar()">+ Sumar Familiar/Hijo</button>
+                <div id="lista-familia"></div>
+            </div>
+
+            <button type="submit" id="btn-guardar" class="guardar">Guardar Personal Eventual</button>
+            <button type="button" id="btn-cancelar" style="display:none; width:100%; padding:10px; background:#757575; color:white; border:none; border-radius:5px; font-weight:bold; cursor:pointer; margin-top:8px;" onclick="cancelarEdicion()">Cancelar edicion</button>
+        </form>
+
+        <div style="margin-top:40px; border-top:3px solid #ff9800; padding-top:20px;">
+            <h3>Personal Eventual Registrado</h3>
+            <table class="tabla-personal">
+                <thead>
+                    <tr><th>Nombre</th><th>C.I.</th><th>Cargo</th><th>Ingreso</th><th>Jornal</th><th>Moto</th><th>Accion</th></tr>
+                </thead>
+                <tbody id="cuerpo-tabla-eventual"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        var modoEdicion = null;
+
+        function habilitarBonoMoto() {
+            var usa = document.getElementById('usa-movilidad').value;
+            var inp = document.getElementById('bono-movilidad');
+            inp.disabled = usa !== 'Si';
+            inp.style.background = usa === 'Si' ? '#fff' : '#eee';
+            if(usa !== 'Si') inp.value = 0;
+        }
+
+        function agregarFamiliar(datos) {
+            datos = datos || null;
+            var contenedor = document.getElementById('lista-familia');
+            var div = document.createElement('div');
+            div.className = 'familiar-item';
+            div.innerHTML =
+                '<div class="fila">'
+                +'<div class="grupo"><label>Nombre</label><input type="text" class="f-nombre" value="'+(datos?datos.nombre:'')+'"></div>'
+                +'<div class="grupo"><label>Parentesco</label><select class="f-parentesco">'
+                +'<option value="Hijo/a"'+(datos&&datos.parentesco==="Hijo/a"?" selected":"")+'>Hijo/a</option>'
+                +'<option value="Esposa/o"'+(datos&&datos.parentesco==="Esposa/o"?" selected":"")+'>Esposa/o</option>'
+                +'<option value="Concubina/o"'+(datos&&datos.parentesco==="Concubina/o"?" selected":"")+'>Concubina/o</option>'
+                +'<option value="Padre/Madre"'+(datos&&datos.parentesco==="Padre/Madre"?" selected":"")+'>Padre/Madre</option>'
+                +'<option value="Otro"'+(datos&&datos.parentesco==="Otro"?" selected":"")+'>Otro</option>'
+                +'</select></div>'
+                +'<div class="grupo"><label>Genero</label><select class="f-genero">'
+                +'<option value="Masculino"'+(datos&&datos.genero==="Masculino"?" selected":"")+'>Masculino</option>'
+                +'<option value="Femenino"'+(datos&&datos.genero==="Femenino"?" selected":"")+'>Femenino</option>'
+                +'</select></div>'
+                +'<div class="grupo"><label>Fecha Nac.</label><input type="date" class="f-nac" value="'+(datos?datos.nac:'')+'"></div>'
+                +'</div>'
+                +'<div class="fila">'
+                +'<div class="grupo"><label>Grado Escolar</label><select class="f-grado">'
+                +'<option>Ninguno (Bebe)</option><option>Inicial</option><option>Primario</option><option>Secundario</option><option>Universitario</option>'
+                +'</select></div>'
+                +'<div class="grupo"><label>U.E.</label><input type="text" class="f-ue" value="'+(datos?datos.ue:'')+'"></div>'
+                +'<div class="grupo"><label>Lugar U.E.</label><input type="text" class="f-lugar" value="'+(datos?datos.lugar:'')+'"></div>'
+                +'</div>'
+                +'<button type="button" style="background:#d32f2f;color:white;border:none;border-radius:4px;padding:5px 10px;cursor:pointer;font-size:12px;" onclick="this.parentElement.remove()">Quitar</button>';
+            contenedor.appendChild(div);
+        }
+
+        function renderTablaPersonal() {
+            var db = JSON.parse(localStorage.getItem('personalEventualDB')) || [];
+            var tbody = document.getElementById('cuerpo-tabla-eventual');
+            if(!db.length) {
+                tbody.innerHTML = '<tr><td colspan="7" style="padding:20px;color:#999;text-align:center;">No hay personal eventual registrado.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = db.map(function(p) {
+                return '<tr>'
+                    +'<td><b>'+p.nombre+'</b></td>'
+                    +'<td>'+p.ci+'</td>'
+                    +'<td>'+(p.cargo||'-')+'</td>'
+                    +'<td>'+p.ingreso+'</td>'
+                    +'<td>'+p.pagoJornal+' Bs.</td>'
+                    +'<td>'+(p.usaMovilidad==='Si'?'Si ('+p.bonoMovilidad+' Bs.)':'No')+'</td>'
+                    +'<td>'
+                    +'<button onclick="editarEventual(\''+p.ci+'\')" style="background:#1565c0;color:white;border:none;padding:5px 10px;border-radius:3px;cursor:pointer;margin-right:4px;">Editar</button>'
+                    +'<button onclick="eliminarEventual(\''+p.ci+'\')" style="background:#d32f2f;color:white;border:none;padding:5px 10px;border-radius:3px;cursor:pointer;">Eliminar</button>'
+                    +'</td></tr>';
+            }).join('');
+        }
+
+        function editarEventual(ci) {
+            var db = JSON.parse(localStorage.getItem('personalEventualDB')) || [];
+            var p  = db.filter(function(x){ return x.ci===ci; })[0];
+            if(!p) return;
+            modoEdicion = ci;
+            document.getElementById('nombre').value           = p.nombre;
+            document.getElementById('ci').value               = p.ci;
+            document.getElementById('fecha-nacimiento').value = p.nacimiento||'';
+            poblarSelectCargo('cargo', p.ci, p.cargo||'');
+            if(document.getElementById('cargo-desc')) document.getElementById('cargo-desc').value = p.cargoDesc||'';
+            document.getElementById('fecha-ingreso').value    = p.ingreso;
+            document.getElementById('celular').value          = p.celular||'';
+            document.getElementById('emergencia').value       = p.emergencia||'';
+            document.getElementById('pago-jornal').value      = p.pagoJornal;
+            document.getElementById('usa-movilidad').value    = p.usaMovilidad||'No';
+            document.getElementById('bono-movilidad').value   = p.bonoMovilidad||0;
+            habilitarBonoMoto();
+            document.getElementById('lista-familia').innerHTML = '';
+            if(p.familia) p.familia.forEach(function(f){ agregarFamiliar(f); });
+            document.getElementById('btn-guardar').innerText   = 'Actualizar Registro';
+            document.getElementById('btn-guardar').style.background = '#1565c0';
+            document.getElementById('btn-cancelar').style.display = 'block';
+            document.getElementById('titulo-principal').innerText  = 'Editando: '+p.nombre;
+            window.scrollTo(0,0);
+        }
+
+        function cancelarEdicion() {
+            modoEdicion = null;
+            document.getElementById('formulario-personal').reset();
+            document.getElementById('lista-familia').innerHTML = '';
+            document.getElementById('btn-guardar').innerText   = 'Guardar Personal Eventual';
+            document.getElementById('btn-guardar').style.background = '#f57c00';
+            document.getElementById('btn-cancelar').style.display = 'none';
+            document.getElementById('titulo-principal').innerText  = 'Nuevo Registro: Personal Eventual';
+            agregarFamiliar();
+        }
+
+        function eliminarEventual(ci) {
+            if(confirm('Eliminar este trabajador?')) {
+                var db = JSON.parse(localStorage.getItem('personalEventualDB')) || [];
+                db = db.filter(function(p){ return p.ci!==ci; });
+                localStorage.setItem('personalEventualDB', JSON.stringify(db));
+                renderTablaPersonal();
+            }
+        }
+
+        document.getElementById('formulario-personal').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var ci = document.getElementById('ci').value.trim();
+            if(!ci){ alert('El C.I. es obligatorio.'); return; }
+
+            var familiares = [];
+            document.querySelectorAll('.familiar-item').forEach(function(item) {
+                familiares.push({
+                    nombre: item.querySelector('.f-nombre').value,
+                    parentesco: item.querySelector('.f-parentesco').value,
+                    genero: item.querySelector('.f-genero').value,
+                    nac: item.querySelector('.f-nac').value,
+                    grado: item.querySelector('.f-grado').value,
+                    ue: item.querySelector('.f-ue').value,
+                    lugar: item.querySelector('.f-lugar').value
+                });
+            });
+
+            var trabajador = {
+                ci:            ci,
+                nombre:        document.getElementById('nombre').value.trim(),
+                nacimiento:    document.getElementById('fecha-nacimiento').value,
+                cargo:         document.getElementById('cargo').value,
+                cargoDesc:     document.getElementById('cargo-desc') ? document.getElementById('cargo-desc').value.trim() : '',
+                ingreso:       document.getElementById('fecha-ingreso').value,
+                celular:       document.getElementById('celular').value,
+                emergencia:    document.getElementById('emergencia').value,
+                pagoJornal:    document.getElementById('pago-jornal').value,
+                bonoMovilidad: document.getElementById('bono-movilidad').value||0,
+                usaMovilidad:  document.getElementById('usa-movilidad').value,
+                familia:       familiares
+            };
+
+            var db = JSON.parse(localStorage.getItem('personalEventualDB')) || [];
+            if(modoEdicion) {
+                db = db.map(function(p){ return p.ci===modoEdicion ? trabajador : p; });
+            } else {
+                if(db.filter(function(p){ return p.ci===ci; }).length) {
+                    if(!confirm('Ya existe un trabajador con C.I. '+ci+'. Reemplazar?')) return;
+                    db = db.filter(function(p){ return p.ci!==ci; });
+                }
+                db.push(trabajador);
+            }
+            localStorage.setItem('personalEventualDB', JSON.stringify(db));
+            alert('Personal eventual guardado con exito.');
+            cancelarEdicion();
+            renderTablaPersonal();
+        });
+
+
+        // ===== CARGOS DEL ORGANIGRAMA =====
+        var CARGOS_ORG = [
+            { grupo: 'Dirección', items: [
+                'Accionista',
+                'Supervisión Externa'
+            ]},
+            { grupo: 'Gestión Operativa', items: [
+                'Encargada de Campo',
+                'Jefe de Almacén y Maquinaria',
+                'Supervisor de Operaciones',
+                'Capataz'
+            ]},
+            { grupo: 'Campo - Vaqueros', items: [
+                'Vaquero 1','Vaquero 2','Vaquero 3','Vaquero 4',
+                'Vaquero 5','Vaquero 6','Vaquero 7',
+                'Vaquero de Reemplazo'
+            ]},
+            { grupo: 'Campo - Tractoristas', items: [
+                'Tractorista 1','Tractorista 2','Tractorista 3',
+                'Tractorista de Reemplazo'
+            ]},
+            { grupo: 'Alimentación', items: [
+                'Coordinadora de Alimentación',
+                'Cocinera Campamento Represa',
+                'Cocinera de Reemplazo'
+            ]},
+            { grupo: 'Otros', items: [
+                'Portero',
+                'Portero de Reemplazo',
+                'Pasante'
+            ]}
+        ];
+
+        function getCargosOcupados(ciActual) {
+            var ocupados = [];
+            var fijos = JSON.parse(localStorage.getItem('personalFijoDB')) || [];
+            var eventuales = JSON.parse(localStorage.getItem('personalEventualDB')) || [];
+            fijos.forEach(function(p) {
+                if(p.cargo && p.ci !== ciActual) ocupados.push(p.cargo);
+            });
+            eventuales.forEach(function(p) {
+                if(p.cargo && p.ci !== ciActual) ocupados.push(p.cargo);
+            });
+            return ocupados;
+        }
+
+        function poblarSelectCargo(selectId, ciActual, valorActual) {
+            var sel = document.getElementById(selectId);
+            if(!sel) return;
+            var ocupados = getCargosOcupados(ciActual||'');
+            sel.innerHTML = '<option value="">Seleccionar cargo...</option>';
+            CARGOS_ORG.forEach(function(grupo) {
+                var og = document.createElement('optgroup');
+                og.label = grupo.grupo;
+                grupo.items.forEach(function(item) {
+                    var opt = document.createElement('option');
+                    opt.value = item;
+                    opt.text  = item;
+                    if(ocupados.indexOf(item) > -1 && item !== valorActual) {
+                        opt.disabled = true;
+                        opt.text = item + ' (ocupado)';
+                        opt.style.color = '#bbb';
+                    }
+                    if(item === valorActual) opt.selected = true;
+                    og.appendChild(opt);
+                });
+                sel.appendChild(og);
+            });
+        }
+
+        window.onload = function() {
+            poblarSelectCargo('cargo','','');
+            agregarFamiliar();
+            renderTablaPersonal();
+        };
+    </script>
+</body>
+</html>

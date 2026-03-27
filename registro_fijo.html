@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro Personal Fijo - El Prado 1</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; }
+        header { background-color: #2e7d32; color: white; padding: 15px; border-radius: 5px; text-align: center; margin-bottom: 20px; }
+        .formulario-contenedor { background: white; padding: 25px; border-radius: 5px; box-shadow: 0px 0px 10px rgba(0,0,0,0.1); max-width: 1050px; margin: auto; }
+        h3 { color: #2e7d32; border-bottom: 2px solid #4caf50; padding-bottom: 5px; margin-top: 25px; }
+        .fila { display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap; }
+        .grupo { flex: 1; min-width: 180px; display: flex; flex-direction: column; }
+        label { font-weight: bold; font-size: 13px; margin-bottom: 5px; color: #333; }
+        input, select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+        .seccion-finanzas { background-color: #f1f8e9; border: 1px solid #a5d6a7; padding: 15px; border-radius: 5px; }
+        .input-calculado { background-color: #e0e0e0; font-weight: bold; color: #2e7d32; }
+        .input-descuento { color: #d32f2f; font-weight: bold; }
+        .familiar-item { border: 1px solid #c8e6c9; padding: 15px; border-radius: 5px; margin-bottom: 15px; background: #fff; border-left: 5px solid #1976d2; position: relative; }
+        .bloque-prestamo { border: 1px solid #90caf9; padding: 15px; border-radius: 5px; background-color: #e3f2fd; margin-top: 10px; }
+        .info-proyeccion { font-size: 13px; color: #1565c0; padding: 10px; background: #fff; border: 1px solid #90caf9; border-radius: 4px; margin-top: 10px; line-height: 1.5; font-weight: bold; }
+        .tabla-seccion { margin-top: 40px; border-top: 3px solid #2e7d32; padding-top: 20px; }
+        .tabla-registrados { width: 100%; border-collapse: collapse; background: white; font-size: 13px; }
+        .tabla-registrados th, .tabla-registrados td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        .tabla-registrados th { background-color: #2e7d32; color: white; }
+    </style>
+</head>
+<body>
+
+    <div style="display: flex; justify-content: space-between; max-width: 1050px; margin: auto;">
+        <button onclick="window.location.href='index.html'" style="background: #757575; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer;">⬅ Volver al Menú</button>
+        <button onclick="configurarSMN()" style="background: #546e7a; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer;">⚙️ Configurar SMN</button>
+    </div>
+
+    <div class="formulario-contenedor">
+        <header><h2>📋 Registro de Personal Fijo: El Prado 1</h2></header>
+
+        <form id="formulario-personal">
+            <h3>1. Identificación del Personal</h3>
+            <div class="fila">
+                <div class="grupo"><label>Apellido Paterno</label><input type="text" id="paterno" required></div>
+                <div class="grupo"><label>Apellido Materno</label><input type="text" id="materno"></div>
+                <div class="grupo"><label>Nombres</label><input type="text" id="nombres" required></div>
+            </div>
+            
+            <div class="fila">
+                <div class="grupo"><label>C.I.</label><input type="text" id="ci" required></div>
+                <div class="grupo"><label>Género</label><select id="genero"><option>Masculino</option><option>Femenino</option></select></div>
+                <div class="grupo"><label>Fecha de Nacimiento</label><input type="date" id="fecha-nac"></div>
+                <div class="grupo"><label>Estado Civil</label>
+                    <select id="estado-civil" onchange="actualizarOpcionesFamiliares()">
+                        <option value="Soltero/a">Soltero/a</option><option value="Casado/a">Casado/a</option><option value="Concubinato">Concubinato</option><option value="Divorciado/a">Divorciado/a</option><option value="Viudo/a">Viudo/a</option>
+                    </select>
+                </div>
+            </div>
+
+            <h4 style="color: #2e7d32; font-size: 14px; margin-bottom: 5px;">📍 Procedencia</h4>
+            <div class="fila">
+                <div class="grupo"><label>País</label>
+                    <select id="pais" onchange="gestionarPais()">
+                        <option value="">Seleccione...</option><option value="Bolivia">Bolivia</option><option value="Otro">Otro (Especificar)</option>
+                    </select>
+                </div>
+                <div class="grupo" id="grupo-otro-pais" style="display:none;"><label>Especifique lugar</label><input type="text" id="otro-pais-texto"></div>
+                <div class="grupo" id="grupo-depto"><label>Departamento</label><select id="depto" onchange="cargarMunicipios()" disabled></select></div>
+                <div class="grupo" id="grupo-mun"><label>Municipio</label><select id="municipio" disabled></select></div>
+            </div>
+
+            <div class="fila">
+                <div class="grupo">
+                    <label>Cargo</label>
+                    <select id="cargo" required>
+                        <option value="">Seleccionar cargo...</option>
+                    </select>
+                    <small id="cargo-hint" style="color:#888;font-size:11px;margin-top:3px;">Los cargos ya ocupados aparecen deshabilitados</small>
+                    <label style="margin-top:8px;display:flex;align-items:center;gap:7px;cursor:pointer;font-weight:normal;font-size:13px;background:#fff3e0;padding:6px 9px;border-radius:5px;border:1px solid #ffcc80;">
+                        <input type="checkbox" id="excluir-asistencia" style="width:16px;height:16px;cursor:pointer;">
+                        <span>&#9888;&#65039; Excluir de planilla de asistencia</span>
+                    </label>
+                </div>
+                <div class="grupo"><label>Fecha de Ingreso</label><input type="date" id="fecha-ingreso" required onchange="calcularSueldo()"></div>
+                <div class="grupo">
+                    <label>📅 Vacaciones pendientes al 01/02/2026</label>
+                    <input type="number" id="vac-pendientes" min="0" value="0" placeholder="Días adeudados" style="background:#e3f2fd;border:1px solid #90caf9;font-weight:bold;color:#1565c0;">
+                    <small style="color:#1565c0;font-size:11px;margin-top:3px;">Días que se le deben antes de arrancar el sistema</small>
+                </div>
+                <div class="grupo"><label>Teléfono Celular</label><input type="text" id="celular"></div>
+                <div class="grupo"><label>Correo Electrónico</label><input type="email" id="email"></div>
+            </div>
+
+            <h3>2. Planilla Económica</h3>
+            <div class="seccion-finanzas">
+                <div class="fila">
+                    <div class="grupo"><label>Sueldo Básico (Bs.)</label><input type="number" step="0.01" id="sueldo-basico" required oninput="calcularSueldo()"></div>
+                    <div class="grupo"><label>Bono Antigüedad</label><input type="number" id="bono-antiguedad" class="input-calculado" readonly><small id="detalle-bono" style="color: #666;"></small></div>
+                    <div class="grupo"><label>AFP (12.71%)</label><input type="number" id="afp" class="input-calculado input-descuento" readonly></div>
+                </div>
+                <div class="fila">
+                    <div class="grupo"><label>Anticipo Quincenal / Cuota</label><input type="number" id="anticipo-base" oninput="calcularSueldo()" class="input-descuento"></div>
+                    <div class="grupo"><label>Renta (RC-IVA 13%)</label><input type="number" id="renta" class="input-calculado" value="0.00" readonly></div>
+                </div>
+
+                <h4 style="color: #1565c0; margin-top: 20px;">💰 Gestión de Préstamos y Aguinaldo</h4>
+                <div class="bloque-prestamo">
+                    <div class="fila">
+                        <div class="grupo"><label>Monto Total Prestado (Bs.)</label><input type="number" id="prestamo-total" oninput="calcularSueldo()"></div>
+                        <div class="grupo"><label>Cuota Mensual Pactada</label><input type="number" id="cuota-mensual" oninput="calcularSueldo()" class="input-descuento"></div>
+                        <div class="grupo"><label>Descuento del Aguinaldo (Anual)</label><input type="number" id="desc-aguinaldo" placeholder="Monto cada 20-Dic" oninput="calcularSueldo()" class="input-descuento"></div>
+                    </div>
+                    <div class="fila"><div class="grupo"><label>Fecha Inicio Cobro</label><input type="date" id="fecha-prestamo" onchange="calcularSueldo()"></div></div>
+                    <div id="info-proyeccion" class="info-proyeccion" style="display: none;"></div>
+                </div>
+
+                <div class="fila" style="background: #c8e6c9; padding: 15px; border-radius: 5px; margin-top: 15px;">
+                    <div class="grupo"><label style="font-size: 15px;">💰 LÍQUIDO PAGABLE</label><input type="text" id="liquido-pagable" class="input-calculado" style="background: white; font-size: 16px;" readonly></div>
+                </div>
+            </div>
+
+            <h3>3. Censo Familiar</h3>
+            <div id="lista-familia"></div>
+            <button type="button" style="background: #1976d2; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold;" onclick="agregarFamiliar()">+ Sumar Familiar</button>
+
+            <div style="margin-top: 30px; border-top: 2px dashed #ccc; padding-top: 20px;">
+                <button type="submit" style="width: 100%; padding: 15px; background: #2e7d32; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer;">💾 Guardar Registro Completo</button>
+            </div>
+        </form>
+
+        <div class="tabla-seccion">
+            <h3>👥 Personal Registrado en el Sistema</h3>
+            <table class="tabla-registrados">
+                <thead>
+                    <tr><th>Nombre Completo</th><th>C.I.</th><th>Cargo</th><th>Ingreso</th><th>Acción</th></tr>
+                </thead>
+                <tbody id="cuerpo-tabla-personal"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const municipiosBolivia = { "Santa Cruz": ["Santa Cruz de la Sierra", "Warnes", "Montero", "Cotoca", "La Guardia", "El Torno", "San Ignacio", "Camiri", "Vallegrande", "Puerto Suárez"], "Beni": ["Trinidad", "Riberalta", "Guayaramerín"], "La Paz": ["La Paz", "El Alto", "Viacha"], "Cochabamba": ["Cochabamba", "Quillacollo", "Sacaba"], "Chuquisaca": ["Sucre", "Monteagudo"], "Oruro": ["Oruro"], "Potosí": ["Potosí", "Uyuni"], "Tarija": ["Tarija", "Yacuiba"], "Pando": ["Cobija"] };
+
+        function exportarParaAsistencia() {
+            const db = localStorage.getItem('personalFijoDB');
+            if(!db || db === "[]") return alert("No hay personal registrado para copiar.");
+            navigator.clipboard.writeText(db).then(() => {
+                alert("✅ DATOS COPIADOS AL PORTAPAPELES.\n\nAhora ve al archivo de ASISTENCIA y dale al botón de PEGAR.");
+            });
+        }
+
+        function gestionarPais() {
+            const pais = document.getElementById('pais').value;
+            const depto = document.getElementById('depto');
+            const divOtro = document.getElementById('grupo-otro-pais');
+            if (pais === "Bolivia") { divOtro.style.display = "none"; depto.disabled = false; cargarDepartamentos(); } 
+            else { divOtro.style.display = "flex"; depto.disabled = true; }
+        }
+
+        function cargarDepartamentos() {
+            const depto = document.getElementById('depto');
+            depto.innerHTML = '<option value="">Seleccione Departamento...</option>';
+            Object.keys(municipiosBolivia).sort().forEach(d => depto.innerHTML += `<option value="${d}">${d}</option>`);
+        }
+
+        function cargarMunicipios() {
+            const depto = document.getElementById('depto').value;
+            const mun = document.getElementById('municipio');
+            mun.innerHTML = '<option value="">Seleccione Municipio...</option>';
+            if (depto && municipiosBolivia[depto]) {
+                municipiosBolivia[depto].sort().forEach(m => mun.innerHTML += `<option value="${m}">${m}</option>`);
+                mun.disabled = false;
+            }
+        }
+
+        function agregarFamiliar(datos = null) {
+            const div = document.createElement('div');
+            div.className = 'familiar-item';
+            const par = ["Hijo/a", "Esposa/o", "Concubina/o", "Padre/Madre", "Otro"];
+            const gra = ["Ninguno (Bebé)", "Inicial", "Primario", "Secundario", "Universitario"];
+            
+            div.innerHTML = `
+                <div class="fila">
+                    <div class="grupo"><label>Nombre</label><input type="text" class="f-nombre" value="${datos ? datos.nombre : ''}"></div>
+                    <div class="grupo"><label>Parentesco</label><select class="f-parentesco">${par.map(p=>`<option value="${p}" ${datos?.parentesco===p?'selected':''}>${p}</option>`).join('')}</select></div>
+                    <div class="grupo"><label>Género</label><select class="f-genero"><option ${datos?.genero==='Masculino'?'selected':''}>Masculino</option><option ${datos?.genero==='Femenino'?'selected':''}>Femenino</option></select></div>
+                    <div class="grupo"><label>Fecha Nac.</label><input type="date" class="f-nac" value="${datos ? datos.nac : ''}"></div>
+                </div>
+                <div class="fila">
+                    <div class="grupo"><label>Grado Escolar</label><select class="f-grado">${gra.map(g=>`<option value="${g}" ${datos?.grado===g?'selected':''}>${g}</option>`).join('')}</select></div>
+                    <div class="grupo"><label>U.E.</label><input type="text" class="f-ue" value="${datos ? datos.ue : ''}"></div>
+                    <div class="grupo"><label>Lugar U.E.</label><input type="text" class="f-lugar" value="${datos ? datos.lugar : ''}"></div>
+                </div>
+                <button type="button" style="background:red; color:white; border:none; padding:5px; border-radius:3px; cursor:pointer;" onclick="this.parentElement.remove()">❌ Quitar</button>`;
+            document.getElementById('lista-familia').appendChild(div);
+        }
+
+        function calcularSueldo() {
+            const smn = parseFloat(localStorage.getItem('smn_prado')) || 2500;
+            const sueldoBasico = parseFloat(document.getElementById('sueldo-basico').value) || 0;
+            const fechaIngreso = document.getElementById('fecha-ingreso').value;
+            const anticipoBase = parseFloat(document.getElementById('anticipo-base').value) || 0;
+            const totalPrestamo = parseFloat(document.getElementById('prestamo-total').value) || 0;
+            const cuotaMes = parseFloat(document.getElementById('cuota-mensual').value) || 0;
+            const aguinaldoDesc = parseFloat(document.getElementById('desc-aguinaldo').value) || 0;
+            const fechaInicio = document.getElementById('fecha-prestamo').value;
+
+            let bono = 0;
+            if (fechaIngreso) {
+                const hoy = new Date();
+                const ingreso = new Date(fechaIngreso + 'T00:00:00');
+                // Calcular años exactos cumplidos
+                let anos = hoy.getFullYear() - ingreso.getFullYear();
+                const mesHoy = hoy.getMonth();
+                const diaHoy = hoy.getDate();
+                const mesIng = ingreso.getMonth();
+                const diaIng = ingreso.getDate();
+                // Restar 1 si todavía no cumplió el aniversario este año
+                if (mesHoy < mesIng || (mesHoy === mesIng && diaHoy < diaIng)) anos--;
+                // Solo aplica bono desde los 2 años cumplidos exactos
+                let porc = 0;
+                if (anos >= 2)  porc = 0.05;
+                if (anos >= 5)  porc = 0.11;
+                if (anos >= 8)  porc = 0.18;
+                if (anos >= 11) porc = 0.26;
+                if (anos >= 15) porc = 0.34;
+                if (anos >= 20) porc = 0.42;
+                if (anos >= 25) porc = 0.50;
+                const smn = parseFloat(localStorage.getItem('smn_prado')) || 2500;
+                bono = (smn * 3) * porc;
+                document.getElementById('bono-antiguedad').value = bono > 0 ? bono.toFixed(2) : '0.00';
+                document.getElementById('detalle-bono').innerText = anos + (anos === 1 ? ' año' : ' años')
+                    + (porc === 0 ? ' — sin bono aun (requiere 2 años)' : ' — '+Math.round(porc*100)+'% del SMN x3');
+            }
+
+            const totalGanado = sueldoBasico + bono;
+            const afp = totalGanado * 0.1271;
+            document.getElementById('afp').value = afp.toFixed(2);
+
+            let descuentoVariable = anticipoBase;
+            const infoDiv = document.getElementById('info-proyeccion');
+
+            if (totalPrestamo > 0 && cuotaMes > 0 && fechaInicio) {
+                let p = fechaInicio.split('-');
+                let mesI = parseInt(p[1]); let anioI = parseInt(p[0]);
+                let hoy = new Date();
+                let mesA = hoy.getMonth() + 1; let anioA = hoy.getFullYear();
+                let mesesTranscurridos = (anioA - anioI) * 12 + (mesA - mesI) + 1;
+                let diciembresPasados = 0;
+                for(let a = anioI; a <= anioA; a++) {
+                    if (a === anioI && mesI > 12) continue;
+                    if (a === anioA && mesA < 12) continue;
+                    diciembresPasados++;
+                }
+                let pagadoHastaHoy = (cuotaMes * (Math.max(0, mesesTranscurridos - 1))) + (diciembresPasados * aguinaldoDesc);
+                let saldoActual = totalPrestamo - pagadoHastaHoy;
+                if (saldoActual > 0) {
+                    descuentoVariable = Math.max(anticipoBase, Math.min(saldoActual, cuotaMes));
+                    infoDiv.style.display = 'block';
+                    infoDiv.innerHTML = `📢 Estatus: Cuota #${mesesTranscurridos} | Saldo: ${(saldoActual - descuentoVariable).toFixed(2)} Bs.`;
+                } else { infoDiv.innerHTML = "✅ Préstamo liquidado."; }
+            } else { infoDiv.style.display = 'none'; }
+
+            document.getElementById('liquido-pagable').value = (totalGanado - afp - descuentoVariable).toFixed(2) + " Bs.";
+        }
+
+        document.getElementById('formulario-personal').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const familiares = [];
+            document.querySelectorAll('.familiar-item').forEach(item => {
+                familiares.push({
+                    nombre: item.querySelector('.f-nombre').value,
+                    parentesco: item.querySelector('.f-parentesco').value,
+                    genero: item.querySelector('.f-genero').value,
+                    nac: item.querySelector('.f-nac').value,
+                    grado: item.querySelector('.f-grado').value,
+                    ue: item.querySelector('.f-ue').value,
+                    lugar: item.querySelector('.f-lugar').value
+                });
+            });
+
+            const trabajador = {
+                ci: document.getElementById('ci').value,
+                paterno: document.getElementById('paterno').value,
+                materno: document.getElementById('materno').value,
+                nombres: document.getElementById('nombres').value,
+                nombreCompleto: document.getElementById('nombres').value + " " + document.getElementById('paterno').value + " " + (document.getElementById('materno').value || ""),
+                genero: document.getElementById('genero').value,
+                nacimiento: document.getElementById('fecha-nac').value,
+                estadoCivil: document.getElementById('estado-civil') ? document.getElementById('estado-civil').value : '',
+                pais: document.getElementById('pais').value,
+                otroPais: document.getElementById('otro-pais-texto') ? document.getElementById('otro-pais-texto').value : '',
+                depto: document.getElementById('depto') ? document.getElementById('depto').value : '',
+                municipio: document.getElementById('municipio') ? document.getElementById('municipio').value : '',
+                cargo: document.getElementById('cargo').value,
+                ingreso: document.getElementById('fecha-ingreso').value,
+                celular: document.getElementById('celular') ? document.getElementById('celular').value : '',
+                email: document.getElementById('email') ? document.getElementById('email').value : '',
+                sueldo: document.getElementById('sueldo-basico').value,
+                familia: familiares,
+                liquido: document.getElementById('liquido-pagable').value,
+                excluirAsistencia: document.getElementById('excluir-asistencia').checked,
+                vacPendientes: parseFloat(document.getElementById('vac-pendientes').value) || 0
+            };
+
+            let db = JSON.parse(localStorage.getItem('personalFijoDB')) || [];
+            db = db.filter(p => p.ci !== trabajador.ci);
+            db.push(trabajador);
+            localStorage.setItem('personalFijoDB', JSON.stringify(db));
+            alert("✅ Guardado con éxito.");
+            renderTabla();
+            this.reset();
+            document.getElementById('lista-familia').innerHTML = "";
+        });
+
+        function modificarPersona(ci) {
+            let db = JSON.parse(localStorage.getItem('personalFijoDB')) || [];
+            const p = db.find(x => x.ci === ci);
+            if (p) {
+                document.getElementById('ci').value        = p.ci;
+                document.getElementById('paterno').value   = p.paterno;
+                document.getElementById('materno').value   = p.materno;
+                document.getElementById('nombres').value   = p.nombres;
+                document.getElementById('fecha-nac').value = p.nacimiento || '';
+                if(document.getElementById('genero'))      document.getElementById('genero').value = p.genero || '';
+                if(document.getElementById('estado-civil'))document.getElementById('estado-civil').value = p.estadoCivil || '';
+                // Procedencia — cargar en secuencia
+                if(document.getElementById('pais') && p.pais) {
+                    document.getElementById('pais').value = p.pais;
+                    gestionarPais();
+                    if(p.pais === 'Otro' && document.getElementById('otro-pais-texto'))
+                        document.getElementById('otro-pais-texto').value = p.otroPais || '';
+                    if(p.pais === 'Bolivia' && p.depto) {
+                        // Esperar a que se carguen los departamentos
+                        setTimeout(function() {
+                            var dEl = document.getElementById('depto');
+                            if(dEl) {
+                                dEl.value = p.depto;
+                                cargarMunicipios();
+                                setTimeout(function() {
+                                    var mEl = document.getElementById('municipio');
+                                    if(mEl && p.municipio) mEl.value = p.municipio;
+                                }, 50);
+                            }
+                        }, 50);
+                    }
+                }
+                poblarSelectCargo('cargo', p.ci, p.cargo||'');
+                document.getElementById('fecha-ingreso').value = p.ingreso;
+                if(document.getElementById('celular')) document.getElementById('celular').value = p.celular || '';
+                if(document.getElementById('email'))   document.getElementById('email').value   = p.email   || '';
+                document.getElementById('sueldo-basico').value = p.sueldo;
+                document.getElementById('excluir-asistencia').checked = p.excluirAsistencia || false;
+                if(document.getElementById('vac-pendientes')) document.getElementById('vac-pendientes').value = p.vacPendientes || 0;
+                document.getElementById('lista-familia').innerHTML = "";
+                if(p.familia) p.familia.forEach(f => agregarFamiliar(f));
+                calcularSueldo();
+                window.scrollTo(0,0);
+            }
+        }
+
+        function renderTabla() {
+            const db = JSON.parse(localStorage.getItem('personalFijoDB')) || [];
+            const tbody = document.getElementById('cuerpo-tabla-personal');
+            tbody.innerHTML = db.map(p => `
+                <tr>
+                    <td><b>${p.nombreCompleto}</b></td>
+                    <td>${p.ci}</td><td>${p.cargo}</td><td>${p.ingreso}</td>
+                    <td>
+                        <button onclick="modificarPersona('${p.ci}')" style="background:#1976d2; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer;">Modificar</button>
+                        <button onclick="eliminar('${p.ci}')" style="background:#d32f2f; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer;">Eliminar</button>
+                    </td>
+                </tr>`).join('');
+        }
+
+        function eliminar(ci) {
+            if(confirm("¿Eliminar trabajador?")) {
+                let db = JSON.parse(localStorage.getItem('personalFijoDB')) || [];
+                db = db.filter(p => p.ci !== ci);
+                localStorage.setItem('personalFijoDB', JSON.stringify(db));
+                renderTabla();
+            }
+        }
+
+        function configurarSMN() {
+            let n = prompt("SMN:", localStorage.getItem('smn_prado') || 2500);
+            if(n) { localStorage.setItem('smn_prado', n); calcularSueldo(); }
+        }
+
+        // ===== ORGANIGRAMA DE CARGOS =====
+        var CARGOS_ORG = [
+            { grupo: 'Dirección', items: ['Accionista', 'Supervisión Externa'] },
+            { grupo: 'Gestión Operativa', items: ['Encargada de Campo', 'Jefe de Almacén y Maquinaria', 'Supervisor de Operaciones', 'Capataz'] },
+            { grupo: 'Campo - Vaqueros', items: ['Vaquero 1','Vaquero 2','Vaquero 3','Vaquero 4','Vaquero 5','Vaquero 6','Vaquero 7','Vaquero de Reemplazo'] },
+            { grupo: 'Campo - Tractoristas', items: ['Tractorista 1','Tractorista 2','Tractorista 3','Tractorista de Reemplazo'] },
+            { grupo: 'Alimentación', items: ['Coordinadora de Alimentación','Cocinera Campamento Represa','Cocinera de Reemplazo'] },
+            { grupo: 'Otros', items: ['Portero','Portero de Reemplazo','Pasante'] }
+        ];
+        function getCargosOcupados(ciActual) {
+            var ocupados = [];
+            var fijos = JSON.parse(localStorage.getItem('personalFijoDB')) || [];
+            var eventuales = JSON.parse(localStorage.getItem('personalEventualDB')) || [];
+            fijos.forEach(function(p) { if(p.cargo && p.ci !== ciActual) ocupados.push(p.cargo); });
+            eventuales.forEach(function(p) { if(p.cargo && p.ci !== ciActual) ocupados.push(p.cargo); });
+            return ocupados;
+        }
+        function poblarSelectCargo(selectId, ciActual, valorActual) {
+            var sel = document.getElementById(selectId);
+            if(!sel) return;
+            var ocupados = getCargosOcupados(ciActual || '');
+            sel.innerHTML = '<option value="">Seleccionar cargo...</option>';
+            CARGOS_ORG.forEach(function(grupo) {
+                var og = document.createElement('optgroup');
+                og.label = grupo.grupo;
+                grupo.items.forEach(function(item) {
+                    var opt = document.createElement('option');
+                    opt.value = item; opt.text = item;
+                    if(ocupados.indexOf(item) > -1 && item !== valorActual) {
+                        opt.disabled = true;
+                        opt.text = item + ' (ocupado)';
+                        opt.style.color = '#bbb';
+                    }
+                    if(item === valorActual) opt.selected = true;
+                    og.appendChild(opt);
+                });
+                sel.appendChild(og);
+            });
+        }
+
+        // ===== PARENTESCO SEGÚN ESTADO CIVIL =====
+        function getParentescosPorEstadoCivil() {
+            var ec = (document.getElementById('estado-civil') ? document.getElementById('estado-civil').value : '') || '';
+            var todos = ["Hijo/a", "Esposa/o", "Concubina/o", "Padre/Madre", "Otro"];
+            if (ec === 'Casado/a')    return todos.filter(function(p){ return p !== 'Concubina/o'; });
+            if (ec === 'Concubinato') return todos.filter(function(p){ return p !== 'Esposa/o'; });
+            return todos.filter(function(p){ return p !== 'Esposa/o' && p !== 'Concubina/o'; });
+        }
+        function actualizarOpcionesFamiliares() {
+            var opciones = getParentescosPorEstadoCivil();
+            document.querySelectorAll('.f-parentesco').forEach(function(sel) {
+                var valorActual = sel.value;
+                sel.innerHTML = opciones.map(function(p) {
+                    return '<option value="' + p + '"' + (p === valorActual ? ' selected' : '') + '>' + p + '</option>';
+                }).join('');
+                if (opciones.indexOf(valorActual) === -1) sel.value = opciones[0];
+            });
+        }
+
+        window.onload = function(){
+            poblarSelectCargo('cargo','','');
+            renderTabla();
+            // Si viene con ?ci= desde asistencia, abrir ese trabajador
+            var params = new URLSearchParams(window.location.search);
+            var ciParam = params.get('ci');
+            if (ciParam) {
+                setTimeout(function(){ modificarPersona(ciParam); }, 100);
+            }
+        };
+    </script>
+</body>
+</html>
