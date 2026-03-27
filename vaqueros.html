@@ -363,7 +363,7 @@ body {
 <div id="pag0" class="pag activo">
   <div class="splash">
     <div class="splash-logo">Hacienda Ganadera</div>
-    <div class="splash-titulo">El Prado</div>
+    <div class="splash-titulo">El Prado 1</div>
     <div class="splash-sub">San Ignacio de Velazco · Bolivia</div>
     <div class="splash-label">¿Quién sos?</div>
     <div id="listaVaquerosV" style="width:100%; max-width:320px;"></div>
@@ -559,7 +559,7 @@ function renderDetalleV() {
     const h = planHoy[0];
     const metrosHTML = h.anchoM && h.largoM
       ? `${h.anchoM} × ${h.largoM} m`
-      : h.anchoM ? `${h.anchoM} m ancho` : '—';
+      : h.largoM ? `${h.largoM} m largo` : h.anchoM ? `${h.anchoM} m ancho` : '—';
     hoyHTML = `<div class="parcela-hoy">
       <span class="parcela-tag">📍 HOY — PARCELA ACTUAL</span>
       <div class="parcela-grid">
@@ -591,7 +591,7 @@ function renderDetalleV() {
   if(planFuturo.length) {
     proxHTML = '<div class="prox-label">Próximas parcelas</div>' +
     planFuturo.map((p,i) => {
-      const metros = p.anchoM && p.largoM ? `${p.anchoM}×${p.largoM}m` : p.anchoM ? `${p.anchoM}m ancho` : '—';
+      const metros = p.anchoM && p.largoM ? `${p.anchoM}×${p.largoM}m` : p.largoM ? `${p.largoM}m largo` : p.anchoM ? `${p.anchoM}m ancho` : '—';
       return `<div class="prox-item">
         <div class="prox-num">${i+1}</div>
         <div class="prox-info">
@@ -643,29 +643,57 @@ function renderDetalleV() {
     <div class="pedidos-section">
       <div class="pedidos-label">📬 Pedidos y Observaciones</div>
       ${pedidosPrevHTML}
-      <div class="pedido-form">
-        <input type="text" class="pedido-input" id="pedidoInput" placeholder="Escribí tu pedido o comentario..." maxlength="200">
-        <button class="pedido-send" onclick="enviarPedido()">Enviar</button>
+      <div class="pedido-form" style="flex-direction:column;gap:8px;">
+        <div style="display:flex;gap:8px;">
+          <input type="text" class="pedido-input" id="pedidoInput" placeholder="Escribí tu pedido o comentario..." maxlength="200">
+          <label style="background:var(--card2);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;cursor:pointer;color:var(--text2);font-size:14px;flex-shrink:0;" title="Adjuntar foto">
+            📷
+            <input type="file" id="pedidoFoto" accept="image/*" capture="environment" style="display:none;" onchange="previsualizarFoto(this)">
+          </label>
+          <button class="pedido-send" onclick="enviarPedido()">Enviar</button>
+        </div>
+        <div id="fotoPreview" style="display:none;">
+          <img id="fotoPreviewImg" style="max-width:100%;max-height:200px;border-radius:8px;border:1px solid var(--border2);">
+          <button onclick="cancelarFoto()" style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer;margin-left:8px;">✕ Quitar foto</button>
+        </div>
       </div>
     </div>
   `;
 }
 
-function enviarPedido() {
+async function enviarPedido() {
   const inp = document.getElementById('pedidoInput');
   const msg = inp?.value?.trim();
-  if(!msg) { notifV('Escribí un mensaje primero', true); return; }
+  const fotoInput = document.getElementById('pedidoFoto');
+  const fotoImg = document.getElementById('fotoPreviewImg');
+  
+  if(!msg && (!fotoInput.files || !fotoInput.files[0])) { 
+    notifV('Escribí un mensaje o adjuntá una foto', true); 
+    return; 
+  }
+  
+  let fotoBase64 = null;
+  if(fotoInput.files && fotoInput.files[0]) {
+    fotoBase64 = await new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = e => resolve(e.target.result);
+      reader.readAsDataURL(fotoInput.files[0]);
+    });
+  }
+  
   const pedidos = getPedidos();
   pedidos.unshift({
     id: uuid(),
     ts: Date.now(),
     vaquero: vaqueroActual?.nombre||'—',
     lote: grupoActual,
-    mensaje: msg,
+    mensaje: msg || '(foto adjunta)',
+    foto: fotoBase64,
     leido: false
   });
   setPedidos(pedidos);
   inp.value = '';
+  cancelarFoto();
   notifV('✓ Pedido enviado al administrador');
   renderDetalleV();
 }
@@ -675,6 +703,23 @@ function formatFecha(iso) {
   const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
   const p = iso.split('-');
   return parseInt(p[2])+' '+meses[parseInt(p[1])-1];
+}
+
+function previsualizarFoto(input) {
+  if(!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('fotoPreviewImg').src = e.target.result;
+    document.getElementById('fotoPreview').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+function cancelarFoto() {
+  document.getElementById('pedidoFoto').value = '';
+  document.getElementById('fotoPreview').style.display = 'none';
+  document.getElementById('fotoPreviewImg').src = '';
 }
 
 function notifV(msg, error=false) {
