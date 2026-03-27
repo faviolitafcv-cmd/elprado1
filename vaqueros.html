@@ -591,7 +591,7 @@ function renderDetalleV() {
   if(planFuturo.length) {
     proxHTML = '<div class="prox-label">Próximas parcelas</div>' +
     planFuturo.map((p,i) => {
-      const metros = p.anchoM && p.largoM ? `${p.anchoM}×${p.largoM}m` : p.largoM ? `${p.largoM}m largo` : p.anchoM ? `${p.anchoM}m ancho` : '—';
+      const metros = p.largoM ? `${Math.round(p.largoM)}m largo` : p.anchoM ? `${p.anchoM}m ancho` : '—';
       return `<div class="prox-item">
         <div class="prox-num">${i+1}</div>
         <div class="prox-info">
