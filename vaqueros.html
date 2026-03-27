@@ -387,13 +387,33 @@ body {
 <div id="notifV"></div>
 
 <script>
-// ── STORAGE (mismo que elprado_actividades) ──
+// ── STORAGE + FIREBASE ──
+const FB_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com/elprado';
+
 function getData(key, def) {
   try { return JSON.parse(localStorage.getItem('elprado_' + key)) || def; }
   catch(e) { return def; }
 }
 function setData(key, val) {
   localStorage.setItem('elprado_' + key, JSON.stringify(val));
+  fetch(FB_URL + '/' + key + '.json', {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(val)
+  }).catch(e => console.log('Firebase write error:', e));
+}
+
+async function syncFromFirebase() {
+  try {
+    const r = await fetch(FB_URL + '.json');
+    const data = await r.json();
+    if(data) {
+      Object.entries(data).forEach(([key, val]) => {
+        if(val !== null) localStorage.setItem('elprado_' + key, JSON.stringify(val));
+      });
+    }
+    return true;
+  } catch(e) { return false; }
 }
 function getVaqueros() { return getData('vaqueros', []); }
 function getPlan() { return getData('plan', []); }
@@ -664,8 +684,15 @@ function notifV(msg, error=false) {
 }
 
 // ── INIT ──
-renderVaquerosV();
-actualizarTopbar();
+(async () => {
+  // Mostrar loader
+  document.body.insertAdjacentHTML('beforeend', '<div id="v-loading" style="position:fixed;inset:0;background:#0f1a0b;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;"><div style="font-size:13px;color:#6dba3a;font-weight:600;letter-spacing:2px;">CARGANDO...</div><div style="font-size:28px;">🐄</div></div>');
+  await syncFromFirebase();
+  const loader = document.getElementById('v-loading');
+  if(loader) loader.remove();
+  renderVaquerosV();
+  actualizarTopbar();
+})();
 
 // Actualizar fecha cada minuto
 setInterval(()=>{ document.getElementById('topbarFecha').textContent = new Date().toLocaleDateString('es-BO',{day:'2-digit',month:'short'}); }, 60000);
