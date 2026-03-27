@@ -489,8 +489,9 @@ function renderVaquerosV() {
 }
 
 // ── PÁGINA 1: GRUPOS DEL VAQUERO ──
-function selVaquero(i) {
+async function selVaquero(i) {
   vaqueroActual = getVaqueros()[i];
+  await syncFromFirebase();
   renderGruposV();
   irA('pag1');
 }
@@ -525,8 +526,9 @@ function renderGruposV() {
 }
 
 // ── PÁGINA 2: DETALLE DEL GRUPO ──
-function selGrupo(lote) {
+async function selGrupo(lote) {
   grupoActual = lote;
+  await syncFromFirebase();
   renderDetalleV();
   irA('pag2');
 }
@@ -545,7 +547,7 @@ function renderDetalleV() {
     .sort((a,b)=>a.fi>b.fi?1:-1);
 
   const planHoy = planGrupo.filter(p=>p.fi<=today && (!p.fs||p.fs>today));
-  const planFuturo = planGrupo.filter(p=>p.fi>today).slice(0,3);
+  const planFuturo = planGrupo.filter(p=>p.fi>today);
 
   // Detectar próximo potrero (diferente al actual)
   const potreroActual = planHoy.length ? planHoy[0].potrero : null;
