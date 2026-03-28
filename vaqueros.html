@@ -498,6 +498,29 @@ async function selVaquero(i) {
 
 function renderGruposV() {
   const plan = getPlan();
+  const actividades = getData('actividades', []);
+  
+  // Función para obtener largo redondeado de un plan entry
+  function getLargoRedondeado(p) {
+    // Buscar en actividades el registro correspondiente
+    const act = actividades.find(a => 
+      a.potrero === p.potrero && 
+      a.parcela === p.parcela && 
+      a.lote === p.lote &&
+      (a.actividad === 'MATERIA SECA' || a.actividad === 'INGRESO HDA')
+    );
+    const largoM = p.largoM || (act && act.largoM);
+    const anchoM = p.anchoM || (act && act.anchoM);
+    const ha = p.ha || (act && act.ha);
+    
+    if(largoM) return (Math.round(largoM / 10) * 10) + 'm largo';
+    if(anchoM && ha) {
+      const lc = (ha * 10000) / anchoM;
+      return (Math.round(lc / 10) * 10) + 'm largo';
+    }
+    if(anchoM) return anchoM + 'm ancho';
+    return '—';
+  }
   const today = new Date().toISOString().split('T')[0];
   const cont = document.getElementById('listaGruposV');
   const grupos = vaqueroActual?.grupos || [];
@@ -557,17 +580,7 @@ function renderDetalleV() {
   let hoyHTML = '';
   if(planHoy.length) {
     const h = planHoy[0];
-    let metrosHTML = '—';
-    if(h.largoM) {
-      const lr = Math.round(h.largoM / 10) * 10;
-      metrosHTML = lr + ' m largo';
-    } else if(h.anchoM && h.ha) {
-      const lc = (h.ha * 10000) / h.anchoM;
-      const lr = Math.round(lc / 10) * 10;
-      metrosHTML = lr + ' m largo';
-    } else if(h.anchoM) {
-      metrosHTML = h.anchoM + ' m ancho';
-    }
+    const metrosHTML = getLargoRedondeado(h);
     hoyHTML = `<div class="parcela-hoy">
       <span class="parcela-tag">📍 HOY — PARCELA ACTUAL</span>
       <div class="parcela-grid">
@@ -599,15 +612,7 @@ function renderDetalleV() {
   if(planFuturo.length) {
     proxHTML = '<div class="prox-label">Próximas parcelas</div>' +
     planFuturo.map((p,i) => {
-      let metros = '—';
-      if(p.largoM) {
-        metros = (Math.round(p.largoM / 10) * 10) + 'm largo';
-      } else if(p.anchoM && p.ha) {
-        const lc = (p.ha * 10000) / p.anchoM;
-        metros = (Math.round(lc / 10) * 10) + 'm largo';
-      } else if(p.anchoM) {
-        metros = p.anchoM + 'm ancho';
-      }
+      const metros = getLargoRedondeado(p);
       return `<div class="prox-item">
         <div class="prox-num">${i+1}</div>
         <div class="prox-info">
