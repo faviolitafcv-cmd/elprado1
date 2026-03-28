@@ -557,9 +557,17 @@ function renderDetalleV() {
   let hoyHTML = '';
   if(planHoy.length) {
     const h = planHoy[0];
-    const metrosHTML = h.anchoM && h.largoM
-      ? `${h.anchoM} × ${h.largoM} m`
-      : h.largoM ? `${h.largoM} m largo` : h.anchoM ? `${h.anchoM} m ancho` : '—';
+    let metrosHTML = '—';
+    if(h.largoM) {
+      const lr = Math.round(h.largoM / 10) * 10;
+      metrosHTML = lr + ' m largo';
+    } else if(h.anchoM && h.ha) {
+      const lc = (h.ha * 10000) / h.anchoM;
+      const lr = Math.round(lc / 10) * 10;
+      metrosHTML = lr + ' m largo';
+    } else if(h.anchoM) {
+      metrosHTML = h.anchoM + ' m ancho';
+    }
     hoyHTML = `<div class="parcela-hoy">
       <span class="parcela-tag">📍 HOY — PARCELA ACTUAL</span>
       <div class="parcela-grid">
@@ -573,11 +581,11 @@ function renderDetalleV() {
         </div>
         <div class="parcela-campo">
           <div class="parcela-campo-lbl">Entrada</div>
-          <div class="parcela-campo-val sm">${formatFecha(h.fi)}</div>
+          <div class="parcela-campo-val sm">${formatFecha(h.fi)}${h.horaIng?' · '+h.horaIng:''}</div>
         </div>
         <div class="parcela-campo">
           <div class="parcela-campo-lbl">Salida</div>
-          <div class="parcela-campo-val sm">${h.fs?formatFecha(h.fs):'—'}</div>
+          <div class="parcela-campo-val sm">${h.fs?formatFecha(h.fs):'—'}${h.horaSal?' · '+h.horaSal:''}</div>
         </div>
         ${h.obs?`<div class="parcela-campo" style="grid-column:1/-1;"><div class="parcela-campo-lbl">Observación</div><div style="font-size:13px;color:var(--gold2);">⚠ ${h.obs}</div></div>`:''}
       </div>
@@ -591,12 +599,20 @@ function renderDetalleV() {
   if(planFuturo.length) {
     proxHTML = '<div class="prox-label">Próximas parcelas</div>' +
     planFuturo.map((p,i) => {
-      const metros = p.largoM ? `${Math.round(p.largoM)}m largo` : p.anchoM ? `${p.anchoM}m ancho` : '—';
+      let metros = '—';
+      if(p.largoM) {
+        metros = (Math.round(p.largoM / 10) * 10) + 'm largo';
+      } else if(p.anchoM && p.ha) {
+        const lc = (p.ha * 10000) / p.anchoM;
+        metros = (Math.round(lc / 10) * 10) + 'm largo';
+      } else if(p.anchoM) {
+        metros = p.anchoM + 'm ancho';
+      }
       return `<div class="prox-item">
         <div class="prox-num">${i+1}</div>
         <div class="prox-info">
           <div class="prox-potpar">${p.potrero} · Parcela ${p.parcela}</div>
-          <div class="prox-fecha">${formatFecha(p.fi)}${p.fs?' → '+formatFecha(p.fs):''} · ${p.dias||1} día${(p.dias||1)!==1?'s':''}</div>
+          <div class="prox-fecha">${formatFecha(p.fi)}${p.horaIng?' '+p.horaIng:''}${p.fs?' → '+formatFecha(p.fs)+(p.horaSal?' '+p.horaSal:''):''} · ${p.dias||1} día${(p.dias||1)!==1?'s':''}</div>
           <div class="prox-metros">${metros}</div>
         </div>
       </div>`;
