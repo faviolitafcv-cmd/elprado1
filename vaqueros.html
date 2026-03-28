@@ -498,29 +498,7 @@ async function selVaquero(i) {
 
 function renderGruposV() {
   const plan = getPlan();
-  const actividades = getData('actividades', []);
-  
-  // Función para obtener largo redondeado de un plan entry
-  function getLargoRedondeado(p) {
-    // Buscar en actividades el registro correspondiente
-    const act = actividades.find(a => 
-      a.potrero === p.potrero && 
-      a.parcela === p.parcela && 
-      a.lote === p.lote &&
-      (a.actividad === 'MATERIA SECA' || a.actividad === 'INGRESO HDA')
-    );
-    const largoM = p.largoM || (act && act.largoM);
-    const anchoM = p.anchoM || (act && act.anchoM);
-    const ha = p.ha || (act && act.ha);
-    
-    if(largoM) return (Math.round(largoM / 10) * 10) + 'm largo';
-    if(anchoM && ha) {
-      const lc = (ha * 10000) / anchoM;
-      return (Math.round(lc / 10) * 10) + 'm largo';
-    }
-    if(anchoM) return anchoM + 'm ancho';
-    return '—';
-  }
+
   const today = new Date().toISOString().split('T')[0];
   const cont = document.getElementById('listaGruposV');
   const grupos = vaqueroActual?.grupos || [];
@@ -554,6 +532,26 @@ async function selGrupo(lote) {
   await syncFromFirebase();
   renderDetalleV();
   irA('pag2');
+}
+
+function getLargoRedondeado(p) {
+  const actividades = getData('actividades', []);
+  const act = actividades.find(function(a) {
+    return a.potrero === p.potrero && 
+      a.parcela === p.parcela && 
+      a.lote === p.lote &&
+      (a.actividad === 'MATERIA SECA' || a.actividad === 'INGRESO HDA');
+  });
+  const largoM = p.largoM || (act && act.largoM);
+  const anchoM = p.anchoM || (act && act.anchoM);
+  const ha = p.ha || (act && act.ha);
+  
+  if(largoM) return (Math.round(largoM / 10) * 10) + 'm largo';
+  if(anchoM && ha) {
+    return (Math.round((ha * 10000 / anchoM) / 10) * 10) + 'm largo';
+  }
+  if(anchoM) return anchoM + 'm ancho';
+  return '—';
 }
 
 function renderDetalleV() {
