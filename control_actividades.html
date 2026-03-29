@@ -35,6 +35,60 @@
         .alerta-warning .barra-llena { background-color: #ff9800; }
         .alerta-warning .texto-alerta { color: #e65100; font-weight: bold; font-size: 13px; margin-top: 5px; }
     </style>
+<script>
+// ═══════════════════════════════════════
+// FIREBASE SYNC — EL PRADO 1
+// ═══════════════════════════════════════
+const FB_RRHH_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com/rrhh';
+const FB_RRHH_KEYS = ['personalFijoDB','personalEventualDB','actividadesDB',
+  'asistFijoCierres','asistFijoPeriodoInicio','prestamosEventualDB',
+  'retirosDB','saldoOcultos','smn_prado'];
+
+async function fbRrhhGet(key) {
+  try {
+    const r = await fetch(FB_RRHH_URL + '/' + key + '.json');
+    return await r.json();
+  } catch(e) { return null; }
+}
+
+async function fbRrhhSet(key, val) {
+  try {
+    await fetch(FB_RRHH_URL + '/' + key + '.json', {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(val)
+    });
+  } catch(e) { console.log('FB RRHH write error:', e); }
+}
+
+async function syncRrhhFromFirebase() {
+  try {
+    const r = await fetch(FB_RRHH_URL + '.json');
+    const data = await r.json();
+    if(data) {
+      Object.entries(data).forEach(([key, val]) => {
+        if(val !== null) localStorage.setItem(key, JSON.stringify(val));
+      });
+    }
+    return true;
+  } catch(e) { return false; }
+}
+
+// Interceptar localStorage para auto-sincronizar a Firebase
+const _origSetItem = localStorage.setItem.bind(localStorage);
+localStorage.setItem = function(key, value) {
+  _origSetItem(key, value);
+  if(FB_RRHH_KEYS.includes(key)) {
+    try { fbRrhhSet(key, JSON.parse(value)); } catch(e) {}
+  }
+};
+
+// Sincronizar al cargar
+(async function() {
+  await syncRrhhFromFirebase();
+})();
+
+</script>
 </head>
 <body>
 
