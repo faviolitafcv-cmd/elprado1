@@ -1,6 +1,30 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+<script>
+// ═══════════════════════════════════════
+// CONTROL DE SESIÓN Y PERMISOS
+// ═══════════════════════════════════════
+(function() {
+  var usuario = sessionStorage.getItem('ep_usuario');
+  var loginTime = parseInt(sessionStorage.getItem('ep_login')||0);
+  var horasDesde = (Date.now() - loginTime) / 3600000;
+  if(!usuario || horasDesde >= 8) { window.location.href = 'login.html'; return; }
+  localStorage.setItem('elprado_usuario', usuario);
+  window._epRol = sessionStorage.getItem('ep_rol') || 'OPERADOR';
+  window._epUsuario = usuario;
+})();
+
+function esAdmin() { return window._epRol === 'ADMIN'; }
+
+function puedeEliminar(fechaRegistro) {
+  if(esAdmin()) return true;
+  // Operador solo puede eliminar registros del mismo día
+  var hoy = new Date().toISOString().split('T')[0];
+  return fechaRegistro === hoy;
+}
+</script>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>El Prado 1 — Gestión de Pasturas</title>
@@ -2048,10 +2072,17 @@ function renderTabla() {
 }
 
 function borrarActividad(id) {
+  const acts = getActividades();
+  const reg = acts.find(a => a.id === id);
+  if(!reg) return;
+  if(!puedeEliminar(reg.fecha)) {
+    notif('⛔ Solo podés eliminar registros del día de hoy', true);
+    return;
+  }
   if(!confirm('¿Eliminar este registro?')) return;
-  let acts = getActividades().filter(a => a.id !== id);
-  setData('actividades', acts);
-  fbSet('actividades', acts);
+  const nuevas = acts.filter(a => a.id !== id);
+  setData('actividades', nuevas);
+  fbSet('actividades', nuevas);
   renderTabla();
   renderStats();
   notif('Registro eliminado');
@@ -3322,6 +3353,17 @@ function borrarSeleccionados() {
     document.body.appendChild(btn);
   });
 })();
+</script>
+<script>
+window.addEventListener('load', function() {
+  var usuario = sessionStorage.getItem('ep_usuario');
+  var rol = sessionStorage.getItem('ep_rol');
+  var barra = document.createElement('div');
+  barra.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:200;background:rgba(0,0,0,.7);padding:5px 16px;display:flex;align-items:center;justify-content:space-between;';
+  barra.innerHTML = '<span style="font-size:11px;color:rgba(255,255,255,.6);">' + (rol==='ADMIN'?'👑':'📝') + ' ' + usuario + '</span>' +
+    '<button onclick="sessionStorage.clear();window.location.href='login.html'" style="background:none;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.5);padding:3px 10px;border-radius:6px;font-size:10px;cursor:pointer;">Cerrar sesión</button>';
+  document.body.appendChild(barra);
+});
 </script>
 </body>
 </html>
