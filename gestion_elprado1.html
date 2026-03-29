@@ -218,5 +218,108 @@ document.addEventListener('keydown', e => {
   if(e.key === 'Escape') volver();
 });
 </script>
+<script>
+(function() {
+  var FB_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com';
+  
+  // Claves RRHH
+  var RRHH_KEYS = ['personalFijoDB','personalEventualDB','actividadesDB',
+    'asistFijoCierres','asistFijoPeriodoInicio','prestamosEventualDB',
+    'retirosDB','saldoOcultos','smn_prado'];
+  
+  // Claves PASTURAS
+  var PASTURAS_KEYS = ['elprado_actividades','elprado_grupos','elprado_vaqueros',
+    'elprado_plan','elprado_pedidos'];
+
+  function fbWrite(path, val) {
+    fetch(FB_URL + path + '.json', {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(val)
+    }).catch(function(){});
+  }
+
+  function fbRead(path, cb) {
+    fetch(FB_URL + path + '.json')
+      .then(function(r){ return r.json(); })
+      .then(cb)
+      .catch(function(){ cb(null); });
+  }
+
+  // Interceptar localStorage.setItem para auto-sincronizar
+  var _orig = Storage.prototype.setItem;
+  Storage.prototype.setItem = function(key, value) {
+    _orig.call(this, key, value);
+    try {
+      var val = JSON.parse(value);
+      if(RRHH_KEYS.indexOf(key) >= 0) {
+        fbWrite('/rrhh/' + key, val);
+      } else if(key.indexOf('elprado_') === 0 && key !== 'elprado_usuario') {
+        var subkey = key.replace('elprado_','');
+        fbWrite('/elprado/' + subkey, val);
+      }
+    } catch(e) {}
+  };
+
+  // Al cargar: sincronizar desde Firebase
+  window.addEventListener('load', function() {
+    // Bajar datos RRHH
+    fbRead('/rrhh', function(data) {
+      if(data && typeof data === 'object') {
+        Object.keys(data).forEach(function(key) {
+          if(data[key] !== null) {
+            _orig.call(localStorage, key, JSON.stringify(data[key]));
+          }
+        });
+      }
+    });
+    
+    // Bajar datos PASTURAS (prefijo elprado_)
+    fbRead('/elprado', function(data) {
+      if(data && typeof data === 'object') {
+        Object.keys(data).forEach(function(key) {
+          if(data[key] !== null && key !== 'usuario') {
+            _orig.call(localStorage, 'elprado_' + key, JSON.stringify(data[key]));
+          }
+        });
+      }
+    });
+
+    // Botón flotante para subida manual (primera vez)
+    var btn = document.createElement('button');
+    btn.id = 'btnFbUpload';
+    btn.innerHTML = '&#x2601; Subir a Firebase';
+    btn.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:99999;' +
+      'background:#e67e22;color:white;border:none;padding:10px 16px;' +
+      'border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;' +
+      'box-shadow:0 2px 8px rgba(0,0,0,.3);';
+    btn.onclick = function() {
+      btn.innerHTML = '&#x23F3; Subiendo...';
+      btn.disabled = true;
+      // Subir RRHH
+      RRHH_KEYS.forEach(function(key) {
+        var v = localStorage.getItem(key);
+        if(v) { try { fbWrite('/rrhh/' + key, JSON.parse(v)); } catch(e){} }
+      });
+      // Subir PASTURAS
+      Object.keys(localStorage).forEach(function(key) {
+        if(key.indexOf('elprado_') === 0 && key !== 'elprado_usuario') {
+          var subkey = key.replace('elprado_','');
+          var v = localStorage.getItem(key);
+          if(v) { try { fbWrite('/elprado/' + subkey, JSON.parse(v)); } catch(e){} }
+        }
+      });
+      setTimeout(function() {
+        btn.innerHTML = '&#x2705; Subido!';
+        setTimeout(function() {
+          btn.innerHTML = '&#x2601; Subir a Firebase';
+          btn.disabled = false;
+        }, 3000);
+      }, 2000);
+    };
+    document.body.appendChild(btn);
+  });
+})();
+</script>
 </body>
 </html>

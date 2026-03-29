@@ -911,5 +911,51 @@ function tieneTipoDia(ci, dg, tipo) {
 
 window.onload = init;
 </script>
+<script>
+(function() {
+  var FB_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com';
+  var RRHH_KEYS = ['personalFijoDB','personalEventualDB','actividadesDB',
+    'asistFijoCierres','asistFijoPeriodoInicio','prestamosEventualDB',
+    'retirosDB','saldoOcultos','smn_prado'];
+
+  function fbWrite(path, val) {
+    fetch(FB_URL + path + '.json', {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(val)
+    }).catch(function(){});
+  }
+
+  var _orig = Storage.prototype.setItem;
+  Storage.prototype.setItem = function(key, value) {
+    _orig.call(this, key, value);
+    try {
+      if(RRHH_KEYS.indexOf(key) >= 0) fbWrite('/rrhh/' + key, JSON.parse(value));
+    } catch(e) {}
+  };
+
+  window.addEventListener('load', function() {
+    fetch(FB_URL + '/rrhh.json').then(function(r){ return r.json(); }).then(function(data) {
+      if(data && typeof data === 'object') {
+        Object.keys(data).forEach(function(key) {
+          if(data[key] !== null) _orig.call(localStorage, key, JSON.stringify(data[key]));
+        });
+      }
+    }).catch(function(){});
+
+    var btn = document.createElement('button');
+    btn.innerHTML = '&#x2601; Subir a Firebase';
+    btn.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:99999;background:#e67e22;color:white;border:none;padding:10px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;';
+    btn.onclick = function() {
+      btn.innerHTML = '&#x23F3; Subiendo...'; btn.disabled = true;
+      RRHH_KEYS.forEach(function(key) {
+        var v = localStorage.getItem(key);
+        if(v) { try { fbWrite('/rrhh/' + key, JSON.parse(v)); } catch(e){} }
+      });
+      setTimeout(function() { btn.innerHTML='&#x2705; Listo!'; setTimeout(function(){ btn.innerHTML='&#x2601; Subir a Firebase'; btn.disabled=false; },3000); }, 2000);
+    };
+    document.body.appendChild(btn);
+  });
+})();
+</script>
 </body>
 </html>
