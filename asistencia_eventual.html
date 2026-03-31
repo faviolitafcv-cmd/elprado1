@@ -793,7 +793,7 @@ function abrirLiquidacion() {
         +'<button class="tab-btn activo" style="background:#2e7d32;" onclick="mostrarTab(1,this)">Planilla 1 - Desarrollo</button>'
         +'<button class="tab-btn" style="background:#1565c0;" onclick="mostrarTab(2,this)">Planilla 2 - Mantenimiento</button>'
         +'<button class="tab-btn" style="background:#880e4f;" onclick="mostrarTab(3,this)">Planilla 3 - Reemplazos</button>'
-        +'<button class="tab-btn" style="background:#333;" onclick="mostrarTab(4,this)">Planilla 4 - General</button>'
+        +'<button class="tab-btn" style="background:#333;" onclick="(function(b){[\"des\",\"man\",\"rem\",\"gen\"].forEach(function(t){var e=document.getElementById(\"tab-\"+t);if(e)e.style.display=\"none\";});var g=document.getElementById(\"tab-gen\");if(g){g.style.display=\"block\";}else{alert(\"No existe tab-gen\");}document.querySelectorAll(\".tab-btn\").forEach(function(x){x.classList.remove(\"activo\");});b.classList.add(\"activo\");})(this)">Planilla 4 - General</button>'
         +'<button class="tab-btn" style="background:#e65100;" onclick="mostrarTodas()">Imprimir todas</button>'
         +'</div>'
 
