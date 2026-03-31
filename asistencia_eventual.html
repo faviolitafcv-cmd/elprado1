@@ -793,7 +793,7 @@ function abrirLiquidacion() {
         +'<button class="tab-btn activo" style="background:#2e7d32;" onclick="mostrarTab(1,this)">Planilla 1 - Desarrollo</button>'
         +'<button class="tab-btn" style="background:#1565c0;" onclick="mostrarTab(2,this)">Planilla 2 - Mantenimiento</button>'
         +'<button class="tab-btn" style="background:#880e4f;" onclick="mostrarTab(3,this)">Planilla 3 - Reemplazos</button>'
-        +'<button class="tab-btn" style="background:#333;" onclick="(function(b){[\"des\",\"man\",\"rem\",\"gen\"].forEach(function(t){var e=document.getElementById(\"tab-\"+t);if(e)e.style.display=\"none\";});var g=document.getElementById(\"tab-gen\");if(g){g.style.display=\"block\";}else{alert(\"No existe tab-gen\");}document.querySelectorAll(\".tab-btn\").forEach(function(x){x.classList.remove(\"activo\");});b.classList.add(\"activo\");})(this)">Planilla 4 - General</button>'
+        +'<button class="tab-btn" style="background:#333;" onclick="mostrarTab(4,this)">Planilla 4 - General</button>'
         +'<button class="tab-btn" style="background:#e65100;" onclick="mostrarTodas()">Imprimir todas</button>'
         +'</div>'
 
@@ -826,8 +826,7 @@ function abrirLiquidacion() {
         +'function mostrarTab(id,btn){'
         +'  var ids=["des","man","rem","gen"];'
         +'  ids.forEach(function(t){document.getElementById("tab-"+t).style.display="none";});'
-        +'  var el=document.getElementById("tab-"+ids[id-1]);'
-        +'  if(el) el.style.display="block"; else { alert("Error: sección no encontrada: tab-"+ids[id-1]); return; }'
+        +'  document.getElementById("tab-"+ids[id-1]).style.display="block";'
         +'  document.querySelectorAll(".tab-btn").forEach(function(b){b.classList.remove("activo");});'
         +'  if(btn) btn.classList.add("activo");'
         +'}'
