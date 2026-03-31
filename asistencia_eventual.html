@@ -1,18 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<script>
-(function() {
-  var usuario = sessionStorage.getItem('ep_usuario');
-  var loginTime = parseInt(sessionStorage.getItem('ep_login')||0);
-  var horasDesde = (Date.now() - loginTime) / 3600000;
-  if(!usuario || horasDesde >= 8) { window.location.href = 'login.html'; return; }
-  window._epRol = sessionStorage.getItem('ep_rol') || 'OPERADOR';
-  window._epUsuario = usuario;
-})();
-function esAdmin() { return window._epRol === 'ADMIN'; }
-</script>
-
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Asistencia Personal Eventual - El Prado 1</title>
@@ -816,11 +804,9 @@ function abrirLiquidacion() {
         +'<div class="noprint" style="margin-top:15px;">'
         +'<button class="btn-imp" onclick="window.print()">Imprimir / PDF</button>'
         +'<button class="btn-save" onclick="guardarPrestamos()">Guardar Prestamos</button>'
-        +'<button class="btn-save" style="background:#e65100;margin-left:8px;" onclick="guardarBonificaciones()">Guardar Bonificaciones</button>'
         +'</div>'
 
         +'<script>'
-        +'var anioQ='+dg.anio+';var mesQ='+dg.mes+';var quinQ='+quincenaActual+';'
         +'var prestamosIni='+prestamosJSON+';'
 
         +'function mostrarTab(id,btn){'
@@ -891,21 +877,6 @@ function abrirLiquidacion() {
 
         +'function actualizarGas(){'
         +'  document.querySelectorAll(".fila-gen").forEach(function(f){recalcGen(f.querySelector(".inp-litros"));});'
-        +'  // Cargar bonificaciones guardadas'
-        +'  var qKey=anioQ+"_"+mesQ+"_"+quinQ;'
-        +'  var storage=window.opener?window.opener.localStorage:localStorage;'
-        +'  var bonifs=JSON.parse(storage.getItem("bonifEventualDB")||"{}")||{};'
-        +'  if(bonifs[qKey]){'
-        +'    document.querySelectorAll(".fila-gen").forEach(function(f){'
-        +'      var ci=f.dataset.ci;'
-        +'      if(bonifs[qKey][ci]){'
-        +'        f.querySelector(".inp-bonif").value=bonifs[qKey][ci].bonif||0;'
-        +'        f.querySelector(".inp-nota").value=bonifs[qKey][ci].nota||"";'
-        +'        f.querySelector(".inp-litros").value=bonifs[qKey][ci].litros||0;'
-        +'        recalcGen(f.querySelector(".inp-litros"));'
-        +'      }'
-        +'    });'
-        +'  }'
         +'}'
 
         +'function guardarPrestamos(){'
@@ -916,25 +887,8 @@ function abrirLiquidacion() {
         +'    var cu=parseInt(f.querySelector(".inp-cuotas").value)||1;'
         +'    if(tot>0){var prev=prestamosIni[ci]||{pagadas:0};datos[ci]={total:tot,cuotas:cu,pagadas:prev.pagadas+1};}'
         +'  });'
-        +'  var storage=window.opener?window.opener.localStorage:localStorage;'
-        +'  storage.setItem("prestamosEventualDB",JSON.stringify(datos));'
+        +'  localStorage.setItem("prestamosEventualDB",JSON.stringify(datos));'
         +'  alert("Prestamos guardados.");'
-        +'}'
-        +'function guardarBonificaciones(){'
-        +'  var qKey=anioQ+"_"+mesQ+"_"+quinQ;'
-        +'  var storage=window.opener?window.opener.localStorage:localStorage;'
-        +'  var bonifs=JSON.parse(storage.getItem("bonifEventualDB")||"{}")||{};'
-        +'  if(!bonifs[qKey]) bonifs[qKey]={};'
-        +'  document.querySelectorAll(".fila-gen").forEach(function(f){'
-        +'    var ci=f.dataset.ci;'
-        +'    var bonif=parseFloat(f.querySelector(".inp-bonif").value)||0;'
-        +'    var nota=f.querySelector(".inp-nota").value||"";'
-        +'    var litros=parseFloat(f.querySelector(".inp-litros").value)||0;'
-        +'    bonifs[qKey][ci]={bonif:bonif,nota:nota,litros:litros};'
-        +'  });'
-        +'  storage.setItem("bonifEventualDB",JSON.stringify(bonifs));'
-        +'  if(window.opener) window.opener.postMessage({type:"bonifSaved",data:bonifs},"*");'
-        +'  alert("Bonificaciones guardadas.");'
         +'}'
 
         +'window.onload=function(){mostrarTab(1,document.querySelector(".tab-btn"));};'
@@ -958,25 +912,6 @@ function tieneTipoDia(ci, dg, tipo) {
 window.onload = init;
 </script>
 <script>
-window.addEventListener('load', function() {
-  var usuario = sessionStorage.getItem('ep_usuario');
-  var rol = sessionStorage.getItem('ep_rol');
-  var barra = document.createElement('div');
-  barra.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9999;background:rgba(0,0,0,.75);padding:5px 16px;display:flex;align-items:center;justify-content:space-between;';
-  barra.innerHTML = '<span style="font-size:11px;color:rgba(255,255,255,.6);">' + (rol==='ADMIN'?'👑':'📝') + ' ' + usuario + '</span>' +
-    '<button onclick="sessionStorage.clear();window.location.href='login.html'" style="background:none;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.5);padding:3px 10px;border-radius:6px;font-size:10px;cursor:pointer;">Cerrar sesión</button>';
-  document.body.appendChild(barra);
-
-  // Si es operador, ocultar elementos restringidos
-  if(rol !== 'ADMIN') {
-    // Ocultar botones de préstamos/anticipos
-    document.querySelectorAll('.btn-prestamo, .btn-anticipo, [data-admin]').forEach(function(el) {
-      el.style.display = 'none';
-    });
-  }
-});
-</script>
-<script>
 (function() {
   var FB_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com';
   var RRHH_KEYS = ['personalFijoDB','personalEventualDB','actividadesDB',
@@ -996,10 +931,7 @@ window.addEventListener('load', function() {
         Object.keys(data).forEach(function(key) {
           if(data[key] !== null) _orig.call(localStorage, key, JSON.stringify(data[key]));
         });
-        // Recargar la página para que los datos nuevos se apliquen
-        if(typeof init === 'function') { setTimeout(init, 100); }
-        else if(typeof cargarDatos === 'function') { setTimeout(cargarDatos, 100); }
-        else if(typeof render === 'function') { setTimeout(render, 100); }
+        if(typeof init === 'function') setTimeout(init, 200);
       }
     }).catch(function(){});
   });
