@@ -637,20 +637,17 @@ function abrirLiquidacion() {
             var totalMoto = datD.m + datM.m + datR.m;
             if(totalJ===0) return;
             var bruto  = jornal*totalJ + bonoDia*totalMoto;
-            var pd     = prestamos[p.ci]||{total:0,cuotas:1,pagadas:0};
-            var cuota  = pd.total>0?(pd.total/pd.cuotas):0;
-            // Calcular cuotas pagadas según quincenas transcurridas
+            var pd = prestamos[p.ci]||{total:0,cuotas:1,pagadas:0};
+            var cuota = pd.total>0?(pd.total/pd.cuotas):0;
             var pagadasCalc = 0;
             if(pd.total>0 && pd.quincenaInicio) {
                 var qi = pd.quincenaInicio;
-                var idxIni = qi.anio*24 + qi.mes*2 + (qi.quin-1);
-                var idxCur = dg.anio*24 + dg.mes*2 + (quincenaActual-1);
-                pagadasCalc = Math.min(Math.max(0, idxCur - idxIni + 1), pd.cuotas);
-            } else {
-                pagadasCalc = pd.pagadas||0;
-            }
-            var cuotaActual = (pagadasCalc <= pd.cuotas && pd.total>0) ? cuota : 0;
-            var saldo  = Math.max(0, pd.total - pagadasCalc*cuota);
+                var idxIni = qi.anio*24+qi.mes*2+(qi.quin-1);
+                var idxCur = dg.anio*24+dg.mes*2+(quincenaActual-1);
+                pagadasCalc = Math.min(Math.max(0,idxCur-idxIni+1), pd.cuotas);
+            } else { pagadasCalc = pd.pagadas||0; }
+            var cuotaActual = (pagadasCalc>0 && pagadasCalc<=pd.cuotas) ? cuota : 0;
+            var saldo = Math.max(0, pd.total - pagadasCalc*cuota);
             granTotal += bruto;
             var liquido = bruto - cuotaActual;
 
@@ -681,8 +678,8 @@ function abrirLiquidacion() {
                 +'<div style="font-size:11px;text-align:left;padding:3px;">'
                 +'<div>Total: <input type="number" class="inp-ptotal" value="'+(pd.total||'')+'" placeholder="0" min="0" style="width:70px;padding:3px;border:1px solid #ccc;border-radius:3px;" oninput="recalcGen(this)"> Bs.</div>'
                 +'<div>Cuotas: <input type="number" class="inp-cuotas" value="'+(pd.cuotas||1)+'" min="1" style="width:40px;padding:3px;border:1px solid #ccc;border-radius:3px;" oninput="recalcGen(this)"> quincenas</div>'
-                +'<div style="color:#1565c0;font-weight:bold;">Cuota: <span class="cuota-calc">'+cuotaActual.toFixed(2)+'</span> Bs.</div>'
-                +'<div style="color:#888;font-size:10px;">Cuota '+pagadasCalc+'/'+pd.cuotas+' — Saldo: <span class="saldo-calc">'+saldo.toFixed(2)+'</span> Bs.</div>'
+                +'<div style="color:#1565c0;font-weight:bold;">Cuota: <span class="cuota-calc">'+cuotaActual.toFixed(2)+'</span> Bs. ('+pagadasCalc+'/'+pd.cuotas+')</div>'
+                +'<div style="color:#888;font-size:10px;">Saldo pendiente: <span class="saldo-calc">'+saldo.toFixed(2)+'</span> Bs.</div>'
                 +'</div>'
                 +'</td>'
                 +'<td><input type="number" class="inp-litros" value="0" min="0" style="width:55px;padding:3px;border:1px solid #ccc;border-radius:3px;" oninput="recalcGen(this)"><br><small class="costo-gas" style="color:#e65100;"></small></td>'
@@ -779,7 +776,7 @@ function abrirLiquidacion() {
         +'.panel-config{background:#fff3e0;padding:10px 15px;border-radius:8px;margin-bottom:15px;display:flex;gap:15px;align-items:center;flex-wrap:wrap;}'
         +'.btn-imp{background:#1565c0;color:white;border:none;padding:10px 20px;border-radius:5px;cursor:pointer;font-size:13px;font-weight:bold;}'
         +'.btn-save{background:#2e7d32;color:white;border:none;padding:10px 18px;border-radius:5px;cursor:pointer;font-size:13px;font-weight:bold;margin-left:8px;}'
-        +'@media print{.noprint{display:none;}h2,h3,.panel-config,.tab-btns,input,select,button,.inp-bonif,.inp-nota,.inp-litros,.inp-ptotal,.inp-cuotas,.costo-gas,.sel-cat{display:none!important;}body{background:white;margin:0;padding:0;}.seccion{box-shadow:none;page-break-after:always;}.seccion:last-child{page-break-after:avoid;}}'
+        +'@media print{.noprint{display:none;}body{background:white;}.seccion{box-shadow:none;page-break-after:always;}.seccion:last-child{page-break-after:avoid;}}'
         +'</style></head><body>'
         +'<h2>Liquidacion: Personal Eventual</h2>'
         +'<h3>'+qTexto+'</h3>'
@@ -814,27 +811,13 @@ function abrirLiquidacion() {
 
         +'<div class="noprint" style="margin-top:15px;">'
         +'<button class="btn-imp" onclick="window.print()">Imprimir / PDF</button>'
-        +'<button id="btnGuardar" class="btn-save" style="background:#1b5e20;font-size:15px;padding:12px 28px;" onclick="guardarTodo()">💾 Guardar Todo</button>'
-        +'<button id="btnCerrar" class="btn-save" style="background:#b71c1c;margin-left:10px;font-size:15px;padding:12px 28px;" onclick="cerrarQuincena()">🔒 Cerrar Quincena</button>'
-        +'<button class="btn-imp" style="background:#1565c0;margin-left:10px;" onclick="window.print()">🖨 Imprimir / PDF</button>'
+        +'<button class="btn-save" style="background:#1b5e20;padding:10px 24px;font-size:14px;" onclick="guardarTodo()">💾 Guardar Todo</button>'
         +'</div>'
 
         +'<script>'
         +'var anioQ='+dg.anio+',mesQ='+dg.mes+',quinQ='+quincenaActual+';'
+        +'var gasPrecioIni='+(function(){ var g=JSON.parse(localStorage.getItem('gasPrecioEventualDB')||'{}'); return g[dg.anio+'_'+dg.mes+'_'+quincenaActual]||3.72; }())+';'
         +'var prestamosIni='+prestamosJSON+';'
-        +'var gasPrecioGuardado='+(function(){
-            var gk='gasPrecioEventualDB';
-            var gd=JSON.parse(localStorage.getItem(gk)||'{}');
-            var qk=dg.anio+'_'+dg.mes+'_'+quincenaActual;
-            return gd[qk]||3.72;
-        }())+';'
-        +'var quincerraCerrada='+(function(){
-            var ck='quincerasCerradasDB';
-            var cd=JSON.parse(localStorage.getItem(ck)||'{}');
-            var qk=dg.anio+'_'+dg.mes+'_'+quincenaActual;
-            var rol=sessionStorage.getItem("ep_rol")||"OPERADOR";
-            return (cd[qk]&&rol!="ADMIN")?'true':'false';
-        }())+';'
 
         +'function mostrarTab(id,btn){'
         +'  var ids=["des","man","rem","gen"];'
@@ -906,22 +889,11 @@ function abrirLiquidacion() {
         +'  document.querySelectorAll(".fila-gen").forEach(function(f){recalcGen(f.querySelector(".inp-litros"));});'
         +'}'
 
-        +'function cerrarQuincena(){'
-        +'  if(!confirm("¿Cerrar definitivamente esta quincena? Los operadores no podrán modificarla.")) return;'
-        +'  guardarTodo(true);'
+        +'function guardarTodo(){'
         +'  var st=window.opener?window.opener.localStorage:localStorage;'
         +'  var qKey=String(anioQ)+"_"+String(mesQ)+"_"+String(quinQ);'
-        +'  var cd=JSON.parse(st.getItem("quincerasCerradasDB")||"{}")||{};'
-        +'  cd[qKey]=true;'
-        +'  st.setItem("quincerasCerradasDB",JSON.stringify(cd));'
-        +'  alert("✅ Quincena cerrada. Solo el administrador puede modificarla.");'
-        +'  document.querySelectorAll("input,select").forEach(function(e){e.disabled=true;});'
-        +'  document.getElementById("btnGuardar").style.display="none";'
-        +'  document.getElementById("btnCerrar").style.display="none";'
-        +'}'
-        +'function guardarTodo(silencioso){'
-        +'  var st=window.opener?window.opener.localStorage:localStorage;'
-        +'  var prestamos={};'
+        +'  // Guardar anticipos'
+        +'  var prests={};'
         +'  document.querySelectorAll(".fila-gen").forEach(function(f){'
         +'    var ci=f.dataset.ci;'
         +'    var tot=parseFloat(f.querySelector(".inp-ptotal").value)||0;'
@@ -929,11 +901,11 @@ function abrirLiquidacion() {
         +'    if(tot>0){'
         +'      var prev=prestamosIni[ci]||{pagadas:0,cuotas:1,total:0};'
         +'      var qi=prev.quincenaInicio||{anio:anioQ,mes:mesQ,quin:quinQ};'
-        +'      prestamos[ci]={total:tot,cuotas:cu,pagadas:prev.pagadas+1,quincenaInicio:qi};'
+        +'      prests[ci]={total:tot,cuotas:cu,pagadas:prev.pagadas,quincenaInicio:qi};'
         +'    }'
         +'  });'
-        +'  st.setItem("prestamosEventualDB",JSON.stringify(prestamos));'
-        +'  var qKey=String(anioQ)+"_"+String(mesQ)+"_"+String(quinQ);'
+        +'  st.setItem("prestamosEventualDB",JSON.stringify(prests));'
+        +'  // Guardar bonificaciones y gasolina'
         +'  var bonifs=JSON.parse(st.getItem("bonifEventualDB")||"{}")||{};'
         +'  bonifs[qKey]={};'
         +'  document.querySelectorAll(".fila-gen").forEach(function(f){'
@@ -942,43 +914,18 @@ function abrirLiquidacion() {
         +'  });'
         +'  st.setItem("bonifEventualDB",JSON.stringify(bonifs));'
         +'  // Guardar precio gasolina'
-        +'  var gd=JSON.parse(st.getItem("gasPrecioEventualDB")||"{}")||{};'
-        +'  gd[qKey]=parseFloat(document.getElementById("precio-gas").value)||3.72;'
-        +'  st.setItem("gasPrecioEventualDB",JSON.stringify(gd));'
-        +'  if(!silencioso) alert("✅ Todo guardado correctamente.");'
+        +'  var gp=JSON.parse(st.getItem("gasPrecioEventualDB")||"{}")||{};'
+        +'  gp[qKey]=parseFloat(document.getElementById("precio-gas").value)||3.72;'
+        +'  st.setItem("gasPrecioEventualDB",JSON.stringify(gp));'
+        +'  alert("Todo guardado correctamente.");'
         +'}'
 
         +'window.onload=function(){'
         +'  mostrarTab(1,document.querySelector(".tab-btn"));'
         +'  var st=window.opener?window.opener.localStorage:localStorage;'
         +'  var qKey=String(anioQ)+"_"+String(mesQ)+"_"+String(quinQ);'
-        +'  // Cargar bonificaciones guardadas'
         +'  var bonifs=JSON.parse(st.getItem("bonifEventualDB")||"{}")||{};'
         +'  if(bonifs[qKey]){document.querySelectorAll(".fila-gen").forEach(function(f){var ci=f.dataset.ci;var bd=bonifs[qKey][ci];if(bd){f.querySelector(".inp-bonif").value=bd.bonif||0;f.querySelector(".inp-nota").value=bd.nota||"";f.querySelector(".inp-litros").value=bd.litros||0;recalcGen(f.querySelector(".inp-litros"));}});}'
-        +'  // Propagar préstamos de quincenas anteriores'
-        +'  document.querySelectorAll(".fila-gen").forEach(function(f){'
-        +'    var ci=f.dataset.ci;'
-        +'    var pd=prestamosIni[ci]||{total:0,cuotas:1,pagadas:0};'
-        +'    if(pd.total>0 && pd.quincenaInicio){'
-        +'      var qi=pd.quincenaInicio;'
-        +'      var idxIni=qi.anio*24+qi.mes*2+(qi.quin-1);'
-        +'      var idxCur=anioQ*24+mesQ*2+(quinQ-1);'
-        +'      var pagadasAuto=Math.min(idxCur-idxIni+1,pd.cuotas);'
-        +'      f.querySelector(".inp-ptotal").value=pd.total;'
-        +'      f.querySelector(".inp-cuotas").value=pd.cuotas;'
-        +'      recalcGen(f.querySelector(".inp-litros"));'
-        +'    }'
-        +'  });'
-        +'  // Bloquear si quincena cerrada'
-        +'  if(quincerraCerrada===true||quincerraCerrada==="true"){'
-        +'    document.querySelectorAll("input,select").forEach(function(e){e.disabled=true;});'
-        +'    document.getElementById("btnGuardar").style.display="none";'
-        +'    document.getElementById("btnCerrar").style.display="none";'
-        +'    var aviso=document.createElement("div");'
-        +'    aviso.innerHTML="🔒 Esta quincena está cerrada. Solo el administrador puede modificarla.";'
-        +'    aviso.style.cssText="background:#fff3e0;border:1px solid #ff9800;padding:10px 16px;border-radius:6px;font-weight:bold;color:#e65100;margin-bottom:10px;";'
-        +'    document.body.insertBefore(aviso,document.body.firstChild);'
-        +'  }'
         +'};'
         +'<\/script></body></html>';
 
@@ -1004,7 +951,7 @@ window.onload = init;
   var FB_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com';
   var RRHH_KEYS = ['personalFijoDB','personalEventualDB','actividadesDB',
     'asistFijoCierres','asistFijoPeriodoInicio','prestamosEventualDB',
-    'retirosDB','saldoOcultos','smn_prado','bonifEventualDB'];
+    'retirosDB','saldoOcultos','smn_prado','bonifEventualDB','gasPrecioEventualDB'];
   function fbWrite(path, val) {
     fetch(FB_URL + path + '.json', {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(val)}).catch(function(){});
   }
