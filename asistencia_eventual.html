@@ -815,6 +815,8 @@ function abrirLiquidacion() {
         +'</div>'
 
         +'<script>'
+        +'var _anioQ='+dg.anio+',_mesQ='+dg.mes+',_quinQ='+quincenaActual+';'
+        +'var _gasIni='+(JSON.parse(localStorage.getItem('gasPrecioEventualDB')||'{}')[dg.anio+'_'+dg.mes+'_'+quincenaActual]||3.72)+';'
         +'var prestamosIni='+prestamosJSON+';'
 
         +'function mostrarTab(id,btn){'
@@ -895,8 +897,13 @@ function abrirLiquidacion() {
         +'    var cu=parseInt(f.querySelector(".inp-cuotas").value)||1;'
         +'    if(tot>0){var prev=prestamosIni[ci]||{pagadas:0};datos[ci]={total:tot,cuotas:cu,pagadas:prev.pagadas+1};}'
         +'  });'
-        +'  localStorage.setItem("prestamosEventualDB",JSON.stringify(datos));'
-        +'  alert("Prestamos guardados.");'
+        +'  var _st=window.opener?window.opener.localStorage:localStorage;'
+        +'  _st.setItem("prestamosEventualDB",JSON.stringify(datos));'
+        +'  var _gp=JSON.parse(_st.getItem("gasPrecioEventualDB")||"{}")||{};'
+        +'  var _qk=String(_anioQ)+"_"+String(_mesQ)+"_"+String(_quinQ);'
+        +'  _gp[_qk]=parseFloat(document.getElementById("precio-gas").value)||3.72;'
+        +'  _st.setItem("gasPrecioEventualDB",JSON.stringify(_gp));'
+        +'  alert("Guardado correctamente.");'
         +'}'
 
         +'window.onload=function(){mostrarTab(1,document.querySelector(".tab-btn"));};'
