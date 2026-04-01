@@ -679,7 +679,7 @@ function abrirLiquidacion() {
                 +'<div>Total: <input type="number" class="inp-ptotal" value="'+(pd.total||'')+'" placeholder="0" min="0" style="width:70px;padding:3px;border:1px solid #ccc;border-radius:3px;" oninput="recalcGen(this)"> Bs.</div>'
                 +'<div>Cuotas: <input type="number" class="inp-cuotas" value="'+(pd.cuotas||1)+'" min="1" style="width:40px;padding:3px;border:1px solid #ccc;border-radius:3px;" oninput="recalcGen(this)"> quincenas</div>'
                 +'<div style="color:#1565c0;font-weight:bold;">Cuota: <span class="cuota-calc">'+cuota.toFixed(2)+'</span> Bs.</div>'
-                +'<div style="color:#888;font-size:10px;">Saldo: <span class="saldo-calc">'+saldo.toFixed(2)+'</span> Bs.</div>'
+                +'<div style="color:#888;font-size:10px;">Saldo pendiente: <span class="saldo-calc">'+saldo.toFixed(2)+'</span> Bs.</div>'
                 +'</div>'
                 +'</td>'
                 +'<td><input type="number" class="inp-litros" value="0" min="0" style="width:55px;padding:3px;border:1px solid #ccc;border-radius:3px;" oninput="recalcGen(this)"><br><small class="costo-gas" style="color:#e65100;"></small></td>'
@@ -815,7 +815,7 @@ function abrirLiquidacion() {
         +'</div>'
 
         +'<script>'
-        +'var anioQI='+dg.anio+',mesQI='+dg.mes+',quinQI='+quincenaActual+';var gasPrecioIni='+(JSON.parse(localStorage.getItem('gasPrecioEventualDB')||'{}')[dg.anio+'_'+dg.mes+'_'+quincenaActual]||3.72)+';var prestamosIni='+prestamosJSON+';'
+        +'var prestamosIni='+prestamosJSON+';'
 
         +'function mostrarTab(id,btn){'
         +'  var ids=["des","man","rem","gen"];'
@@ -893,9 +893,9 @@ function abrirLiquidacion() {
         +'    var ci=f.dataset.ci;'
         +'    var tot=parseFloat(f.querySelector(".inp-ptotal").value)||0;'
         +'    var cu=parseInt(f.querySelector(".inp-cuotas").value)||1;'
-        +'    if(tot>0){var prev=prestamosIni[ci]||{pagadas:0};var qi=prev.quincenaInicio||{anio:anioQI,mes:mesQI,quin:quinQI};datos[ci]={total:tot,cuotas:cu,pagadas:prev.pagadas,quincenaInicio:qi};}'
+        +'    if(tot>0){var prev=prestamosIni[ci]||{pagadas:0};datos[ci]={total:tot,cuotas:cu,pagadas:prev.pagadas+1};}'
         +'  });'
-        +'  var st=window.opener?window.opener.localStorage:localStorage;st.setItem("prestamosEventualDB",JSON.stringify(datos));var gp=JSON.parse(st.getItem("gasPrecioEventualDB")||"{}")||{};var qk=String(anioQI)+"_"+String(mesQI)+"_"+String(quinQI);gp[qk]=parseFloat(document.getElementById("precio-gas").value)||3.72;st.setItem("gasPrecioEventualDB",JSON.stringify(gp));'
+        +'  localStorage.setItem("prestamosEventualDB",JSON.stringify(datos));'
         +'  alert("Prestamos guardados.");'
         +'}'
 
@@ -920,14 +920,7 @@ function tieneTipoDia(ci, dg, tipo) {
 window.onload = init;
 </script>
 <script>
-(function() {
-  var FB_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com';
-  var KEYS = ['personalFijoDB','personalEventualDB','actividadesDB','asistFijoCierres','asistFijoPeriodoInicio','prestamosEventualDB','retirosDB','saldoOcultos','smn_prado','bonifEventualDB','gasPrecioEventualDB'];
-  function fbW(k,v){fetch(FB_URL+'/rrhh/'+k+'.json',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)}).catch(function(){});}
-  var _o=Storage.prototype.setItem;
-  Storage.prototype.setItem=function(k,v){_o.call(this,k,v);try{if(KEYS.indexOf(k)>=0)fbW(k,JSON.parse(v));}catch(e){}};
-  window.addEventListener('load',function(){fetch(FB_URL+'/rrhh.json').then(function(r){return r.json();}).then(function(d){if(d&&typeof d==='object')Object.keys(d).forEach(function(k){if(d[k]!==null)_o.call(localStorage,k,JSON.stringify(d[k]));});if(typeof init==='function')setTimeout(init,200);}).catch(function(){});});
-})();
+(function(){var U='https://elprado1-153ef-default-rtdb.firebaseio.com';var K=['personalFijoDB','personalEventualDB','actividadesDB','asistFijoCierres','asistFijoPeriodoInicio','prestamosEventualDB','retirosDB','saldoOcultos','smn_prado'];function w(k,v){fetch(U+'/rrhh/'+k+'.json',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)}).catch(function(){});}var o=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){o.call(this,k,v);try{if(K.indexOf(k)>=0)w(k,JSON.parse(v));}catch(e){}};window.addEventListener('load',function(){fetch(U+'/rrhh.json').then(function(r){return r.json();}).then(function(d){if(d)Object.keys(d).forEach(function(k){if(d[k]!==null)o.call(localStorage,k,JSON.stringify(d[k]));});if(typeof init==='function')setTimeout(init,200);}).catch(function(){});});})();
 </script>
 </body>
 </html>
