@@ -678,8 +678,8 @@ function abrirLiquidacion() {
                 +'<div style="font-size:11px;text-align:left;padding:3px;">'
                 +'<div>Total: <input type="number" class="inp-ptotal" value="'+(pd.total||'')+'" placeholder="0" min="0" style="width:70px;padding:3px;border:1px solid #ccc;border-radius:3px;" oninput="recalcGen(this)"> Bs.</div>'
                 +'<div>Cuotas: <input type="number" class="inp-cuotas" value="'+(pd.cuotas||1)+'" min="1" style="width:40px;padding:3px;border:1px solid #ccc;border-radius:3px;" oninput="recalcGen(this)"> quincenas</div>'
-                +'<div style="color:#1565c0;font-weight:bold;">Cuota: <span class="cuota-calc">'+cuotaActual.toFixed(2)+'</span> Bs. ('+pagadasCalc+'/'+pd.cuotas+')</div>'
-                +'<div style="color:#888;font-size:10px;">Saldo pendiente: <span class="saldo-calc">'+saldo.toFixed(2)+'</span> Bs.</div>'
+                +'<div style="color:#1565c0;font-weight:bold;">Cuota: <span class="cuota-calc">'+cuota.toFixed(2)+'</span> Bs.</div>'
+                +'<div style="color:#888;font-size:10px;">Saldo: <span class="saldo-calc">'+saldo.toFixed(2)+'</span> Bs.</div>'
                 +'</div>'
                 +'</td>'
                 +'<td><input type="number" class="inp-litros" value="0" min="0" style="width:55px;padding:3px;border:1px solid #ccc;border-radius:3px;" oninput="recalcGen(this)"><br><small class="costo-gas" style="color:#e65100;"></small></td>'
@@ -811,13 +811,11 @@ function abrirLiquidacion() {
 
         +'<div class="noprint" style="margin-top:15px;">'
         +'<button class="btn-imp" onclick="window.print()">Imprimir / PDF</button>'
-        +'<button class="btn-save" style="background:#1b5e20;padding:10px 24px;font-size:14px;" onclick="guardarTodo()">💾 Guardar Todo</button>'
+        +'<button class="btn-save" onclick="guardarPrestamos()">Guardar Prestamos</button>'
         +'</div>'
 
         +'<script>'
-        +'var anioQ='+dg.anio+',mesQ='+dg.mes+',quinQ='+quincenaActual+';'
-        +'var gasPrecioIni='+(function(){ var g=JSON.parse(localStorage.getItem('gasPrecioEventualDB')||'{}'); return g[dg.anio+'_'+dg.mes+'_'+quincenaActual]||3.72; }())+';'
-        +'var prestamosIni='+prestamosJSON+';'
+        +'var anioQI='+dg.anio+',mesQI='+dg.mes+',quinQI='+quincenaActual+';var gasPrecioIni='+(JSON.parse(localStorage.getItem('gasPrecioEventualDB')||'{}')[dg.anio+'_'+dg.mes+'_'+quincenaActual]||3.72)+';var prestamosIni='+prestamosJSON+';'
 
         +'function mostrarTab(id,btn){'
         +'  var ids=["des","man","rem","gen"];'
@@ -889,44 +887,19 @@ function abrirLiquidacion() {
         +'  document.querySelectorAll(".fila-gen").forEach(function(f){recalcGen(f.querySelector(".inp-litros"));});'
         +'}'
 
-        +'function guardarTodo(){'
-        +'  var st=window.opener?window.opener.localStorage:localStorage;'
-        +'  var qKey=String(anioQ)+"_"+String(mesQ)+"_"+String(quinQ);'
-        +'  // Guardar anticipos'
-        +'  var prests={};'
+        +'function guardarPrestamos(){'
+        +'  var datos={};'
         +'  document.querySelectorAll(".fila-gen").forEach(function(f){'
         +'    var ci=f.dataset.ci;'
         +'    var tot=parseFloat(f.querySelector(".inp-ptotal").value)||0;'
         +'    var cu=parseInt(f.querySelector(".inp-cuotas").value)||1;'
-        +'    if(tot>0){'
-        +'      var prev=prestamosIni[ci]||{pagadas:0,cuotas:1,total:0};'
-        +'      var qi=prev.quincenaInicio||{anio:anioQ,mes:mesQ,quin:quinQ};'
-        +'      prests[ci]={total:tot,cuotas:cu,pagadas:prev.pagadas,quincenaInicio:qi};'
-        +'    }'
+        +'    if(tot>0){var prev=prestamosIni[ci]||{pagadas:0};var qi=prev.quincenaInicio||{anio:anioQI,mes:mesQI,quin:quinQI};datos[ci]={total:tot,cuotas:cu,pagadas:prev.pagadas,quincenaInicio:qi};}'
         +'  });'
-        +'  st.setItem("prestamosEventualDB",JSON.stringify(prests));'
-        +'  // Guardar bonificaciones y gasolina'
-        +'  var bonifs=JSON.parse(st.getItem("bonifEventualDB")||"{}")||{};'
-        +'  bonifs[qKey]={};'
-        +'  document.querySelectorAll(".fila-gen").forEach(function(f){'
-        +'    var ci=f.dataset.ci;'
-        +'    bonifs[qKey][ci]={bonif:parseFloat(f.querySelector(".inp-bonif").value)||0,nota:f.querySelector(".inp-nota").value||"",litros:parseFloat(f.querySelector(".inp-litros").value)||0};'
-        +'  });'
-        +'  st.setItem("bonifEventualDB",JSON.stringify(bonifs));'
-        +'  // Guardar precio gasolina'
-        +'  var gp=JSON.parse(st.getItem("gasPrecioEventualDB")||"{}")||{};'
-        +'  gp[qKey]=parseFloat(document.getElementById("precio-gas").value)||3.72;'
-        +'  st.setItem("gasPrecioEventualDB",JSON.stringify(gp));'
-        +'  alert("Todo guardado correctamente.");'
+        +'  var st=window.opener?window.opener.localStorage:localStorage;st.setItem("prestamosEventualDB",JSON.stringify(datos));var gp=JSON.parse(st.getItem("gasPrecioEventualDB")||"{}")||{};var qk=String(anioQI)+"_"+String(mesQI)+"_"+String(quinQI);gp[qk]=parseFloat(document.getElementById("precio-gas").value)||3.72;st.setItem("gasPrecioEventualDB",JSON.stringify(gp));'
+        +'  alert("Prestamos guardados.");'
         +'}'
 
-        +'window.onload=function(){'
-        +'  mostrarTab(1,document.querySelector(".tab-btn"));'
-        +'  var st=window.opener?window.opener.localStorage:localStorage;'
-        +'  var qKey=String(anioQ)+"_"+String(mesQ)+"_"+String(quinQ);'
-        +'  var bonifs=JSON.parse(st.getItem("bonifEventualDB")||"{}")||{};'
-        +'  if(bonifs[qKey]){document.querySelectorAll(".fila-gen").forEach(function(f){var ci=f.dataset.ci;var bd=bonifs[qKey][ci];if(bd){f.querySelector(".inp-bonif").value=bd.bonif||0;f.querySelector(".inp-nota").value=bd.nota||"";f.querySelector(".inp-litros").value=bd.litros||0;recalcGen(f.querySelector(".inp-litros"));}});}'
-        +'};'
+        +'window.onload=function(){mostrarTab(1,document.querySelector(".tab-btn"));};'
         +'<\/script></body></html>';
 
     ventana.document.write(html);
@@ -949,27 +922,11 @@ window.onload = init;
 <script>
 (function() {
   var FB_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com';
-  var RRHH_KEYS = ['personalFijoDB','personalEventualDB','actividadesDB',
-    'asistFijoCierres','asistFijoPeriodoInicio','prestamosEventualDB',
-    'retirosDB','saldoOcultos','smn_prado','bonifEventualDB','gasPrecioEventualDB'];
-  function fbWrite(path, val) {
-    fetch(FB_URL + path + '.json', {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(val)}).catch(function(){});
-  }
-  var _orig = Storage.prototype.setItem;
-  Storage.prototype.setItem = function(key, value) {
-    _orig.call(this, key, value);
-    try { if(RRHH_KEYS.indexOf(key) >= 0) fbWrite('/rrhh/' + key, JSON.parse(value)); } catch(e) {}
-  };
-  window.addEventListener('load', function() {
-    fetch(FB_URL + '/rrhh.json').then(function(r){ return r.json(); }).then(function(data) {
-      if(data && typeof data === 'object') {
-        Object.keys(data).forEach(function(key) {
-          if(data[key] !== null) _orig.call(localStorage, key, JSON.stringify(data[key]));
-        });
-        if(typeof init === 'function') setTimeout(init, 200);
-      }
-    }).catch(function(){});
-  });
+  var KEYS = ['personalFijoDB','personalEventualDB','actividadesDB','asistFijoCierres','asistFijoPeriodoInicio','prestamosEventualDB','retirosDB','saldoOcultos','smn_prado','bonifEventualDB','gasPrecioEventualDB'];
+  function fbW(k,v){fetch(FB_URL+'/rrhh/'+k+'.json',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)}).catch(function(){});}
+  var _o=Storage.prototype.setItem;
+  Storage.prototype.setItem=function(k,v){_o.call(this,k,v);try{if(KEYS.indexOf(k)>=0)fbW(k,JSON.parse(v));}catch(e){}};
+  window.addEventListener('load',function(){fetch(FB_URL+'/rrhh.json').then(function(r){return r.json();}).then(function(d){if(d&&typeof d==='object')Object.keys(d).forEach(function(k){if(d[k]!==null)_o.call(localStorage,k,JSON.stringify(d[k]));});if(typeof init==='function')setTimeout(init,200);}).catch(function(){});});
 })();
 </script>
 </body>
