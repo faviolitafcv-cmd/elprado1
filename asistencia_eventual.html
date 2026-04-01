@@ -803,12 +803,27 @@ function abrirLiquidacion() {
 
         +'<div class="noprint" style="margin-top:15px;">'
         +'<button class="btn-imp" onclick="window.print()">Imprimir / PDF</button>'
-        +'<button class="btn-save" style="background:#1b5e20;font-size:15px;padding:12px 28px;" onclick="guardarTodo()">💾 Guardar Todo</button>'
+        +'<button id="btnGuardar" class="btn-save" style="background:#1b5e20;font-size:15px;padding:12px 28px;" onclick="guardarTodo()">💾 Guardar Todo</button>'
+        +'<button id="btnCerrar" class="btn-save" style="background:#b71c1c;margin-left:10px;font-size:15px;padding:12px 28px;" onclick="cerrarQuincena()">🔒 Cerrar Quincena</button>'
+        +'<button class="btn-imp" style="background:#1565c0;margin-left:10px;" onclick="window.print()">🖨 Imprimir / PDF</button>'
         +'</div>'
 
         +'<script>'
         +'var anioQ='+dg.anio+',mesQ='+dg.mes+',quinQ='+quincenaActual+';'
         +'var prestamosIni='+prestamosJSON+';'
+        +'var gasPrecioGuardado='+(function(){
+            var gk='gasPrecioEventualDB';
+            var gd=JSON.parse(localStorage.getItem(gk)||'{}');
+            var qk=dg.anio+'_'+dg.mes+'_'+quincenaActual;
+            return gd[qk]||3.72;
+        }())+';'
+        +'var quincerraCerrada='+(function(){
+            var ck='quincerasCerradasDB';
+            var cd=JSON.parse(localStorage.getItem(ck)||'{}');
+            var qk=dg.anio+'_'+dg.mes+'_'+quincenaActual;
+            var rol=sessionStorage.getItem("ep_rol")||"OPERADOR";
+            return (cd[qk]&&rol!="ADMIN")?'true':'false';
+        }())+';'
 
         +'function mostrarTab(id,btn){'
         +'  var ids=["des","man","rem","gen"];'
@@ -880,14 +895,31 @@ function abrirLiquidacion() {
         +'  document.querySelectorAll(".fila-gen").forEach(function(f){recalcGen(f.querySelector(".inp-litros"));});'
         +'}'
 
-        +'function guardarTodo(){'
+        +'function cerrarQuincena(){'
+        +'  if(!confirm("¿Cerrar definitivamente esta quincena? Los operadores no podrán modificarla.")) return;'
+        +'  guardarTodo(true);'
+        +'  var st=window.opener?window.opener.localStorage:localStorage;'
+        +'  var qKey=String(anioQ)+"_"+String(mesQ)+"_"+String(quinQ);'
+        +'  var cd=JSON.parse(st.getItem("quincerasCerradasDB")||"{}")||{};'
+        +'  cd[qKey]=true;'
+        +'  st.setItem("quincerasCerradasDB",JSON.stringify(cd));'
+        +'  alert("✅ Quincena cerrada. Solo el administrador puede modificarla.");'
+        +'  document.querySelectorAll("input,select").forEach(function(e){e.disabled=true;});'
+        +'  document.getElementById("btnGuardar").style.display="none";'
+        +'  document.getElementById("btnCerrar").style.display="none";'
+        +'}'
+        +'function guardarTodo(silencioso){'
         +'  var st=window.opener?window.opener.localStorage:localStorage;'
         +'  var prestamos={};'
         +'  document.querySelectorAll(".fila-gen").forEach(function(f){'
         +'    var ci=f.dataset.ci;'
         +'    var tot=parseFloat(f.querySelector(".inp-ptotal").value)||0;'
         +'    var cu=parseInt(f.querySelector(".inp-cuotas").value)||1;'
-        +'    if(tot>0){var prev=prestamosIni[ci]||{pagadas:0};prestamos[ci]={total:tot,cuotas:cu,pagadas:prev.pagadas+1};}'
+        +'    if(tot>0){'
+        +'      var prev=prestamosIni[ci]||{pagadas:0,cuotas:1,total:0};'
+        +'      var qi=prev.quincenaInicio||{anio:anioQ,mes:mesQ,quin:quinQ};'
+        +'      prestamos[ci]={total:tot,cuotas:cu,pagadas:prev.pagadas+1,quincenaInicio:qi};'
+        +'    }'
         +'  });'
         +'  st.setItem("prestamosEventualDB",JSON.stringify(prestamos));'
         +'  var qKey=String(anioQ)+"_"+String(mesQ)+"_"+String(quinQ);'
@@ -898,15 +930,44 @@ function abrirLiquidacion() {
         +'    bonifs[qKey][ci]={bonif:parseFloat(f.querySelector(".inp-bonif").value)||0,nota:f.querySelector(".inp-nota").value||"",litros:parseFloat(f.querySelector(".inp-litros").value)||0};'
         +'  });'
         +'  st.setItem("bonifEventualDB",JSON.stringify(bonifs));'
-        +'  alert("✅ Todo guardado correctamente.");'
+        +'  // Guardar precio gasolina'
+        +'  var gd=JSON.parse(st.getItem("gasPrecioEventualDB")||"{}")||{};'
+        +'  gd[qKey]=parseFloat(document.getElementById("precio-gas").value)||3.72;'
+        +'  st.setItem("gasPrecioEventualDB",JSON.stringify(gd));'
+        +'  if(!silencioso) alert("✅ Todo guardado correctamente.");'
         +'}'
 
         +'window.onload=function(){'
         +'  mostrarTab(1,document.querySelector(".tab-btn"));'
         +'  var st=window.opener?window.opener.localStorage:localStorage;'
         +'  var qKey=String(anioQ)+"_"+String(mesQ)+"_"+String(quinQ);'
+        +'  // Cargar bonificaciones guardadas'
         +'  var bonifs=JSON.parse(st.getItem("bonifEventualDB")||"{}")||{};'
         +'  if(bonifs[qKey]){document.querySelectorAll(".fila-gen").forEach(function(f){var ci=f.dataset.ci;var bd=bonifs[qKey][ci];if(bd){f.querySelector(".inp-bonif").value=bd.bonif||0;f.querySelector(".inp-nota").value=bd.nota||"";f.querySelector(".inp-litros").value=bd.litros||0;recalcGen(f.querySelector(".inp-litros"));}});}'
+        +'  // Propagar préstamos de quincenas anteriores'
+        +'  document.querySelectorAll(".fila-gen").forEach(function(f){'
+        +'    var ci=f.dataset.ci;'
+        +'    var pd=prestamosIni[ci]||{total:0,cuotas:1,pagadas:0};'
+        +'    if(pd.total>0 && pd.quincenaInicio){'
+        +'      var qi=pd.quincenaInicio;'
+        +'      var idxIni=qi.anio*24+qi.mes*2+(qi.quin-1);'
+        +'      var idxCur=anioQ*24+mesQ*2+(quinQ-1);'
+        +'      var pagadasAuto=Math.min(idxCur-idxIni+1,pd.cuotas);'
+        +'      f.querySelector(".inp-ptotal").value=pd.total;'
+        +'      f.querySelector(".inp-cuotas").value=pd.cuotas;'
+        +'      recalcGen(f.querySelector(".inp-litros"));'
+        +'    }'
+        +'  });'
+        +'  // Bloquear si quincena cerrada'
+        +'  if(quincerraCerrada===true||quincerraCerrada==="true"){'
+        +'    document.querySelectorAll("input,select").forEach(function(e){e.disabled=true;});'
+        +'    document.getElementById("btnGuardar").style.display="none";'
+        +'    document.getElementById("btnCerrar").style.display="none";'
+        +'    var aviso=document.createElement("div");'
+        +'    aviso.innerHTML="🔒 Esta quincena está cerrada. Solo el administrador puede modificarla.";'
+        +'    aviso.style.cssText="background:#fff3e0;border:1px solid #ff9800;padding:10px 16px;border-radius:6px;font-weight:bold;color:#e65100;margin-bottom:10px;";'
+        +'    document.body.insertBefore(aviso,document.body.firstChild);'
+        +'  }'
         +'};'
         +'<\/script></body></html>';
 
