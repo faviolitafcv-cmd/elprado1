@@ -804,9 +804,11 @@ function abrirLiquidacion() {
         +'<div class="noprint" style="margin-top:15px;">'
         +'<button class="btn-imp" onclick="window.print()">Imprimir / PDF</button>'
         +'<button class="btn-save" onclick="guardarPrestamos()">Guardar Prestamos</button>'
+        +'<button class="btn-save" style="background:#e65100;margin-left:8px;" onclick="guardarBonificaciones()">Guardar Bonificaciones</button>'
         +'</div>'
 
         +'<script>'
+        +'var anioQ='+dg.anio+',mesQ='+dg.mes+',quinQ='+quincenaActual+';'
         +'var prestamosIni='+prestamosJSON+';'
 
         +'function mostrarTab(id,btn){'
@@ -887,11 +889,44 @@ function abrirLiquidacion() {
         +'    var cu=parseInt(f.querySelector(".inp-cuotas").value)||1;'
         +'    if(tot>0){var prev=prestamosIni[ci]||{pagadas:0};datos[ci]={total:tot,cuotas:cu,pagadas:prev.pagadas+1};}'
         +'  });'
-        +'  localStorage.setItem("prestamosEventualDB",JSON.stringify(datos));'
+        +'  var st=window.opener?window.opener.localStorage:localStorage;'
+        +'  st.setItem("prestamosEventualDB",JSON.stringify(datos));'
         +'  alert("Prestamos guardados.");'
         +'}'
 
-        +'window.onload=function(){mostrarTab(1,document.querySelector(".tab-btn"));};'
+        +'function guardarBonificaciones(){'
+        +'  var st=window.opener?window.opener.localStorage:localStorage;'
+        +'  var qKey=String(anioQ)+"_"+String(mesQ)+"_"+String(quinQ);'
+        +'  var bonifs=JSON.parse(st.getItem("bonifEventualDB")||"{}")||{};'
+        +'  bonifs[qKey]={};'
+        +'  document.querySelectorAll(".fila-gen").forEach(function(f){'
+        +'    var ci=f.dataset.ci;'
+        +'    var bonif=parseFloat(f.querySelector(".inp-bonif").value)||0;'
+        +'    var nota=f.querySelector(".inp-nota").value||"";'
+        +'    var litros=parseFloat(f.querySelector(".inp-litros").value)||0;'
+        +'    bonifs[qKey][ci]={bonif:bonif,nota:nota,litros:litros};'
+        +'  });'
+        +'  st.setItem("bonifEventualDB",JSON.stringify(bonifs));'
+        +'  alert("Bonificaciones guardadas.");'
+        +'}'
+        +'window.onload=function(){'
+        +'  mostrarTab(1,document.querySelector(".tab-btn"));'
+        +'  var st=window.opener?window.opener.localStorage:localStorage;'
+        +'  var qKey=String(anioQ)+"_"+String(mesQ)+"_"+String(quinQ);'
+        +'  var bonifs=JSON.parse(st.getItem("bonifEventualDB")||"{}")||{};'
+        +'  if(bonifs[qKey]){'
+        +'    document.querySelectorAll(".fila-gen").forEach(function(f){'
+        +'      var ci=f.dataset.ci;'
+        +'      var bd=bonifs[qKey][ci];'
+        +'      if(bd){'
+        +'        f.querySelector(".inp-bonif").value=bd.bonif||0;'
+        +'        f.querySelector(".inp-nota").value=bd.nota||"";'
+        +'        f.querySelector(".inp-litros").value=bd.litros||0;'
+        +'        recalcGen(f.querySelector(".inp-litros"));'
+        +'      }'
+        +'    });'
+        +'  }'
+        +'};'
         +'<\/script></body></html>';
 
     ventana.document.write(html);
@@ -910,6 +945,32 @@ function tieneTipoDia(ci, dg, tipo) {
 }
 
 window.onload = init;
+</script>
+<script>
+(function() {
+  var FB_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com';
+  var RRHH_KEYS = ['personalFijoDB','personalEventualDB','actividadesDB',
+    'asistFijoCierres','asistFijoPeriodoInicio','prestamosEventualDB',
+    'retirosDB','saldoOcultos','smn_prado','bonifEventualDB'];
+  function fbWrite(path, val) {
+    fetch(FB_URL + path + '.json', {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(val)}).catch(function(){});
+  }
+  var _orig = Storage.prototype.setItem;
+  Storage.prototype.setItem = function(key, value) {
+    _orig.call(this, key, value);
+    try { if(RRHH_KEYS.indexOf(key) >= 0) fbWrite('/rrhh/' + key, JSON.parse(value)); } catch(e) {}
+  };
+  window.addEventListener('load', function() {
+    fetch(FB_URL + '/rrhh.json').then(function(r){ return r.json(); }).then(function(data) {
+      if(data && typeof data === 'object') {
+        Object.keys(data).forEach(function(key) {
+          if(data[key] !== null) _orig.call(localStorage, key, JSON.stringify(data[key]));
+        });
+        if(typeof init === 'function') setTimeout(init, 200);
+      }
+    }).catch(function(){});
+  });
+})();
 </script>
 </body>
 </html>
