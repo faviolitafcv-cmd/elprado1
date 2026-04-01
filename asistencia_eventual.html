@@ -639,9 +639,20 @@ function abrirLiquidacion() {
             var bruto  = jornal*totalJ + bonoDia*totalMoto;
             var pd     = prestamos[p.ci]||{total:0,cuotas:1,pagadas:0};
             var cuota  = pd.total>0?(pd.total/pd.cuotas):0;
-            var saldo  = Math.max(0, pd.total - pd.pagadas*cuota);
+            // Calcular cuotas pagadas según quincenas transcurridas
+            var pagadasCalc = 0;
+            if(pd.total>0 && pd.quincenaInicio) {
+                var qi = pd.quincenaInicio;
+                var idxIni = qi.anio*24 + qi.mes*2 + (qi.quin-1);
+                var idxCur = dg.anio*24 + dg.mes*2 + (quincenaActual-1);
+                pagadasCalc = Math.min(Math.max(0, idxCur - idxIni + 1), pd.cuotas);
+            } else {
+                pagadasCalc = pd.pagadas||0;
+            }
+            var cuotaActual = (pagadasCalc <= pd.cuotas && pd.total>0) ? cuota : 0;
+            var saldo  = Math.max(0, pd.total - pagadasCalc*cuota);
             granTotal += bruto;
-            var liquido = bruto - cuota;
+            var liquido = bruto - cuotaActual;
 
             // Detectar categoria predominante para valor inicial del selector
             var catInicial = 'desarrollo';
@@ -670,8 +681,8 @@ function abrirLiquidacion() {
                 +'<div style="font-size:11px;text-align:left;padding:3px;">'
                 +'<div>Total: <input type="number" class="inp-ptotal" value="'+(pd.total||'')+'" placeholder="0" min="0" style="width:70px;padding:3px;border:1px solid #ccc;border-radius:3px;" oninput="recalcGen(this)"> Bs.</div>'
                 +'<div>Cuotas: <input type="number" class="inp-cuotas" value="'+(pd.cuotas||1)+'" min="1" style="width:40px;padding:3px;border:1px solid #ccc;border-radius:3px;" oninput="recalcGen(this)"> quincenas</div>'
-                +'<div style="color:#1565c0;font-weight:bold;">Cuota: <span class="cuota-calc">'+cuota.toFixed(2)+'</span> Bs.</div>'
-                +'<div style="color:#888;font-size:10px;">Saldo: <span class="saldo-calc">'+saldo.toFixed(2)+'</span> Bs.</div>'
+                +'<div style="color:#1565c0;font-weight:bold;">Cuota: <span class="cuota-calc">'+cuotaActual.toFixed(2)+'</span> Bs.</div>'
+                +'<div style="color:#888;font-size:10px;">Cuota '+pagadasCalc+'/'+pd.cuotas+' — Saldo: <span class="saldo-calc">'+saldo.toFixed(2)+'</span> Bs.</div>'
                 +'</div>'
                 +'</td>'
                 +'<td><input type="number" class="inp-litros" value="0" min="0" style="width:55px;padding:3px;border:1px solid #ccc;border-radius:3px;" oninput="recalcGen(this)"><br><small class="costo-gas" style="color:#e65100;"></small></td>'
