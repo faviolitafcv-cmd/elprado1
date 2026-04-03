@@ -220,7 +220,24 @@ function init() {
         if(a===hoy.getFullYear()) o2.selected = true;
         aSel.appendChild(o2);
     }
+    migrarPrestamos();
     renderTodo();
+}
+
+// ── Migración: cualquier préstamo sin quinPagadas gets reset a pagadas=0 ──
+function migrarPrestamos() {
+    var prestamos = getPrestamos();
+    var modificado = false;
+    Object.keys(prestamos).forEach(function(ci) {
+        var pd = prestamos[ci];
+        if(pd && pd.total > 0 && !pd.quinPagadas) {
+            prestamos[ci] = Object.assign({}, pd, { quinPagadas: [], pagadas: 0 });
+            modificado = true;
+        }
+    });
+    if(modificado) {
+        localStorage.setItem('prestamosEventualDB', JSON.stringify(prestamos));
+    }
 }
 
 function setQuincena(q) {
@@ -269,8 +286,9 @@ function cerrarQuincena() {
     var qTxt = quincenaActual===1 ? '1ª Quincena (1–15)' : '2ª Quincena (16–fin)';
     if(!confirm('⚠️ ¿Cerrar ' + qTxt + ' de ' + meses[d.mes] + ' ' + d.anio + '?\n\nEsto:\n• Avanza los préstamos activos en 1 cuota\n• Bloquea la quincena — no se podrá editar\n\nEsta acción no se puede deshacer.')) return;
 
-    // 1. Avanzar pagadas en préstamos activos esta quincena
+    // 1. Registrar esta quincena como pagada en cada préstamo activo (idempotente)
     var prestamos = getPrestamos();
+    var quinKey = d.anio+'_'+d.mes+'_'+quincenaActual;
     var idxCur = d.anio*24 + d.mes*2 + (quincenaActual-1);
     var personal = getPersonal();
     personal.forEach(function(p) {
@@ -278,10 +296,12 @@ function cerrarQuincena() {
         if(!pd || pd.total<=0) return;
         var qi = pd.quincenaInicio||{};
         var idxIni = (qi.anio||0)*24 + (qi.mes||0)*2 + ((qi.quin||1)-1);
-        var pagadas = pd.pagadas||0;
-        if(idxCur >= idxIni && pagadas < pd.cuotas) {
-            prestamos[p.ci] = Object.assign({}, pd, {pagadas: pagadas+1});
-        }
+        if(idxCur < idxIni) return; // quincena anterior al inicio
+        var qPags = pd.quinPagadas ? pd.quinPagadas.slice() : [];
+        if(qPags.indexOf(quinKey) !== -1) return; // ya registrada esta quincena
+        if(qPags.length >= pd.cuotas) return; // préstamo ya completado
+        qPags.push(quinKey);
+        prestamos[p.ci] = Object.assign({}, pd, {quinPagadas: qPags, pagadas: qPags.length});
     });
     localStorage.setItem('prestamosEventualDB', JSON.stringify(prestamos));
 
@@ -760,7 +780,7 @@ function abrirLiquidacion() {
             var bruto  = jornal*totalJ + bonoDia*totalMoto;
             var pd = prestamos[p.ci]||{total:0,cuotas:1,pagadas:0};
             var cuota = pd.total>0?(pd.total/pd.cuotas):0;
-            var pagadasCalc = pd.pagadas||0;
+            var pagadasCalc = pd.quinPagadas ? pd.quinPagadas.length : (pd.pagadas||0);
             var estaEnRango = false;
             if(pd.total>0 && pd.quincenaInicio) {
                 var qi = pd.quincenaInicio;
@@ -994,20 +1014,6 @@ function abrirLiquidacion() {
         +'function guardarTodo(){' +
         '  var st=window.opener?window.opener.localStorage:localStorage;' +
         '  var prestamos=JSON.parse(st.getItem(\"prestamosEventualDB\")||\"{}\")||{};' +
-        '  var idxCur=_aq*24+_mq*2+(_qq-1);' +
-        '  document.querySelectorAll(\".fila-gen\").forEach(function(f){' +
-        '    var ci=f.dataset.ci;' +
-        '    var cuota=parseFloat(f.dataset.cuota)||0;' +
-        '    if(cuota>0 && prestamos[ci] && prestamos[ci].total>0){' +
-        '      var pd=prestamos[ci];' +
-        '      var qi=pd.quincenaInicio||{};' +
-        '      var idxIni=(qi.anio||0)*24+(qi.mes||0)*2+((qi.quin||1)-1);' +
-        '      var pagsActuales=pd.pagadas||0;' +
-        '      if(idxCur>=idxIni && pagsActuales<pd.cuotas){' +
-        '        prestamos[ci]=Object.assign({},pd,{pagadas:pagsActuales+1});' +
-        '      }' +
-        '    }' +
-        '  });' +
         '  st.setItem(\"prestamosEventualDB\",JSON.stringify(prestamos));' +
         '  var qKey=String(anioQ)+\"_\"+String(mesQ)+\"_\"+String(quinQ);' +
         '  var bonifs=JSON.parse(st.getItem(\"bonifEventualDB\")||\"{}\")||{};' +
@@ -1031,13 +1037,18 @@ function abrirLiquidacion() {
         '  var prestamos=JSON.parse(st.getItem(\"prestamosEventualDB\")||\"{}\")||{};' +
         '  var personal=JSON.parse(st.getItem(\"personalEventualDB\")||\"[]\");' +
         '  var idxCur=_aq*24+_mq*2+(_qq-1);' +
+        '  var quinKey=_aq+"_"+_mq+"_"+_qq;' +
         '  personal.forEach(function(p){' +
         '    var pd=prestamos[p.ci];' +
         '    if(!pd||pd.total<=0) return;' +
         '    var qi=pd.quincenaInicio||{};' +
         '    var idxIni=(qi.anio||0)*24+(qi.mes||0)*2+((qi.quin||1)-1);' +
-        '    var pags=pd.pagadas||0;' +
-        '    if(idxCur>=idxIni && pags<pd.cuotas){prestamos[p.ci]=Object.assign({},pd,{pagadas:pags+1});}' +
+        '    if(idxCur<idxIni) return;' +
+        '    var qPags=pd.quinPagadas?pd.quinPagadas.slice():[];' +
+        '    if(qPags.indexOf(quinKey)!==-1) return;' +
+        '    if(qPags.length>=pd.cuotas) return;' +
+        '    qPags.push(quinKey);' +
+        '    prestamos[p.ci]=Object.assign({},pd,{quinPagadas:qPags,pagadas:qPags.length});' +
         '  });' +
         '  st.setItem(\"prestamosEventualDB\",JSON.stringify(prestamos));' +
         '  cierres[k]={fecha:new Date().toLocaleDateString(\"es-BO\"),hora:new Date().toLocaleTimeString(\"es-BO\")};' +
@@ -1144,6 +1155,7 @@ function guardarPrestamo() {
         total: monto,
         cuotas: cuotas,
         pagadas: 0,
+        quinPagadas: [],
         quincenaInicio: { anio: anioini, mes: mesini, quin: qini }
     };
     localStorage.setItem('prestamosEventualDB', JSON.stringify(prestamos));
@@ -1151,6 +1163,93 @@ function guardarPrestamo() {
     document.getElementById('prest-preview').style.display = 'none';
     renderTablaPrestamos();
     alert('✅ Préstamo guardado correctamente.');
+}
+
+function editarPrestamo(ci) {
+    var personal = getPersonal();
+    var prestamos = getPrestamos();
+    var pd = prestamos[ci];
+    var persona = personal.find(function(p){ return p.ci === ci; });
+    if(!pd || !persona) return;
+    var qi = pd.quincenaInicio || {anio:2026, mes:0, quin:1};
+    var pagadasActual = pd.quinPagadas ? pd.quinPagadas.length : (pd.pagadas||0);
+
+    var modal = document.getElementById('modal-edit-prestamo');
+    if(!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modal-edit-prestamo';
+        modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;';
+        document.body.appendChild(modal);
+    }
+    modal.innerHTML =
+        '<div style="background:white;border-radius:10px;padding:25px;max-width:480px;width:95%;box-shadow:0 8px 30px rgba(0,0,0,0.3);">'
+        +'<h3 style="margin:0 0 15px 0;color:#e65100;border-bottom:2px solid #ff9800;padding-bottom:8px;">✏️ Editar Préstamo — '+persona.nombre+'</h3>'
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:15px;">'
+        +'<div><label style="font-size:12px;font-weight:bold;color:#555;">Monto Total (Bs.)</label>'
+        +'<input type="number" id="edit-monto" value="'+pd.total+'" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:4px;font-size:13px;margin-top:3px;" oninput="actualizarPreviewEdicion()"></div>'
+        +'<div><label style="font-size:12px;font-weight:bold;color:#555;">Cuotas totales</label>'
+        +'<input type="number" id="edit-cuotas" value="'+pd.cuotas+'" min="1" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:4px;font-size:13px;margin-top:3px;" oninput="actualizarPreviewEdicion()"></div>'
+        +'<div><label style="font-size:12px;font-weight:bold;color:#555;">Cuotas ya cobradas</label>'
+        +'<input type="number" id="edit-pagadas" value="'+pagadasActual+'" min="0" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:4px;font-size:13px;margin-top:3px;" oninput="actualizarPreviewEdicion()"></div>'
+        +'<div><label style="font-size:12px;font-weight:bold;color:#555;">Inicio — Quincena</label>'
+        +'<select id="edit-qini" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:4px;font-size:13px;margin-top:3px;">'
+        +'<option value="1" '+(qi.quin===1?'selected':'')+'>1ª (1–15)</option>'
+        +'<option value="2" '+(qi.quin===2?'selected':'')+'>2ª (16–fin)</option>'
+        +'</select></div>'
+        +'<div><label style="font-size:12px;font-weight:bold;color:#555;">Mes inicio</label>'
+        +'<select id="edit-mes" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:4px;font-size:13px;margin-top:3px;">'
+        +meses.map(function(m,i){ return '<option value="'+i+'" '+(i===qi.mes?'selected':'')+'>'+m+'</option>'; }).join('')
+        +'</select></div>'
+        +'<div><label style="font-size:12px;font-weight:bold;color:#555;">Año inicio</label>'
+        +'<select id="edit-anio" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:4px;font-size:13px;margin-top:3px;">'
+        +[2025,2026,2027].map(function(a){ return '<option value="'+a+'" '+(a===qi.anio?'selected':'')+'>'+a+'</option>'; }).join('')
+        +'</select></div>'
+        +'</div>'
+        +'<div id="edit-preview" style="background:#fff3e0;border:1px solid #ffb74d;border-radius:6px;padding:8px;font-size:12px;margin-bottom:15px;"></div>'
+        +'<div style="display:flex;gap:10px;justify-content:flex-end;">'
+        +'<button onclick="document.getElementById(\'modal-edit-prestamo\').style.display=\'none\'" style="background:#757575;color:white;border:none;padding:8px 18px;border-radius:5px;cursor:pointer;">Cancelar</button>'
+        +'<button onclick="guardarEdicionPrestamo(\''+ci+'\')" style="background:#e65100;color:white;border:none;padding:8px 18px;border-radius:5px;font-weight:bold;cursor:pointer;">💾 Guardar</button>'
+        +'</div>'
+        +'</div>';
+    modal.style.display = 'flex';
+    actualizarPreviewEdicion();
+}
+
+function actualizarPreviewEdicion() {
+    var monto = parseFloat(document.getElementById('edit-monto').value)||0;
+    var cuotas = parseInt(document.getElementById('edit-cuotas').value)||1;
+    var pagadas = parseInt(document.getElementById('edit-pagadas').value)||0;
+    var prev = document.getElementById('edit-preview');
+    if(!prev) return;
+    var cuota = monto / cuotas;
+    var saldo = Math.max(0, monto - pagadas * cuota);
+    var estado = pagadas >= cuotas ? '✅ Cancelado' : ('⏳ Cuota '+(pagadas+1)+' de '+cuotas);
+    prev.innerHTML = '💰 <strong>Cuota:</strong> '+cuota.toFixed(2)+' Bs.'
+        +' &nbsp;|&nbsp; '+estado
+        +' &nbsp;|&nbsp; 📋 <strong>Saldo:</strong> <span style="color:#e65100;font-weight:bold;">'+saldo.toFixed(2)+' Bs.</span>';
+}
+
+function guardarEdicionPrestamo(ci) {
+    var monto   = parseFloat(document.getElementById('edit-monto').value)||0;
+    var cuotas  = parseInt(document.getElementById('edit-cuotas').value)||1;
+    var pagadas = parseInt(document.getElementById('edit-pagadas').value)||0;
+    var qini    = parseInt(document.getElementById('edit-qini').value);
+    var mes     = parseInt(document.getElementById('edit-mes').value);
+    var anio    = parseInt(document.getElementById('edit-anio').value);
+    if(monto <= 0)       { alert('El monto debe ser mayor a 0.'); return; }
+    if(pagadas > cuotas) { alert('Las cuotas cobradas no pueden ser mayores al total.'); return; }
+    var prestamos = getPrestamos();
+    // Preservar quinPagadas existentes, recortando si el usuario bajó el número
+    var qPagsExist = (prestamos[ci] && prestamos[ci].quinPagadas) ? prestamos[ci].quinPagadas.slice(0, pagadas) : [];
+    prestamos[ci] = {
+        total: monto, cuotas: cuotas, pagadas: pagadas,
+        quinPagadas: qPagsExist,
+        quincenaInicio: { anio: anio, mes: mes, quin: qini }
+    };
+    localStorage.setItem('prestamosEventualDB', JSON.stringify(prestamos));
+    document.getElementById('modal-edit-prestamo').style.display = 'none';
+    renderTablaPrestamos();
+    alert('✅ Préstamo actualizado.');
 }
 
 function eliminarPrestamo(ci) {
@@ -1186,7 +1285,7 @@ function renderTablaPrestamos() {
         var pd = prestamos[p.ci];
         var cuota = pd.total / pd.cuotas;
         // Calcular cuotas pagadas automáticamente por quincena actual
-        var pagadasCalc = pd.pagadas || 0;
+        var pagadasCalc = pd.quinPagadas ? pd.quinPagadas.length : (pd.pagadas || 0);
         var saldo = Math.max(0, pd.total - pagadasCalc * cuota);
         var terminado = pagadasCalc >= pd.cuotas;
         var qi = pd.quincenaInicio || {};
@@ -1203,6 +1302,7 @@ function renderTablaPrestamos() {
             +'<td style="padding:8px;text-align:center;font-weight:bold;color:'+color+';">'+saldo.toFixed(2)+' Bs.</td>'
             +'<td style="padding:8px;text-align:center;color:'+color+';font-weight:bold;">'+estado+'</td>'
             +'<td style="padding:8px;text-align:center;">'
+            +'<button onclick="editarPrestamo(\''+p.ci+'\')" style="background:#e65100;color:white;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;margin-right:4px;">✏️ Editar</button>'
             +(terminado ? '' : '<button onclick="eliminarPrestamo(\''+p.ci+'\')" style="background:#c62828;color:white;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;">🗑 Eliminar</button>')
             +'</td>'
             +'</tr>';
