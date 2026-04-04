@@ -2838,6 +2838,15 @@ function renderAnalisisGestion() {
   });
   const minimos  = MESES.map((_,i) => Math.min(...filas.map(f=>f.vals[i])));
   const maximos  = MESES.map((_,i) => Math.max(...filas.map(f=>f.vals[i])));
+  const desvios  = MESES.map((_,i) => {
+    const vs = filas.map(f=>f.vals[i]);
+    const avg = vs.reduce((s,v)=>s+v,0)/vs.length;
+    return Math.sqrt(vs.reduce((s,v)=>s+(v-avg)**2,0)/vs.length);
+  });
+  const cvs = MESES.map((_,i) => promedios[i] > 0 ? (desvios[i]/promedios[i]*100) : 0);
+
+  // Color para CV: verde <50%, amarillo 50-100%, rojo >100%
+  const cvColor = v => v <= 50 ? 'var(--green-soft)' : v <= 100 ? 'var(--gold2)' : 'var(--red)';
 
   tbody.innerHTML = filas.map(({g, vals, total, cols}) => `
     <tr>
@@ -2860,6 +2869,16 @@ function renderAnalisisGestion() {
       <td style="font-weight:700;color:var(--text3);">Máximo</td>
       ${maximos.map(v=>`<td class="td-mono" style="color:var(--text3);">${Math.round(v)}</td>`).join('')}
       <td class="td-mono" style="color:var(--text3);">${Math.round(maximos.reduce((s,v)=>s+v,0))}</td>
+    </tr>
+    <tr>
+      <td style="font-weight:700;color:var(--text3);">Desv. Estándar</td>
+      ${desvios.map(v=>`<td class="td-mono" style="color:var(--text3);">${Math.round(v)}</td>`).join('')}
+      <td class="td-mono" style="color:var(--text3);">—</td>
+    </tr>
+    <tr style="border-top:1px solid var(--border2);">
+      <td style="font-weight:700;color:var(--text2);">Coef. Variación</td>
+      ${cvs.map(v=>`<td class="td-mono" style="color:${cvColor(v)};font-weight:600;">${Math.round(v)}%</td>`).join('')}
+      <td class="td-mono" style="color:var(--text3);">—</td>
     </tr>
   `;
 }
@@ -2929,7 +2948,6 @@ function renderLluvia() {
   const tbody = document.getElementById('tablaLluviaBody');
   if(!thead || !tbody) return;
 
-  // Cabecera dinámica según pluviómetros
   const colsPluvio = pluvios.map(p => `<th>${p.nombre} (mm)</th>`).join('');
   thead.innerHTML = `<tr><th>Fecha</th><th>Mes</th>${colsPluvio}<th>Prom. (mm)</th><th>Usuario</th></tr>`;
 
@@ -2939,11 +2957,15 @@ function renderLluvia() {
   }
 
   tbody.innerHTML = data.map(r => {
-    const cols = pluvios.map(p => {
-      const lect = (r.lecturas||[]).find(l => l.nombre === p.nombre);
-      return `<td class="td-mono">${lect ? lect.mm.toFixed(1) : '—'}</td>`;
+    const lects = r.lecturas || [];
+    // Buscar por nombre (trim) O por posición como fallback
+    const cols = pluvios.map((p, i) => {
+      const lect = lects.find(l => l.nombre && l.nombre.trim() === p.nombre.trim())
+                || lects[i];
+      const mm = lect ? (parseFloat(lect.mm) || 0) : 0;
+      return `<td class="td-mono" style="${mm>0?'color:var(--blue);':''}">${mm > 0 ? mm.toFixed(1) : '—'}</td>`;
     }).join('');
-    const vals = (r.lecturas||[]).map(l=>l.mm).filter(v=>v>0);
+    const vals = lects.map(l => parseFloat(l.mm)||0).filter(v=>v>0);
     const prom = vals.length ? (vals.reduce((s,v)=>s+v,0)/vals.length).toFixed(1) : '—';
     return `<tr>
       <td class="td-mono">${r.fecha}</td>
