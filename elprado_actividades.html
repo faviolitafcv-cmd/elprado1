@@ -1161,6 +1161,17 @@ tr:hover td { background: rgba(255,255,255,.02); }
     </div>
   </div>
 
+  <!-- Análisis por gestión (estilo Excel) -->
+  <div class="card">
+    <div class="card-title"><span>📋</span> Análisis de Lluvias por Gestión — Campamento Principal</div>
+    <div class="tbl-wrap">
+      <table id="tablaAnalisisGestion">
+        <thead id="tablaAnalisisHead"></thead>
+        <tbody id="tablaAnalisisBody"></tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- Resumen mensual acumulado -->
   <div class="card">
     <div class="card-title"><span>📈</span> Resumen Mensual Acumulado
@@ -2664,7 +2675,14 @@ function renderGrupos() {
 
 function getPluviometros() { return getData('pluviometros', []); }
 function setPluviometros(v) { setData('pluviometros', v); fbSet('pluviometros', v); }
-function getLluvia() { return getData('lluvia', []); }
+function getLluvia() {
+  const data = getData('lluvia', []);
+  // Firebase convierte arrays anidados a objetos — normalizar lecturas
+  return data.map(r => ({
+    ...r,
+    lecturas: Array.isArray(r.lecturas) ? r.lecturas : Object.values(r.lecturas || {})
+  }));
+}
 function setLluvia(v) { setData('lluvia', v); fbSet('lluvia', v); }
 
 function abrirModalPluviometro(idx) {
@@ -2771,6 +2789,79 @@ function guardarLluvia() {
   pluvios.forEach((_, i) => { const el = document.getElementById(`llMm_${i}`); if(el) el.value=''; });
   renderLluvia();
   notif('✅ Lluvia registrada para ' + fecha);
+}
+
+function renderAnalisisGestion() {
+  const MESES = ['AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE','ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO'];
+  const MESES_CORTO = ['AGO','SEP','OCT','NOV','DIC','ENE','FEB','MAR','ABR','MAY','JUN','JUL'];
+  const GESTIONES = ['2021-2022','2022-2023','2023-2024','2024-2025','2025-2026'];
+  const lluvia = getLluvia();
+
+  const thead = document.getElementById('tablaAnalisisHead');
+  const tbody = document.getElementById('tablaAnalisisBody');
+  if(!thead || !tbody) return;
+
+  thead.innerHTML = `<tr>
+    <th>Gestión</th>
+    ${MESES_CORTO.map(m=>`<th style="min-width:42px;">${m}</th>`).join('')}
+    <th>Total</th>
+  </tr>`;
+
+  // Calcular totales por gestión/mes sumando Camp. Principal
+  const totales = {};
+  lluvia.forEach(r => {
+    const g = r.gestion || '';
+    if(!totales[g]) totales[g] = {};
+    const lect = (r.lecturas||[]).find(l => l.nombre === 'Campamento Principal');
+    if(lect && lect.mm > 0) {
+      if(!totales[g][r.mes]) totales[g][r.mes] = 0;
+      totales[g][r.mes] += lect.mm;
+    }
+  });
+
+  // Generar filas de gestiones
+  const filas = GESTIONES.map(g => {
+    const mesesData = totales[g] || {};
+    const vals = MESES.map(m => mesesData[m] || 0);
+    const total = vals.reduce((s,v)=>s+v, 0);
+    const cols = vals.map(v => v > 0
+      ? `<td class="td-mono" style="color:var(--blue);">${Math.round(v)}</td>`
+      : `<td class="td-mono" style="color:var(--text3);">0</td>`
+    ).join('');
+    return { g, vals, total, cols };
+  });
+
+  // Calcular estadísticas
+  const promedios = MESES.map((_,i) => {
+    const vs = filas.map(f=>f.vals[i]).filter(v=>v>0);
+    return vs.length ? vs.reduce((s,v)=>s+v,0)/vs.length : 0;
+  });
+  const minimos  = MESES.map((_,i) => Math.min(...filas.map(f=>f.vals[i])));
+  const maximos  = MESES.map((_,i) => Math.max(...filas.map(f=>f.vals[i])));
+
+  tbody.innerHTML = filas.map(({g, vals, total, cols}) => `
+    <tr>
+      <td style="font-weight:700;color:var(--gold2);white-space:nowrap;">${g}</td>
+      ${cols}
+      <td class="td-mono td-green" style="font-weight:700;">${Math.round(total)}</td>
+    </tr>
+  `).join('') + `
+    <tr style="border-top:2px solid var(--border2);background:rgba(109,186,58,.04);">
+      <td style="font-weight:700;color:var(--green-soft);">Promedio</td>
+      ${promedios.map(v=>`<td class="td-mono" style="color:var(--green-soft);font-weight:600;">${v>0?Math.round(v):0}</td>`).join('')}
+      <td class="td-mono td-green" style="font-weight:700;">${Math.round(promedios.reduce((s,v)=>s+v,0))}</td>
+    </tr>
+    <tr>
+      <td style="font-weight:700;color:var(--text3);">Mínimo</td>
+      ${minimos.map(v=>`<td class="td-mono" style="color:var(--text3);">${Math.round(v)}</td>`).join('')}
+      <td class="td-mono" style="color:var(--text3);">${Math.round(minimos.reduce((s,v)=>s+v,0))}</td>
+    </tr>
+    <tr>
+      <td style="font-weight:700;color:var(--text3);">Máximo</td>
+      ${maximos.map(v=>`<td class="td-mono" style="color:var(--text3);">${Math.round(v)}</td>`).join('')}
+      <td class="td-mono" style="color:var(--text3);">${Math.round(maximos.reduce((s,v)=>s+v,0))}</td>
+    </tr>
+  `;
 }
 
 function renderResumenLluvia() {
@@ -3164,6 +3255,7 @@ function showPage(id) {
   if(id==='lluvia') {
     renderPluviometros();
     renderCamposLluvia();
+    renderAnalisisGestion();
     renderResumenLluvia();
     renderLluvia();
     // Fecha de hoy por defecto
