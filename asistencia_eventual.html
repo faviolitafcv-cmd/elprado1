@@ -99,8 +99,11 @@ async function syncRrhhFromFirebase() {
 const _origSetItem = localStorage.setItem.bind(localStorage);
 localStorage.setItem = function(key, value) {
   _origSetItem(key, value);
-  if(FB_RRHH_KEYS.includes(key)) {
-    try { fbRrhhSet(key, JSON.parse(value)); } catch(e) {}
+  const prefijos = ['evAsist_','evAct_','evRol_','evMoto_'];
+  if(FB_RRHH_KEYS.includes(key) || prefijos.some(function(p){ return key.startsWith(p); })) {
+    try { fbRrhhSet(key, JSON.parse(value)); } catch(e) {
+      try { fbRrhhSet(key, value); } catch(e2) {}
+    }
   }
 };
 
@@ -123,6 +126,7 @@ localStorage.setItem = function(key, value) {
     </div>
     <button class="btn" style="background:#e65100;" onclick="togglePrestamos()">📋 Préstamos</button>
     <button class="btn" style="background:#2e7d32;" onclick="abrirLiquidacion()">Ver Liquidacion</button>
+    <button id="btn-guardar-asist" class="btn" style="background:#e65100;font-weight:bold;" onclick="guardarAsistencia()">💾 Guardar Asistencia</button>
     <button id="btn-cerrar-q" class="btn" style="background:#1565c0;" onclick="cerrarQuincena()">🔒 Cerrar Quincena</button>
 </div>
 
@@ -1314,6 +1318,46 @@ function renderTablaPrestamos() {
 // ═══════════════════════════════════════
 // FIN GESTIÓN DE PRÉSTAMOS
 // ═══════════════════════════════════════
+
+function guardarAsistencia() {
+    const btn = document.getElementById('btn-guardar-asist');
+    if(btn) { btn.textContent = '⏳ Guardando...'; btn.disabled = true; }
+
+    // Subir todas las claves de asistencia (evAsist_*, evAct_*, evRol_*, evMoto_*)
+    let count = 0;
+    const prefijos = ['evAsist_','evAct_','evRol_','evMoto_'];
+    for(let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if(key && prefijos.some(p => key.startsWith(p))) {
+            const val = localStorage.getItem(key);
+            if(val !== null) {
+                try { fbRrhhSet(key, JSON.parse(val)); } catch(e) {
+                    try { fbRrhhSet(key, val); } catch(e2) {}
+                }
+                count++;
+            }
+        }
+    }
+    // También subir las claves estándar
+    FB_RRHH_KEYS.forEach(function(key) {
+        const val = localStorage.getItem(key);
+        if(val !== null) {
+            try { fbRrhhSet(key, JSON.parse(val)); } catch(e) {}
+        }
+    });
+
+    setTimeout(function() {
+        if(btn) {
+            btn.textContent = '✅ Guardado';
+            btn.style.background = '#2e7d32';
+            setTimeout(function() {
+                btn.textContent = '💾 Guardar Asistencia';
+                btn.style.background = '#e65100';
+                btn.disabled = false;
+            }, 2500);
+        }
+    }, 1000);
+}
 
 window.onload = init;
 </script>
