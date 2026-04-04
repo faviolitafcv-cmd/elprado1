@@ -596,6 +596,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
   <div class="tab" onclick="showPage('plan')">📅 Planificación</div>
   <div class="tab" onclick="showPage('pedidos')">📬 Pedidos</div>
   <div class="tab" onclick="showPage('config')">⚙ Configuración</div>
+  <div class="tab" onclick="showPage('lluvia')">🌧 Lluvia</div>
 </div>
 
 <!-- ════════════════ ACTIVIDADES ════════════════ -->
@@ -1134,6 +1135,81 @@ tr:hover td { background: rgba(255,255,255,.02); }
   </div>
 </div>
 
+<!-- ════════════════ LLUVIA ════════════════ -->
+<div class="page" id="page-lluvia">
+
+  <!-- Configuración de pluviómetros -->
+  <div class="card">
+    <div class="card-title"><span>📡</span> Pluviómetros
+      <button class="btn btn-secondary btn-sm" style="margin-left:auto;" onclick="abrirModalPluviometro()">+ Agregar Pluviómetro</button>
+    </div>
+    <div id="listaPluviometros"></div>
+  </div>
+
+  <!-- Registro de lluvia -->
+  <div class="card">
+    <div class="card-title"><span>🌧</span> Registrar Lluvia</div>
+    <div class="form-grid" style="max-width:500px;">
+      <div class="form-group">
+        <label>Fecha</label>
+        <input type="date" id="llFecha">
+      </div>
+    </div>
+    <div id="llCamposPluvio" style="margin-top:12px;"></div>
+    <div class="btn-row" style="justify-content:flex-start;margin-top:16px;">
+      <button class="btn btn-gold" onclick="guardarLluvia()">💾 Guardar Registro de Lluvia</button>
+    </div>
+  </div>
+
+  <!-- Historial de lluvia -->
+  <div class="card">
+    <div class="card-title"><span>📊</span> Historial de Lluvia
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+        <select id="llFiltroMes" onchange="renderLluvia()" style="font-size:11px;padding:4px 8px;">
+          <option value="">Todos los meses</option>
+          <option>AGOSTO</option><option>SEPTIEMBRE</option><option>OCTUBRE</option>
+          <option>NOVIEMBRE</option><option>DICIEMBRE</option><option>ENERO</option>
+          <option>FEBRERO</option><option>MARZO</option><option>ABRIL</option>
+          <option>MAYO</option><option>JUNIO</option><option>JULIO</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="exportarLluviaExcel()">⬇ Excel</button>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+      <table id="tablaLluvia">
+        <thead id="tablaLluviaHead"></thead>
+        <tbody id="tablaLluviaBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ MODAL PLUVIÓMETRO ════════════════ -->
+<div class="modal-bg" id="modalPluviometro">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-title">
+      📡 Agregar / Editar Pluviómetro
+      <button class="modal-close" onclick="cerrarModal('modalPluviometro')">✕</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>Nombre del Pluviómetro</label>
+        <input type="text" id="mpNombre" placeholder="Ej: Norte, Sur, Centro...">
+      </div>
+      <div class="form-group full">
+        <label>Potreros asociados</label>
+        <div style="font-size:10px;color:var(--text3);margin-bottom:6px;">Seleccioná los potreros que corresponden a este pluviómetro</div>
+        <div id="mpPotreros" style="display:flex;flex-wrap:wrap;gap:6px;max-height:200px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:10px;"></div>
+      </div>
+    </div>
+    <input type="hidden" id="mpIndex" value="">
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="cerrarModal('modalPluviometro')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarPluviometro()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ════════════════ MODAL GRUPO ════════════════ -->
 <div class="modal-bg" id="modalGrupo">
   <div class="modal">
@@ -1351,7 +1427,7 @@ async function fbSet(key, val) {
 }
 
 async function pushAllToFirebase() {
-  const keys = ['actividades','grupos','vaqueros','plan','pedidos'];
+  const keys = ['actividades','grupos','vaqueros','plan','pedidos','pluviometros','lluvia'];
   let count = 0;
   for(const key of keys) {
     const val = getData(key, null);
@@ -2534,6 +2610,184 @@ function renderGrupos() {
   document.getElementById('storageInfo').textContent = `Registros: ${getActividades().length} · Tamaño aprox: ${(total/1024).toFixed(1)} KB`;
 }
 
+// ═══════════════════════════════════════
+// LLUVIA
+// ═══════════════════════════════════════
+
+function getPluviometros() { return getData('pluviometros', []); }
+function setPluviometros(v) { setData('pluviometros', v); fbSet('pluviometros', v); }
+function getLluvia() { return getData('lluvia', []); }
+function setLluvia(v) { setData('lluvia', v); fbSet('lluvia', v); }
+
+function abrirModalPluviometro(idx) {
+  const pluvios = getPluviometros();
+  const p = idx !== undefined ? pluvios[idx] : null;
+  document.getElementById('mpNombre').value = p ? p.nombre : '';
+  document.getElementById('mpIndex').value = idx !== undefined ? idx : '';
+
+  // Renderizar checkboxes de potreros
+  const todos = ALL_POTREROS.map(x => x.p);
+  const seleccionados = p ? (p.potreros || []) : [];
+  document.getElementById('mpPotreros').innerHTML = todos.map(pot => `
+    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;padding:3px 8px;border-radius:4px;border:1px solid var(--border);background:var(--card2);white-space:nowrap;">
+      <input type="checkbox" value="${pot}" ${seleccionados.includes(pot)?'checked':''} style="width:14px;height:14px;accent-color:var(--green2);">
+      ${pot}
+    </label>
+  `).join('');
+  document.getElementById('modalPluviometro').classList.add('open');
+}
+
+function guardarPluviometro() {
+  const nombre = document.getElementById('mpNombre').value.trim();
+  if(!nombre) { notif('Ingresá un nombre', true); return; }
+  const potreros = [...document.querySelectorAll('#mpPotreros input:checked')].map(el => el.value);
+  const pluvios = getPluviometros();
+  const idx = document.getElementById('mpIndex').value;
+  const obj = { nombre, potreros };
+  if(idx !== '') pluvios[parseInt(idx)] = obj;
+  else pluvios.push(obj);
+  setPluviometros(pluvios);
+  cerrarModal('modalPluviometro');
+  renderPluviometros();
+  renderCamposLluvia();
+  notif('✅ Pluviómetro guardado');
+}
+
+function borrarPluviometro(idx) {
+  if(!confirm('¿Eliminar este pluviómetro?')) return;
+  const pluvios = getPluviometros();
+  pluvios.splice(idx, 1);
+  setPluviometros(pluvios);
+  renderPluviometros();
+  renderCamposLluvia();
+  notif('Pluviómetro eliminado');
+}
+
+function renderPluviometros() {
+  const pluvios = getPluviometros();
+  const el = document.getElementById('listaPluviometros');
+  if(!pluvios.length) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:8px;">Sin pluviómetros. Agregá uno con el botón +</div>';
+    return;
+  }
+  el.innerHTML = pluvios.map((p, i) => `
+    <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">
+      <div style="font-size:22px;">📡</div>
+      <div style="flex:1;">
+        <div style="font-weight:700;color:var(--white);margin-bottom:4px;">${p.nombre}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;">
+          ${(p.potreros||[]).map(pot=>`<span style="font-size:10px;padding:2px 7px;border-radius:4px;background:rgba(109,186,58,.12);color:var(--green-soft);border:1px solid rgba(109,186,58,.2);">${pot}</span>`).join('')||'<span style="font-size:11px;color:var(--text3);">Sin potreros asignados</span>'}
+        </div>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="abrirModalPluviometro(${i})">✏</button>
+      <button class="btn btn-danger" onclick="borrarPluviometro(${i})">✕</button>
+    </div>
+  `).join('');
+}
+
+function renderCamposLluvia() {
+  const pluvios = getPluviometros();
+  const el = document.getElementById('llCamposPluvio');
+  if(!pluvios.length) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--text3);">Primero configurá al menos un pluviómetro en la sección de arriba.</div>';
+    return;
+  }
+  el.innerHTML = `<div class="form-grid">` + pluvios.map((p, i) => `
+    <div class="form-group">
+      <label>${p.nombre}</label>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <input type="number" id="llMm_${i}" step="0.1" min="0" placeholder="0.0" style="flex:1;">
+        <span style="font-size:12px;color:var(--text3);">mm</span>
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin-top:3px;">${(p.potreros||[]).slice(0,4).join(', ')}${(p.potreros||[]).length>4?'...':''}</div>
+    </div>
+  `).join('') + `</div>`;
+}
+
+function guardarLluvia() {
+  const fecha = document.getElementById('llFecha').value;
+  if(!fecha) { notif('Ingresá la fecha', true); return; }
+  const pluvios = getPluviometros();
+  if(!pluvios.length) { notif('Primero configurá pluviómetros', true); return; }
+  const lecturas = pluvios.map((p, i) => ({
+    nombre: p.nombre,
+    potreros: p.potreros || [],
+    mm: parseFloat(document.getElementById(`llMm_${i}`)?.value) || 0
+  }));
+  const lluvia = getLluvia();
+  // Reemplazar si ya existe registro de ese día
+  const filtrado = lluvia.filter(r => r.fecha !== fecha);
+  filtrado.unshift({ fecha, mes: mesDeDate(fecha), lecturas, usuario: localStorage.getItem('elprado_usuario')||'' });
+  setLluvia(filtrado);
+  // Limpiar campos
+  pluvios.forEach((_, i) => { const el = document.getElementById(`llMm_${i}`); if(el) el.value=''; });
+  renderLluvia();
+  notif('✅ Lluvia registrada para ' + fecha);
+}
+
+function renderLluvia() {
+  const pluvios = getPluviometros();
+  const mes = document.getElementById('llFiltroMes')?.value || '';
+  let data = getLluvia();
+  if(mes) data = data.filter(r => r.mes === mes);
+  data = [...data].sort((a,b) => b.fecha > a.fecha ? 1 : -1);
+
+  const thead = document.getElementById('tablaLluviaHead');
+  const tbody = document.getElementById('tablaLluviaBody');
+  if(!thead || !tbody) return;
+
+  // Cabecera dinámica según pluviómetros
+  const colsPluvio = pluvios.map(p => `<th>${p.nombre} (mm)</th>`).join('');
+  thead.innerHTML = `<tr><th>Fecha</th><th>Mes</th>${colsPluvio}<th>Prom. (mm)</th><th>Usuario</th></tr>`;
+
+  if(!data.length) {
+    tbody.innerHTML = `<tr><td colspan="${pluvios.length+4}"><div class="empty"><div class="empty-icon">🌤</div>Sin registros de lluvia</div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = data.map(r => {
+    const cols = pluvios.map(p => {
+      const lect = (r.lecturas||[]).find(l => l.nombre === p.nombre);
+      return `<td class="td-mono">${lect ? lect.mm.toFixed(1) : '—'}</td>`;
+    }).join('');
+    const vals = (r.lecturas||[]).map(l=>l.mm).filter(v=>v>0);
+    const prom = vals.length ? (vals.reduce((s,v)=>s+v,0)/vals.length).toFixed(1) : '—';
+    return `<tr>
+      <td class="td-mono">${r.fecha}</td>
+      <td style="font-size:11px;color:var(--text3);">${r.mes||'—'}</td>
+      ${cols}
+      <td class="td-mono td-green">${prom}</td>
+      <td style="font-size:11px;color:var(--text3);">${r.usuario||'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function exportarLluviaExcel() {
+  const pluvios = getPluviometros();
+  const data = getLluvia();
+  if(!data.length) { notif('Sin datos para exportar', true); return; }
+  const rows = [['Fecha','Mes',...pluvios.map(p=>p.nombre+' (mm)'),'Promedio (mm)','Usuario']];
+  [...data].sort((a,b)=>a.fecha>b.fecha?1:-1).forEach(r => {
+    const cols = pluvios.map(p => {
+      const l = (r.lecturas||[]).find(l=>l.nombre===p.nombre);
+      return l ? l.mm : 0;
+    });
+    const vals = cols.filter(v=>v>0);
+    const prom = vals.length ? +(vals.reduce((s,v)=>s+v,0)/vals.length).toFixed(1) : 0;
+    rows.push([r.fecha, r.mes||'', ...cols, prom, r.usuario||'']);
+  });
+  if(typeof XLSX === 'undefined') { notif('Librería Excel no disponible', true); return; }
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Lluvia');
+  XLSX.writeFile(wb, 'lluvia_elprado1.xlsx');
+  notif('✅ Excel exportado');
+}
+
+// ═══════════════════════════════════════
+// FIN LLUVIA
+// ═══════════════════════════════════════
+
 function abrirModalGananciaGlobal() {
   document.getElementById('ggGanancia').value = '';
   document.getElementById('ggPreview').innerHTML = '';
@@ -2797,7 +3051,7 @@ function showPage(id) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
-  const tabs = ['actividades','nueva','resumen','plan','pedidos','config'];
+  const tabs = ['actividades','nueva','resumen','plan','pedidos','config','lluvia'];
   const idx = tabs.indexOf(id);
   document.querySelectorAll('.tab')[idx]?.classList.add('active');
   if(id==='resumen') { actualizarGestionesDisponibles(); renderResumen(); }
@@ -2805,6 +3059,14 @@ function showPage(id) {
   if(id==='actividades') { renderStats(); }
   if(id==='plan') { renderPlan(); }
   if(id==='pedidos') { renderPedidos(); }
+  if(id==='lluvia') {
+    renderPluviometros();
+    renderCamposLluvia();
+    renderLluvia();
+    // Fecha de hoy por defecto
+    if(!document.getElementById('llFecha').value)
+      document.getElementById('llFecha').value = new Date().toISOString().split('T')[0];
+  }
 }
 
 // ═══════════════════════════════════════
