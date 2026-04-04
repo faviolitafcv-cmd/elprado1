@@ -43,6 +43,8 @@ function puedeEliminar(fechaRegistro) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>El Prado 1 — Gestión de Pasturas</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>if(typeof pdfjsLib !== 'undefined') pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -597,6 +599,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
   <div class="tab" onclick="showPage('pedidos')">📬 Pedidos</div>
   <div class="tab" onclick="showPage('config')">⚙ Configuración</div>
   <div class="tab" onclick="showPage('lluvia')">🌧 Lluvia</div>
+  <div class="tab" onclick="showPage('calidad')">🧪 Calidad</div>
 </div>
 
 <!-- ════════════════ ACTIVIDADES ════════════════ -->
@@ -1210,6 +1213,114 @@ tr:hover td { background: rgba(255,255,255,.02); }
 
 </div>
 
+<!-- ════════════════ CALIDAD FORRAJERA ════════════════ -->
+<div class="page" id="page-calidad">
+
+  <!-- Upload + registro bromatológico -->
+  <div class="card">
+    <div class="card-title"><span>🧪</span> Registrar Bromatológico
+      <span style="font-size:10px;color:var(--text3);font-weight:400;margin-left:8px;">Subí el PDF del laboratorio — los valores se cargan automáticamente</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <!-- Upload PDF -->
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+        <label style="background:var(--card2);border:2px dashed var(--border2);border-radius:8px;padding:12px 20px;cursor:pointer;font-size:12px;color:var(--text2);display:flex;align-items:center;gap:8px;transition:all .2s;" onmouseover="this.style.borderColor='var(--green2)'" onmouseout="this.style.borderColor='var(--border2)'">
+          📄 Subir PDF del laboratorio
+          <input type="file" id="bromPDF" accept=".pdf" style="display:none;" onchange="parsearPDFBrom(this)">
+        </label>
+        <div id="bromPDFNombre" style="font-size:11px;color:var(--text3);"></div>
+      </div>
+      <!-- Variedad + Rango -->
+      <div class="form-grid" style="max-width:700px;">
+        <div class="form-group">
+          <label>Variedad</label>
+          <select id="bromVariedad">
+            <option value="BRACHIARIA">BRACHIARIA</option>
+            <option value="PANICUM">PANICUM</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Fecha inicio período</label>
+          <input type="date" id="bromFechaIni">
+        </div>
+        <div class="form-group">
+          <label>Fecha fin período</label>
+          <input type="date" id="bromFechaFin">
+        </div>
+      </div>
+      <!-- Parámetros -->
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px;">
+        <div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;">Parámetros del Análisis (%)</div>
+        <div class="form-grid">
+          <div class="form-group"><label>PB (Proteína Bruta)</label><input type="number" id="brom_pb" step="0.01" placeholder="0.00"></div>
+          <div class="form-group"><label>FDN ⭐</label><input type="number" id="brom_fdn" step="0.01" placeholder="0.00" style="border-color:var(--green2);"></div>
+          <div class="form-group"><label>FDA</label><input type="number" id="brom_fda" step="0.01" placeholder="0.00"></div>
+          <div class="form-group"><label>aFDNmo</label><input type="number" id="brom_afdn" step="0.01" placeholder="0.00"></div>
+          <div class="form-group"><label>Lignina</label><input type="number" id="brom_lignina" step="0.01" placeholder="0.00"></div>
+          <div class="form-group"><label>DFDN48</label><input type="number" id="brom_dfdn48" step="0.01" placeholder="0.00"></div>
+          <div class="form-group"><label>uFDNmo240</label><input type="number" id="brom_ufdn" step="0.01" placeholder="0.00"></div>
+          <div class="form-group"><label>PIDA</label><input type="number" id="brom_pida" step="0.01" placeholder="0.00"></div>
+          <div class="form-group"><label>PIDN</label><input type="number" id="brom_pidn" step="0.01" placeholder="0.00"></div>
+          <div class="form-group"><label>PS_PB</label><input type="number" id="brom_pspb" step="0.01" placeholder="0.00"></div>
+          <div class="form-group"><label>Azúcar</label><input type="number" id="brom_azucar" step="0.01" placeholder="0.00"></div>
+          <div class="form-group"><label>Almidón</label><input type="number" id="brom_almidon" step="0.01" placeholder="0.00"></div>
+          <div class="form-group"><label>Extracto Etéreo</label><input type="number" id="brom_ee" step="0.01" placeholder="0.00"></div>
+          <div class="form-group"><label>AGT</label><input type="number" id="brom_agt" step="0.01" placeholder="0.00"></div>
+          <div class="form-group"><label>Cenizas</label><input type="number" id="brom_cenizas" step="0.01" placeholder="0.00"></div>
+          <div class="form-group"><label>Ca</label><input type="number" id="brom_ca" step="0.01" placeholder="0.00"></div>
+          <div class="form-group"><label>P</label><input type="number" id="brom_p" step="0.01" placeholder="0.00"></div>
+          <div class="form-group"><label>Mg</label><input type="number" id="brom_mg" step="0.01" placeholder="0.00"></div>
+          <div class="form-group"><label>K</label><input type="number" id="brom_k" step="0.01" placeholder="0.00"></div>
+          <div class="form-group"><label>S</label><input type="number" id="brom_s" step="0.01" placeholder="0.00"></div>
+          <div class="form-group"><label>Cl</label><input type="number" id="brom_cl" step="0.01" placeholder="0.00"></div>
+        </div>
+      </div>
+      <div id="bromAsignados" style="font-size:12px;color:var(--text3);"></div>
+      <div class="btn-row" style="justify-content:flex-start;">
+        <button class="btn btn-gold" onclick="guardarBromatologico()">💾 Guardar y Asignar a Registros</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Historial bromatológicos -->
+  <div class="card">
+    <div class="card-title"><span>📋</span> Historial de Bromatológicos
+      <div style="margin-left:auto;">
+        <button class="btn btn-gold btn-sm" onclick="abrirExportCalidad()">📊 Descargar Informe Gestión de Calidad</button>
+      </div>
+    </div>
+    <div id="listaBromatologicos"></div>
+  </div>
+</div>
+
+<!-- ════════════════ MODAL EXPORTAR CALIDAD ════════════════ -->
+<div class="modal-bg" id="modalExportCalidad">
+  <div class="modal" style="max-width:440px;">
+    <div class="modal-title">
+      📊 Informe Gestión de Calidad
+      <button class="modal-close" onclick="cerrarModal('modalExportCalidad')">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:16px;">
+      Generá el Excel con todos los registros de Materia Seca en el rango de fechas seleccionado, con FDN, lluvia y datos de calidad forrajera.
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Fecha inicio</label>
+        <input type="date" id="expCalIni">
+      </div>
+      <div class="form-group">
+        <label>Fecha fin</label>
+        <input type="date" id="expCalFin">
+      </div>
+    </div>
+    <div id="expCalPreview" style="font-size:11px;color:var(--text3);margin-top:10px;"></div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="cerrarModal('modalExportCalidad')">Cancelar</button>
+      <button class="btn btn-gold" onclick="exportarInformeCalidad()">⬇ Descargar Excel</button>
+    </div>
+  </div>
+</div>
+
 <!-- ════════════════ MODAL PLUVIÓMETRO ════════════════ -->
 <div class="modal-bg" id="modalPluviometro">
   <div class="modal" style="max-width:600px;">
@@ -1453,7 +1564,7 @@ async function fbSet(key, val) {
 }
 
 async function pushAllToFirebase() {
-  const keys = ['actividades','grupos','vaqueros','plan','pedidos','pluviometros','lluvia'];
+  const keys = ['actividades','grupos','vaqueros','plan','pedidos','pluviometros','lluvia','bromatologicos'];
   let count = 0;
   for(const key of keys) {
     const val = getData(key, null);
@@ -2663,8 +2774,322 @@ function renderGrupos() {
 }
 
 // ═══════════════════════════════════════
-// LLUVIA
+// CALIDAD FORRAJERA (BROMATOLÓGICO)
 // ═══════════════════════════════════════
+
+function getBromatologicos() { return getData('bromatologicos', []); }
+function setBromatologicos(v) { setData('bromatologicos', v); fbSet('bromatologicos', v); }
+
+// Mapeo parámetros PDF → IDs de inputs
+const BROM_MAP = {
+  'proteina bruta': 'brom_pb', 'pb': 'brom_pb',
+  'fdn': 'brom_fdn',
+  'fda': 'brom_fda',
+  'afdn': 'brom_afdn', 'afdn mo': 'brom_afdn', 'afdn_mo': 'brom_afdn', 'afdn.mo': 'brom_afdn',
+  'afdnmo': 'brom_afdn',
+  'lignina': 'brom_lignina',
+  'dfdn48': 'brom_dfdn48', 'dfdn 48': 'brom_dfdn48',
+  'ufdnmo240': 'brom_ufdn', 'ufdn mo 240': 'brom_ufdn', 'ufdn240': 'brom_ufdn',
+  'pida': 'brom_pida',
+  'pidn': 'brom_pidn',
+  'ps_pb': 'brom_pspb', 'ps pb': 'brom_pspb',
+  'azucar': 'brom_azucar', 'azúcar': 'brom_azucar',
+  'almidon': 'brom_almidon', 'almidón': 'brom_almidon',
+  'extracto etereo': 'brom_ee', 'extracto etéreo': 'brom_ee',
+  'agt': 'brom_agt',
+  'material mineral': 'brom_cenizas', 'cenizas': 'brom_cenizas',
+  'ca': 'brom_ca',
+  'p': 'brom_p',
+  'mg': 'brom_mg',
+  'k': 'brom_k',
+  's': 'brom_s',
+  'cl': 'brom_cl'
+};
+
+function parsearPDFBrom(input) {
+  const file = input.files[0];
+  if(!file) return;
+  document.getElementById('bromPDFNombre').textContent = file.name;
+
+  // Detectar variedad desde nombre del archivo
+  const nombre = file.name.toLowerCase();
+  if(nombre.includes('brachiar')) document.getElementById('bromVariedad').value = 'BRACHIARIA';
+  else if(nombre.includes('panicum') || nombre.includes('panic')) document.getElementById('bromVariedad').value = 'PANICUM';
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const typedArray = new Uint8Array(e.target.result);
+    // Usar pdfjsLib si está disponible
+    if(typeof pdfjsLib !== 'undefined') {
+      pdfjsLib.getDocument(typedArray).promise.then(pdf => {
+        let textoTotal = '';
+        const promesas = [];
+        for(let i=1; i<=pdf.numPages; i++) {
+          promesas.push(pdf.getPage(i).then(page =>
+            page.getTextContent().then(tc => {
+              textoTotal += tc.items.map(s=>s.str).join(' ') + ' ';
+            })
+          ));
+        }
+        Promise.all(promesas).then(() => {
+          extraerValoresBrom(textoTotal);
+          notif('✅ PDF leído — verificá los valores');
+        });
+      }).catch(() => notif('No se pudo leer el PDF automáticamente — ingresá los valores manualmente', true));
+    } else {
+      notif('ℹ PDF subido — ingresá los valores manualmente', false);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function extraerValoresBrom(texto) {
+  // Parsear texto del PDF buscando pares "Parámetro Valor"
+  const lineas = texto.toLowerCase().replace(/\s+/g,' ').split(/(?=%)|(?<=%)|\n/);
+  const numRe = /(\d+[\.,]\d+)/;
+  // Buscar cada parámetro conocido
+  Object.entries(BROM_MAP).forEach(([param, id]) => {
+    const re = new RegExp(param.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '[\\s\\S]{0,30}?(\\d+[\\.,]\\d+)', 'i');
+    const m = texto.match(re);
+    if(m) {
+      const el = document.getElementById(id);
+      if(el && !el.value) el.value = parseFloat(m[1].replace(',','.'));
+    }
+  });
+}
+
+function previewBromAsignados() {
+  const variedad = document.getElementById('bromVariedad').value;
+  const ini = document.getElementById('bromFechaIni').value;
+  const fin = document.getElementById('bromFechaFin').value;
+  if(!ini || !fin) { document.getElementById('bromAsignados').textContent = ''; return; }
+  const acts = getActividades().filter(a =>
+    a.actividad === 'MATERIA SECA' &&
+    a.fechaIng >= ini && a.fechaIng <= fin &&
+    (a.variedad||'').toUpperCase() === variedad
+  );
+  document.getElementById('bromAsignados').textContent =
+    acts.length > 0
+      ? `✅ Se asignará a ${acts.length} registro(s) de ${variedad} con ingreso entre ${ini} y ${fin}`
+      : `⚠ No hay registros de ${variedad} con ingreso en ese período`;
+}
+
+// Actualizar preview cuando cambian los campos
+['bromVariedad','bromFechaIni','bromFechaFin'].forEach(id => {
+  document.addEventListener('DOMContentLoaded', () => {
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('change', previewBromAsignados);
+  });
+});
+
+function leerCamposBrom() {
+  return {
+    pb:      parseFloat(document.getElementById('brom_pb')?.value)||null,
+    fdn:     parseFloat(document.getElementById('brom_fdn')?.value)||null,
+    fda:     parseFloat(document.getElementById('brom_fda')?.value)||null,
+    afdn:    parseFloat(document.getElementById('brom_afdn')?.value)||null,
+    lignina: parseFloat(document.getElementById('brom_lignina')?.value)||null,
+    dfdn48:  parseFloat(document.getElementById('brom_dfdn48')?.value)||null,
+    ufdn:    parseFloat(document.getElementById('brom_ufdn')?.value)||null,
+    pida:    parseFloat(document.getElementById('brom_pida')?.value)||null,
+    pidn:    parseFloat(document.getElementById('brom_pidn')?.value)||null,
+    pspb:    parseFloat(document.getElementById('brom_pspb')?.value)||null,
+    azucar:  parseFloat(document.getElementById('brom_azucar')?.value)||null,
+    almidon: parseFloat(document.getElementById('brom_almidon')?.value)||null,
+    ee:      parseFloat(document.getElementById('brom_ee')?.value)||null,
+    agt:     parseFloat(document.getElementById('brom_agt')?.value)||null,
+    cenizas: parseFloat(document.getElementById('brom_cenizas')?.value)||null,
+    ca:      parseFloat(document.getElementById('brom_ca')?.value)||null,
+    p:       parseFloat(document.getElementById('brom_p')?.value)||null,
+    mg:      parseFloat(document.getElementById('brom_mg')?.value)||null,
+    k:       parseFloat(document.getElementById('brom_k')?.value)||null,
+    s:       parseFloat(document.getElementById('brom_s')?.value)||null,
+    cl:      parseFloat(document.getElementById('brom_cl')?.value)||null,
+  };
+}
+
+function guardarBromatologico() {
+  const variedad = document.getElementById('bromVariedad').value;
+  const ini = document.getElementById('bromFechaIni').value;
+  const fin = document.getElementById('bromFechaFin').value;
+  if(!ini || !fin) { notif('Ingresá el rango de fechas', true); return; }
+  if(ini > fin) { notif('La fecha inicio debe ser menor a la fecha fin', true); return; }
+  const params = leerCamposBrom();
+  if(!params.fdn) { notif('Ingresá al menos el valor de FDN', true); return; }
+
+  const broms = getBromatologicos();
+  // Reemplazar si ya existe para mismo variedad+rango
+  const filtrado = broms.filter(b => !(b.variedad===variedad && b.fechaIni===ini && b.fechaFin===fin));
+  filtrado.unshift({
+    id: uuid(),
+    fecha: new Date().toISOString().split('T')[0],
+    variedad, fechaIni: ini, fechaFin: fin,
+    params,
+    usuario: localStorage.getItem('elprado_usuario') || ''
+  });
+  setBromatologicos(filtrado);
+  renderBromatologicos();
+
+  // Contar registros asignados
+  const acts = getActividades().filter(a =>
+    a.actividad === 'MATERIA SECA' && a.fechaIng >= ini && a.fechaIng <= fin &&
+    (a.variedad||'').toUpperCase() === variedad
+  );
+  notif(`✅ Bromatológico guardado — asignado a ${acts.length} registros de ${variedad}`);
+  // Limpiar form
+  ['brom_pb','brom_fdn','brom_fda','brom_afdn','brom_lignina','brom_dfdn48','brom_ufdn',
+   'brom_pida','brom_pidn','brom_pspb','brom_azucar','brom_almidon','brom_ee','brom_agt',
+   'brom_cenizas','brom_ca','brom_p','brom_mg','brom_k','brom_s','brom_cl',
+   'bromFechaIni','bromFechaFin'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  document.getElementById('bromPDFNombre').textContent = '';
+  document.getElementById('bromAsignados').textContent = '';
+}
+
+function getBromForRecord(rec) {
+  if(!rec || !rec.fechaIng) return null;
+  const variedad = (rec.variedad||'').toUpperCase();
+  const broms = getBromatologicos();
+  return broms.find(b =>
+    b.variedad === variedad &&
+    rec.fechaIng >= b.fechaIni &&
+    rec.fechaIng <= b.fechaFin
+  ) || null;
+}
+
+function renderBromatologicos() {
+  const broms = getBromatologicos();
+  const el = document.getElementById('listaBromatologicos');
+  if(!el) return;
+  if(!broms.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">🧪</div>Sin bromatológicos registrados</div>';
+    return;
+  }
+  el.innerHTML = `<div class="tbl-wrap"><table>
+    <thead><tr>
+      <th>Variedad</th><th>Período</th><th>FDN</th><th>PB</th><th>FDA</th>
+      <th>aFDNmo</th><th>Ca</th><th>P</th><th>Mg</th><th>Fecha registro</th><th></th>
+    </tr></thead>
+    <tbody>
+    ${broms.map(b => `<tr>
+      <td><span class="badge ${b.variedad==='BRACHIARIA'?'badge-maq':'badge-ms'}">${b.variedad}</span></td>
+      <td class="td-mono" style="font-size:11px;">${b.fechaIni} → ${b.fechaFin}</td>
+      <td class="td-mono td-green" style="font-weight:700;">${b.params.fdn??'—'}</td>
+      <td class="td-mono">${b.params.pb??'—'}</td>
+      <td class="td-mono">${b.params.fda??'—'}</td>
+      <td class="td-mono">${b.params.afdn??'—'}</td>
+      <td class="td-mono">${b.params.ca??'—'}</td>
+      <td class="td-mono">${b.params.p??'—'}</td>
+      <td class="td-mono">${b.params.mg??'—'}</td>
+      <td style="font-size:11px;color:var(--text3);">${b.fecha||'—'}</td>
+      <td><button class="btn btn-danger" onclick="borrarBromatologico('${b.id}')">✕</button></td>
+    </tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+function borrarBromatologico(id) {
+  if(!confirm('¿Eliminar este bromatológico?')) return;
+  const broms = getBromatologicos().filter(b => b.id !== id);
+  setBromatologicos(broms);
+  renderBromatologicos();
+  notif('Bromatológico eliminado');
+}
+
+// ═══════════════════════════════════════
+// INFORME GESTIÓN DE CALIDAD (EXCEL)
+// ═══════════════════════════════════════
+
+function abrirExportCalidad() {
+  const hoy = new Date().toISOString().split('T')[0];
+  const hace7 = new Date(Date.now() - 7*86400000).toISOString().split('T')[0];
+  document.getElementById('expCalIni').value = hace7;
+  document.getElementById('expCalFin').value = hoy;
+  actualizarPreviewCalidad();
+  document.getElementById('modalExportCalidad').classList.add('open');
+}
+
+function actualizarPreviewCalidad() {
+  const ini = document.getElementById('expCalIni').value;
+  const fin = document.getElementById('expCalFin').value;
+  if(!ini || !fin) return;
+  const acts = getActividades().filter(a =>
+    a.actividad === 'MATERIA SECA' && a.fechaIng && a.fechaIng >= ini && a.fechaIng <= fin
+  );
+  document.getElementById('expCalPreview').textContent =
+    `${acts.length} registros de Materia Seca con ingreso en ese rango`;
+}
+
+function getLluviaMM(potrero, fechaIni, fechaSal) {
+  if(!fechaIni) return 0;
+  const fin = fechaSal || fechaIni;
+  // Buscar pluviómetro asociado al potrero
+  const pluvios = getPluviometros();
+  const pluvioIdx = pluvios.findIndex(p => (p.potreros||[]).includes(potrero));
+  const pluvioNombre = pluvioIdx >= 0 ? pluvios[pluvioIdx].nombre : null;
+  // Sumar lluvia en el rango
+  const lluvia = getLluvia();
+  let total = 0;
+  lluvia.forEach(r => {
+    if(r.fecha < fechaIni || r.fecha > fin) return;
+    const lects = r.lecturas || [];
+    let mm = 0;
+    if(pluvioNombre) {
+      const lect = lects.find(l => l.nombre && l.nombre.trim() === pluvioNombre)
+                || (pluvioIdx >= 0 ? lects[pluvioIdx] : null);
+      mm = lect ? (parseFloat(lect.mm)||0) : 0;
+    } else {
+      // Sin pluviómetro asignado: promedio de todos
+      const vals = lects.map(l=>parseFloat(l.mm)||0).filter(v=>v>0);
+      mm = vals.length ? vals.reduce((s,v)=>s+v,0)/vals.length : 0;
+    }
+    total += mm;
+  });
+  return Math.round(total * 10) / 10;
+}
+
+function exportarInformeCalidad() {
+  if(typeof XLSX === 'undefined') { notif('Librería Excel no disponible', true); return; }
+  const ini = document.getElementById('expCalIni').value;
+  const fin = document.getElementById('expCalFin').value;
+  if(!ini || !fin) { notif('Ingresá el rango de fechas', true); return; }
+
+  const acts = getActividades().filter(a =>
+    a.actividad === 'MATERIA SECA' && a.fechaIng && a.fechaIng >= ini && a.fechaIng <= fin
+  ).sort((a,b) => a.fechaIng > b.fechaIng ? 1 : -1);
+
+  if(!acts.length) { notif('Sin registros en ese rango', true); return; }
+
+  const rows = [['fecha','lote','parc','fdn','ms','dias','esp','ndvi','lluvia','prop','MS (KG/HA) REAL']];
+
+  acts.forEach(a => {
+    const brom = getBromForRecord(a);
+    const fdn = brom ? (brom.params.fdn ?? '') : '';
+    const ms = a.pctMs ? Math.round(a.pctMs * 1000) / 10 : '';
+    const dias = a.retorno ?? '';
+    const esp = (a.variedad || '').toUpperCase();
+    const ndvi = a.ndvi || '';
+    const lluvia = getLluviaMM(a.potrero, a.fechaIng, a.fechaSal);
+    const kgMs = a.kgMsHa ? Math.round(a.kgMsHa) : '';
+    rows.push([
+      a.fechaIng || '', a.potrero || '', a.parcela || '',
+      fdn, ms, dias, esp, ndvi, lluvia, 'EL PRADO', kgMs
+    ]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  // Estilo de cabecera (negrita)
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Calidad Forrajera');
+  XLSX.writeFile(wb, `informe_calidad_${ini}_${fin}.xlsx`);
+  cerrarModal('modalExportCalidad');
+  notif(`✅ Excel generado con ${acts.length} registros`);
+}
+
+// ═══════════════════════════════════════
+// FIN CALIDAD
+// ═══════════════════════════════════════
+
 // Estado del calendario
 var llCalAnio = new Date().getFullYear();
 var llCalMes  = new Date().getMonth(); // 0-based
@@ -3396,7 +3821,7 @@ function showPage(id) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
-  const tabs = ['actividades','nueva','resumen','plan','pedidos','config','lluvia'];
+  const tabs = ['actividades','nueva','resumen','plan','pedidos','config','lluvia','calidad'];
   const idx = tabs.indexOf(id);
   document.querySelectorAll('.tab')[idx]?.classList.add('active');
   if(id==='resumen') { actualizarGestionesDisponibles(); renderResumen(); }
@@ -3404,7 +3829,7 @@ function showPage(id) {
   if(id==='actividades') { renderStats(); }
   if(id==='plan') { renderPlan(); }
   if(id==='pedidos') { renderPedidos(); }
-  if(id==='lluvia') {
+  if(id==='calidad') { renderBromatologicos(); }
     renderPluviometros();
     renderAnalisisGestion();
     renderResumenLluvia();
