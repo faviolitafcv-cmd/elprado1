@@ -1253,9 +1253,10 @@ tr:hover td { background: rgba(255,255,255,.02); }
         <div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;">Parámetros del Análisis (%)</div>
         <div class="form-grid">
           <div class="form-group"><label>PB (Proteína Bruta)</label><input type="number" id="brom_pb" step="0.01" placeholder="0.00"></div>
-          <div class="form-group"><label>FDN ⭐</label><input type="number" id="brom_fdn" step="0.01" placeholder="0.00" style="border-color:var(--green2);"></div>
+          <div class="form-group"><label>FDN ⭐</label><input type="number" id="brom_fdn" step="0.01" placeholder="0.00" style="border-color:var(--green2);" oninput="calcFDNPromedio()"></div>
           <div class="form-group"><label>FDA</label><input type="number" id="brom_fda" step="0.01" placeholder="0.00"></div>
-          <div class="form-group"><label>aFDNmo</label><input type="number" id="brom_afdn" step="0.01" placeholder="0.00"></div>
+          <div class="form-group"><label>aFDNmo</label><input type="number" id="brom_afdn" step="0.01" placeholder="0.00" oninput="calcFDNPromedio()"></div>
+          <div class="form-group"><label style="color:var(--gold2);">FDN PROMEDIO ⭐ (Excel)</label><input type="number" id="brom_fdn_prom" step="0.01" placeholder="Auto" style="border-color:var(--gold2);background:var(--card2);color:var(--gold2);font-weight:700;" oninput=""></div>
           <div class="form-group"><label>Lignina</label><input type="number" id="brom_lignina" step="0.01" placeholder="0.00"></div>
           <div class="form-group"><label>DFDN48</label><input type="number" id="brom_dfdn48" step="0.01" placeholder="0.00"></div>
           <div class="form-group"><label>uFDNmo240</label><input type="number" id="brom_ufdn" step="0.01" placeholder="0.00"></div>
@@ -2847,18 +2848,54 @@ function parsearPDFBrom(input) {
 }
 
 function extraerValoresBrom(texto) {
-  // Parsear texto del PDF buscando pares "Parámetro Valor"
-  const lineas = texto.toLowerCase().replace(/\s+/g,' ').split(/(?=%)|(?<=%)|\n/);
-  const numRe = /(\d+[\.,]\d+)/;
-  // Buscar cada parámetro conocido
-  Object.entries(BROM_MAP).forEach(([param, id]) => {
-    const re = new RegExp(param.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '[\\s\\S]{0,30}?(\\d+[\\.,]\\d+)', 'i');
-    const m = texto.match(re);
+  // Solo parsear DESPUÉS de "Resultados" para evitar capturar coordenadas GPS
+  const idxRes = texto.toLowerCase().indexOf('resultados');
+  const textoRes = idxRes >= 0 ? texto.slice(idxRes) : texto;
+  const numReStr = '(\\d+[\\.,]\\d+|\\d+)';
+
+  const params = [
+    {key:'proteina bruta',id:'brom_pb'},{key:'fdn',id:'brom_fdn'},
+    {key:'fda',id:'brom_fda'},{key:'afdnmo',id:'brom_afdn'},{key:'afdn mo',id:'brom_afdn'},
+    {key:'lignina',id:'brom_lignina'},{key:'dfdn48',id:'brom_dfdn48'},
+    {key:'ufdnmo240',id:'brom_ufdn'},{key:'ufdn240',id:'brom_ufdn'},
+    {key:'pida',id:'brom_pida'},{key:'pidn',id:'brom_pidn'},
+    {key:'ps_pb',id:'brom_pspb'},{key:'ps pb',id:'brom_pspb'},
+    {key:'azucar',id:'brom_azucar'},{key:'azucar',id:'brom_azucar'},
+    {key:'almidon',id:'brom_almidon'},{key:'extracto etereo',id:'brom_ee'},
+    {key:'agt',id:'brom_agt'},{key:'material mineral',id:'brom_cenizas'},
+  ];
+  params.forEach(({key,id}) => {
+    const escaped = key.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const re = new RegExp(escaped + '[\\s\\S]{0,30}?' + numReStr, 'i');
+    const m = textoRes.match(re);
     if(m) {
       const el = document.getElementById(id);
-      if(el && !el.value) el.value = parseFloat(m[1].replace(',','.'));
+      const val = parseFloat(m[1].replace(',','.'));
+      if(el && !el.value && val >= 0 && val <= 100) el.value = val;
     }
   });
+  // Parámetros cortos (Ca, P, Mg etc.) - buscar con "Nombre valor %"
+  [{key:'Ca',id:'brom_ca'},{key:'P',id:'brom_p'},{key:'Mg',id:'brom_mg'},
+   {key:'K',id:'brom_k'},{key:'S',id:'brom_s'},{key:'Cl',id:'brom_cl'}
+  ].forEach(({key,id}) => {
+    const re = new RegExp('\\b' + key + '\\b[\\s]{1,10}' + numReStr + '[\\s]*%', 'i');
+    const m = textoRes.match(re);
+    if(m) {
+      const el = document.getElementById(id);
+      const val = parseFloat(m[1].replace(',','.'));
+      if(el && !el.value && val >= 0 && val <= 100) el.value = val;
+    }
+  });
+  calcFDNPromedio();
+}
+
+function calcFDNPromedio() {
+  const fdn = parseFloat(document.getElementById('brom_fdn')?.value) || 0;
+  const afdn = parseFloat(document.getElementById('brom_afdn')?.value) || 0;
+  const el = document.getElementById('brom_fdn_prom');
+  if(!el) return;
+  if(fdn > 0 && afdn > 0) { el.value = ((fdn+afdn)/2).toFixed(2); el.style.borderColor='var(--gold2)'; }
+  else if(fdn > 0) { el.value = fdn.toFixed(2); }
 }
 
 function previewBromAsignados() {
@@ -2908,6 +2945,7 @@ function leerCamposBrom() {
     k:       parseFloat(document.getElementById('brom_k')?.value)||null,
     s:       parseFloat(document.getElementById('brom_s')?.value)||null,
     cl:      parseFloat(document.getElementById('brom_cl')?.value)||null,
+    fdnProm: parseFloat(document.getElementById('brom_fdn_prom')?.value)||null,
   };
 }
 
@@ -3067,7 +3105,7 @@ function exportarInformeCalidad() {
 
   acts.forEach(a => {
     const brom = getBromForRecord(a);
-    const fdn = brom ? (brom.params.fdn ?? '') : '';
+    const fdn = brom ? (brom.params.fdnProm ?? brom.params.fdn ?? '') : '';
     const ms = a.pctMs ? Math.round(a.pctMs * 1000) / 10 : '';
     const dias = a.retorno ?? '';
     const esp = (a.variedad || '').toUpperCase();
