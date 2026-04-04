@@ -1166,6 +1166,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
       <span style="color:var(--green);font-weight:700;">ℹ La planificación se genera automáticamente</span> desde cada registro de <strong>Materia Seca</strong> que tenga fechas de ingreso/salida cargadas. Los vaqueros ven esta info en tiempo real desde su pantalla.
     </div>
     <button class="btn btn-secondary" onclick="sincronizarPlanDesdeMS()">🔄 Sincronizar registros existentes</button>
+    <button class="btn btn-secondary" style="background:var(--red);color:white;margin-left:8px;" onclick="limpiarPlanHuerfano()">🧹 Limpiar plan huérfano</button>
   </div>
 
   <div class="card">
@@ -2157,9 +2158,51 @@ function borrarActividad(id) {
   const nuevas = acts.filter(a => a.id !== id);
   setData('actividades', nuevas);
   fbSet('actividades', nuevas);
+
+  // ── Limpiar entradas del plan generadas desde este registro ──
+  const planLimpio = getPlan().filter(p => {
+    if(!p.autoDesdeMS) return true; // entradas manuales se quedan
+    // si el registro tenía fechaIng, buscar coincidencia exacta
+    if(reg.fechaIng && p.fi === reg.fechaIng && p.potrero === reg.potrero && p.parcela === reg.parcela && p.lote === reg.lote) return false;
+    return true;
+  });
+  setPlan(planLimpio);
+  fbSet('plan', planLimpio);
+
   renderTabla();
   renderStats();
   notif('Registro eliminado');
+}
+
+// ── Limpiar plan huérfano (entradas sin actividad correspondiente) ──
+function limpiarPlanHuerfano() {
+  const acts = getActividades();
+  const plan = getPlan();
+  let removidos = 0;
+  const planLimpio = plan.filter(p => {
+    if(!p.autoDesdeMS) return true; // entradas manuales no se tocan
+    // buscar si existe la actividad que generó esta entrada
+    const existe = acts.some(a =>
+      a.fechaIng === p.fi &&
+      a.potrero === p.potrero &&
+      a.parcela === p.parcela &&
+      a.lote === p.lote
+    );
+    if(!existe) { removidos++; return false; }
+    return true;
+  });
+  // También deduplicar: misma fi+potrero+parcela+lote
+  const vistos = new Set();
+  const planDedup = planLimpio.filter(p => {
+    const key = p.fi + '|' + p.potrero + '|' + p.parcela + '|' + p.lote;
+    if(vistos.has(key)) { removidos++; return false; }
+    vistos.add(key);
+    return true;
+  });
+  setPlan(planDedup);
+  fbSet('plan', planDedup);
+  renderPlan();
+  notif('✅ Plan limpiado: ' + removidos + ' entr' + (removidos===1?'ada':'adas') + ' eliminada' + (removidos===1?'':'s'));
 }
 
 function editarActividad(id) {
