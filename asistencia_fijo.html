@@ -150,8 +150,10 @@ async function syncRrhhFromFirebase() {
 const _origSetItem = localStorage.setItem.bind(localStorage);
 localStorage.setItem = function(key, value) {
   _origSetItem(key, value);
-  if(FB_RRHH_KEYS.includes(key)) {
-    try { fbRrhhSet(key, JSON.parse(value)); } catch(e) {}
+  if(FB_RRHH_KEYS.includes(key) || key.startsWith('asistF_')) {
+    try { fbRrhhSet(key, JSON.parse(value)); } catch(e) {
+      try { fbRrhhSet(key, value); } catch(e2) {}
+    }
   }
 };
 
@@ -176,6 +178,10 @@ localStorage.setItem = function(key, value) {
         <button class="btn btn-historial"onclick="abrirHistorial()">📋 Historial Pagos</button>
         <button id="btn-planif" class="btn" style="background:#795548;" onclick="togglePlanif()">📅 Modo Planificación</button>
         <button class="btn btn-print"    onclick="window.print()">🖨️ Imprimir</button>
+        <button class="btn" style="background:#e65100;" onclick="exportarAsistencia()">📤 Exportar Asistencia</button>
+        <button class="btn" style="background:#6a1b9a;" onclick="document.getElementById('importAsistInput').click()">📥 Importar Asistencia</button>
+        <input type="file" id="importAsistInput" accept=".json" style="display:none;" onchange="importarAsistencia(this)">
+        <button class="btn" style="background:#2e7d32;font-weight:bold;" onclick="guardarAsistenciaFijo()">💾 Guardar</button>
     </div>
 </div>
 
@@ -925,6 +931,83 @@ function init() {
         aSel.appendChild(o);
     });
     renderTodo();
+}
+
+// ── EXPORTAR / IMPORTAR / GUARDAR ASISTENCIA ──
+
+function exportarAsistencia() {
+    var datos = {};
+    var prefijos = ['asistF_', 'asistFijoCierres', 'asistFijoPeriodoInicio',
+                    'personalFijoDB', 'saldoOcultos', 'smn_prado'];
+    for(var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        if(!key) continue;
+        var esAsist = prefijos.some(function(p){ return key.startsWith(p); });
+        if(esAsist) datos[key] = localStorage.getItem(key);
+    }
+    var total = Object.keys(datos).filter(function(k){ return k.startsWith('asistF_'); }).length;
+    var json = JSON.stringify(datos, null, 2);
+    var blob = new Blob([json], {type:'application/json'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'asistencia_fijo_backup_' + new Date().toISOString().split('T')[0] + '.json';
+    a.click();
+    alert('✅ Exportado: ' + total + ' registros de asistencia');
+}
+
+function importarAsistencia(input) {
+    var file = input.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            var datos = JSON.parse(e.target.result);
+            var count = 0;
+            Object.keys(datos).forEach(function(key) {
+                localStorage.setItem(key, datos[key]);
+                count++;
+            });
+            // Subir a Firebase
+            guardarAsistenciaFijo(true);
+            alert('✅ Importados ' + count + ' registros. Subiendo a Firebase...');
+            renderTodo();
+        } catch(err) {
+            alert('❌ Error al leer el archivo: ' + err.message);
+        }
+    };
+    reader.readAsText(file);
+    input.value = '';
+}
+
+function guardarAsistenciaFijo(silencioso) {
+    var btn = document.querySelector('[onclick="guardarAsistenciaFijo()"]');
+    if(btn && !silencioso) { btn.textContent = '⏳ Guardando...'; btn.disabled = true; }
+
+    // Subir todas las claves de asistencia a Firebase
+    for(var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        if(!key) continue;
+        if(key.startsWith('asistF_') || FB_RRHH_KEYS.includes(key)) {
+            var val = localStorage.getItem(key);
+            if(val !== null) {
+                try { fbRrhhSet(key, JSON.parse(val)); } catch(e) {
+                    try { fbRrhhSet(key, val); } catch(e2) {}
+                }
+            }
+        }
+    }
+
+    if(!silencioso && btn) {
+        setTimeout(function() {
+            btn.textContent = '✅ Guardado';
+            btn.style.background = '#1565c0';
+            setTimeout(function() {
+                btn.textContent = '💾 Guardar';
+                btn.style.background = '#2e7d32';
+                btn.disabled = false;
+            }, 2500);
+        }, 1000);
+    }
 }
 
 window.onload = init;
