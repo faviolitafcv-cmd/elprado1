@@ -854,7 +854,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
         <div class="form-grid">
           <div class="form-group">
             <label>Fecha Ingreso</label>
-            <input type="date" id="fFechaIng" oninput="autoSalidaMS(); calcIng();">
+            <input type="date" id="fFechaIng" oninput="autoSalidaMS(); calcIng(); const _sel=document.getElementById('fLote'); if(_sel&&_sel.value) onLoteChange(_sel,'fCabezas','fPeso');">
           </div>
           <div class="form-group">
             <label>Hora Ingreso</label>
@@ -920,7 +920,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
           </div>
           <div class="form-group">
             <label>Fecha Ingreso</label>
-            <input type="date" id="fFechaIngStd" oninput="autoSalidaStd(); calcIngStd();">
+            <input type="date" id="fFechaIngStd" oninput="autoSalidaStd(); calcIngStd(); const _sel2=document.getElementById('fLoteIng'); if(_sel2&&_sel2.value) onLoteChange(_sel2,'fCabezasIng','fPesoIng');">
           </div>
           <div class="form-group">
             <label>Fecha Salida</label>
@@ -1078,7 +1078,10 @@ tr:hover td { background: rgba(255,255,255,.02); }
   <div class="card">
     <div class="card-title"><span>👥</span> Grupos de Animales</div>
     <div id="listaGrupos"></div>
-    <button class="btn btn-secondary btn-sm" style="margin-top:12px;" onclick="abrirModalGrupo()">+ Agregar Grupo</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
+      <button class="btn btn-secondary btn-sm" onclick="abrirModalGrupo()">+ Agregar Grupo</button>
+      <button class="btn btn-secondary btn-sm" style="border-color:var(--gold);color:var(--gold2);" onclick="abrirModalGananciaGlobal()">⚖️ Actualizar ganancia a todos los grupos</button>
+    </div>
   </div>
   <div class="card">
     <div class="card-title"><span>📥</span> Importar Historial desde Excel</div>
@@ -1160,8 +1163,13 @@ tr:hover td { background: rgba(255,255,255,.02); }
         <input type="number" id="mgCabezas" placeholder="0">
       </div>
       <div class="form-group">
-        <label>Peso medio (kg)</label>
+        <label>Peso medio actual (kg)</label>
         <input type="number" id="mgPeso" placeholder="0">
+      </div>
+      <div class="form-group">
+        <label>Ganancia diaria (g/día) — opcional</label>
+        <input type="number" id="mgGanancia" placeholder="ej: 600" step="10" min="0">
+        <div style="font-size:10px;color:var(--text3);margin-top:3px;">El peso se actualiza automáticamente en nuevos registros</div>
       </div>
     </div>
     <input type="hidden" id="mgIndex" value="">
@@ -1241,6 +1249,31 @@ tr:hover td { background: rgba(255,255,255,.02); }
     <div class="btn-row">
       <button class="btn btn-secondary" onclick="cerrarModal('modalVaquero')">Cancelar</button>
       <button class="btn btn-primary" onclick="guardarVaquero()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ MODAL GANANCIA GLOBAL ════════════════ -->
+<div class="modal-bg" id="modalGananciaGlobal">
+  <div class="modal">
+    <div class="modal-title">
+      ⚖️ Actualizar Ganancia Diaria
+      <button class="modal-close" onclick="cerrarModal('modalGananciaGlobal')">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:16px;line-height:1.6;">
+      Establece la ganancia diaria de peso para <strong>todos los grupos</strong> a la vez.<br>
+      El peso base queda fijado en <strong>hoy</strong>. Los nuevos registros calcularán el peso proyectado automáticamente según la fecha de ingreso.
+    </div>
+    <div class="form-grid" style="max-width:320px;">
+      <div class="form-group">
+        <label>Ganancia diaria (g/día) para todos</label>
+        <input type="number" id="ggGanancia" placeholder="ej: 600" step="10" min="0">
+      </div>
+    </div>
+    <div id="ggPreview" style="margin-top:12px;font-size:12px;color:var(--text3);"></div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="cerrarModal('modalGananciaGlobal')">Cancelar</button>
+      <button class="btn btn-gold" onclick="aplicarGananciaGlobal()">✅ Aplicar a todos</button>
     </div>
   </div>
 </div>
@@ -2501,6 +2534,46 @@ function renderGrupos() {
   document.getElementById('storageInfo').textContent = `Registros: ${getActividades().length} · Tamaño aprox: ${(total/1024).toFixed(1)} KB`;
 }
 
+function abrirModalGananciaGlobal() {
+  document.getElementById('ggGanancia').value = '';
+  document.getElementById('ggPreview').innerHTML = '';
+  document.getElementById('modalGananciaGlobal').classList.add('open');
+  document.getElementById('ggGanancia').oninput = function() {
+    const gd = parseFloat(this.value);
+    const grupos = getGrupos();
+    const hoy = new Date().toISOString().split('T')[0];
+    if(!isNaN(gd) && gd > 0) {
+      const ejemplos = grupos.slice(0,3).map(g => {
+        const p30 = Math.round((g.peso + 30 * gd/1000) * 10) / 10;
+        return `<div>${g.grupo}: ${g.peso} kg → <strong style="color:var(--green-soft);">${p30} kg</strong> en 30 días</div>`;
+      }).join('');
+      document.getElementById('ggPreview').innerHTML =
+        `<div style="color:var(--text3);margin-bottom:6px;">Ejemplo de proyección:</div>${ejemplos}`;
+    } else {
+      document.getElementById('ggPreview').innerHTML = '';
+    }
+  };
+}
+
+function aplicarGananciaGlobal() {
+  const gd = parseFloat(document.getElementById('ggGanancia').value);
+  if(isNaN(gd) || gd < 0) { notif('Ingresá un valor válido', true); return; }
+  const grupos = getGrupos();
+  const hoy = new Date().toISOString().split('T')[0];
+  const actualizados = grupos.map(g => ({
+    ...g,
+    gananciaDiaria: gd,
+    pesoBase: g.peso,
+    fechaBase: hoy
+  }));
+  setData('grupos', actualizados);
+  fbSet('grupos', actualizados);
+  cerrarModal('modalGananciaGlobal');
+  renderGrupos();
+  poblarSelectGrupos();
+  notif(`✅ Ganancia ${gd} g/día aplicada a ${grupos.length} grupos desde hoy`);
+}
+
 function abrirModalGrupo() {
   document.getElementById('mgTipo').value='FAENA';
   document.getElementById('mgCategoria').value='';
@@ -2518,6 +2591,8 @@ function editarGrupo(i) {
   document.getElementById('mgGrupo').value=g.grupo;
   document.getElementById('mgCabezas').value=g.cabezas||'';
   document.getElementById('mgPeso').value=g.peso||'';
+  const gdEl = document.getElementById('mgGanancia');
+  if(gdEl) gdEl.value = (g.gananciaDiaria !== null && g.gananciaDiaria !== undefined) ? g.gananciaDiaria : '';
   document.getElementById('mgIndex').value=i;
   document.getElementById('modalGrupo').classList.add('open');
 }
@@ -2531,10 +2606,25 @@ function guardarGrupo() {
   if(!cat||!grp) { notif('Completá categoría y nombre', true); return; }
   const grupos = getGrupos();
   const idx = document.getElementById('mgIndex').value;
-  const obj = {tipo,categoria:cat,grupo:grp,cabezas:cab,peso};
-  if(idx!=='') grupos[parseInt(idx)] = obj;
-  else grupos.push(obj);
+  const gdStr = document.getElementById('mgGanancia')?.value;
+  const gd = gdStr !== '' && gdStr !== undefined ? parseFloat(gdStr) : null;
+  const hoy = new Date().toISOString().split('T')[0];
+  const obj = {tipo, categoria:cat, grupo:grp, cabezas:cab, peso,
+    gananciaDiaria: gd !== null && !isNaN(gd) ? gd : null,
+    pesoBase: peso,
+    fechaBase: hoy
+  };
+  if(idx!=='') {
+    // Preservar pesoBase/fechaBase anteriores si no cambió el peso
+    const anterior = grupos[parseInt(idx)];
+    if(anterior && anterior.peso === peso && anterior.pesoBase) {
+      obj.pesoBase = anterior.pesoBase;
+      obj.fechaBase = anterior.fechaBase;
+    }
+    grupos[parseInt(idx)] = obj;
+  } else grupos.push(obj);
   setData('grupos', grupos);
+  fbSet('grupos', grupos);
   cerrarModal('modalGrupo');
   renderGrupos();
   poblarSelectGrupos();
@@ -2561,7 +2651,7 @@ function cerrarModal(id) {
 function poblarSelectGrupos() {
   const grupos = getGrupos();
   const opts = ['<option value="" data-cab="" data-peso="">— elegir —</option>',
-    ...grupos.map(g=>`<option value="${g.tipo}|${g.categoria}|${g.grupo}" data-cab="${g.cabezas||0}" data-peso="${g.peso||0}">${g.tipo} · ${g.categoria} · ${g.grupo}</option>`)
+    ...grupos.map(g=>`<option value="${g.tipo}|${g.categoria}|${g.grupo}" data-cab="${g.cabezas||0}" data-peso="${g.peso||0}" data-gd="${g.gananciaDiaria||0}" data-pb="${g.pesoBase||g.peso||0}" data-fb="${g.fechaBase||''}">${g.tipo} · ${g.categoria} · ${g.grupo}</option>`)
   ].join('');
   document.getElementById('fLote').innerHTML = opts;
   document.getElementById('fLoteIng').innerHTML = opts;
@@ -2569,12 +2659,25 @@ function poblarSelectGrupos() {
 
 function onLoteChange(selectEl, idCab, idPeso) {
   const opt = selectEl.options[selectEl.selectedIndex];
-  const cab = opt.getAttribute('data-cab');
-  const peso = opt.getAttribute('data-peso');
-  const elCab = document.getElementById(idCab);
+  const cab   = opt.getAttribute('data-cab');
+  const gd    = parseFloat(opt.getAttribute('data-gd')) || 0;   // g/día
+  const pb    = parseFloat(opt.getAttribute('data-pb')) || 0;   // pesoBase
+  const fb    = opt.getAttribute('data-fb') || '';               // fechaBase
+  const elCab  = document.getElementById(idCab);
   const elPeso = document.getElementById(idPeso);
   if(cab && parseFloat(cab) > 0) { elCab.value = cab; elCab.style.borderColor='var(--green2)'; }
-  if(peso && parseFloat(peso) > 0) { elPeso.value = peso; elPeso.style.borderColor='var(--green2)'; }
+  // Calcular peso proyectado usando fecha de ingreso del formulario
+  let pesoFinal = pb;
+  if(gd > 0 && fb) {
+    const fechaIng = document.getElementById('fFechaIng')?.value
+                  || document.getElementById('fFechaIngStd')?.value
+                  || new Date().toISOString().split('T')[0];
+    if(fechaIng && fechaIng >= fb) {
+      const dias = Math.max(0, Math.round((new Date(fechaIng) - new Date(fb)) / 86400000));
+      pesoFinal = Math.round((pb + dias * gd / 1000) * 10) / 10;
+    }
+  }
+  if(pesoFinal > 0) { elPeso.value = pesoFinal; elPeso.style.borderColor='var(--green2)'; }
   calcMS();
 }
 
