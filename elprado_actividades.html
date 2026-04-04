@@ -972,6 +972,17 @@ tr:hover td { background: rgba(255,255,255,.02); }
         </div>
       </div>
 
+      <!-- FIN DE VUELTA -->
+      <div id="grpFinVuelta" style="display:none; margin-bottom:12px;">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;background:var(--card2);border:2px solid var(--green-soft);border-radius:8px;padding:12px 16px;">
+          <input type="checkbox" id="chkFinVuelta" style="width:20px;height:20px;cursor:pointer;accent-color:var(--green-soft);">
+          <span>
+            <strong style="color:var(--green-soft);">🔚 Fin de Vuelta</strong>
+            <span style="color:var(--text2);font-size:13px;display:block;margin-top:2px;">Esta es la última parcela/actividad del potrero en esta vuelta</span>
+          </span>
+        </label>
+      </div>
+
       <div class="btn-row">
         <button class="btn btn-secondary" onclick="limpiarForm()">Cancelar</button>
         <button class="btn btn-gold" onclick="guardarActividad()">💾 Guardar Registro</button>
@@ -1377,14 +1388,26 @@ function notif(msg, err=false) {
 // ═══════════════════════════════════════
 // RETORNO AUTOMÁTICO
 // ═══════════════════════════════════════
-function calcRetornoAuto(potrero, parcela) {
+function calcRetornoAuto(potrero, parcela, excludeId) {
   const acts = getActividades();
   const today = new Date().toISOString().split('T')[0];
   let lastDate = null;
   let lastEvt = null;
 
+  // ── Buscar el último FIN_VUELTA de este potrero ──
+  let lastFinVuelta = null;
   for(const a of acts) {
     if(a.potrero !== potrero) continue;
+    if(excludeId && a.id === excludeId) continue;
+    if(a.actividad === 'FIN_VUELTA') {
+      if(!lastFinVuelta || a.fecha > lastFinVuelta.fecha) lastFinVuelta = a;
+    }
+  }
+
+  for(const a of acts) {
+    if(a.potrero !== potrero) continue;
+    if(excludeId && a.id === excludeId) continue;
+    if(a.actividad === 'FIN_VUELTA') continue; // se maneja aparte
 
     // CASO 1: Desbrozar potrero completo → afecta todas las parcelas
     if(a.actividad === 'DESBROZAR' && a.modoDesb === 'POTRERO_COMPLETO') {
@@ -1405,11 +1428,21 @@ function calcRetornoAuto(potrero, parcela) {
     if(a.parcela !== parcela) continue;
 
     let fecha = a.fecha;
-    if(a.actividad === 'INGRESO HDA')                   fecha = a.fechaSal || a.fecha;
+    if(a.actividad === 'INGRESO HDA')                    fecha = a.fechaSal || a.fecha;
     if(a.actividad === 'DESBROZAR' || a.actividad === 'ROLO') fecha = a.fechaSalMaq || a.fecha;
     if(a.actividad === 'SIEMBRA')                        fecha = a.fechaSalMaq || a.fecha;
 
     if(fecha && (!lastDate || fecha > lastDate)) { lastDate = fecha; lastEvt = a; }
+  }
+
+  // ── Si no hay registro propio de esta parcela posterior al FIN_VUELTA,
+  //    usar la fecha del FIN_VUELTA como inicio del descanso ──
+  if(lastFinVuelta) {
+    const fvFecha = lastFinVuelta.fecha;
+    if(!lastDate || fvFecha > lastDate) {
+      lastDate = fvFecha;
+      lastEvt = { ...lastFinVuelta, actividad: 'FIN VUELTA' };
+    }
   }
 
   if(!lastDate) return { dias: null, lastDate: null, lastEvt: null };
@@ -1530,6 +1563,11 @@ function selAct(tipo) {
   document.getElementById('siembraObs').style.display = tipo==='SIEMBRA'?'block':'none';
   document.getElementById('fumigObs').style.display = tipo.includes('FUMIG')||tipo==='QUEMA'?'block':'none';
 
+  // Fin de Vuelta: disponible en MATERIA SECA y DESBROZAR
+  const showFinVuelta = (tipo === 'MATERIA SECA' || tipo === 'DESBROZAR');
+  document.getElementById('grpFinVuelta').style.display = showFinVuelta ? 'block' : 'none';
+  if(!showFinVuelta) document.getElementById('chkFinVuelta').checked = false;
+
   // Fecha hoy por defecto
   if(!document.getElementById('fFecha').value)
     document.getElementById('fFecha').value = new Date().toISOString().split('T')[0];
@@ -1647,7 +1685,8 @@ function calcIngStd() {
     document.getElementById('cEstadiaStd').textContent = dateDiff(fi,fs)+' días';
   } else { document.getElementById('cEstadiaStd').textContent = '—'; }
   if(potrero) {
-    const r = calcRetornoAuto(potrero, parcela);
+    const _editId = document.getElementById('formComun')?.dataset?.editId || null;
+    const r = calcRetornoAuto(potrero, parcela, _editId);
     const infoEl = document.getElementById('retornoInfoStd');
     if(r.dias !== null) {
       infoEl.style.display='flex';
@@ -1675,7 +1714,8 @@ function calcIng() {
   }
 
   if(potrero) {
-    const r = calcRetornoAuto(potrero, parcela);
+    const _editId = document.getElementById('formComun')?.dataset?.editId || null;
+    const r = calcRetornoAuto(potrero, parcela, _editId);
     const infoEl = document.getElementById('retornoInfo');
     if(r.dias !== null) {
       infoEl.style.display = 'flex';
@@ -1823,6 +1863,34 @@ function guardarActividad() {
   // Una sola fila — no se genera duplicado de INGRESO HDA
 
   setData('actividades', acts);
+
+  // ── FIN DE VUELTA: si el checkbox está marcado, guardar registro especial ──
+  const chkFV = document.getElementById('chkFinVuelta');
+  if(chkFV && chkFV.checked && potrero) {
+    const fechaFV = (actActual === 'DESBROZAR')
+      ? (document.getElementById('fFechaSalMaq')?.value || fecha)
+      : (document.getElementById('fFechaSal')?.value || fecha);
+    const recFV = {
+      id: uuid(),
+      fecha: fechaFV,
+      mes: mesDeDate(fechaFV),
+      trimestre: TRIMESTRES[mesDeDate(fechaFV)] || '',
+      gestion: '2025-2026',
+      potrero,
+      variedad: getVariedad(potrero),
+      actividad: 'FIN_VUELTA',
+      comentario: 'Fin de vuelta automático',
+      usuario: localStorage.getItem('elprado_usuario') || '',
+      fechaMod: new Date().toISOString()
+    };
+    const actsPost = getActividades();
+    // Reemplazar FIN_VUELTA anterior del mismo potrero si existe
+    const actsFiltered = actsPost.filter(a => !(a.actividad === 'FIN_VUELTA' && a.potrero === potrero));
+    actsFiltered.unshift(recFV);
+    setData('actividades', actsFiltered);
+    chkFV.checked = false;
+    notif('🔚 Fin de vuelta registrado para ' + potrero);
+  }
 
   // ═══════════════════════════════════════
 // SINCRONIZAR PLAN DESDE REGISTROS EXISTENTES
@@ -1994,6 +2062,11 @@ function limpiarForm() {
   if(ghM) ghM.style.display='none';
   if(ghS) ghS.style.display='none';
   document.getElementById('retornoInfo').style.display='none';
+  // Reset Fin de Vuelta
+  const chkFV = document.getElementById('chkFinVuelta');
+  if(chkFV) chkFV.checked = false;
+  const grpFV = document.getElementById('grpFinVuelta');
+  if(grpFV) grpFV.style.display = 'none';
 }
 
   // Restaurar datos persistentes del registro anterior
@@ -2032,6 +2105,7 @@ function renderTabla() {
   const pot = document.getElementById('filtroPotrero').value;
 
   let data = getActividades();
+  data = data.filter(r => r.actividad !== 'FIN_VUELTA'); // no mostrar registros internos
   if(mes) data = data.filter(r => r.mes===mes);
   if(act) data = data.filter(r => r.actividad===act);
   if(pot) data = data.filter(r => r.potrero===pot);
@@ -2152,6 +2226,9 @@ function editarActividad(id) {
 
     // Marcar edición
     document.getElementById('formComun').dataset.editId = id;
+    // Reset fin de vuelta checkbox (no aplica al editar)
+    const chkFVEdit = document.getElementById('chkFinVuelta');
+    if(chkFVEdit) chkFVEdit.checked = false;
     const btnGuardar = document.querySelector('[onclick="guardarActividad()"]');
     if(btnGuardar) {
       btnGuardar.textContent = '💾 Actualizar Registro';
@@ -2169,6 +2246,8 @@ function renderStats() {
   const ms = acts.filter(a => a.actividad==='MATERIA SECA');
   const ing = acts.filter(a => a.actividad==='INGRESO HDA');
 
+  // filtrar FIN_VUELTA de stats
+  const actsReal = acts.filter(a => a.actividad !== 'FIN_VUELTA');
   const totalMs = ms.length;
   const avgKgMs = ms.length ? ms.reduce((s,a)=>s+(a.kgMsHa||0),0)/ms.length : 0;
   const totalIng = ing.length;
@@ -2180,7 +2259,7 @@ function renderStats() {
     <div class="stat-card"><div class="stat-val">${fmt(avgKgMs,0)}</div><div class="stat-lbl">KG MS/HA prom</div></div>
     <div class="stat-card"><div class="stat-val">${totalIng}</div><div class="stat-lbl">Ingresos HDA</div></div>
     <div class="stat-card"><div class="stat-val">${fmt(avgRetorno,1)}</div><div class="stat-lbl">Retorno prom (días)</div></div>
-    <div class="stat-card"><div class="stat-val">${acts.length}</div><div class="stat-lbl">Total registros</div></div>
+    <div class="stat-card"><div class="stat-val">${actsReal.length}</div><div class="stat-lbl">Total registros</div></div>
   `;
 }
 
