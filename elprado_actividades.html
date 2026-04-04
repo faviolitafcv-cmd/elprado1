@@ -13,6 +13,20 @@
   localStorage.setItem('elprado_usuario', usuario);
   window._epRol = sessionStorage.getItem('ep_rol') || 'OPERADOR';
   window._epUsuario = usuario;
+
+  // Aplicar permisos de UI según rol
+  if(window._epRol !== 'ADMIN') {
+    // Ocultar fila de borrar seleccionados
+    document.addEventListener('DOMContentLoaded', function() {
+      var rowBorrar = document.getElementById('rowBorrarSel');
+      if(rowBorrar) rowBorrar.style.display = 'none';
+      // Ocultar botones peligrosos de configuración para operadores
+      var btnBorrarTodo = document.querySelector('[onclick="borrarTodo()"]');
+      if(btnBorrarTodo) btnBorrarTodo.style.display = 'none';
+      var btnImportarJSON = document.querySelector('[onclick="importarJSON()"]');
+      if(btnImportarJSON) btnImportarJSON.style.display = 'none';
+    });
+  }
 })();
 
 function esAdmin() { return window._epRol === 'ADMIN'; }
@@ -622,7 +636,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
       </div>
       <button class="btn btn-secondary btn-sm" onclick="exportarCSV()">⬇ Exportar CSV</button>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;">
+    <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;" id="rowBorrarSel">
       <button class="btn btn-danger btn-sm" onclick="borrarSeleccionados()" id="btnBorrarSel" style="display:none;">🗑 Eliminar seleccionados</button>
       <span id="contSel" style="font-size:11px;color:var(--text3);display:none;"></span>
     </div>
@@ -2139,8 +2153,9 @@ function renderTabla() {
       <td class="td-mono ${r.retorno>=28?'td-green':r.retorno!=null&&r.retorno<21?'td-red':''}">${r.retorno!=null?r.retorno+'d':'—'}</td>
       <td style="font-size:11px;color:var(--text3);">${r.usuario||'—'}</td>
       <td onclick="event.stopPropagation()" style="display:flex;gap:4px;">
-        <input type="checkbox" class="chk-registro" value="${r.id}" style="width:16px;height:16px;cursor:pointer;" onclick="event.stopPropagation()">
-        <button class="btn btn-danger" onclick="event.stopPropagation();borrarActividad('${r.id}')">✕</button>
+        ${esAdmin() ? `<input type="checkbox" class="chk-registro" value="${r.id}" style="width:16px;height:16px;cursor:pointer;" onclick="event.stopPropagation()">` : ''}
+        <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();editarActividad('${r.id}')">✏</button>
+        ${esAdmin() ? `<button class="btn btn-danger" onclick="event.stopPropagation();borrarActividad('${r.id}')">✕</button>` : ''}
       </td>
     </tr>`;
   }).join('');
