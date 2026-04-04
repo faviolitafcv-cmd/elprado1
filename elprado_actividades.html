@@ -1878,6 +1878,7 @@ function guardarActividad() {
   // Una sola fila — no se genera duplicado de INGRESO HDA
 
   setData('actividades', acts);
+  fbSet('actividades', acts); // ← sincronizar con Firebase siempre (nuevo Y edición)
 
   // ── FIN DE VUELTA: si el checkbox está marcado, guardar registro especial ──
   const chkFV = document.getElementById('chkFinVuelta');
