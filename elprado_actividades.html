@@ -1509,7 +1509,15 @@ function cargarLluviaHistorica() {
 // STORAGE
 // ═══════════════════════════════════════
 function getData(key, def) {
-  try { return JSON.parse(localStorage.getItem('elprado_' + key)) || def; }
+  try {
+    const val = JSON.parse(localStorage.getItem('elprado_' + key));
+    if(val === null || val === undefined) return def;
+    // Firebase convierte arrays a objetos {0:{...}, 1:{...}} — convertir de vuelta
+    if(Array.isArray(def) && val !== null && typeof val === 'object' && !Array.isArray(val)) {
+      return Object.values(val);
+    }
+    return val;
+  }
   catch(e) { return def; }
 }
 function setData(key, val) {
