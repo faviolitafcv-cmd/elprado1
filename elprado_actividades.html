@@ -1138,30 +1138,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
 <!-- ════════════════ LLUVIA ════════════════ -->
 <div class="page" id="page-lluvia">
 
-  <!-- Configuración de pluviómetros -->
-  <div class="card">
-    <div class="card-title"><span>📡</span> Pluviómetros
-      <button class="btn btn-secondary btn-sm" style="margin-left:auto;" onclick="abrirModalPluviometro()">+ Agregar Pluviómetro</button>
-    </div>
-    <div id="listaPluviometros"></div>
-  </div>
-
-  <!-- Registro de lluvia -->
-  <div class="card">
-    <div class="card-title"><span>🌧</span> Registrar Lluvia</div>
-    <div class="form-grid" style="max-width:500px;">
-      <div class="form-group">
-        <label>Fecha</label>
-        <input type="date" id="llFecha">
-      </div>
-    </div>
-    <div id="llCamposPluvio" style="margin-top:12px;"></div>
-    <div class="btn-row" style="justify-content:flex-start;margin-top:16px;">
-      <button class="btn btn-gold" onclick="guardarLluvia()">💾 Guardar Registro de Lluvia</button>
-    </div>
-  </div>
-
-  <!-- Análisis por gestión (estilo Excel) -->
+  <!-- Análisis por gestión -->
   <div class="card">
     <div class="card-title"><span>📋</span> Análisis de Lluvias por Gestión — Campamento Principal</div>
     <div class="tbl-wrap">
@@ -1172,19 +1149,10 @@ tr:hover td { background: rgba(255,255,255,.02); }
     </div>
   </div>
 
-  <!-- Resumen mensual acumulado -->
+  <!-- Resumen mensual 2025-2026 -->
   <div class="card">
-    <div class="card-title"><span>📈</span> Resumen Mensual Acumulado
-      <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
-        <select id="llFiltroGestion" onchange="renderResumenLluvia()" style="font-size:11px;padding:4px 8px;">
-          <option value="">Todas las gestiones</option>
-          <option value="2025-2026">2025-2026</option>
-          <option value="2024-2025">2024-2025</option>
-          <option value="2023-2024">2023-2024</option>
-          <option value="2022-2023">2022-2023</option>
-          <option value="2021-2022">2021-2022</option>
-        </select>
-      </div>
+    <div class="card-title"><span>📈</span> Resumen Mensual — Gestión 2025-2026
+      <button class="btn btn-secondary btn-sm" style="margin-left:auto;" onclick="exportarLluviaExcel()">⬇ Excel</button>
     </div>
     <div class="tbl-wrap">
       <table id="tablaResumenLluvia">
@@ -1194,27 +1162,52 @@ tr:hover td { background: rgba(255,255,255,.02); }
     </div>
   </div>
 
-  <!-- Historial de lluvia -->
+  <!-- Configuración pluviómetros -->
   <div class="card">
-    <div class="card-title"><span>📊</span> Historial de Lluvia
-      <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
-        <select id="llFiltroMes" onchange="renderLluvia()" style="font-size:11px;padding:4px 8px;">
-          <option value="">Todos los meses</option>
-          <option>AGOSTO</option><option>SEPTIEMBRE</option><option>OCTUBRE</option>
-          <option>NOVIEMBRE</option><option>DICIEMBRE</option><option>ENERO</option>
-          <option>FEBRERO</option><option>MARZO</option><option>ABRIL</option>
-          <option>MAYO</option><option>JUNIO</option><option>JULIO</option>
-        </select>
-        <button class="btn btn-secondary btn-sm" onclick="exportarLluviaExcel()">⬇ Excel</button>
+    <div class="card-title"><span>📡</span> Pluviómetros
+      <button class="btn btn-secondary btn-sm" style="margin-left:auto;" onclick="abrirModalPluviometro()">+ Agregar / Editar</button>
+    </div>
+    <div id="listaPluviometros"></div>
+  </div>
+
+  <!-- CALENDARIO -->
+  <div class="card">
+    <div class="card-title">
+      <span>🌧</span> Registro de Lluvia
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+        <button onclick="llCalNavegar(-1)" style="background:var(--card2);border:1px solid var(--border);color:var(--text2);padding:4px 14px;border-radius:4px;cursor:pointer;font-size:18px;line-height:1;">‹</button>
+        <span id="llCalTitulo" style="font-size:13px;font-weight:700;color:var(--green-soft);min-width:130px;text-align:center;"></span>
+        <button onclick="llCalNavegar(1)" style="background:var(--card2);border:1px solid var(--border);color:var(--text2);padding:4px 14px;border-radius:4px;cursor:pointer;font-size:18px;line-height:1;">›</button>
       </div>
     </div>
-    <div class="tbl-wrap">
-      <table id="tablaLluvia">
-        <thead id="tablaLluviaHead"></thead>
-        <tbody id="tablaLluviaBody"></tbody>
-      </table>
+    <!-- Días de la semana -->
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:4px;">
+      <div style="text-align:center;font-size:10px;font-weight:700;color:var(--text3);padding:4px;">LU</div>
+      <div style="text-align:center;font-size:10px;font-weight:700;color:var(--text3);padding:4px;">MA</div>
+      <div style="text-align:center;font-size:10px;font-weight:700;color:var(--text3);padding:4px;">MI</div>
+      <div style="text-align:center;font-size:10px;font-weight:700;color:var(--text3);padding:4px;">JU</div>
+      <div style="text-align:center;font-size:10px;font-weight:700;color:var(--text3);padding:4px;">VI</div>
+      <div style="text-align:center;font-size:10px;font-weight:700;color:var(--red);padding:4px;">SA</div>
+      <div style="text-align:center;font-size:10px;font-weight:700;color:var(--red);padding:4px;">DO</div>
+    </div>
+    <div id="llCalendario" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;"></div>
+  </div>
+
+  <!-- Modal registro de lluvia por día -->
+  <div id="modalLluviaDia" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;align-items:center;justify-content:center;">
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:24px;width:95%;max-width:380px;box-shadow:0 8px 32px rgba(0,0,0,.4);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <strong id="llDiaLabel" style="color:var(--green-soft);font-size:14px;">🌧 Lluvia</strong>
+        <button onclick="cerrarModalLluvia()" style="background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;line-height:1;">✕</button>
+      </div>
+      <div id="llCamposDia" style="display:flex;flex-direction:column;gap:10px;"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+        <button onclick="cerrarModalLluvia()" class="btn btn-secondary btn-sm">Cancelar</button>
+        <button onclick="guardarLluviaDia()" class="btn btn-gold">💾 Guardar</button>
+      </div>
     </div>
   </div>
+
 </div>
 
 <!-- ════════════════ MODAL PLUVIÓMETRO ════════════════ -->
@@ -2672,6 +2665,144 @@ function renderGrupos() {
 // ═══════════════════════════════════════
 // LLUVIA
 // ═══════════════════════════════════════
+// Estado del calendario
+var llCalAnio = new Date().getFullYear();
+var llCalMes  = new Date().getMonth(); // 0-based
+var llDiaActual = null; // fecha seleccionada "YYYY-MM-DD"
+
+const MESES_NOMBRES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function llCalNavegar(dir) {
+  llCalMes += dir;
+  if(llCalMes > 11) { llCalMes = 0; llCalAnio++; }
+  if(llCalMes < 0)  { llCalMes = 11; llCalAnio--; }
+  renderCalendarioLluvia();
+}
+
+function renderCalendarioLluvia() {
+  const el = document.getElementById('llCalendario');
+  const titulo = document.getElementById('llCalTitulo');
+  if(!el || !titulo) return;
+
+  titulo.textContent = MESES_NOMBRES[llCalMes] + ' ' + llCalAnio;
+
+  const lluvia = getLluvia().filter(r => r.gestion === '2025-2026');
+  // Índice rápido por fecha
+  const porFecha = {};
+  lluvia.forEach(r => { porFecha[r.fecha] = r; });
+
+  const hoy = new Date().toISOString().split('T')[0];
+  const primerDia = new Date(llCalAnio, llCalMes, 1);
+  const ultimoDia = new Date(llCalAnio, llCalMes + 1, 0).getDate();
+
+  // Día de la semana del 1 (0=dom → convertir a LU=0)
+  let inicioSemana = primerDia.getDay(); // 0=dom
+  inicioSemana = (inicioSemana === 0) ? 6 : inicioSemana - 1; // convertir a LU=0
+
+  let html = '';
+  // Celdas vacías antes del día 1
+  for(let i = 0; i < inicioSemana; i++) {
+    html += '<div style="height:52px;"></div>';
+  }
+
+  for(let d = 1; d <= ultimoDia; d++) {
+    const num = String(llCalMes + 1).padStart(2,'0');
+    const dStr = String(d).padStart(2,'0');
+    const fecha = llCalAnio + '-' + num + '-' + dStr;
+    const reg = porFecha[fecha];
+    const esHoy = fecha === hoy;
+    const tieneData = !!reg;
+
+    // Calcular promedio si tiene datos
+    let mmLabel = '';
+    let bgColor = 'var(--card2)';
+    let borderColor = esHoy ? 'var(--green)' : 'var(--border)';
+    let textColor = 'var(--text)';
+
+    if(tieneData) {
+      const vals = (reg.lecturas||[]).map(l=>parseFloat(l.mm)||0);
+      const total = vals.reduce((s,v)=>s+v,0);
+      const prom = vals.filter(v=>v>0).length ? total/vals.filter(v=>v>0).length : 0;
+      mmLabel = prom > 0 ? Math.round(prom)+'mm' : '—';
+      bgColor = prom > 0 ? 'rgba(74,154,186,.2)' : 'rgba(109,186,58,.06)';
+      borderColor = prom > 0 ? 'var(--blue)' : 'var(--border2)';
+      textColor = prom > 0 ? 'var(--blue)' : 'var(--text3)';
+    }
+
+    html += \`<div onclick="abrirModalLluviaDia('\${fecha}')" style="
+      height:52px;border-radius:6px;cursor:pointer;
+      background:\${bgColor};border:1.5px solid \${borderColor};
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      gap:2px;transition:all .15s;user-select:none;
+      \${esHoy ? 'box-shadow:0 0 0 2px var(--green);' : ''}
+    " onmouseover="this.style.borderColor='var(--green2)'" onmouseout="this.style.borderColor='\${borderColor}'">
+      <span style="font-size:12px;font-weight:\${esHoy?'800':'600'};color:\${esHoy?'var(--green)':textColor};">\${d}</span>
+      <span style="font-size:10px;font-weight:600;color:\${textColor};">\${mmLabel}</span>
+    </div>\`;
+  }
+  el.innerHTML = html;
+}
+
+function abrirModalLluviaDia(fecha) {
+  llDiaActual = fecha;
+  const pluvios = getPluviometros();
+  const lluvia = getLluvia();
+  const reg = lluvia.find(r => r.fecha === fecha && r.gestion === '2025-2026');
+
+  const partes = fecha.split('-');
+  const label = partes[2] + ' de ' + MESES_NOMBRES[parseInt(partes[1])-1] + ' ' + partes[0];
+  document.getElementById('llDiaLabel').textContent = '🌧 Lluvia — ' + label;
+
+  document.getElementById('llCamposDia').innerHTML = pluvios.map((p, i) => {
+    const lect = reg ? ((reg.lecturas||[]).find(l=>l.nombre&&l.nombre.trim()===p.nombre.trim()) || (reg.lecturas||[])[i]) : null;
+    const mm = lect ? (parseFloat(lect.mm)||0) : 0;
+    return \`<div style="display:flex;align-items:center;gap:10px;">
+      <label style="font-size:11px;font-weight:700;color:var(--text2);min-width:140px;text-transform:uppercase;letter-spacing:.5px;">\${p.nombre}</label>
+      <input type="number" id="llDia_\${i}" step="0.1" min="0" placeholder="0.0" value="\${mm||''}" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--white);font-size:14px;">
+      <span style="font-size:12px;color:var(--text3);">mm</span>
+    </div>\`;
+  }).join('');
+
+  const modal = document.getElementById('modalLluviaDia');
+  modal.style.display = 'flex';
+  // Focus primer campo
+  setTimeout(() => { const f = document.getElementById('llDia_0'); if(f) f.focus(); }, 100);
+}
+
+function cerrarModalLluvia() {
+  document.getElementById('modalLluviaDia').style.display = 'none';
+  llDiaActual = null;
+}
+
+function guardarLluviaDia() {
+  if(!llDiaActual) return;
+  const pluvios = getPluviometros();
+  const lecturas = pluvios.map((p, i) => ({
+    nombre: p.nombre,
+    potreros: p.potreros || [],
+    mm: parseFloat(document.getElementById('llDia_'+i)?.value) || 0
+  }));
+
+  const lluvia = getLluvia();
+  const filtrado = lluvia.filter(r => !(r.fecha === llDiaActual && r.gestion === '2025-2026'));
+  const partes = llDiaActual.split('-');
+  const mesNum = parseInt(partes[1]);
+  const MESES_MAP = {8:'AGOSTO',9:'SEPTIEMBRE',10:'OCTUBRE',11:'NOVIEMBRE',12:'DICIEMBRE',1:'ENERO',2:'FEBRERO',3:'MARZO',4:'ABRIL',5:'MAYO',6:'JUNIO',7:'JULIO'};
+  filtrado.unshift({
+    fecha: llDiaActual,
+    mes: MESES_MAP[mesNum] || '',
+    gestion: '2025-2026',
+    tipo: 'diario',
+    lecturas,
+    usuario: localStorage.getItem('elprado_usuario') || ''
+  });
+  setLluvia(filtrado);
+  cerrarModalLluvia();
+  renderCalendarioLluvia();
+  renderResumenLluvia();
+  renderAnalisisGestion();
+  notif('✅ Lluvia guardada para ' + llDiaActual);
+}
 
 function getPluviometros() { return getData('pluviometros', []); }
 function setPluviometros(v) { setData('pluviometros', v); fbSet('pluviometros', v); }
@@ -2885,9 +3016,8 @@ function renderAnalisisGestion() {
 
 function renderResumenLluvia() {
   const pluvios = getPluviometros();
-  const gestion = document.getElementById('llFiltroGestion')?.value || '';
-  let data = getLluvia();
-  if(gestion) data = data.filter(r => r.gestion === gestion);
+  const gestion = '2025-2026';
+  let data = getLluvia().filter(r => r.gestion === '2025-2026');
 
   const thead = document.getElementById('tablaResumenLluviaHead');
   const tbody = document.getElementById('tablaResumenLluviaBody');
@@ -3276,13 +3406,9 @@ function showPage(id) {
   if(id==='pedidos') { renderPedidos(); }
   if(id==='lluvia') {
     renderPluviometros();
-    renderCamposLluvia();
     renderAnalisisGestion();
     renderResumenLluvia();
-    renderLluvia();
-    // Fecha de hoy por defecto
-    if(!document.getElementById('llFecha').value)
-      document.getElementById('llFecha').value = new Date().toISOString().split('T')[0];
+    renderCalendarioLluvia();
   }
 }
 
