@@ -3274,10 +3274,9 @@ function renderCampo() {
     a.actividad === 'MATERIA SECA' && a.fechaIng && a.lote
   );
 
-  // Obtener grupos únicos con actividad reciente
-  const lotesSet = new Set();
-  acts.forEach(a => { if(a.lote) lotesSet.add(a.lote); });
-  const lotes = [...lotesSet].sort();
+  // Usar grupos configurados en Configuración
+  const gruposConfig = getGrupos();
+  const lotes = gruposConfig.map(g => `${g.tipo}|${g.categoria}|${g.grupo}`);
 
   const thead = document.getElementById('campoHead');
   const tbody = document.getElementById('campoBody');
