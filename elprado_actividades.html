@@ -1972,9 +1972,10 @@ function aplicarFechaMinIngreso() {
   const minFecha = ultReg.fechaSal;
   const turnoSuggerido = ultReg.horaSal || '';
 
-  const elIng = document.getElementById('fFechaIng');
-  const elSal = document.getElementById('fFechaSal');
+  const elIng    = document.getElementById('fFechaIng');
+  const elSal    = document.getElementById('fFechaSal');
   const elHoraIng = document.getElementById('fHoraIng');
+  const elHoraSal = document.getElementById('fHoraSal');
   if(!minFecha || !elIng) return;
 
   elIng.min = minFecha;
@@ -1983,11 +1984,16 @@ function aplicarFechaMinIngreso() {
     elIng.value = minFecha;
     elIng.style.borderColor = 'var(--gold2)';
     if(elSal) { elSal.value = sumarUnDia(minFecha); }
-    // Sugerir turno de ingreso = turno de salida del registro anterior
+    // Turno ingreso = turno salida del anterior; turno salida = mismo por defecto
     if(elHoraIng && turnoSuggerido) { elHoraIng.value = turnoSuggerido; }
+    if(elHoraSal && turnoSuggerido) { elHoraSal.value = turnoSuggerido; }
     calcIng();
     const turnoLabel = turnoSuggerido === 'MAÑANA' ? '🌅 Mañana' : turnoSuggerido === 'TARDE' ? '🌇 Tarde' : '';
     notif(`📅 Ingreso ajustado a ${minFecha} ${turnoLabel} — última salida de este grupo en ${potrero}`);
+  } else {
+    // Fecha OK pero sugerir turno si los campos están vacíos
+    if(elHoraIng && !elHoraIng.value && turnoSuggerido) { elHoraIng.value = turnoSuggerido; }
+    if(elHoraSal && !elHoraSal.value && turnoSuggerido) { elHoraSal.value = turnoSuggerido; }
   }
 }
 
@@ -2062,6 +2068,10 @@ function autoSalidaMS() {
   if(!fi) return;
   const salEl = document.getElementById('fFechaSal');
   salEl.value = sumarUnDia(fi);
+  // Copiar turno ingreso a salida por defecto si salida no tiene turno
+  const horaIng = document.getElementById('fHoraIng')?.value;
+  const horaSal = document.getElementById('fHoraSal');
+  if(horaIng && horaSal && !horaSal.value) { horaSal.value = horaIng; }
   calcIng();
 }
 
@@ -3554,22 +3564,26 @@ function previsualizarCambio() {
     });
   }
 
-  // Registros siguientes — correr fechas Y propagar turno
+  // Registros siguientes — correr fechas Y propagar turno en cadena
   // El turno de ingreso de la siguiente = turno de salida de la anterior
+  // El turno de salida de la siguiente = mismo turno (propagar en cadena)
   let turnoSalAnterior = nuevoTurno;
   acts.forEach(a => {
     if(a.id === regId) return;
     const nuevoIng = diff !== 0 ? sumarDias(a.fechaIng, diff) : a.fechaIng;
     const nuevoSal = a.fechaSal && diff !== 0 ? sumarDias(a.fechaSal, diff) : a.fechaSal;
+    // Si hay cambio de turno, propagar: horaIng = turno salida anterior, horaSal = mismo turno
+    const nuevoHoraIng = turnoCambio ? turnoSalAnterior : (a.horaIng||'');
+    const nuevoHoraSal = turnoCambio ? turnoSalAnterior : (a.horaSal||'');
     cambios.push({
       id: a.id, parcela: a.parcela,
       campo: 'ingreso+salida',
       deIng: a.fechaIng, aIng: nuevoIng,
       deSal: a.fechaSal, aSal: nuevoSal,
-      deHoraIng: a.horaIng||'', aHoraIng: turnoSalAnterior,
-      deHoraSal: a.horaSal||'', aHoraSal: a.horaSal||''
+      deHoraIng: a.horaIng||'', aHoraIng: nuevoHoraIng,
+      deHoraSal: a.horaSal||'', aHoraSal: nuevoHoraSal
     });
-    turnoSalAnterior = a.horaSal||'';
+    turnoSalAnterior = nuevoHoraSal;
   });
 
   _cambioActual.cambios = cambios;
