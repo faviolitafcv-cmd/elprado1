@@ -1082,7 +1082,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
   <div class="card">
     <div class="card-title"><span>🗺</span> Área de Potreros (Hectáreas)</div>
     <div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Asigná el área total en hectáreas a cada potrero.</div>
-    <div id="listaPotreroAreas" style="width:100%;"></div>
+    <div id="listaPotreroAreas" style="width:100%;overflow-x:auto;"></div>
     <div class="btn-row" style="justify-content:flex-start;margin-top:12px;"><button class="btn btn-primary btn-sm" onclick="guardarPotreroAreas()">💾 Guardar Cambios</button></div>
   </div>
 
@@ -2008,7 +2008,7 @@ function renderPotreroAreas() {
 
   el.innerHTML = `
     <div style="overflow-x:auto;">
-    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <table style="width:100%;min-width:500px;border-collapse:collapse;font-size:12px;">
       <thead><tr style="border-bottom:2px solid var(--border2);">
         <th style="padding:6px 8px;text-align:left;color:var(--text3);font-weight:700;">Potrero</th>
         <th style="padding:6px 8px;text-align:left;color:var(--text3);font-weight:700;">Variedad</th>
@@ -2019,7 +2019,7 @@ function renderPotreroAreas() {
       ${lista.map((p,i) => `<tr style="border-bottom:1px solid var(--border);">
         <td style="padding:5px 8px;">
           <input type="text" id="pot_nom_${i}" value="${p.nombre}"
-            style="width:90px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--white);font-size:12px;font-weight:700;"
+            style="width:70px;padding:3px 5px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--white);font-size:12px;font-weight:700;"
             ${p.esBase ? '' : ''}>
         </td>
         <td style="padding:5px 8px;">
@@ -2031,7 +2031,7 @@ function renderPotreroAreas() {
         <td style="padding:5px 8px;text-align:center;">
           <div style="display:flex;align-items:center;gap:4px;justify-content:center;">
             <input type="number" id="pot_area_${i}" value="${p.area||''}" min="0" step="0.1"
-              style="width:75px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--white);font-size:12px;"
+              style="width:65px;padding:3px 5px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--white);font-size:12px;"
               placeholder="0.0">
             <span style="font-size:10px;color:var(--text3);">ha</span>
           </div>
