@@ -1328,7 +1328,9 @@ tr:hover td { background: rgba(255,255,255,.02); }
   <div class="card">
     <div class="card-title">
       <span>📍</span> Estado del Campo
-      <div style="margin-left:auto;display:flex;align-items:center;gap:10px;">
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+        <button onclick="exportarCampoExcel()" class="btn btn-secondary btn-sm">⬇ Excel</button>
+        <button onclick="imprimirCampo()" class="btn btn-secondary btn-sm">🖨️ Imprimir</button>
         <button onclick="campoNavegar(-1)" style="background:var(--card2);border:1px solid var(--border);color:var(--text2);padding:4px 14px;border-radius:4px;cursor:pointer;font-size:18px;">‹</button>
         <span id="campoFechaLabel" style="font-size:13px;font-weight:700;color:var(--green-soft);min-width:220px;text-align:center;"></span>
         <button onclick="campoNavegar(1)" style="background:var(--card2);border:1px solid var(--border);color:var(--text2);padding:4px 14px;border-radius:4px;cursor:pointer;font-size:18px;">›</button>
@@ -3273,6 +3275,79 @@ function exportarInformeCalidad() {
 
 var campoFechaBase = null; // fecha central (hoy por defecto)
 var _cambioActual = null;  // registro en edición
+
+function imprimirCampo() {
+  const tabla = document.getElementById('campoTabla');
+  const titulo = document.getElementById('campoFechaLabel')?.textContent || '';
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head>
+    <title>Estado del Campo — ${titulo}</title>
+    <style>
+      body { font-family: Arial, sans-serif; padding: 20px; font-size: 11px; }
+      h2 { color: #1a3a1a; margin-bottom: 16px; }
+      table { border-collapse: collapse; width: 100%; }
+      th { background: #2e4020; color: white; padding: 6px 8px; text-align: center; font-size: 10px; }
+      td { padding: 5px 7px; border: 1px solid #ccc; text-align: center; font-size: 10px; }
+      td:first-child { text-align: left; font-weight: bold; }
+      @media print { body { padding: 10px; } }
+    </style>
+  </head><body>
+    <h2>📍 Estado del Campo — ${titulo}</h2>
+    ${tabla.outerHTML}
+    <script>window.onload=function(){window.print();}<\/script>
+  </body></html>`);
+  win.document.close();
+}
+
+function exportarCampoExcel() {
+  if(typeof XLSX === 'undefined') { notif('Librería Excel no disponible', true); return; }
+  const hoy = new Date().toISOString().split('T')[0];
+  if(!campoFechaBase) campoFechaBase = hoy;
+
+  const dias = [];
+  for(let i = -3; i <= 3; i++) dias.push(sumarDias(campoFechaBase, i));
+
+  const gruposConfig = getGrupos();
+  const lotes = gruposConfig.map(g => `${g.tipo}|${g.categoria}|${g.grupo}`);
+  const acts = getActividades().filter(a => a.actividad === 'MATERIA SECA' && a.fechaIng && a.lote);
+
+  // Cabecera
+  const DIAS_S = ['Do','Lu','Ma','Mi','Ju','Vi','Sa'];
+  const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const diasLabels = dias.map(d => {
+    const dt = new Date(d+'T12:00:00');
+    return DIAS_S[dt.getDay()] + ' ' + dt.getDate() + ' ' + meses[dt.getMonth()];
+  });
+
+  const rows = [['Grupo', ...diasLabels]];
+
+  lotes.forEach(lote => {
+    const lparts = lote.split('|');
+    const loteLabel = lparts.length >= 3 ? lparts[1]+' · '+lparts[2] : lote;
+    const fila = [loteLabel];
+    dias.forEach(d => {
+      const candidatos = acts.filter(a =>
+        a.lote === lote && a.fechaIng &&
+        ((a.fechaSal && a.fechaIng <= d && a.fechaSal >= d) ||
+         (!a.fechaSal && a.fechaIng === d))
+      );
+      const reg = candidatos.length > 0
+        ? candidatos.reduce((best, a) => a.fechaIng >= best.fechaIng ? a : best)
+        : null;
+      fila.push(reg ? `${reg.potrero}·P${reg.parcela}` : '—');
+    });
+    rows.push(fila);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  // Ancho de columnas
+  ws['!cols'] = [{wch:20}, ...dias.map(()=>({wch:14}))];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Estado del Campo');
+  const titulo = document.getElementById('campoFechaLabel')?.textContent?.replace(' — ','-').replace(/ /g,'') || 'campo';
+  XLSX.writeFile(wb, `estado_campo_${titulo}.xlsx`);
+  notif('✅ Excel exportado');
+}
 
 function campoIrHoy() {
   campoFechaBase = new Date().toISOString().split('T')[0];
