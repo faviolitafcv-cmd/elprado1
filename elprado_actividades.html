@@ -1560,7 +1560,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
 // ═══════════════════════════════════════
 // DATOS BASE
 // ═══════════════════════════════════════
-const POTREROS = {
+const POTREROS_BASE = {
   BRACHIARIA: ['A6','A7','A8','A9','D1','D2','D3','D4','D5','D6','D7','D8','D9','D10',
     'D6-N','D6-S','D7-N','D7-S','D8-A','D8-B','D8-C','D9-N','D9-S',
     '1NN','1SN','1NP','1SP','2NP','2NN','2SN','2SP','3NP','3NN','3SN','3SP',
@@ -1569,6 +1569,53 @@ const POTREROS = {
     'B8','B8-A','B8-B','B9','B9-A','B9-B',
     'C1','C2','C3','C4','C5','C6','C7','C8','C9','C10','C11','D11','D12','ENTRADA']
 };
+
+// Gestión dinámica de potreros
+function getPotreroConfig() { return getData('potreroConfig', {}); }
+function setPotreroConfig(v) { setData('potreroConfig', v); fbSet('potreroConfig', v); }
+
+// Retorna array de todos los potreros: {nombre, variedad, area, esBase}
+function getAllPotrerosList() {
+  const cfg = getPotreroConfig();
+  const areas = getPotreroAreas();
+  const list = [];
+  // Base BRACHIARIA
+  POTREROS_BASE.BRACHIARIA.forEach(p => {
+    const over = cfg[p] || {};
+    list.push({ nombre: p, variedad: over.variedad || 'BRACHIARIA', area: over.area || areas[p] || '', esBase: true });
+  });
+  // Base PANICUM
+  POTREROS_BASE.PANICUM.forEach(p => {
+    const over = cfg[p] || {};
+    list.push({ nombre: p, variedad: over.variedad || 'PANICUM', area: over.area || areas[p] || '', esBase: true });
+  });
+  // Extras (no están en base)
+  Object.keys(cfg).forEach(p => {
+    if(!POTREROS_BASE.BRACHIARIA.includes(p) && !POTREROS_BASE.PANICUM.includes(p)) {
+      list.push({ nombre: p, variedad: cfg[p].variedad || 'BRACHIARIA', area: cfg[p].area || areas[p] || '', esBase: false });
+    }
+  });
+  return list;
+}
+
+function getVariedad(potrero) {
+  const cfg = getPotreroConfig();
+  if(cfg[potrero]?.variedad) return cfg[potrero].variedad;
+  if(POTREROS_BASE.BRACHIARIA.includes(potrero)) return 'BRACHIARIA';
+  if(POTREROS_BASE.PANICUM.includes(potrero)) return 'PANICUM';
+  return 'BRACHIARIA';
+}
+
+// Compatibilidad: POTREROS sigue funcionando
+const POTREROS = POTREROS_BASE;
+
+let ALL_POTREROS = buildAllPotreros();
+function buildAllPotreros() {
+  return getAllPotrerosList().map(p => ({p: p.nombre, v: p.variedad}));
+}
+function refreshAllPotreros() {
+  ALL_POTREROS = buildAllPotreros();
+}
 
 const MESES = ['AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE','ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO'];
 
@@ -1626,7 +1673,7 @@ async function fbSet(key, val) {
 }
 
 async function pushAllToFirebase() {
-  const keys = ['actividades','grupos','vaqueros','plan','pedidos','pluviometros','lluvia','bromatologicos','potreroAreas'];
+  const keys = ['actividades','grupos','vaqueros','plan','pedidos','pluviometros','lluvia','bromatologicos','potreroAreas','potreroConfig'];
   let count = 0;
   for(const key of keys) {
     const val = getData(key, null);
@@ -1719,11 +1766,7 @@ function mesDeDate(d) {
   const meses = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
   return meses[m];
 }
-function getVariedad(potrero) {
-  if(POTREROS.BRACHIARIA.includes(potrero)) return 'BRACHIARIA';
-  if(POTREROS.PANICUM.includes(potrero)) return 'PANICUM';
-  return '';
-}
+// getVariedad defined above (dynamic)
 function dateDiff(d1, d2) {
   return Math.round((new Date(d2+'T12:00:00') - new Date(d1+'T12:00:00')) / 86400000);
 }
@@ -1961,30 +2004,130 @@ function onPotreroChange() {
 function renderPotreroAreas() {
   const el = document.getElementById('listaPotreroAreas');
   if(!el) return;
-  const areas = getPotreroAreas();
-  const todos = [...POTREROS.BRACHIARIA, ...POTREROS.PANICUM];
-  el.innerHTML = todos.map(p => `
-    <div style="display:flex;flex-direction:column;gap:4px;">
-      <label style="font-size:11px;font-weight:700;color:var(--text2);">${p}</label>
-      <div style="display:flex;align-items:center;gap:4px;">
-        <input type="number" id="area_${p}" value="${areas[p]||''}" min="0" step="0.1"
-          style="width:80px;padding:5px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--white);font-size:12px;"
-          placeholder="ha">
-        <span style="font-size:10px;color:var(--text3);">ha</span>
-      </div>
-    </div>`).join('');
+  const lista = getAllPotrerosList();
+
+  el.innerHTML = `
+    <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead><tr style="border-bottom:2px solid var(--border2);">
+        <th style="padding:6px 8px;text-align:left;color:var(--text3);font-weight:700;">Potrero</th>
+        <th style="padding:6px 8px;text-align:left;color:var(--text3);font-weight:700;">Variedad</th>
+        <th style="padding:6px 8px;text-align:center;color:var(--text3);font-weight:700;">Área (ha)</th>
+        <th style="padding:6px 8px;text-align:center;color:var(--text3);font-weight:700;"></th>
+      </tr></thead>
+      <tbody>
+      ${lista.map((p,i) => `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:5px 8px;">
+          <input type="text" id="pot_nom_${i}" value="${p.nombre}"
+            style="width:90px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--white);font-size:12px;font-weight:700;"
+            ${p.esBase ? '' : ''}>
+        </td>
+        <td style="padding:5px 8px;">
+          <select id="pot_var_${i}" style="padding:4px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--white);font-size:12px;">
+            <option value="BRACHIARIA" ${p.variedad==='BRACHIARIA'?'selected':''}>BRACHIARIA</option>
+            <option value="PANICUM" ${p.variedad==='PANICUM'?'selected':''}>PANICUM</option>
+          </select>
+        </td>
+        <td style="padding:5px 8px;text-align:center;">
+          <div style="display:flex;align-items:center;gap:4px;justify-content:center;">
+            <input type="number" id="pot_area_${i}" value="${p.area||''}" min="0" step="0.1"
+              style="width:75px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--white);font-size:12px;"
+              placeholder="0.0">
+            <span style="font-size:10px;color:var(--text3);">ha</span>
+          </div>
+        </td>
+        <td style="padding:5px 8px;text-align:center;">
+          ${!p.esBase ? `<button onclick="eliminarPotreroExtra('${p.nombre}')" style="background:var(--red);color:white;border:none;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;">✕</button>` : '<span style="font-size:10px;color:var(--text3);">base</span>'}
+        </td>
+      </tr>`).join('')}
+      </tbody>
+    </table>
+    </div>
+    <div style="margin-top:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <input type="text" id="nuevoPotNombre" placeholder="Nombre (ej: E5)" maxlength="20"
+        style="padding:6px 10px;border:1px solid var(--border2);border-radius:4px;background:var(--bg2);color:var(--white);font-size:12px;width:120px;">
+      <select id="nuevoPotVar" style="padding:6px 10px;border:1px solid var(--border2);border-radius:4px;background:var(--bg2);color:var(--white);font-size:12px;">
+        <option value="BRACHIARIA">BRACHIARIA</option>
+        <option value="PANICUM">PANICUM</option>
+      </select>
+      <input type="number" id="nuevoPotArea" placeholder="ha" min="0" step="0.1"
+        style="padding:6px 10px;border:1px solid var(--border2);border-radius:4px;background:var(--bg2);color:var(--white);font-size:12px;width:80px;">
+      <button class="btn btn-primary btn-sm" onclick="agregarNuevoPotrero()">+ Agregar Potrero</button>
+    </div>`;
 }
 
 function guardarPotreroAreas() {
-  const todos = [...POTREROS.BRACHIARIA, ...POTREROS.PANICUM];
-  const areas = {};
-  todos.forEach(p => {
-    const el = document.getElementById('area_' + p);
-    if(el && el.value) areas[p] = parseFloat(el.value);
+  const lista = getAllPotrerosList();
+  const cfg = getPotreroConfig();
+  const areas = getPotreroAreas();
+
+  lista.forEach((p, i) => {
+    const nombre    = document.getElementById('pot_nom_'  + i)?.value?.trim().toUpperCase();
+    const variedad  = document.getElementById('pot_var_'  + i)?.value;
+    const area      = parseFloat(document.getElementById('pot_area_' + i)?.value) || null;
+    if(!nombre) return;
+
+    // Guardar en potreroConfig (overrides)
+    if(!cfg[nombre]) cfg[nombre] = {};
+    cfg[nombre].variedad = variedad;
+    if(area) cfg[nombre].area = area; else delete cfg[nombre].area;
+
+    // También en areas para compatibilidad
+    if(area) areas[nombre] = area; else delete areas[nombre];
+
+    // Si renombró un potrero extra
+    if(!p.esBase && nombre !== p.nombre.toUpperCase()) {
+      delete cfg[p.nombre];
+      cfg[nombre] = { variedad, area };
+    }
   });
+
+  setPotreroConfig(cfg);
   setPotreroAreas(areas);
-  notif('✅ Áreas guardadas');
+  refreshAllPotreros();
+  poblarSelectPotreros();
+  notif('✅ Potreros guardados');
 }
+
+function agregarNuevoPotrero() {
+  const nombre   = document.getElementById('nuevoPotNombre')?.value?.trim().toUpperCase();
+  const variedad = document.getElementById('nuevoPotVar')?.value;
+  const area     = parseFloat(document.getElementById('nuevoPotArea')?.value) || null;
+
+  if(!nombre) { notif('Ingresá el nombre del potrero', true); return; }
+
+  // Verificar que no exista
+  const todos = getAllPotrerosList().map(p => p.nombre.toUpperCase());
+  if(todos.includes(nombre)) { notif(`El potrero ${nombre} ya existe`, true); return; }
+
+  const cfg = getPotreroConfig();
+  cfg[nombre] = { variedad };
+  if(area) cfg[nombre].area = area;
+  setPotreroConfig(cfg);
+
+  if(area) {
+    const areas = getPotreroAreas();
+    areas[nombre] = area;
+    setPotreroAreas(areas);
+  }
+
+  refreshAllPotreros();
+  poblarSelectPotreros();
+  renderPotreroAreas();
+  notif(`✅ Potrero ${nombre} (${variedad}) agregado`);
+}
+
+function eliminarPotreroExtra(nombre) {
+  if(!confirm(`¿Eliminar el potrero ${nombre}? Esta acción no elimina los registros existentes.`)) return;
+  const cfg = getPotreroConfig();
+  delete cfg[nombre];
+  setPotreroConfig(cfg);
+  refreshAllPotreros();
+  poblarSelectPotreros();
+  renderPotreroAreas();
+  notif(`Potrero ${nombre} eliminado`);
+}
+
 
 // ═══════════════════════════════════════
 // SALDO HA Y PARCELA SUGERIDA
@@ -4451,10 +4594,7 @@ function onLoteChange(selectEl, idCab, idPeso) {
   setTimeout(() => { aplicarFechaMinIngreso(); sugerirProximaParcela(); actualizarSaldoHA(); }, 50);
 }
 
-const ALL_POTREROS = [
-  ...POTREROS.BRACHIARIA.map(p=>({p,v:'BRACHIARIA'})),
-  ...POTREROS.PANICUM.map(p=>({p,v:'PANICUM'}))
-];
+// ALL_POTREROS defined dynamically above
 
 function poblarSelectPotreros() {
   // Filtro tabla (select normal)
