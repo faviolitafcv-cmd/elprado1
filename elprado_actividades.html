@@ -600,6 +600,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
   <div class="tab" onclick="showPage('config')">⚙ Configuración</div>
   <div class="tab" onclick="showPage('lluvia')">🌧 Lluvia</div>
   <div class="tab" onclick="showPage('calidad')">🧪 Calidad</div>
+  <div class="tab" onclick="showPage('campo')">📍 Campo</div>
 </div>
 
 <!-- ════════════════ ACTIVIDADES ════════════════ -->
@@ -1318,6 +1319,50 @@ tr:hover td { background: rgba(255,255,255,.02); }
     <div class="btn-row">
       <button class="btn btn-secondary" onclick="cerrarModal('modalExportCalidad')">Cancelar</button>
       <button class="btn btn-gold" onclick="exportarInformeCalidad()">⬇ Descargar Excel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ CAMPO ════════════════ -->
+<div class="page" id="page-campo">
+  <div class="card">
+    <div class="card-title">
+      <span>📍</span> Estado del Campo
+      <div style="margin-left:auto;display:flex;align-items:center;gap:10px;">
+        <button onclick="campoNavegar(-1)" style="background:var(--card2);border:1px solid var(--border);color:var(--text2);padding:4px 14px;border-radius:4px;cursor:pointer;font-size:18px;">‹</button>
+        <span id="campoFechaLabel" style="font-size:13px;font-weight:700;color:var(--green-soft);min-width:220px;text-align:center;"></span>
+        <button onclick="campoNavegar(1)" style="background:var(--card2);border:1px solid var(--border);color:var(--text2);padding:4px 14px;border-radius:4px;cursor:pointer;font-size:18px;">›</button>
+        <button onclick="campoIrHoy()" style="background:var(--green2);color:white;border:none;padding:5px 14px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700;">Hoy</button>
+      </div>
+    </div>
+    <div class="tbl-wrap" id="campoTablaWrap">
+      <table id="campoTabla" style="min-width:700px;">
+        <thead id="campoHead"></thead>
+        <tbody id="campoBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CAMBIO SALIDA -->
+<div class="modal-bg" id="modalCambioSalida">
+  <div class="modal" style="max-width:500px;">
+    <div class="modal-title">
+      ✏️ Modificar Salida
+      <button class="modal-close" onclick="cerrarModal('modalCambioSalida')">✕</button>
+    </div>
+    <div id="cambioSalidaInfo" style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.7;"></div>
+    <div class="form-grid" style="max-width:300px;">
+      <div class="form-group">
+        <label>Nueva fecha de salida</label>
+        <input type="date" id="cambioSalidaFecha">
+      </div>
+    </div>
+    <div id="cambioSalidaPreview" style="margin-top:12px;font-size:12px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:10px;display:none;"></div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="cerrarModal('modalCambioSalida')">Cancelar</button>
+      <button class="btn btn-secondary" style="border-color:var(--blue);color:var(--blue);" onclick="previsualizarCambio()">👁 Previsualizar</button>
+      <button class="btn btn-gold" onclick="confirmarCambioSalida()">✅ Confirmar</button>
     </div>
   </div>
 </div>
@@ -3179,6 +3224,268 @@ function exportarInformeCalidad() {
 
 // ═══════════════════════════════════════
 // FIN CALIDAD
+
+// ═══════════════════════════════════════
+// ESTADO DEL CAMPO (VISTA 7 DÍAS)
+// ═══════════════════════════════════════
+
+var campoFechaBase = null; // fecha central (hoy por defecto)
+var _cambioActual = null;  // registro en edición
+
+function campoIrHoy() {
+  campoFechaBase = new Date().toISOString().split('T')[0];
+  renderCampo();
+}
+
+function campoNavegar(dir) {
+  if(!campoFechaBase) campoFechaBase = new Date().toISOString().split('T')[0];
+  const d = new Date(campoFechaBase + 'T12:00:00');
+  d.setDate(d.getDate() + dir);
+  campoFechaBase = d.toISOString().split('T')[0];
+  renderCampo();
+}
+
+function campoFechaLabel(f) {
+  const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const d = new Date(f + 'T12:00:00');
+  return d.getDate() + ' ' + meses[d.getMonth()];
+}
+
+function sumarDias(fecha, dias) {
+  const d = new Date(fecha + 'T12:00:00');
+  d.setDate(d.getDate() + dias);
+  return d.toISOString().split('T')[0];
+}
+
+function renderCampo() {
+  const hoy = new Date().toISOString().split('T')[0];
+  if(!campoFechaBase) campoFechaBase = hoy;
+
+  // Generar 7 días: 3 atrás, centro, 3 adelante
+  const dias = [];
+  for(let i = -3; i <= 3; i++) dias.push(sumarDias(campoFechaBase, i));
+  const centro = campoFechaBase;
+
+  // Label rango
+  document.getElementById('campoFechaLabel').textContent =
+    campoFechaLabel(dias[0]) + ' — ' + campoFechaLabel(dias[6]);
+
+  const acts = getActividades().filter(a =>
+    a.actividad === 'MATERIA SECA' && a.fechaIng && a.lote
+  );
+
+  // Obtener grupos únicos con actividad reciente
+  const lotesSet = new Set();
+  acts.forEach(a => { if(a.lote) lotesSet.add(a.lote); });
+  const lotes = [...lotesSet].sort();
+
+  const thead = document.getElementById('campoHead');
+  const tbody = document.getElementById('campoBody');
+  if(!thead || !tbody) return;
+
+  // Cabecera
+  const diasHead = dias.map(d => {
+    const esHoy = d === hoy;
+    const esCentro = d === centro;
+    const label = campoFechaLabel(d);
+    const dow = ['Do','Lu','Ma','Mi','Ju','Vi','Sa'][new Date(d+'T12:00:00').getDay()];
+    return `<th style="min-width:90px;text-align:center;${esCentro?'background:rgba(109,186,58,.15);border-bottom:2px solid var(--green2);':''}${esHoy?'color:var(--green);':''}">${dow}<br><span style="font-size:11px;">${label}</span></th>`;
+  }).join('');
+  thead.innerHTML = `<tr><th style="min-width:160px;">Grupo</th>${diasHead}</tr>`;
+
+  // Filas por lote
+  tbody.innerHTML = lotes.map(lote => {
+    const lparts = lote.split('|');
+    const loteLabel = lparts.length >= 3 ? lparts[1]+' · '+lparts[2] : lote;
+
+    const celdas = dias.map(d => {
+      // Buscar registro activo en este día para este lote
+      const reg = acts.find(a =>
+        a.lote === lote &&
+        a.fechaIng && a.fechaSal &&
+        a.fechaIng <= d && a.fechaSal >= d
+      ) || acts.find(a =>
+        a.lote === lote &&
+        a.fechaIng === d
+      );
+
+      const esCentro = d === centro;
+      const esHoy = d === hoy;
+      const bgBase = esCentro ? 'background:rgba(109,186,58,.06);' : '';
+
+      if(!reg) {
+        return `<td style="text-align:center;${bgBase}color:var(--text3);font-size:11px;">—</td>`;
+      }
+
+      // Color según urgencia de salida
+      const diasRestantes = reg.fechaSal ? Math.round((new Date(reg.fechaSal+'T12:00:00') - new Date(hoy+'T12:00:00')) / 86400000) : null;
+      let color = 'var(--green-soft)';
+      let bgColor = 'rgba(109,186,58,.12)';
+      if(diasRestantes !== null) {
+        if(diasRestantes < 0)  { color='var(--text3)'; bgColor='rgba(100,100,100,.1)'; }
+        else if(diasRestantes === 0) { color='var(--red)'; bgColor='rgba(224,90,74,.15)'; }
+        else if(diasRestantes === 1) { color='var(--gold2)'; bgColor='rgba(201,162,39,.15)'; }
+      }
+
+      const esUltimoDia = reg.fechaSal === d;
+      const badge = esUltimoDia ? `<div style="font-size:9px;color:${color};font-weight:700;">${diasRestantes===0?'SALE HOY':diasRestantes<0?'VENCIDO':'SALE MÑN'}</div>` : '';
+
+      return `<td style="text-align:center;cursor:pointer;${bgBase}${esCentro?'':''}padding:4px;" onclick="abrirCambioSalida('${lote}','${reg.potrero}','${reg.parcela}','${reg.fechaSal||''}','${reg.id}')">
+        <div style="background:${bgColor};border-radius:5px;padding:4px 6px;">
+          <div style="font-size:12px;font-weight:700;color:${color};">${reg.potrero}·P${reg.parcela}</div>
+          <div style="font-size:10px;color:var(--text3);">${reg.fechaSal||'—'}</div>
+          ${badge}
+        </div>
+      </td>`;
+    }).join('');
+
+    return `<tr>
+      <td style="font-size:12px;font-weight:600;color:var(--text2);padding:6px 8px;">${loteLabel}</td>
+      ${celdas}
+    </tr>`;
+  }).join('');
+}
+
+function abrirCambioSalida(lote, potrero, parcela, fechaSalActual, regId) {
+  _cambioActual = { lote, potrero, parcela, fechaSalActual, regId };
+
+  const lparts = lote.split('|');
+  const loteLabel = lparts.length >= 3 ? lparts[1]+' · '+lparts[2] : lote;
+
+  document.getElementById('cambioSalidaInfo').innerHTML =
+    `<strong style="color:var(--white);">${loteLabel}</strong><br>
+     Potrero: <strong>${potrero}</strong> · Parcela: <strong>${parcela}</strong><br>
+     Salida actual: <strong style="color:var(--gold2);">${fechaSalActual||'—'}</strong>`;
+
+  document.getElementById('cambioSalidaFecha').value = fechaSalActual || '';
+  document.getElementById('cambioSalidaPreview').style.display = 'none';
+  document.getElementById('cambioSalidaPreview').innerHTML = '';
+
+  document.getElementById('modalCambioSalida').classList.add('open');
+}
+
+function previsualizarCambio() {
+  if(!_cambioActual) return;
+  const nuevaFecha = document.getElementById('cambioSalidaFecha').value;
+  if(!nuevaFecha) { notif('Ingresá la nueva fecha de salida', true); return; }
+
+  const { lote, potrero, parcela, fechaSalActual, regId } = _cambioActual;
+  if(!fechaSalActual) { notif('Sin fecha de salida original para comparar', true); return; }
+
+  const diff = Math.round((new Date(nuevaFecha+'T12:00:00') - new Date(fechaSalActual+'T12:00:00')) / 86400000);
+  if(diff === 0) { notif('La fecha es la misma', true); return; }
+
+  // Buscar registros siguientes del mismo lote en el mismo potrero
+  const acts = getActividades().filter(a =>
+    a.actividad === 'MATERIA SECA' &&
+    a.lote === lote &&
+    a.potrero === potrero &&
+    a.fechaIng >= fechaSalActual
+  ).sort((a,b) => a.fechaIng > b.fechaIng ? 1 : -1);
+
+  // El propio registro
+  const regPropio = getActividades().find(a => a.id === regId);
+  const cambios = [];
+
+  if(regPropio) {
+    cambios.push({
+      id: regPropio.id,
+      parcela: regPropio.parcela,
+      campo: 'salida',
+      de: regPropio.fechaSal,
+      a: nuevaFecha
+    });
+  }
+
+  // Registros siguientes — correr todos
+  acts.forEach(a => {
+    if(a.id === regId) return;
+    const nuevoIng = sumarDias(a.fechaIng, diff);
+    const nuevoSal = a.fechaSal ? sumarDias(a.fechaSal, diff) : null;
+    cambios.push({
+      id: a.id,
+      parcela: a.parcela,
+      campo: 'ingreso+salida',
+      deIng: a.fechaIng, aIng: nuevoIng,
+      deSal: a.fechaSal, aSal: nuevoSal
+    });
+  });
+
+  _cambioActual.cambios = cambios;
+  _cambioActual.diff = diff;
+
+  const signo = diff > 0 ? '+' : '';
+  const preview = document.getElementById('cambioSalidaPreview');
+  preview.style.display = 'block';
+  preview.innerHTML = `<div style="color:var(--gold2);font-weight:700;margin-bottom:8px;">
+    ⚠️ Se van a modificar ${cambios.length} registro(s) — Corrimiento: ${signo}${diff} día(s)
+  </div>` + cambios.map(c => {
+    if(c.campo === 'salida') {
+      return `<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">
+        Parcela <strong>${c.parcela}</strong>: salida <span style="color:var(--red);">${c.de}</span> → <span style="color:var(--green-soft);">${c.a}</span>
+      </div>`;
+    } else {
+      return `<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">
+        Parcela <strong>${c.parcela}</strong>: 
+        ingreso <span style="color:var(--red);">${c.deIng}</span> → <span style="color:var(--green-soft);">${c.aIng}</span>
+        ${c.deSal ? ` · salida <span style="color:var(--red);">${c.deSal}</span> → <span style="color:var(--green-soft);">${c.aSal}</span>` : ''}
+      </div>`;
+    }
+  }).join('');
+}
+
+function confirmarCambioSalida() {
+  if(!_cambioActual || !_cambioActual.cambios) {
+    previsualizarCambio();
+    return;
+  }
+  if(!confirm(`¿Confirmar el corrimiento de ${_cambioActual.cambios.length} registro(s)?`)) return;
+
+  const { diff } = _cambioActual;
+  let acts = getActividades();
+
+  _cambioActual.cambios.forEach(c => {
+    const idx = acts.findIndex(a => a.id === c.id);
+    if(idx === -1) return;
+    if(c.campo === 'salida') {
+      acts[idx] = { ...acts[idx], fechaSal: c.a,
+        estadia: acts[idx].fechaIng ? dateDiff(acts[idx].fechaIng, c.a) : acts[idx].estadia
+      };
+    } else {
+      acts[idx] = { ...acts[idx],
+        fechaIng: c.aIng,
+        fechaSal: c.aSal || acts[idx].fechaSal,
+        estadia: c.aIng && c.aSal ? dateDiff(c.aIng, c.aSal) : acts[idx].estadia
+      };
+    }
+  });
+
+  setData('actividades', acts);
+  fbSet('actividades', acts);
+
+  // Actualizar plan también
+  let plan = getPlan();
+  _cambioActual.cambios.forEach(c => {
+    plan = plan.map(p => {
+      if(p.autoDesdeMS && p.potrero === _cambioActual.potrero && p.lote === _cambioActual.lote) {
+        const planAct = acts.find(a => a.id === c.id);
+        if(planAct && p.fi === (c.deIng || c.de)) {
+          return { ...p, fi: planAct.fechaIng, fs: planAct.fechaSal || p.fs };
+        }
+      }
+      return p;
+    });
+  });
+  setPlan(plan);
+  fbSet('plan', plan);
+
+  cerrarModal('modalCambioSalida');
+  renderCampo();
+  renderTabla();
+  notif(`✅ ${_cambioActual.cambios.length} registros actualizados`);
+  _cambioActual = null;
+}
+
 // ═══════════════════════════════════════
 
 // Estado del calendario
@@ -3912,7 +4219,7 @@ function showPage(id) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
-  const tabs = ['actividades','nueva','resumen','plan','pedidos','config','lluvia','calidad'];
+  const tabs = ['actividades','nueva','resumen','plan','pedidos','config','lluvia','calidad','campo'];
   const idx = tabs.indexOf(id);
   document.querySelectorAll('.tab')[idx]?.classList.add('active');
   if(id==='resumen') { actualizarGestionesDisponibles(); renderResumen(); }
@@ -3921,6 +4228,7 @@ function showPage(id) {
   if(id==='plan') { renderPlan(); }
   if(id==='pedidos') { renderPedidos(); }
   if(id==='calidad') { renderBromatologicos(); }
+  if(id==='campo') { campoIrHoy(); }
   if(id==='lluvia') {
     renderAnalisisGestion();
     renderResumenLluvia();
