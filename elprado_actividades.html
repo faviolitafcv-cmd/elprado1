@@ -3341,15 +3341,20 @@ function renderCampo() {
 
     const celdas = dias.map(d => {
       // Buscar registro activo en este día para este lote
-      const reg = acts.find(a =>
+      // Prioridad: ingreso ese día > ingreso más reciente activo > sale ese día
+      const candidatos = acts.filter(a =>
         a.lote === lote &&
-        a.fechaIng && a.fechaSal &&
-        a.fechaIng <= d && a.fechaSal >= d
-      ) || acts.find(a =>
-        a.lote === lote && a.fechaIng === d
-      ) || acts.find(a =>
-        a.lote === lote && a.fechaSal === d
+        a.fechaIng && (
+          // Rango normal: ingreso <= dia <= salida
+          (a.fechaSal && a.fechaIng <= d && a.fechaSal >= d) ||
+          // Sin fecha salida: solo ingreso
+          (!a.fechaSal && a.fechaIng === d)
+        )
       );
+      // Si hay varios, mostrar el que ingresó más tarde (más reciente)
+      const reg = candidatos.length > 0
+        ? candidatos.reduce((best, a) => a.fechaIng >= best.fechaIng ? a : best)
+        : null;
 
       const esCentro = d === centro;
       const esHoy = d === hoy;
