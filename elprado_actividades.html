@@ -1354,10 +1354,18 @@ tr:hover td { background: rgba(255,255,255,.02); }
       <button class="modal-close" onclick="cerrarModal('modalCambioSalida')">✕</button>
     </div>
     <div id="cambioSalidaInfo" style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.7;"></div>
-    <div class="form-grid" style="max-width:300px;">
+    <div class="form-grid" style="max-width:400px;">
       <div class="form-group">
         <label>Nueva fecha de salida</label>
         <input type="date" id="cambioSalidaFecha">
+      </div>
+      <div class="form-group">
+        <label>Turno de salida</label>
+        <select id="cambioSalidaTurno" style="padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--white);">
+          <option value="">— sin especificar —</option>
+          <option value="MAÑANA">🌅 Mañana</option>
+          <option value="TARDE">🌇 Tarde</option>
+        </select>
       </div>
     </div>
     <div id="cambioSalidaPreview" style="margin-top:12px;font-size:12px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:10px;display:none;"></div>
@@ -1954,23 +1962,34 @@ function aplicarFechaMinIngreso() {
   const lote    = document.getElementById('fLote')?.value;
   if(!potrero || !lote) return;
 
-  const minFecha = getFechaMinIngreso(potrero, lote);
+  const editId = document.getElementById('formComun')?.dataset?.editId || null;
+  const acts = getActividades().filter(a =>
+    a.actividad === 'MATERIA SECA' && a.potrero === potrero && a.lote === lote &&
+    a.fechaSal && (!editId || a.id !== editId)
+  );
+  if(!acts.length) return;
+
+  // Registro con la fecha de salida más reciente
+  const ultReg = acts.reduce((best, a) => a.fechaSal > best.fechaSal ? a : best);
+  const minFecha = ultReg.fechaSal;
+  const turnoSuggerido = ultReg.horaSal || '';
+
   const elIng = document.getElementById('fFechaIng');
   const elSal = document.getElementById('fFechaSal');
+  const elHoraIng = document.getElementById('fHoraIng');
   if(!minFecha || !elIng) return;
 
-  // Bloquear fecha de ingreso: mínimo = última fecha de salida registrada
   elIng.min = minFecha;
 
-  // Si la fecha actual es anterior al mínimo, corregirla
   if(!elIng.value || elIng.value < minFecha) {
     elIng.value = minFecha;
     elIng.style.borderColor = 'var(--gold2)';
-    // Auto-calcular salida
     if(elSal) { elSal.value = sumarUnDia(minFecha); }
+    // Sugerir turno de ingreso = turno de salida del registro anterior
+    if(elHoraIng && turnoSuggerido) { elHoraIng.value = turnoSuggerido; }
     calcIng();
-    // Aviso
-    notif(`📅 Ingreso ajustado a ${minFecha} — última salida registrada para este grupo en ${potrero}`);
+    const turnoLabel = turnoSuggerido === 'MAÑANA' ? '🌅 Mañana' : turnoSuggerido === 'TARDE' ? '🌇 Tarde' : '';
+    notif(`📅 Ingreso ajustado a ${minFecha} ${turnoLabel} — última salida de este grupo en ${potrero}`);
   }
 }
 
@@ -3452,10 +3471,18 @@ function renderCampo() {
       const esUltimoDia = reg.fechaSal === d;
       const badge = (esUltimoDia && diasRestantes !== null) ? `<div style="font-size:9px;color:${color};font-weight:700;">${diasRestantes<0?'VENCIDO':diasRestantes===0?'SALE HOY':diasRestantes===1?'SALE MÑN':''}</div>` : '';
 
-      return `<td style="text-align:center;cursor:pointer;${bgBase}${esCentro?'':''}padding:4px;" onclick="abrirCambioSalida('${lote}','${reg.potrero}','${reg.parcela}','${reg.fechaSal||''}','${reg.id}')">
+      // Turno emoji
+      const turnoIng = reg.horaIng === 'MAÑANA' ? '🌅' : reg.horaIng === 'TARDE' ? '🌇' : '';
+      const turnoSal = reg.horaSal === 'MAÑANA' ? '🌅' : reg.horaSal === 'TARDE' ? '🌇' : '';
+      const turnoLabel = turnoIng || turnoSal
+        ? `<div style="font-size:10px;color:var(--text3);">${turnoIng ? 'Ing:'+turnoIng : ''} ${turnoSal ? 'Sal:'+turnoSal : ''}</div>`
+        : '';
+
+      return `<td style="text-align:center;cursor:pointer;${bgBase}${esCentro?'':''}padding:4px;" onclick="abrirCambioSalida('${lote}','${reg.potrero}','${reg.parcela}','${reg.fechaSal||''}','${reg.id}','${reg.horaSal||''}')">
         <div style="background:${bgColor};border-radius:5px;padding:4px 6px;">
           <div style="font-size:12px;font-weight:700;color:${color};">${reg.potrero}·P${reg.parcela}</div>
           <div style="font-size:10px;color:var(--text3);">${reg.fechaSal||'—'}</div>
+          ${turnoLabel}
           ${badge}
         </div>
       </td>`;
@@ -3468,18 +3495,24 @@ function renderCampo() {
   }).join('');
 }
 
-function abrirCambioSalida(lote, potrero, parcela, fechaSalActual, regId) {
-  _cambioActual = { lote, potrero, parcela, fechaSalActual, regId };
+function abrirCambioSalida(lote, potrero, parcela, fechaSalActual, regId, horaSalActual) {
+  _cambioActual = { lote, potrero, parcela, fechaSalActual, regId, horaSalActual: horaSalActual||'' };
 
   const lparts = lote.split('|');
   const loteLabel = lparts.length >= 3 ? lparts[1]+' · '+lparts[2] : lote;
+  const turnoActual = horaSalActual === 'MAÑANA' ? '🌅 Mañana' : horaSalActual === 'TARDE' ? '🌇 Tarde' : '—';
 
   document.getElementById('cambioSalidaInfo').innerHTML =
     `<strong style="color:var(--white);">${loteLabel}</strong><br>
      Potrero: <strong>${potrero}</strong> · Parcela: <strong>${parcela}</strong><br>
-     Salida actual: <strong style="color:var(--gold2);">${fechaSalActual||'—'}</strong>`;
+     Salida actual: <strong style="color:var(--gold2);">${fechaSalActual||'—'}</strong> ${turnoActual}`;
 
   document.getElementById('cambioSalidaFecha').value = fechaSalActual || '';
+
+  // Set turno select
+  const sel = document.getElementById('cambioSalidaTurno');
+  if(sel) sel.value = horaSalActual || '';
+
   document.getElementById('cambioSalidaPreview').style.display = 'none';
   document.getElementById('cambioSalidaPreview').innerHTML = '';
 
@@ -3489,67 +3522,74 @@ function abrirCambioSalida(lote, potrero, parcela, fechaSalActual, regId) {
 function previsualizarCambio() {
   if(!_cambioActual) return;
   const nuevaFecha = document.getElementById('cambioSalidaFecha').value;
+  const nuevoTurno = document.getElementById('cambioSalidaTurno')?.value || '';
   if(!nuevaFecha) { notif('Ingresá la nueva fecha de salida', true); return; }
 
-  const { lote, potrero, parcela, fechaSalActual, regId } = _cambioActual;
-  if(!fechaSalActual) { notif('Sin fecha de salida original para comparar', true); return; }
+  const { lote, potrero, parcela, fechaSalActual, horaSalActual, regId } = _cambioActual;
 
-  const diff = Math.round((new Date(nuevaFecha+'T12:00:00') - new Date(fechaSalActual+'T12:00:00')) / 86400000);
-  if(diff === 0) { notif('La fecha es la misma', true); return; }
+  const fechaCambio = fechaSalActual || nuevaFecha;
+  const diff = Math.round((new Date(nuevaFecha+'T12:00:00') - new Date(fechaCambio+'T12:00:00')) / 86400000);
+  const turnoCambio = nuevoTurno !== (horaSalActual||'');
+
+  if(diff === 0 && !turnoCambio) { notif('Sin cambios para aplicar', true); return; }
 
   // Buscar registros siguientes del mismo lote en el mismo potrero
   const acts = getActividades().filter(a =>
     a.actividad === 'MATERIA SECA' &&
     a.lote === lote &&
     a.potrero === potrero &&
-    a.fechaIng >= fechaSalActual
+    a.fechaIng >= fechaCambio
   ).sort((a,b) => a.fechaIng > b.fechaIng ? 1 : -1);
 
-  // El propio registro
   const regPropio = getActividades().find(a => a.id === regId);
   const cambios = [];
 
   if(regPropio) {
     cambios.push({
-      id: regPropio.id,
-      parcela: regPropio.parcela,
+      id: regPropio.id, parcela: regPropio.parcela,
       campo: 'salida',
-      de: regPropio.fechaSal,
-      a: nuevaFecha
+      de: regPropio.fechaSal, a: nuevaFecha,
+      deTurno: horaSalActual||'', aTurno: nuevoTurno
     });
   }
 
-  // Registros siguientes — correr todos
+  // Registros siguientes — correr fechas Y propagar turno
+  // El turno de ingreso de la siguiente = turno de salida de la anterior
+  let turnoSalAnterior = nuevoTurno;
   acts.forEach(a => {
     if(a.id === regId) return;
-    const nuevoIng = sumarDias(a.fechaIng, diff);
-    const nuevoSal = a.fechaSal ? sumarDias(a.fechaSal, diff) : null;
+    const nuevoIng = diff !== 0 ? sumarDias(a.fechaIng, diff) : a.fechaIng;
+    const nuevoSal = a.fechaSal && diff !== 0 ? sumarDias(a.fechaSal, diff) : a.fechaSal;
     cambios.push({
-      id: a.id,
-      parcela: a.parcela,
+      id: a.id, parcela: a.parcela,
       campo: 'ingreso+salida',
       deIng: a.fechaIng, aIng: nuevoIng,
-      deSal: a.fechaSal, aSal: nuevoSal
+      deSal: a.fechaSal, aSal: nuevoSal,
+      deHoraIng: a.horaIng||'', aHoraIng: turnoSalAnterior,
+      deHoraSal: a.horaSal||'', aHoraSal: a.horaSal||''
     });
+    turnoSalAnterior = a.horaSal||'';
   });
 
   _cambioActual.cambios = cambios;
   _cambioActual.diff = diff;
+  _cambioActual.nuevoTurno = nuevoTurno;
 
   const signo = diff > 0 ? '+' : '';
+  const turnoLabel = t => t === 'MAÑANA' ? '🌅' : t === 'TARDE' ? '🌇' : '—';
   const preview = document.getElementById('cambioSalidaPreview');
   preview.style.display = 'block';
   preview.innerHTML = `<div style="color:var(--gold2);font-weight:700;margin-bottom:8px;">
-    ⚠️ Se van a modificar ${cambios.length} registro(s) — Corrimiento: ${signo}${diff} día(s)
+    ⚠️ Se van a modificar ${cambios.length} registro(s)${diff!==0?` — Corrimiento: ${signo}${diff} día(s)`:''}${turnoCambio?' — Turno actualizado':''}
   </div>` + cambios.map(c => {
     if(c.campo === 'salida') {
       return `<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">
-        Parcela <strong>${c.parcela}</strong>: salida <span style="color:var(--red);">${c.de}</span> → <span style="color:var(--green-soft);">${c.a}</span>
+        Parcela <strong>${c.parcela}</strong>: salida <span style="color:var(--red);">${c.de} ${turnoLabel(c.deTurno)}</span> → <span style="color:var(--green-soft);">${c.a} ${turnoLabel(c.aTurno)}</span>
       </div>`;
     } else {
       return `<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">
-        Parcela <strong>${c.parcela}</strong>: 
-        ingreso <span style="color:var(--red);">${c.deIng}</span> → <span style="color:var(--green-soft);">${c.aIng}</span>
+        Parcela <strong>${c.parcela}</strong>:
+        ingreso <span style="color:var(--red);">${c.deIng} ${turnoLabel(c.deHoraIng)}</span> → <span style="color:var(--green-soft);">${c.aIng} ${turnoLabel(c.aHoraIng)}</span>
         ${c.deSal ? ` · salida <span style="color:var(--red);">${c.deSal}</span> → <span style="color:var(--green-soft);">${c.aSal}</span>` : ''}
       </div>`;
     }
@@ -3561,7 +3601,7 @@ function confirmarCambioSalida() {
     previsualizarCambio();
     return;
   }
-  if(!confirm(`¿Confirmar el corrimiento de ${_cambioActual.cambios.length} registro(s)?`)) return;
+  if(!confirm(`¿Confirmar los cambios en ${_cambioActual.cambios.length} registro(s)?`)) return;
 
   const { diff } = _cambioActual;
   let acts = getActividades();
@@ -3570,13 +3610,17 @@ function confirmarCambioSalida() {
     const idx = acts.findIndex(a => a.id === c.id);
     if(idx === -1) return;
     if(c.campo === 'salida') {
-      acts[idx] = { ...acts[idx], fechaSal: c.a,
+      acts[idx] = { ...acts[idx],
+        fechaSal: c.a,
+        horaSal: c.aTurno || acts[idx].horaSal,
         estadia: acts[idx].fechaIng ? dateDiff(acts[idx].fechaIng, c.a) : acts[idx].estadia
       };
     } else {
       acts[idx] = { ...acts[idx],
         fechaIng: c.aIng,
         fechaSal: c.aSal || acts[idx].fechaSal,
+        horaIng: c.aHoraIng !== undefined ? c.aHoraIng : acts[idx].horaIng,
+        horaSal: c.aHoraSal !== undefined ? c.aHoraSal : acts[idx].horaSal,
         estadia: c.aIng && c.aSal ? dateDiff(c.aIng, c.aSal) : acts[idx].estadia
       };
     }
