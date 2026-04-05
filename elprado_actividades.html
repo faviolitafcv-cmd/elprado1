@@ -704,13 +704,14 @@ tr:hover td { background: rgba(255,255,255,.02); }
         </div>
         <div class="form-group" id="grpParcela">
           <label>Parcela (N°)</label>
-          <input type="text" id="fParcela" placeholder="ej: 1, 2, A, B...">
+          <input type="text" id="fParcela" placeholder="ej: 1, 2..." oninput="actualizarSaldoHA()">
         </div>
         <div class="form-group" id="grpVariedad" style="display:none">
           <label>Variedad</label>
           <input type="text" id="fVariedad" readonly>
         </div>
       </div>
+      <div id="grpSaldoHA" style="display:none;margin-top:10px;"><div style="background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:12px 16px;display:flex;gap:20px;flex-wrap:wrap;align-items:center;"><div style="font-size:11px;color:var(--text3);font-weight:700;">📐 Potrero</div><div><div style="font-size:10px;color:var(--text3);">Total</div><div id="saldoHATotal" style="font-size:14px;font-weight:700;color:var(--text2);">—</div></div><div><div style="font-size:10px;color:var(--text3);">Usado esta vuelta</div><div id="saldoHAUsado" style="font-size:14px;font-weight:700;color:var(--blue);">—</div></div><div><div style="font-size:10px;color:var(--text3);">Saldo</div><div id="saldoHAResta" style="font-size:16px;font-weight:800;">—</div></div><div><div style="font-size:10px;color:var(--text3);">Próxima parcela</div><div id="saldoHAProxParcela" style="font-size:14px;font-weight:700;color:var(--gold2);">—</div></div></div></div>
 
       <!-- Modo desbrozadora -->
       <div id="grpModoDesb" style="display:none; margin-top:12px;">
@@ -1078,6 +1079,13 @@ tr:hover td { background: rgba(255,255,255,.02); }
 
 <!-- ════════════════ CONFIGURACIÓN ════════════════ -->
 <div class="page" id="page-config">
+  <div class="card">
+    <div class="card-title"><span>🗺</span> Área de Potreros (Hectáreas)</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Asigná el área total en hectáreas a cada potrero.</div>
+    <div id="listaPotreroAreas" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;max-height:380px;overflow-y:auto;"></div>
+    <div class="btn-row" style="justify-content:flex-start;margin-top:12px;"><button class="btn btn-primary btn-sm" onclick="guardarPotreroAreas()">💾 Guardar Áreas</button></div>
+  </div>
+
   <div class="card">
     <div class="card-title"><span>👥</span> Grupos de Animales</div>
     <div id="listaGrupos"></div>
@@ -1618,7 +1626,7 @@ async function fbSet(key, val) {
 }
 
 async function pushAllToFirebase() {
-  const keys = ['actividades','grupos','vaqueros','plan','pedidos','pluviometros','lluvia','bromatologicos'];
+  const keys = ['actividades','grupos','vaqueros','plan','pedidos','pluviometros','lluvia','bromatologicos','potreroAreas'];
   let count = 0;
   for(const key of keys) {
     const val = getData(key, null);
@@ -1698,6 +1706,9 @@ function setData(key, val) {
 }
 function getActividades() { return getData('actividades', []); }
 function getGrupos() { return getData('grupos', GRUPOS_BASE); }
+function getPotreroAreas() { return getData('potreroAreas', {}); }
+function setPotreroAreas(v) { setData('potreroAreas', v); fbSet('potreroAreas', v); }
+function getPotreroArea(pot) { const a=getPotreroAreas(); return a[pot]?parseFloat(a[pot]):null; }
 
 // ═══════════════════════════════════════
 // UTILS
@@ -1935,8 +1946,161 @@ function onPotreroChange() {
   document.getElementById('fVariedad').value = v;
   document.getElementById('grpVariedad').style.display = p?'block':'none';
   if(actActual === 'INGRESO HDA') calcIng();
-  if(actActual === 'MATERIA SECA') { calcIng(); aplicarFechaMinIngreso(); }
+  if(actActual === 'MATERIA SECA') {
+    calcIng();
+    aplicarFechaMinIngreso();
+    sugerirProximaParcela();
+    actualizarSaldoHA();
+  }
 }
+
+// ═══════════════════════════════════════
+// ÁREAS DE POTREROS
+// ═══════════════════════════════════════
+
+function renderPotreroAreas() {
+  const el = document.getElementById('listaPotreroAreas');
+  if(!el) return;
+  const areas = getPotreroAreas();
+  const todos = [...POTREROS.BRACHIARIA, ...POTREROS.PANICUM];
+  el.innerHTML = todos.map(p => `
+    <div style="display:flex;flex-direction:column;gap:4px;">
+      <label style="font-size:11px;font-weight:700;color:var(--text2);">${p}</label>
+      <div style="display:flex;align-items:center;gap:4px;">
+        <input type="number" id="area_${p}" value="${areas[p]||''}" min="0" step="0.1"
+          style="width:80px;padding:5px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--white);font-size:12px;"
+          placeholder="ha">
+        <span style="font-size:10px;color:var(--text3);">ha</span>
+      </div>
+    </div>`).join('');
+}
+
+function guardarPotreroAreas() {
+  const todos = [...POTREROS.BRACHIARIA, ...POTREROS.PANICUM];
+  const areas = {};
+  todos.forEach(p => {
+    const el = document.getElementById('area_' + p);
+    if(el && el.value) areas[p] = parseFloat(el.value);
+  });
+  setPotreroAreas(areas);
+  notif('✅ Áreas guardadas');
+}
+
+// ═══════════════════════════════════════
+// SALDO HA Y PARCELA SUGERIDA
+// ═══════════════════════════════════════
+
+function sugerirProximaParcela() {
+  if(actActual !== 'MATERIA SECA') return;
+  const potrero = document.getElementById('fPotrero').value;
+  const lote    = document.getElementById('fLote')?.value;
+  const elParcela = document.getElementById('fParcela');
+  if(!potrero || !lote || !elParcela) return;
+  if(elParcela.value) return; // No sobreescribir si ya tiene algo
+
+  const editId = document.getElementById('formComun')?.dataset?.editId || null;
+  const acts = getActividades().filter(a =>
+    a.actividad === 'MATERIA SECA' &&
+    a.potrero === potrero &&
+    a.lote === lote &&
+    (!editId || a.id !== editId)
+  );
+  if(!acts.length) return;
+
+  // Encontrar número de parcela más alto
+  const nums = acts.map(a => parseInt(a.parcela)).filter(n => !isNaN(n));
+  if(!nums.length) return;
+  const maxParcela = Math.max(...nums);
+  elParcela.value = maxParcela + 1;
+  elParcela.style.borderColor = 'var(--green2)';
+  actualizarSaldoHA();
+}
+
+function getHAUsadaEnVuelta(potrero, lote, excludeId) {
+  // Suma de ha de todos los registros de MS en este potrero para este grupo
+  // desde el último "Fin de Vuelta" o desde el inicio si no hay
+  const acts = getActividades().filter(a =>
+    a.actividad === 'MATERIA SECA' &&
+    a.potrero === potrero &&
+    a.lote === lote &&
+    (!excludeId || a.id !== excludeId) &&
+    a.ha && parseFloat(a.ha) > 0
+  ).sort((a,b) => a.fechaIng > b.fechaIng ? 1 : -1);
+
+  // Buscar último fin de vuelta para este potrero
+  const fv = getData('finVuelta', []);
+  const ultFV = fv.filter(f => f.potrero === potrero)
+                  .sort((a,b) => a.fecha > b.fecha ? -1 : 1)[0];
+  const desdeFecha = ultFV ? ultFV.fecha : '0000-00-00';
+
+  return acts
+    .filter(a => a.fechaIng >= desdeFecha)
+    .reduce((sum, a) => sum + (parseFloat(a.ha)||0), 0);
+}
+
+function actualizarSaldoHA() {
+  if(actActual !== 'MATERIA SECA') return;
+  const potrero = document.getElementById('fPotrero').value;
+  const lote    = document.getElementById('fLote')?.value;
+  const grp     = document.getElementById('grpSaldoHA');
+  if(!grp) return;
+
+  if(!potrero) { grp.style.display = 'none'; return; }
+
+  const areaTotal = getPotreroArea(potrero);
+  const editId    = document.getElementById('formComun')?.dataset?.editId || null;
+  const haUsada   = getHAUsadaEnVuelta(potrero, lote, editId);
+
+  grp.style.display = 'block';
+
+  const elTotal  = document.getElementById('saldoHATotal');
+  const elUsado  = document.getElementById('saldoHAUsado');
+  const elResta  = document.getElementById('saldoHAResta');
+  const elProx   = document.getElementById('saldoHAProxParcela');
+
+  if(elTotal) elTotal.textContent = areaTotal ? areaTotal.toFixed(1) + ' ha' : '— ha';
+  if(elUsado) elUsado.textContent = haUsada.toFixed(1) + ' ha';
+
+  if(elResta) {
+    if(areaTotal) {
+      const saldo = areaTotal - haUsada;
+      elResta.textContent = saldo.toFixed(1) + ' ha';
+      elResta.style.color = saldo >= 0 ? 'var(--green-soft)' : 'var(--red)';
+    } else {
+      elResta.textContent = '— ha';
+      elResta.style.color = 'var(--text3)';
+    }
+  }
+
+  // Próxima parcela sugerida
+  if(elProx) {
+    const acts = getActividades().filter(a =>
+      a.actividad === 'MATERIA SECA' && a.potrero === potrero && a.lote === lote &&
+      (!editId || a.id !== editId)
+    );
+    const nums = acts.map(a => parseInt(a.parcela)).filter(n => !isNaN(n));
+    const proxNum = nums.length > 0 ? Math.max(...nums) + 1 : 1;
+    elProx.textContent = 'P' + proxNum;
+  }
+}
+
+// ─── Validar parcela duplicada al guardar ───
+function validarParcelaDuplicada(potrero, lote, parcela, fechaIng, editId) {
+  const acts = getActividades().filter(a =>
+    a.actividad === 'MATERIA SECA' &&
+    a.potrero === potrero &&
+    a.lote === lote &&
+    String(a.parcela) === String(parcela) &&
+    (!editId || a.id !== editId)
+  );
+  if(!acts.length) return null;
+  // Verificar si hay solapamiento de fechas
+  const dup = acts.find(a => a.fechaIng === fechaIng);
+  if(dup) return `⚠️ Ya existe un registro para ${potrero} Parcela ${parcela} con ingreso el ${fechaIng}`;
+  return null;
+}
+
+
 
 // ── Fecha mínima de ingreso para evitar solapamiento ──
 function getFechaMinIngreso(potrero, lote) {
@@ -2143,14 +2307,16 @@ function calcIng() {
 // ═══════════════════════════════════════
 function guardarActividad() {
   if(!actActual) { notif('Seleccioná un tipo de actividad', true); return; }
-  // Validar parcela duplicada
+  // Validar parcela duplicada (incluye lote)
   if(actActual === 'MATERIA SECA') {
-    const _pot = document.getElementById('fPotrero').value;
-    const _par = document.getElementById('fParcela').value;
-    const _fec = document.getElementById('fFecha').value;
+    const _pot    = document.getElementById('fPotrero').value;
+    const _par    = document.getElementById('fParcela').value;
+    const _fec    = document.getElementById('fFechaIng')?.value || document.getElementById('fFecha').value;
+    const _lote   = document.getElementById('fLote')?.value || '';
     const _editId = document.getElementById('formComun').dataset.editId;
-    if(!_editId && validarParcelaDuplicada(_pot, _par, _fec)) {
-      if(!confirm('⚠ Ya registraste ' + _pot + ' parcela ' + _par + ' en esta fecha. ¿Querés registrarla de nuevo de todas formas?')) return;
+    const _err    = validarParcelaDuplicada(_pot, _lote, _par, _fec, _editId);
+    if(_err && !_editId) {
+      notif(_err, true); return;
     }
   }
   // Verificar si es edición
@@ -4282,8 +4448,7 @@ function onLoteChange(selectEl, idCab, idPeso) {
   }
   if(pesoFinal > 0) { elPeso.value = pesoFinal; elPeso.style.borderColor='var(--green2)'; }
   calcMS();
-  // Aplicar fecha mínima cuando cambia el lote
-  setTimeout(aplicarFechaMinIngreso, 50);
+  setTimeout(() => { aplicarFechaMinIngreso(); sugerirProximaParcela(); actualizarSaldoHA(); }, 50);
 }
 
 const ALL_POTREROS = [
@@ -4406,7 +4571,7 @@ function showPage(id) {
   const idx = tabs.indexOf(id);
   document.querySelectorAll('.tab')[idx]?.classList.add('active');
   if(id==='resumen') { actualizarGestionesDisponibles(); renderResumen(); }
-  if(id==='config') { renderGrupos(); renderVaqueros(); cargarUsuarioConfig(); }
+  if(id==='config') { renderGrupos(); renderVaqueros(); cargarUsuarioConfig(); renderPotreroAreas(); }
   if(id==='actividades') { renderStats(); }
   if(id==='plan') { renderPlan(); }
   if(id==='pedidos') { renderPedidos(); }
