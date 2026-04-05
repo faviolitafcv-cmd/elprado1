@@ -2007,51 +2007,36 @@ function renderPotreroAreas() {
   const lista = getAllPotrerosList();
 
   el.innerHTML = `
-    <div style="overflow-x:auto;">
-    <table style="width:100%;min-width:500px;border-collapse:collapse;font-size:12px;">
-      <thead><tr style="border-bottom:2px solid var(--border2);">
-        <th style="padding:6px 8px;text-align:left;color:var(--text3);font-weight:700;">Potrero</th>
-        <th style="padding:6px 8px;text-align:left;color:var(--text3);font-weight:700;">Variedad</th>
-        <th style="padding:6px 8px;text-align:center;color:var(--text3);font-weight:700;">Área (ha)</th>
-        <th style="padding:6px 8px;text-align:center;color:var(--text3);font-weight:700;"></th>
-      </tr></thead>
-      <tbody>
-      ${lista.map((p,i) => `<tr style="border-bottom:1px solid var(--border);">
-        <td style="padding:5px 8px;">
-          <input type="text" id="pot_nom_${i}" value="${p.nombre}"
-            style="width:70px;padding:3px 5px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--white);font-size:12px;font-weight:700;"
-            ${p.esBase ? '' : ''}>
-        </td>
-        <td style="padding:5px 8px;">
-          <select id="pot_var_${i}" style="padding:4px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--white);font-size:12px;">
-            <option value="BRACHIARIA" ${p.variedad==='BRACHIARIA'?'selected':''}>BRACHIARIA</option>
-            <option value="PANICUM" ${p.variedad==='PANICUM'?'selected':''}>PANICUM</option>
-          </select>
-        </td>
-        <td style="padding:5px 8px;text-align:center;">
-          <div style="display:flex;align-items:center;gap:4px;justify-content:center;">
-            <input type="number" id="pot_area_${i}" value="${p.area||''}" min="0" step="0.1"
-              style="width:65px;padding:3px 5px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--white);font-size:12px;"
-              placeholder="0.0">
-            <span style="font-size:10px;color:var(--text3);">ha</span>
-          </div>
-        </td>
-        <td style="padding:5px 8px;text-align:center;">
-          ${!p.esBase ? `<button onclick="eliminarPotreroExtra('${p.nombre}')" style="background:var(--red);color:white;border:none;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;">✕</button>` : '<span style="font-size:10px;color:var(--text3);">base</span>'}
-        </td>
-      </tr>`).join('')}
-      </tbody>
-    </table>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;">
+    ${lista.map((p,i) => `
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;display:flex;gap:6px;align-items:center;">
+        <input type="text" id="pot_nom_${i}" value="${p.nombre}"
+          style="width:72px;padding:4px 6px;border:1px solid var(--border2);border-radius:4px;background:var(--card2);color:var(--white);font-size:12px;font-weight:700;">
+        <select id="pot_var_${i}"
+          style="flex:1;padding:4px 5px;border:1px solid var(--border2);border-radius:4px;background:var(--card2);color:var(--white);font-size:11px;">
+          <option value="BRACHIARIA" ${p.variedad==='BRACHIARIA'?'selected':''}>BRAC</option>
+          <option value="PANICUM" ${p.variedad==='PANICUM'?'selected':''}>PANI</option>
+        </select>
+        <div style="display:flex;align-items:center;gap:2px;">
+          <input type="number" id="pot_area_${i}" value="${p.area||''}" min="0" step="0.1" placeholder="ha"
+            style="width:55px;padding:4px 5px;border:1px solid var(--border2);border-radius:4px;background:var(--card2);color:var(--white);font-size:11px;">
+          <span style="font-size:10px;color:var(--text3);">ha</span>
+        </div>
+        ${!p.esBase ? `<button onclick="eliminarPotreroExtra('${p.nombre}')"
+          style="background:var(--red);color:white;border:none;width:22px;height:22px;border-radius:4px;cursor:pointer;font-size:11px;flex-shrink:0;">✕</button>` : ''}
+      </div>`).join('')}
     </div>
-    <div style="margin-top:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+    <div style="margin-top:14px;padding:10px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <span style="font-size:11px;font-weight:700;color:var(--text3);">+ Nuevo:</span>
       <input type="text" id="nuevoPotNombre" placeholder="Nombre (ej: E5)" maxlength="20"
-        style="padding:6px 10px;border:1px solid var(--border2);border-radius:4px;background:var(--bg2);color:var(--white);font-size:12px;width:120px;">
-      <select id="nuevoPotVar" style="padding:6px 10px;border:1px solid var(--border2);border-radius:4px;background:var(--bg2);color:var(--white);font-size:12px;">
+        style="padding:5px 8px;border:1px solid var(--border2);border-radius:4px;background:var(--card2);color:var(--white);font-size:12px;width:110px;">
+      <select id="nuevoPotVar"
+        style="padding:5px 8px;border:1px solid var(--border2);border-radius:4px;background:var(--card2);color:var(--white);font-size:12px;">
         <option value="BRACHIARIA">BRACHIARIA</option>
         <option value="PANICUM">PANICUM</option>
       </select>
       <input type="number" id="nuevoPotArea" placeholder="ha" min="0" step="0.1"
-        style="padding:6px 10px;border:1px solid var(--border2);border-radius:4px;background:var(--bg2);color:var(--white);font-size:12px;width:80px;">
+        style="padding:5px 8px;border:1px solid var(--border2);border-radius:4px;background:var(--card2);color:var(--white);font-size:12px;width:70px;">
       <button class="btn btn-primary btn-sm" onclick="agregarNuevoPotrero()">+ Agregar Potrero</button>
     </div>`;
 }
