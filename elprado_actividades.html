@@ -1927,7 +1927,49 @@ function onPotreroChange() {
   document.getElementById('fVariedad').value = v;
   document.getElementById('grpVariedad').style.display = p?'block':'none';
   if(actActual === 'INGRESO HDA') calcIng();
-  if(actActual === 'MATERIA SECA') calcIng();
+  if(actActual === 'MATERIA SECA') { calcIng(); aplicarFechaMinIngreso(); }
+}
+
+// ── Fecha mínima de ingreso para evitar solapamiento ──
+function getFechaMinIngreso(potrero, lote) {
+  if(!potrero || !lote) return null;
+  const editId = document.getElementById('formComun')?.dataset?.editId || null;
+  const acts = getActividades().filter(a =>
+    a.actividad === 'MATERIA SECA' &&
+    a.potrero === potrero &&
+    a.lote === lote &&
+    a.fechaSal &&
+    (!editId || a.id !== editId)
+  );
+  if(!acts.length) return null;
+  // La fecha mínima es la fecha de salida más reciente
+  return acts.reduce((max, a) => a.fechaSal > max ? a.fechaSal : max, '');
+}
+
+function aplicarFechaMinIngreso() {
+  if(actActual !== 'MATERIA SECA') return;
+  const potrero = document.getElementById('fPotrero').value;
+  const lote    = document.getElementById('fLote')?.value;
+  if(!potrero || !lote) return;
+
+  const minFecha = getFechaMinIngreso(potrero, lote);
+  const elIng = document.getElementById('fFechaIng');
+  const elSal = document.getElementById('fFechaSal');
+  if(!minFecha || !elIng) return;
+
+  // Bloquear fecha de ingreso: mínimo = última fecha de salida registrada
+  elIng.min = minFecha;
+
+  // Si la fecha actual es anterior al mínimo, corregirla
+  if(!elIng.value || elIng.value < minFecha) {
+    elIng.value = minFecha;
+    elIng.style.borderColor = 'var(--gold2)';
+    // Auto-calcular salida
+    if(elSal) { elSal.value = sumarUnDia(minFecha); }
+    calcIng();
+    // Aviso
+    notif(`📅 Ingreso ajustado a ${minFecha} — última salida registrada para este grupo en ${potrero}`);
+  }
 }
 
 // ═══════════════════════════════════════
@@ -3304,8 +3346,9 @@ function renderCampo() {
         a.fechaIng && a.fechaSal &&
         a.fechaIng <= d && a.fechaSal >= d
       ) || acts.find(a =>
-        a.lote === lote &&
-        a.fechaIng === d
+        a.lote === lote && a.fechaIng === d
+      ) || acts.find(a =>
+        a.lote === lote && a.fechaSal === d
       );
 
       const esCentro = d === centro;
@@ -3327,7 +3370,7 @@ function renderCampo() {
       }
 
       const esUltimoDia = reg.fechaSal === d;
-      const badge = esUltimoDia ? `<div style="font-size:9px;color:${color};font-weight:700;">${diasRestantes===0?'SALE HOY':diasRestantes<0?'VENCIDO':'SALE MÑN'}</div>` : '';
+      const badge = (esUltimoDia && diasRestantes !== null) ? `<div style="font-size:9px;color:${color};font-weight:700;">${diasRestantes<0?'VENCIDO':diasRestantes===0?'SALE HOY':diasRestantes===1?'SALE MÑN':''}</div>` : '';
 
       return `<td style="text-align:center;cursor:pointer;${bgBase}${esCentro?'':''}padding:4px;" onclick="abrirCambioSalida('${lote}','${reg.potrero}','${reg.parcela}','${reg.fechaSal||''}','${reg.id}')">
         <div style="background:${bgColor};border-radius:5px;padding:4px 6px;">
@@ -4100,6 +4143,8 @@ function onLoteChange(selectEl, idCab, idPeso) {
   }
   if(pesoFinal > 0) { elPeso.value = pesoFinal; elPeso.style.borderColor='var(--green2)'; }
   calcMS();
+  // Aplicar fecha mínima cuando cambia el lote
+  setTimeout(aplicarFechaMinIngreso, 50);
 }
 
 const ALL_POTREROS = [
