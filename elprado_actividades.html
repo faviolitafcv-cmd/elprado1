@@ -3306,6 +3306,9 @@ function imprimirCampo() {
       th { background: #2e4020; color: white; padding: 6px 8px; text-align: center; font-size: 10px; }
       td { padding: 5px 7px; border: 1px solid #ccc; text-align: center; font-size: 10px; }
       td:first-child { text-align: left; font-weight: bold; }
+      div[style*="gold"] { color: #b8860b !important; font-weight: bold; font-size: 10px; }
+      div[style*="red"] { color: #cc0000 !important; }
+      div[style*="green"] { color: #1a6b1a !important; }
       @media print { body { padding: 10px; } }
     </style>
   </head><body>
@@ -3470,10 +3473,10 @@ function renderCampo() {
       const badge = (esUltimoDia && diasRestantes !== null) ? `<div style="font-size:9px;color:${color};font-weight:700;">${diasRestantes<0?'VENCIDO':diasRestantes===0?'SALE HOY':diasRestantes===1?'SALE MÑN':''}</div>` : '';
 
       // Turno emoji
-      const turnoIng = reg.horaIng === 'MAÑANA' ? '🌅' : reg.horaIng === 'TARDE' ? '🌇' : '';
-      const turnoSal = reg.horaSal === 'MAÑANA' ? '🌅' : reg.horaSal === 'TARDE' ? '🌇' : '';
-      const turnoLabel = turnoIng || turnoSal
-        ? `<div style="font-size:10px;color:var(--text3);">${turnoIng ? 'Ing:'+turnoIng : ''} ${turnoSal ? 'Sal:'+turnoSal : ''}</div>`
+      const turnoIngLabel = reg.horaIng === 'MAÑANA' ? '🌅 Mañana' : reg.horaIng === 'TARDE' ? '🌇 Tarde' : '';
+      const turnoSalLabel = reg.horaSal === 'MAÑANA' ? '🌅 Mañana' : reg.horaSal === 'TARDE' ? '🌇 Tarde' : '';
+      const turnoLabel = (turnoIngLabel || turnoSalLabel)
+        ? `<div style="font-size:11px;font-weight:700;color:var(--gold2);margin-top:2px;">${turnoSalLabel || turnoIngLabel}</div>`
         : '';
 
       return `<td style="text-align:center;cursor:pointer;${bgBase}${esCentro?'':''}padding:4px;" onclick="abrirCambioSalida('${lote}','${reg.potrero}','${reg.parcela}','${reg.fechaSal||''}','${reg.id}','${reg.horaSal||''}')">
