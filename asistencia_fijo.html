@@ -139,7 +139,12 @@ async function syncRrhhFromFirebase() {
     const data = await r.json();
     if(data) {
       Object.entries(data).forEach(([key, val]) => {
-        if(val !== null) localStorage.setItem(key, JSON.stringify(val));
+        if(val !== null) {
+          // Usar _origSetItem para no re-disparar el override
+          // Si el valor es un string simple (ej: "P","F"), guardarlo directo sin JSON.stringify
+          const stored = (typeof val === 'object') ? JSON.stringify(val) : String(val);
+          _origSetItem(key, stored);
+        }
       });
     }
     return true;
@@ -151,9 +156,9 @@ const _origSetItem = localStorage.setItem.bind(localStorage);
 localStorage.setItem = function(key, value) {
   _origSetItem(key, value);
   if(FB_RRHH_KEYS.includes(key) || key.startsWith('asistF_')) {
-    try { fbRrhhSet(key, JSON.parse(value)); } catch(e) {
-      try { fbRrhhSet(key, value); } catch(e2) {}
-    }
+    var parsed;
+    try { parsed = JSON.parse(value); } catch(e) { parsed = value; }
+    try { fbRrhhSet(key, parsed); } catch(e2) {}
   }
 };
 
@@ -333,7 +338,13 @@ function kA(ci,y,m,d) {
 function getEstado(ci,y,m,d,esFer) {
     var k = kA(ci,y,m,d);
     var s = localStorage.getItem(k);
-    if (s) return s;
+    if (s) {
+        // Limpiar doble encoding: '"P"' → 'P'
+        if(s.charAt(0) === '"' && s.charAt(s.length-1) === '"') {
+            try { s = JSON.parse(s); } catch(e) {}
+        }
+        return s;
+    }
     var fecha = new Date(y,m,d);
     var hoy = new Date(); hoy.setHours(0,0,0,0);
     if (fecha > hoy) return '-';
@@ -989,11 +1000,12 @@ function guardarAsistenciaFijo(silencioso) {
         if(!key) continue;
         if(key.startsWith('asistF_') || FB_RRHH_KEYS.includes(key)) {
             var val = localStorage.getItem(key);
-            if(val !== null) {
-                try { fbRrhhSet(key, JSON.parse(val)); } catch(e) {
-                    try { fbRrhhSet(key, val); } catch(e2) {}
-                }
-            }
+        if(val !== null) {
+            // Intentar parsear como JSON, si falla guardar como string directo
+            var parsed;
+            try { parsed = JSON.parse(val); } catch(e) { parsed = val; }
+            try { fbRrhhSet(key, parsed); } catch(e2) {}
+        }
         }
     }
 
