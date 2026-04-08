@@ -711,7 +711,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
           <input type="text" id="fVariedad" readonly>
         </div>
       </div>
-      <div id="grpSaldoHA" style="display:none;margin-top:10px;"><div style="background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:12px 16px;display:flex;gap:20px;flex-wrap:wrap;align-items:center;"><div style="font-size:11px;color:var(--text3);font-weight:700;">📐 Potrero</div><div><div style="font-size:10px;color:var(--text3);">Total</div><div id="saldoHATotal" style="font-size:14px;font-weight:700;color:var(--text2);">—</div></div><div><div style="font-size:10px;color:var(--text3);">Usado esta vuelta</div><div id="saldoHAUsado" style="font-size:14px;font-weight:700;color:var(--blue);">—</div></div><div><div style="font-size:10px;color:var(--text3);">Saldo</div><div id="saldoHAResta" style="font-size:16px;font-weight:800;">—</div></div><div><div style="font-size:10px;color:var(--text3);">Próxima parcela</div><div id="saldoHAProxParcela" style="font-size:14px;font-weight:700;color:var(--gold2);">—</div></div></div></div>
+      <div id="grpSaldoHA" style="display:none;margin-top:10px;"><div style="background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:12px 16px;display:flex;gap:16px;flex-wrap:wrap;align-items:center;"><div style="font-size:11px;color:var(--text3);font-weight:700;">📐 Potrero</div><div><div style="font-size:10px;color:var(--text3);">Total</div><div id="saldoHATotal" style="font-size:14px;font-weight:700;color:var(--text2);">—</div></div><div><div style="font-size:10px;color:var(--text3);">Usado esta vuelta</div><div id="saldoHAUsado" style="font-size:14px;font-weight:700;color:var(--blue);">—</div></div><div><div style="font-size:10px;color:var(--text3);">Saldo</div><div id="saldoHAResta" style="font-size:16px;font-weight:800;">—</div></div><div><div style="font-size:10px;color:var(--text3);">Próxima parcela</div><div id="saldoHAProxParcela" style="font-size:14px;font-weight:700;color:var(--gold2);">—</div></div><div><div style="font-size:10px;color:var(--text3);">Inicio de vuelta</div><div id="saldoHAInicioVuelta" style="font-size:11px;color:var(--text3);">—</div></div><div><button onclick="iniciarVuelta(document.getElementById('fPotrero').value)" style="background:var(--green2);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;">🔄 Iniciar Vuelta</button></div></div></div>
 
       <!-- Modo desbrozadora -->
       <div id="grpModoDesb" style="display:none; margin-top:12px;">
@@ -1072,6 +1072,32 @@ tr:hover td { background: rgba(255,255,255,.02); }
           </tr>
         </thead>
         <tbody id="rankingBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Métricas HA por mes -->
+  <div class="card">
+    <div class="card-title"><span>📐</span> Hectáreas por Mes
+      <div style="margin-left:auto;">
+        <select id="filtroHAAnio" onchange="renderMetricasHA()" style="padding:5px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--white);font-size:12px;">
+          <option value="2026">2026</option>
+          <option value="2025">2025</option>
+          <option value="2024">2024</option>
+        </select>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border2);">
+            <th style="padding:8px;text-align:left;color:var(--text3);">Mes</th>
+            <th style="padding:8px;text-align:center;color:var(--text3);">HA Pastoreadas<br><span style="font-size:10px;font-weight:400;">(con repetición)</span></th>
+            <th style="padding:8px;text-align:center;color:var(--text3);">Área Física Única<br><span style="font-size:10px;font-weight:400;">(sin repetir potreros)</span></th>
+            <th style="padding:8px;text-align:center;color:var(--text3);">Potreros únicos</th>
+          </tr>
+        </thead>
+        <tbody id="metricasHABody"></tbody>
       </table>
     </div>
   </div>
@@ -1673,7 +1699,7 @@ async function fbSet(key, val) {
 }
 
 async function pushAllToFirebase() {
-  const keys = ['actividades','grupos','vaqueros','plan','pedidos','pluviometros','lluvia','bromatologicos','potreroAreas','potreroConfig'];
+  const keys = ['actividades','grupos','vaqueros','plan','pedidos','pluviometros','lluvia','bromatologicos','potreroAreas','potreroConfig','finVuelta'];
   let count = 0;
   for(const key of keys) {
     const val = getData(key, null);
@@ -2145,26 +2171,62 @@ function sugerirProximaParcela() {
 }
 
 function getHAUsadaEnVuelta(potrero, lote, excludeId) {
-  // Suma de ha de todos los registros de MS en este potrero para este grupo
-  // desde el último "Fin de Vuelta" o desde el inicio si no hay
-  const acts = getActividades().filter(a =>
-    a.actividad === 'MATERIA SECA' &&
-    a.potrero === potrero &&
-    a.lote === lote &&
-    (!excludeId || a.id !== excludeId) &&
-    a.ha && parseFloat(a.ha) > 0
-  ).sort((a,b) => a.fechaIng > b.fechaIng ? 1 : -1);
-
-  // Buscar último fin de vuelta para este potrero
+  // Suma de ha de TODOS los grupos en este potrero desde el último inicio de vuelta
   const fv = getData('finVuelta', []);
-  const ultFV = fv.filter(f => f.potrero === potrero)
+  const ultFV = fv.filter(f => f.potrero === potrero && f.tipo === 'INICIO')
                   .sort((a,b) => a.fecha > b.fecha ? -1 : 1)[0];
   const desdeFecha = ultFV ? ultFV.fecha : '0000-00-00';
 
-  return acts
-    .filter(a => a.fechaIng >= desdeFecha)
-    .reduce((sum, a) => sum + (parseFloat(a.ha)||0), 0);
+  return getActividades().filter(a =>
+    a.actividad === 'MATERIA SECA' &&
+    a.potrero === potrero &&
+    (!excludeId || a.id !== excludeId) &&
+    a.ha && parseFloat(a.ha) > 0 &&
+    a.fechaIng >= desdeFecha
+  ).reduce((sum, a) => sum + (parseFloat(a.ha)||0), 0);
 }
+
+// Registrar inicio/fin de vuelta para un potrero
+function getVueltasData() { return getData('finVuelta', []); }
+function setVueltasData(v) { setData('finVuelta', v); fbSet('finVuelta', v); }
+
+function iniciarVuelta(potrero) {
+  if(!potrero) { notif('Seleccioná un potrero', true); return; }
+  const hoy = new Date().toISOString().split('T')[0];
+  if(!confirm(`¿Iniciar nueva vuelta en ${potrero} hoy (${hoy})?\nEsto reiniciará el contador de hectáreas de este potrero.`)) return;
+  const vueltas = getVueltasData();
+  vueltas.unshift({ id: uuid(), potrero, fecha: hoy, tipo: 'INICIO', usuario: localStorage.getItem('elprado_usuario')||'' });
+  setVueltasData(vueltas);
+  actualizarSaldoHA();
+  notif(`✅ Vuelta iniciada en ${potrero} — contador reiniciado`);
+}
+
+// ─── Métricas HA por mes ───
+function getMetricasHAMes(anio, mes) {
+  // mes: 0-11
+  const inicio = `${anio}-${String(mes+1).padStart(2,'0')}-01`;
+  const fin    = `${anio}-${String(mes+1).padStart(2,'0')}-${new Date(anio,mes+1,0).getDate()}`;
+
+  // Solo registros donde fechaSal está dentro del mes
+  const acts = getActividades().filter(a =>
+    a.actividad === 'MATERIA SECA' &&
+    a.fechaSal && a.fechaSal >= inicio && a.fechaSal <= fin &&
+    a.ha && parseFloat(a.ha) > 0
+  );
+
+  // Métrica 1: total ha pastoreadas (con repetición)
+  const totalHa = acts.reduce((sum, a) => sum + (parseFloat(a.ha)||0), 0);
+
+  // Métrica 2: área física única (sin repetir potreros)
+  const potrerosUnicos = [...new Set(acts.map(a => a.potrero))];
+  const areaUnica = potrerosUnicos.reduce((sum, p) => {
+    const area = getPotreroArea(p);
+    return sum + (area || 0);
+  }, 0);
+
+  return { totalHa: Math.round(totalHa*10)/10, areaUnica: Math.round(areaUnica*10)/10, potrerosUnicos };
+}
+
 
 function actualizarSaldoHA() {
   if(actActual !== 'MATERIA SECA') return;
@@ -2210,9 +2272,44 @@ function actualizarSaldoHA() {
     const proxNum = nums.length > 0 ? Math.max(...nums) + 1 : 1;
     elProx.textContent = 'P' + proxNum;
   }
+
+  // Mostrar fecha de inicio de vuelta
+  const elInicio = document.getElementById('saldoHAInicioVuelta');
+  if(elInicio) {
+    const vueltas = getVueltasData();
+    const ultV = vueltas.filter(f => f.potrero === potrero && f.tipo === 'INICIO')
+                        .sort((a,b) => a.fecha > b.fecha ? -1 : 1)[0];
+    elInicio.textContent = ultV ? ultV.fecha : 'Sin inicio registrado';
+  }
 }
 
-// ─── Validar parcela duplicada al guardar ───
+function renderMetricasHA() {
+  const tbody = document.getElementById('metricasHABody');
+  if(!tbody) return;
+  const anio = parseInt(document.getElementById('filtroHAAnio')?.value || new Date().getFullYear());
+  const MESES_N = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const hoy = new Date().toISOString().split('T')[0];
+
+  tbody.innerHTML = MESES_N.map((mes, m) => {
+    const finMes = `${anio}-${String(m+1).padStart(2,'0')}-${new Date(anio,m+1,0).getDate()}`;
+    if(finMes > hoy) return ''; // No mostrar meses futuros
+    const { totalHa, areaUnica, potrerosUnicos } = getMetricasHAMes(anio, m);
+    if(totalHa === 0) return '';
+    return `<tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:7px 8px;font-weight:600;color:var(--text2);">${mes} ${anio}</td>
+      <td style="padding:7px 8px;text-align:center;font-weight:700;color:var(--green-soft);">${totalHa.toFixed(1)} ha</td>
+      <td style="padding:7px 8px;text-align:center;font-weight:700;color:var(--blue);">${areaUnica > 0 ? areaUnica.toFixed(1) + ' ha' : '—'}</td>
+      <td style="padding:7px 8px;text-align:center;font-size:11px;color:var(--text3);">${potrerosUnicos.join(', ')}</td>
+    </tr>`;
+  }).join('');
+
+  if(!tbody.innerHTML.trim()) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text3);">Sin registros con fecha de salida en ${anio}</td></tr>`;
+  }
+}
+
+// ─── FIN MÉTRICAS HA ───
+
 function validarParcelaDuplicada(potrero, lote, parcela, fechaIng, editId) {
   const acts = getActividades().filter(a =>
     a.actividad === 'MATERIA SECA' &&
@@ -4695,7 +4792,7 @@ function showPage(id) {
   const tabs = ['actividades','nueva','resumen','plan','pedidos','config','lluvia','calidad','campo'];
   const idx = tabs.indexOf(id);
   document.querySelectorAll('.tab')[idx]?.classList.add('active');
-  if(id==='resumen') { actualizarGestionesDisponibles(); renderResumen(); }
+  if(id==='resumen') { actualizarGestionesDisponibles(); renderResumen(); renderMetricasHA(); }
   if(id==='config') { renderGrupos(); renderVaqueros(); cargarUsuarioConfig(); renderPotreroAreas(); }
   if(id==='actividades') { renderStats(); }
   if(id==='plan') { renderPlan(); }
