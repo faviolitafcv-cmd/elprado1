@@ -662,6 +662,13 @@ function renderDetalleV() {
     </div>
 
     ${hoyHTML}
+
+    <!-- Vista 7 días Estado del Campo -->
+    <div style="margin:12px 0 6px;font-size:11px;font-weight:700;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;">📅 Movimientos — 7 días</div>
+    <div style="overflow-x:auto;margin-bottom:8px;">
+      ${renderCampoVaquero(lote)}
+    </div>
+
     ${proxHTML}
     ${proxPotreroHTML}
 
@@ -684,6 +691,77 @@ function renderDetalleV() {
       </div>
     </div>
   `;
+}
+
+function sumarDiasV(fecha, dias) {
+  const d = new Date(fecha + 'T12:00:00');
+  d.setDate(d.getDate() + dias);
+  return d.toISOString().split('T')[0];
+}
+
+function renderCampoVaquero(lote) {
+  const hoy = new Date().toISOString().split('T')[0];
+  const dias = [];
+  for(let i = -3; i <= 3; i++) dias.push(sumarDiasV(hoy, i));
+
+  const MESES_C = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const DIAS_C  = ['Do','Lu','Ma','Mi','Ju','Vi','Sa'];
+
+  // Leer actividades de Materia Seca para este lote
+  const acts = (getData('actividades', [])).filter(a =>
+    a.actividad === 'MATERIA SECA' && a.lote === lote && a.fechaIng
+  );
+
+  const celdas = dias.map(d => {
+    const esHoy = d === hoy;
+    const dt = new Date(d + 'T12:00:00');
+    const dow = DIAS_C[dt.getDay()];
+    const label = dt.getDate() + ' ' + MESES_C[dt.getMonth()];
+
+    // Buscar registro activo — prioridad: ingresó más tarde
+    const candidatos = acts.filter(a =>
+      a.fechaIng && (
+        (a.fechaSal && a.fechaIng <= d && a.fechaSal >= d) ||
+        (!a.fechaSal && a.fechaIng === d)
+      )
+    );
+    const reg = candidatos.length > 0
+      ? candidatos.reduce((best, a) => a.fechaIng >= best.fechaIng ? a : best)
+      : null;
+
+    // Color urgencia
+    let bgH = esHoy ? 'rgba(109,186,58,.18)' : 'var(--bg2)';
+    let borderH = esHoy ? '2px solid var(--green2)' : '1px solid var(--border)';
+    let textColor = 'var(--text2)';
+
+    let contenido = '<span style="color:var(--text3);font-size:13px;">—</span>';
+    if(reg) {
+      const diasRest = reg.fechaSal ? Math.round((new Date(reg.fechaSal+'T12:00:00') - new Date(hoy+'T12:00:00')) / 86400000) : null;
+      if(diasRest !== null) {
+        if(diasRest < 0)  { bgH = 'rgba(100,100,100,.1)'; textColor = 'var(--text3)'; }
+        else if(diasRest === 0) { bgH = 'rgba(224,90,74,.18)'; textColor = 'var(--red)'; borderH = '2px solid var(--red)'; }
+        else if(diasRest === 1) { bgH = 'rgba(201,162,39,.15)'; textColor = 'var(--gold2)'; }
+        else { textColor = 'var(--green-soft)'; }
+      }
+      const turno = reg.horaSal === 'MAÑANA' ? '🌅 Mañana' : reg.horaSal === 'TARDE' ? '🌇 Tarde' : '';
+      const badge = reg.fechaSal === d ? (diasRest === 0 ? '<div style="font-size:10px;font-weight:700;color:var(--red);">SALE HOY</div>' : diasRest === 1 ? '<div style="font-size:10px;font-weight:700;color:var(--gold2);">SALE MÑN</div>' : '') : '';
+      contenido = `
+        <div style="font-size:13px;font-weight:700;color:${textColor};">${reg.potrero}·P${reg.parcela}</div>
+        <div style="font-size:10px;color:var(--text3);">${reg.fechaSal||'—'}</div>
+        ${turno ? `<div style="font-size:10px;font-weight:700;color:var(--gold2);">${turno}</div>` : ''}
+        ${badge}`;
+    }
+
+    return `<td style="min-width:80px;padding:5px 4px;text-align:center;background:${bgH};border:${borderH};border-radius:6px;">
+      <div style="font-size:10px;font-weight:700;color:${esHoy?'var(--green)':'var(--text3)'};">${dow}</div>
+      <div style="font-size:10px;color:var(--text3);margin-bottom:4px;">${label}</div>
+      ${contenido}
+    </td>`;
+  }).join('');
+
+  return `<table style="border-collapse:separate;border-spacing:3px;width:100%;">
+    <tbody><tr>${celdas}</tr></tbody>
+  </table>`;
 }
 
 async function enviarPedido() {
