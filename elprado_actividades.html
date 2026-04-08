@@ -4277,12 +4277,23 @@ function abrirModalPluviometro(idx) {
   // Renderizar checkboxes de potreros
   const todos = ALL_POTREROS.map(x => x.p);
   const seleccionados = p ? (p.potreros || []) : [];
-  document.getElementById('mpPotreros').innerHTML = todos.map(pot => `
-    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;padding:3px 8px;border-radius:4px;border:1px solid var(--border);background:var(--card2);white-space:nowrap;">
-      <input type="checkbox" value="${pot}" ${seleccionados.includes(pot)?'checked':''} style="width:14px;height:14px;accent-color:var(--green2);">
-      ${pot}
-    </label>
-  `).join('');
+  // Excluir potreros ya asignados a OTROS pluviómetros
+  const pluviosActuales = getPluviometros();
+  const idxActual = document.getElementById('mpIndex').value;
+  const asignadosAOtros = new Set();
+  pluviosActuales.forEach((pl, i) => {
+    if(String(i) !== String(idxActual)) {
+      (pl.potreros || []).forEach(pot => asignadosAOtros.add(pot));
+    }
+  });
+
+  document.getElementById('mpPotreros').innerHTML = todos.map(pot => {
+    const estaEnOtro = asignadosAOtros.has(pot) && !seleccionados.includes(pot);
+    return `<label style="display:flex;align-items:center;gap:5px;cursor:${estaEnOtro?'not-allowed':'pointer'};font-size:12px;padding:3px 8px;border-radius:4px;border:1px solid var(--border);background:${estaEnOtro?'rgba(80,80,80,.3)':'var(--card2)'};white-space:nowrap;opacity:${estaEnOtro?'0.4':'1'};" title="${estaEnOtro?'Ya asignado a otro pluviómetro':''}">
+      <input type="checkbox" value="${pot}" ${seleccionados.includes(pot)?'checked':''} ${estaEnOtro?'disabled':''} style="width:14px;height:14px;accent-color:var(--green2);">
+      ${pot}${estaEnOtro?' <span style=\'font-size:9px;color:var(--text3);\'>✗</span>':''}
+    </label>`;
+  }).join('');
   document.getElementById('modalPluviometro').classList.add('open');
 }
 
@@ -4390,19 +4401,26 @@ function renderAnalisisGestion() {
     <th>Total</th>
   </tr>`;
 
-  // Calcular totales por gestión/mes sumando Camp. Principal
+  // Calcular totales por gestión/mes usando PROMEDIO de todas las lecturas del día
   const totales = {};
   lluvia.forEach(r => {
     const g = r.gestion || '';
+    const mes = r.mes || '';
+    if(!g || !mes) return;
     if(!totales[g]) totales[g] = {};
-    const lect = (r.lecturas||[]).find(l => l.nombre === 'Campamento Principal');
-    if(lect && lect.mm > 0) {
-      if(!totales[g][r.mes]) totales[g][r.mes] = 0;
-      totales[g][r.mes] += lect.mm;
+    const lects = (r.lecturas||[]).filter(l => l && parseFloat(l.mm) > 0);
+    let mmValor = 0;
+    if(lects.length > 0) {
+      mmValor = lects.reduce((s,l) => s + (parseFloat(l.mm)||0), 0) / lects.length;
+    } else if(r.mm > 0) {
+      mmValor = parseFloat(r.mm) || 0;
+    }
+    if(mmValor > 0) {
+      if(!totales[g][mes]) totales[g][mes] = 0;
+      totales[g][mes] += mmValor;
     }
   });
 
-  // Generar filas de gestiones
   const filas = GESTIONES.map(g => {
     const mesesData = totales[g] || {};
     const vals = MESES.map(m => mesesData[m] || 0);
@@ -4414,21 +4432,20 @@ function renderAnalisisGestion() {
     return { g, vals, total, cols };
   });
 
-  // Calcular estadísticas
+  const filasCon = filas.filter(f => f.total > 0);
   const promedios = MESES.map((_,i) => {
-    const vs = filas.map(f=>f.vals[i]).filter(v=>v>0);
+    const vs = filasCon.map(f=>f.vals[i]).filter(v=>v>0);
     return vs.length ? vs.reduce((s,v)=>s+v,0)/vs.length : 0;
   });
-  const minimos  = MESES.map((_,i) => Math.min(...filas.map(f=>f.vals[i])));
-  const maximos  = MESES.map((_,i) => Math.max(...filas.map(f=>f.vals[i])));
-  const desvios  = MESES.map((_,i) => {
-    const vs = filas.map(f=>f.vals[i]);
+  const minimos = MESES.map((_,i) => { const vs = filasCon.map(f=>f.vals[i]); return vs.length ? Math.min(...vs) : 0; });
+  const maximos = MESES.map((_,i) => { const vs = filasCon.map(f=>f.vals[i]); return vs.length ? Math.max(...vs) : 0; });
+  const desvios = MESES.map((_,i) => {
+    const vs = filasCon.map(f=>f.vals[i]);
+    if(!vs.length) return 0;
     const avg = vs.reduce((s,v)=>s+v,0)/vs.length;
     return Math.sqrt(vs.reduce((s,v)=>s+(v-avg)**2,0)/vs.length);
   });
   const cvs = MESES.map((_,i) => promedios[i] > 0 ? (desvios[i]/promedios[i]*100) : 0);
-
-  // Color para CV: verde <50%, amarillo 50-100%, rojo >100%
   const cvColor = v => v <= 50 ? 'var(--green-soft)' : v <= 100 ? 'var(--gold2)' : 'var(--red)';
 
   tbody.innerHTML = filas.map(({g, vals, total, cols}) => `
@@ -4465,6 +4482,7 @@ function renderAnalisisGestion() {
     </tr>
   `;
 }
+
 
 function renderResumenLluvia() {
   const pluvios = getPluviometros();
