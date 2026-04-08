@@ -555,8 +555,8 @@ function renderCapatazCampo() {
   const acts = asArray(getData('actividades', [])).filter(function(a) {
     return a.actividad === 'MATERIA SECA' && a.fechaIng && a.lote;
   });
-  const lotesSet = new Set(acts.map(function(a){ return a.lote; }));
-  const lotes = Array.from(lotesSet).sort();
+  const grupos = asArray(getData('grupos', []));
+  const lotes = grupos.map(function(g){ return (g.tipo||'')+'|'+(g.categoria||'')+'|'+(g.grupo||''); });
 
   const diasHead = dias.map(function(d) {
     const esHoy = d === hoy;
