@@ -1363,6 +1363,14 @@ tr:hover td { background: rgba(255,255,255,.02); }
 
 <!-- ════════════════ CAMPO ════════════════ -->
 <div class="page" id="page-campo">
+  <!-- Alertas del capataz -->
+  <div class="card" id="capAlertasCard" style="display:none;">
+    <div class="card-title"><span>🔔</span> Modificaciones del Capataz
+      <button class="btn btn-secondary btn-sm" style="margin-left:auto;" onclick="limpiarCapAlerts()">Limpiar</button>
+    </div>
+    <div id="capAlertasAdmin"></div>
+  </div>
+
   <div class="card">
     <div class="card-title">
       <span>📍</span> Estado del Campo
@@ -1705,7 +1713,7 @@ async function fbSet(key, val) {
 }
 
 async function pushAllToFirebase() {
-  const keys = ['actividades','grupos','vaqueros','plan','pedidos','pluviometros','lluvia','bromatologicos','potreroAreas','potreroConfig','finVuelta'];
+  const keys = ['actividades','grupos','vaqueros','plan','pedidos','pluviometros','lluvia','bromatologicos','potreroAreas','potreroConfig','finVuelta','capAlerts'];
   let count = 0;
   for(const key of keys) {
     const val = getData(key, null);
@@ -2315,6 +2323,31 @@ function renderMetricasHA() {
 }
 
 // ─── FIN MÉTRICAS HA ───
+
+// ─── ALERTAS CAPATAZ ───
+function renderCapAlertasAdmin() {
+  const el = document.getElementById('capAlertasAdmin');
+  const card = document.getElementById('capAlertasCard');
+  if(!el || !card) return;
+  const alertas = getData('capAlerts', []);
+  if(!alertas.length) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  el.innerHTML = alertas.slice(0,10).map(a => `
+    <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+      <span style="font-size:20px;">✏️</span>
+      <div style="flex:1;">
+        <div style="font-size:12px;font-weight:700;color:var(--gold2);">${a.quien||'Capataz'} — ${a.desc||''}</div>
+        <div style="font-size:11px;color:var(--text3);">${new Date(a.ts).toLocaleString('es-BO')}</div>
+      </div>
+    </div>`).join('');
+}
+function limpiarCapAlerts() {
+  if(!confirm('¿Eliminar todas las alertas del capataz?')) return;
+  setData('capAlerts', []);
+  fbSet('capAlerts', []);
+  renderCapAlertasAdmin();
+}
+
 
 function validarParcelaDuplicada(potrero, lote, parcela, fechaIng, editId) {
   const acts = getActividades().filter(a =>
@@ -4885,7 +4918,7 @@ function showPage(id) {
   if(id==='plan') { renderPlan(); }
   if(id==='pedidos') { renderPedidos(); }
   if(id==='calidad') { renderBromatologicos(); poblarSelectorZonas(); preLlenarFechasBrom(); }
-  if(id==='campo') { campoIrHoy(); }
+  if(id==='campo') { campoIrHoy(); renderCapAlertasAdmin(); }
   if(id==='lluvia') {
     renderAnalisisGestion();
     renderResumenLluvia();

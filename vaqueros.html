@@ -371,6 +371,33 @@ body {
       <div class="vacio-icon">🤠</div>
       No hay vaqueros configurados.<br>Pedí al administrador que los cargue.
     </div>
+    <!-- Acceso Capataz -->
+    <div style="margin-top:24px;width:100%;max-width:320px;">
+      <div onclick="abrirPINCapataz()" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:rgba(109,186,58,.08);border:1px solid rgba(109,186,58,.25);border-radius:10px;cursor:pointer;">
+        <div style="font-size:28px;">👨‍🌾</div>
+        <div>
+          <div style="font-weight:700;color:var(--white);font-size:14px;">Capataz</div>
+          <div style="font-size:11px;color:var(--text3);">Vista general + modificaciones</div>
+        </div>
+        <div style="margin-left:auto;color:var(--text3);font-size:18px;">›</div>
+      </div>
+    </div>
+    <!-- Modal PIN -->
+    <div id="modalPIN" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;display:none;align-items:center;justify-content:center;">
+      <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:28px 24px;width:280px;text-align:center;">
+        <div style="font-size:32px;margin-bottom:8px;">🔐</div>
+        <div style="font-weight:700;color:var(--white);margin-bottom:4px;">Acceso Capataz</div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:16px;">Ingresá el PIN de capataz</div>
+        <input type="password" id="pinInput" maxlength="6" inputmode="numeric"
+          style="width:100%;padding:12px;font-size:20px;text-align:center;letter-spacing:8px;border:1px solid var(--border2);border-radius:8px;background:var(--bg2);color:var(--white);margin-bottom:12px;"
+          placeholder="••••" onkeydown="if(event.key==='Enter') verificarPIN()">
+        <div style="display:flex;gap:8px;">
+          <button onclick="cerrarPIN()" style="flex:1;padding:10px;border:1px solid var(--border);background:none;color:var(--text2);border-radius:8px;cursor:pointer;">Cancelar</button>
+          <button onclick="verificarPIN()" style="flex:1;padding:10px;background:var(--green2);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:700;">Entrar</button>
+        </div>
+        <div id="pinError" style="color:var(--red);font-size:12px;margin-top:8px;display:none;">PIN incorrecto</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -382,6 +409,22 @@ body {
 <!-- PÁGINA 2: DETALLE DEL GRUPO -->
 <div id="pag2" class="pag">
   <div id="detalleGrupoV"></div>
+</div>
+
+<!-- PÁGINA 3: VISTA CAPATAZ -->
+<div id="pag3" class="pag">
+  <div style="padding:12px 0 4px;">
+    <div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;">📍 Estado del Campo — 7 días</div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+      <button onclick="capNavegar(-1)" style="background:var(--card2);border:1px solid var(--border);color:var(--text2);padding:4px 14px;border-radius:4px;cursor:pointer;font-size:16px;">‹</button>
+      <span id="capFechaLabel" style="font-size:12px;font-weight:700;color:var(--green-soft);flex:1;text-align:center;"></span>
+      <button onclick="capNavegar(1)" style="background:var(--card2);border:1px solid var(--border);color:var(--text2);padding:4px 14px;border-radius:4px;cursor:pointer;font-size:16px;">›</button>
+      <button onclick="capIrHoy()" style="background:var(--green2);color:white;border:none;padding:5px 12px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:700;">Hoy</button>
+    </div>
+    <div id="capTablaWrap" style="overflow-x:auto;"></div>
+    <!-- Alertas de modificaciones -->
+    <div id="capAlertas" style="margin-top:12px;"></div>
+  </div>
 </div>
 
 <div id="notifV"></div>
@@ -451,6 +494,243 @@ function volver() {
   document.getElementById(anterior).classList.add('activo');
   actualizarTopbar();
   window.scrollTo(0,0);
+}
+
+// ── CAPATAZ PIN ──
+const PIN_CAPATAZ = '2810';
+var capFechaBase = null;
+var _capCambioActual = null;
+
+function abrirPINCapataz() {
+  const modal = document.getElementById('modalPIN');
+  if(modal) { modal.style.display = 'flex'; }
+  const inp = document.getElementById('pinInput');
+  if(inp) { inp.value = ''; inp.focus(); }
+  const err = document.getElementById('pinError');
+  if(err) err.style.display = 'none';
+}
+function cerrarPIN() {
+  const modal = document.getElementById('modalPIN');
+  if(modal) modal.style.display = 'none';
+}
+async function verificarPIN() {
+  const inp = document.getElementById('pinInput');
+  const pin = inp ? inp.value : '';
+  if(pin === PIN_CAPATAZ) {
+    cerrarPIN();
+    await syncFromFirebase();
+    capIrHoy();
+    irA('pag3');
+  } else {
+    const err = document.getElementById('pinError');
+    if(err) err.style.display = 'block';
+    if(inp) inp.value = '';
+  }
+}
+
+function capIrHoy() {
+  capFechaBase = new Date().toISOString().split('T')[0];
+  renderCapatazCampo();
+}
+function capNavegar(dir) {
+  if(!capFechaBase) capFechaBase = new Date().toISOString().split('T')[0];
+  const d = new Date(capFechaBase + 'T12:00:00');
+  d.setDate(d.getDate() + dir);
+  capFechaBase = d.toISOString().split('T')[0];
+  renderCapatazCampo();
+}
+
+function renderCapatazCampo() {
+  const hoy = new Date().toISOString().split('T')[0];
+  if(!capFechaBase) capFechaBase = hoy;
+  const MESES_C = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const DIAS_C  = ['Do','Lu','Ma','Mi','Ju','Vi','Sa'];
+  const dias = [];
+  for(let i = -3; i <= 3; i++) dias.push(sumarDiasV(capFechaBase, i));
+
+  const d0 = new Date(dias[0]+'T12:00:00'), d6 = new Date(dias[6]+'T12:00:00');
+  const lbl = document.getElementById('capFechaLabel');
+  if(lbl) lbl.textContent = d0.getDate()+' '+MESES_C[d0.getMonth()]+' — '+d6.getDate()+' '+MESES_C[d6.getMonth()];
+
+  const acts = asArray(getData('actividades', [])).filter(function(a) {
+    return a.actividad === 'MATERIA SECA' && a.fechaIng && a.lote;
+  });
+  const lotesSet = new Set(acts.map(function(a){ return a.lote; }));
+  const lotes = Array.from(lotesSet).sort();
+
+  const diasHead = dias.map(function(d) {
+    const esHoy = d === hoy;
+    const dt = new Date(d+'T12:00:00');
+    return '<th style="min-width:72px;text-align:center;padding:4px;font-size:10px;'+(esHoy?'background:rgba(109,186,58,.15);color:var(--green);':'color:var(--text3);')+'">'+DIAS_C[dt.getDay()]+'<br>'+dt.getDate()+' '+MESES_C[dt.getMonth()]+'</th>';
+  }).join('');
+
+  const filas = lotes.map(function(lote) {
+    const lparts = lote.split('|');
+    const loteLabel = lparts.length >= 3 ? lparts[1]+'·'+lparts[2] : lote;
+    const celdas = dias.map(function(d) {
+      const esHoy = d === hoy;
+      const candidatos = acts.filter(function(a) {
+        return a.lote === lote && a.fechaIng && (
+          (a.fechaSal && a.fechaIng <= d && a.fechaSal >= d) ||
+          (!a.fechaSal && a.fechaIng === d)
+        );
+      });
+      const reg = candidatos.length > 0
+        ? candidatos.reduce(function(best, a){ return a.fechaIng >= best.fechaIng ? a : best; })
+        : null;
+      const bg = esHoy ? 'rgba(109,186,58,.08)' : 'transparent';
+      if(!reg) return '<td style="text-align:center;padding:3px;background:'+bg+';"><span style="color:var(--text3);font-size:11px;">—</span></td>';
+      const diasRest = reg.fechaSal ? Math.round((new Date(reg.fechaSal+'T12:00:00') - new Date(hoy+'T12:00:00')) / 86400000) : null;
+      let color = 'var(--green-soft)', bgCell = esHoy ? 'rgba(109,186,58,.12)' : 'rgba(109,186,58,.06)';
+      if(diasRest !== null) {
+        if(diasRest < 0) { color='var(--text3)'; bgCell='rgba(100,100,100,.08)'; }
+        else if(diasRest === 0) { color='var(--red)'; bgCell='rgba(224,90,74,.12)'; }
+        else if(diasRest === 1) { color='var(--gold2)'; bgCell='rgba(201,162,39,.1)'; }
+      }
+      const turno = reg.horaSal === 'MAÑANA' ? '🌅' : reg.horaSal === 'TARDE' ? '🌇' : '';
+      const badge = (reg.fechaSal === d && diasRest === 0) ? '<br><span style="font-size:9px;color:var(--red);font-weight:700;">SALE HOY</span>' :
+                    (reg.fechaSal === d && diasRest === 1) ? '<br><span style="font-size:9px;color:var(--gold2);font-weight:700;">SALE MÑN</span>' : '';
+      const rId = reg.id || '';
+      const rHSal = reg.horaSal || '';
+      const rFSal = reg.fechaSal || '';
+      const onClick = 'capAbrirCambio(this)';
+      return '<td data-lote="'+lote+'" data-pot="'+reg.potrero+'" data-par="'+reg.parcela+'" data-fsal="'+rFSal+'" data-rid="'+rId+'" data-hsal="'+rHSal+'" style="text-align:center;padding:3px;cursor:pointer;background:'+bgCell+';border-radius:4px;" onclick="capAbrirCambioEl(this)">'
+        +'<div style="font-size:9px;color:var(--text3);">'+( reg.fechaSal||'—' )+' '+turno+'</div>'
+        +badge+'</td>';
+    }).join('');
+    return '<tr><td style="font-size:11px;font-weight:600;color:var(--text2);padding:4px 6px;white-space:nowrap;">'+loteLabel+'</td>'+celdas+'</tr>';
+  }).join('');
+
+  const wrap = document.getElementById('capTablaWrap');
+  if(wrap) wrap.innerHTML = '<table style="border-collapse:separate;border-spacing:2px;font-size:11px;width:100%;"><thead><tr><th style="text-align:left;padding:4px;color:var(--text3);font-size:10px;">Grupo</th>'+diasHead+'</tr></thead><tbody>'+filas+'</tbody></table>';
+  renderCapAlertas();
+}
+
+function capCerrarModal() {
+  const m = document.getElementById('modalCapCambio');
+  if(m) m.remove();
+}
+function capAbrirCambioEl(el) {
+  const lote = el.dataset.lote || '';
+  const pot  = el.dataset.pot  || '';
+  const par  = el.dataset.par  || '';
+  const fsal = el.dataset.fsal || '';
+  const rid  = el.dataset.rid  || '';
+  const hsal = el.dataset.hsal || '';
+  capAbrirCambio(lote, pot, par, fsal, rid, hsal);
+}
+function capAbrirCambio(lote, potrero, parcela, fechaSal, regId, horaSal) {
+  _capCambioActual = { lote, potrero, parcela, fechaSal, regId, horaSal };
+  const lparts = lote.split('|');
+  const loteLabel = lparts.length >= 3 ? lparts[1]+' · '+lparts[2] : lote;
+  const viejo = document.getElementById('modalCapCambio');
+  if(viejo) viejo.remove();
+  const modal = document.createElement('div');
+  modal.id = 'modalCapCambio';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  modal.innerHTML = '<div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:20px;width:100%;max-width:340px;">'
+    +'<div style="font-weight:700;color:var(--white);margin-bottom:4px;">✏️ Modificar Salida</div>'
+    +'<div style="font-size:12px;color:var(--text2);margin-bottom:12px;"><strong>'+loteLabel+'</strong> — '+potrero+'·P'+parcela+'<br>Salida actual: <span style="color:var(--gold2);">'+(fechaSal||'—')+' '+(horaSal||'')+'</span></div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:8px;">'
+    +'<div style="flex:1;"><div style="font-size:10px;color:var(--text3);margin-bottom:4px;">Nueva fecha</div><input type="date" id="capNuevaFecha" value="'+(fechaSal||'')+'" style="width:100%;padding:8px;border:1px solid var(--border2);border-radius:6px;background:var(--bg2);color:var(--white);font-size:13px;"></div>'
+    +'<div style="flex:1;"><div style="font-size:10px;color:var(--text3);margin-bottom:4px;">Turno salida</div><select id="capNuevoTurno" style="width:100%;padding:8px;border:1px solid var(--border2);border-radius:6px;background:var(--bg2);color:var(--white);font-size:13px;"><option value="">Sin esp.</option><option value="MAÑANA" '+(horaSal==="MAÑANA"?'selected':'')+'>🌅 Mañana</option><option value="TARDE" '+(horaSal==="TARDE"?'selected':'')+'>🌇 Tarde</option></select></div>'
+    +'</div>'
+    +'<div id="capPreviewDiv" style="font-size:11px;color:var(--text2);background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:10px;display:none;"></div>'
+    +'<div style="display:flex;gap:8px;">'
+    +'<button onclick="capCerrarModal()" style="flex:1;padding:10px;border:1px solid var(--border);background:none;color:var(--text2);border-radius:8px;cursor:pointer;">Cancelar</button>'
+    +'<button onclick="capPrevisualizar()" style="flex:1;padding:10px;border:1px solid var(--blue);background:none;color:var(--blue);border-radius:8px;cursor:pointer;font-weight:700;">👁 Preview</button>'
+    +'<button onclick="capConfirmar()" style="flex:1;padding:10px;background:var(--green2);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:700;">✅ OK</button>'
+    +'</div></div>';
+  document.body.appendChild(modal);
+}
+
+function capPrevisualizar() {
+  if(!_capCambioActual) return;
+  const nuevaFecha = document.getElementById('capNuevaFecha') ? document.getElementById('capNuevaFecha').value : '';
+  const nuevoTurno = document.getElementById('capNuevoTurno') ? document.getElementById('capNuevoTurno').value : '';
+  if(!nuevaFecha) return;
+  const fechaSal = _capCambioActual.fechaSal;
+  const lote = _capCambioActual.lote;
+  const potrero = _capCambioActual.potrero;
+  const regId = _capCambioActual.regId;
+  const horaSal = _capCambioActual.horaSal;
+  if(!fechaSal) return;
+  const diff = Math.round((new Date(nuevaFecha+'T12:00:00') - new Date(fechaSal+'T12:00:00')) / 86400000);
+  const turnoCambio = nuevoTurno !== (horaSal||'');
+  if(diff === 0 && !turnoCambio) { notifV('Sin cambios'); return; }
+  const acts = asArray(getData('actividades', []));
+  const siguientes = acts.filter(function(a) {
+    return a.actividad === 'MATERIA SECA' && a.lote === lote && a.potrero === potrero && a.fechaIng >= fechaSal && a.id !== regId;
+  }).sort(function(a,b){ return a.fechaIng > b.fechaIng ? 1 : -1; });
+  const regPropio = acts.find(function(a){ return a.id === regId; });
+  const cambios = [];
+  if(regPropio) cambios.push({ id: regPropio.id, parcela: regPropio.parcela, de: regPropio.fechaSal, a: nuevaFecha, aTurno: nuevoTurno });
+  let turnoAnterior = nuevoTurno;
+  siguientes.forEach(function(a) {
+    const nIng = diff !== 0 ? sumarDiasV(a.fechaIng, diff) : a.fechaIng;
+    const nSal = a.fechaSal && diff !== 0 ? sumarDiasV(a.fechaSal, diff) : a.fechaSal;
+    cambios.push({ id: a.id, parcela: a.parcela, deIng: a.fechaIng, aIng: nIng, deSal: a.fechaSal, aSal: nSal, aTurno: turnoCambio ? turnoAnterior : a.horaSal });
+    turnoAnterior = turnoCambio ? turnoAnterior : a.horaSal;
+  });
+  _capCambioActual.cambios = cambios;
+  _capCambioActual.diff = diff;
+  _capCambioActual.nuevoTurno = nuevoTurno;
+  _capCambioActual.nuevaFecha = nuevaFecha;
+  const signo = diff > 0 ? '+' : '';
+  const prev = document.getElementById('capPreviewDiv');
+  if(prev) {
+    prev.style.display = 'block';
+    prev.innerHTML = '<strong style="color:var(--gold2);">⚠️ '+cambios.length+' registro(s) — '+signo+diff+' día(s)'+(turnoCambio?' · turno cambia':'')+'</strong><br>'
+      +cambios.map(function(c){ return c.de ? 'P'+c.parcela+': salida '+c.de+' → <strong>'+c.a+'</strong>' : 'P'+c.parcela+': '+c.deIng+'→'+c.aIng+' · '+c.deSal+'→'+c.aSal; }).join('<br>');
+  }
+}
+
+async function capConfirmar() {
+  if(!_capCambioActual || !_capCambioActual.cambios) { capPrevisualizar(); return; }
+  if(!confirm('¿Confirmar '+_capCambioActual.cambios.length+' cambio(s)?')) return;
+  const diff = _capCambioActual.diff;
+  const lote = _capCambioActual.lote;
+  const potrero = _capCambioActual.potrero;
+  const cambios = _capCambioActual.cambios;
+  let acts = asArray(getData('actividades', []));
+  cambios.forEach(function(c) {
+    const idx = acts.findIndex(function(a){ return a.id === c.id; });
+    if(idx === -1) return;
+    if(c.de !== undefined) {
+      acts[idx] = Object.assign({}, acts[idx], { fechaSal: c.a, horaSal: c.aTurno });
+    } else {
+      acts[idx] = Object.assign({}, acts[idx], { fechaIng: c.aIng, fechaSal: c.aSal, horaSal: c.aTurno });
+    }
+  });
+  setData('actividades', acts);
+  // Registrar alerta
+  const alertas = JSON.parse(localStorage.getItem('elprado_capAlerts') || '[]');
+  const loteNombre = lote.split('|')[2] || lote;
+  alertas.unshift({ ts: Date.now(), quien: 'Capataz', lote, potrero, cambios: cambios.length, diff,
+    desc: loteNombre+' — '+potrero+': '+cambios.length+' registro(s) corridos '+(diff>0?'+':'')+diff+' día(s)' });
+  localStorage.setItem('elprado_capAlerts', JSON.stringify(alertas.slice(0,50)));
+  fetch('https://elprado1-153ef-default-rtdb.firebaseio.com/elprado/capAlerts.json', {
+    method: 'PUT', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(alertas.slice(0,50))
+  }).catch(function(){});
+  const m = document.getElementById('modalCapCambio');
+  if(m) m.remove();
+  _capCambioActual = null;
+  renderCapatazCampo();
+  notifV('✅ Cambios guardados y enviados al sistema');
+}
+
+function renderCapAlertas() {
+  const el = document.getElementById('capAlertas');
+  if(!el) return;
+  const alertas = JSON.parse(localStorage.getItem('elprado_capAlerts') || '[]');
+  if(!alertas.length) { el.innerHTML = ''; return; }
+  el.innerHTML = '<div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">🔔 Últimas modificaciones</div>'
+    +alertas.slice(0,3).map(function(a){
+      return '<div style="font-size:11px;color:var(--text2);background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:4px;">'
+        +'<span style="color:var(--gold2);font-weight:700;">✏ '+a.quien+'</span> — '+a.desc+'<br>'
+        +'<span style="font-size:10px;color:var(--text3);">'+new Date(a.ts).toLocaleString('es-BO')+'</span></div>';
+    }).join('');
 }
 
 function actualizarTopbar() {
