@@ -1263,8 +1263,8 @@ tr:hover td { background: rgba(255,255,255,.02); }
         </label>
         <div id="bromPDFNombre" style="font-size:11px;color:var(--text3);"></div>
       </div>
-      <!-- Variedad + Rango -->
-      <div class="form-grid" style="max-width:700px;">
+      <!-- Variedad + Zona + Rango -->
+      <div class="form-grid" style="max-width:900px;">
         <div class="form-group">
           <label>Variedad</label>
           <select id="bromVariedad">
@@ -1273,12 +1273,18 @@ tr:hover td { background: rgba(255,255,255,.02); }
           </select>
         </div>
         <div class="form-group">
+          <label>Zona (Pluviómetro)</label>
+          <select id="bromZona" onchange="previewBromAsignados()">
+            <option value="">— Sin zona (aplica a toda la variedad) —</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label>Fecha inicio período</label>
-          <input type="date" id="bromFechaIni">
+          <input type="date" id="bromFechaIni" onchange="previewBromAsignados()">
         </div>
         <div class="form-group">
           <label>Fecha fin período</label>
-          <input type="date" id="bromFechaFin">
+          <input type="date" id="bromFechaFin" onchange="previewBromAsignados()">
         </div>
       </div>
       <!-- Parámetros -->
@@ -3510,18 +3516,23 @@ function guardarBromatologico() {
   const variedad = document.getElementById('bromVariedad').value;
   const ini = document.getElementById('bromFechaIni').value;
   const fin = document.getElementById('bromFechaFin').value;
+  const zona = document.getElementById('bromZona')?.value || '';
   if(!ini || !fin) { notif('Ingresá el rango de fechas', true); return; }
   if(ini > fin) { notif('La fecha inicio debe ser menor a la fecha fin', true); return; }
   const params = leerCamposBrom();
   if(!params.fdn) { notif('Ingresá al menos el valor de FDN', true); return; }
 
   const broms = getBromatologicos();
-  // Reemplazar si ya existe para mismo variedad+rango
-  const filtrado = broms.filter(b => !(b.variedad===variedad && b.fechaIni===ini && b.fechaFin===fin));
+  // Reemplazar si ya existe para mismo variedad+zona+rango
+  const filtrado = broms.filter(b => !(b.variedad===variedad && b.zona===(zona||undefined||'') && b.fechaIni===ini && b.fechaFin===fin));
+  const pluvios = getPluviometros();
+  const pluvio = zona ? pluvios.find(p => (p.id||p.nombre) === zona) : null;
+  const zonaNombre = pluvio ? pluvio.nombre : '';
   filtrado.unshift({
     id: uuid(),
     fecha: new Date().toISOString().split('T')[0],
-    variedad, fechaIni: ini, fechaFin: fin,
+    variedad, zona: zona||'', zonaNombre,
+    fechaIni: ini, fechaFin: fin,
     params,
     usuario: localStorage.getItem('elprado_usuario') || ''
   });
@@ -3549,11 +3560,55 @@ function getBromForRecord(rec) {
   if(!rec || !rec.fechaIng) return null;
   const variedad = (rec.variedad||'').toUpperCase();
   const broms = getBromatologicos();
+
+  // Buscar el pluviómetro asignado al potrero del registro
+  const pluvios = getPluviometros();
+  const pluvio = pluvios.find(p => (p.potreros||[]).includes(rec.potrero));
+  const zonaId = pluvio ? (pluvio.id || pluvio.nombre) : null;
+
+  // Prioridad 1: brom con zona + variedad + fecha
+  if(zonaId) {
+    const conZona = broms.find(b =>
+      b.variedad === variedad &&
+      b.zona === zonaId &&
+      rec.fechaIng >= b.fechaIni &&
+      rec.fechaIng <= b.fechaFin
+    );
+    if(conZona) return conZona;
+  }
+
+  // Prioridad 2: brom sin zona (aplica a toda la variedad) — compatibilidad con registros anteriores
   return broms.find(b =>
     b.variedad === variedad &&
+    !b.zona &&
     rec.fechaIng >= b.fechaIni &&
     rec.fechaIng <= b.fechaFin
   ) || null;
+}
+
+// Poblar selector de zonas con pluviómetros configurados
+function poblarSelectorZonas() {
+  const el = document.getElementById('bromZona');
+  if(!el) return;
+  const pluvios = getPluviometros();
+  // Mantener opción sin zona
+  el.innerHTML = '<option value="">— Sin zona (aplica a toda la variedad) —</option>';
+  pluvios.forEach((p, i) => {
+    const id = p.id || p.nombre;
+    const label = `Pluviómetro ${i+1} · ${p.nombre}`;
+    el.innerHTML += `<option value="${id}">${label}</option>`;
+  });
+}
+
+// Pre-completar fechas con el último bromatológico guardado
+function preLlenarFechasBrom() {
+  const broms = getBromatologicos();
+  if(!broms.length) return;
+  const ultimo = broms[0]; // Ya están ordenados por fecha desc
+  const elIni = document.getElementById('bromFechaIni');
+  const elFin = document.getElementById('bromFechaFin');
+  if(elIni && !elIni.value && ultimo.fechaIni) elIni.value = ultimo.fechaIni;
+  if(elFin && !elFin.value && ultimo.fechaFin) elFin.value = ultimo.fechaFin;
 }
 
 function renderBromatologicos() {
@@ -3566,14 +3621,16 @@ function renderBromatologicos() {
   }
   el.innerHTML = `<div class="tbl-wrap"><table>
     <thead><tr>
-      <th>Variedad</th><th>Período</th><th>FDN</th><th>PB</th><th>FDA</th>
-      <th>aFDNmo</th><th>Ca</th><th>P</th><th>Mg</th><th>Fecha registro</th><th></th>
+      <th>Variedad</th><th>Zona</th><th>Período</th><th>FDN</th><th>FDN Prom</th><th>PB</th><th>FDA</th>
+      <th>aFDNmo</th><th>Ca</th><th>P</th><th>Mg</th><th>Fecha reg.</th><th></th>
     </tr></thead>
     <tbody>
     ${broms.map(b => `<tr>
       <td><span class="badge ${b.variedad==='BRACHIARIA'?'badge-maq':'badge-ms'}">${b.variedad}</span></td>
+      <td style="font-size:11px;color:var(--text2);">${b.zonaNombre ? '📍 '+b.zonaNombre : '<span style="color:var(--text3);">General</span>'}</td>
       <td class="td-mono" style="font-size:11px;">${b.fechaIni} → ${b.fechaFin}</td>
       <td class="td-mono td-green" style="font-weight:700;">${b.params.fdn??'—'}</td>
+      <td class="td-mono" style="color:var(--gold2);font-weight:700;">${b.params.fdnProm??'—'}</td>
       <td class="td-mono">${b.params.pb??'—'}</td>
       <td class="td-mono">${b.params.fda??'—'}</td>
       <td class="td-mono">${b.params.afdn??'—'}</td>
@@ -4797,7 +4854,7 @@ function showPage(id) {
   if(id==='actividades') { renderStats(); }
   if(id==='plan') { renderPlan(); }
   if(id==='pedidos') { renderPedidos(); }
-  if(id==='calidad') { renderBromatologicos(); }
+  if(id==='calidad') { renderBromatologicos(); poblarSelectorZonas(); preLlenarFechasBrom(); }
   if(id==='campo') { campoIrHoy(); }
   if(id==='lluvia') {
     renderAnalisisGestion();
