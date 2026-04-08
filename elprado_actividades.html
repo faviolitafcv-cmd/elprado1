@@ -4291,7 +4291,7 @@ function abrirModalPluviometro(idx) {
     const estaEnOtro = asignadosAOtros.has(pot) && !seleccionados.includes(pot);
     return `<label style="display:flex;align-items:center;gap:5px;cursor:${estaEnOtro?'not-allowed':'pointer'};font-size:12px;padding:3px 8px;border-radius:4px;border:1px solid var(--border);background:${estaEnOtro?'rgba(80,80,80,.3)':'var(--card2)'};white-space:nowrap;opacity:${estaEnOtro?'0.4':'1'};" title="${estaEnOtro?'Ya asignado a otro pluviómetro':''}">
       <input type="checkbox" value="${pot}" ${seleccionados.includes(pot)?'checked':''} ${estaEnOtro?'disabled':''} style="width:14px;height:14px;accent-color:var(--green2);">
-      ${pot}${estaEnOtro?' <span style=\'font-size:9px;color:var(--text3);\'>✗</span>':''}
+      ${pot}
     </label>`;
   }).join('');
   document.getElementById('modalPluviometro').classList.add('open');
@@ -4401,30 +4401,42 @@ function renderAnalisisGestion() {
     <th>Total</th>
   </tr>`;
 
-  // Calcular totales por gestión/mes usando PROMEDIO de todas las lecturas del día
-  const totales = {};
+  // Agrupar igual que renderResumenLluvia: sumar lecturas por pluviómetro por mes
+  // Luego calcular promedio campo = promedio de todos los pluviómetros de ese mes
+  const grupos = {};
   lluvia.forEach(r => {
     const g = r.gestion || '';
     const mes = r.mes || '';
     if(!g || !mes) return;
-    if(!totales[g]) totales[g] = {};
-    const lects = (r.lecturas||[]).filter(l => l && parseFloat(l.mm) > 0);
-    let mmValor = 0;
-    if(lects.length > 0) {
-      mmValor = lects.reduce((s,l) => s + (parseFloat(l.mm)||0), 0) / lects.length;
-    } else if(r.mm > 0) {
-      mmValor = parseFloat(r.mm) || 0;
+    const key = g + '|' + mes;
+    if(!grupos[key]) grupos[key] = { gestion: g, mes, sumas: {} };
+    (r.lecturas||[]).forEach(l => {
+      if(!l || !l.nombre) return;
+      if(!grupos[key].sumas[l.nombre]) grupos[key].sumas[l.nombre] = 0;
+      grupos[key].sumas[l.nombre] += parseFloat(l.mm) || 0;
+    });
+    // Soporte para formato legacy (mm directo)
+    if((!r.lecturas || !r.lecturas.length) && r.mm > 0) {
+      const nombre = 'Legacy';
+      if(!grupos[key].sumas[nombre]) grupos[key].sumas[nombre] = 0;
+      grupos[key].sumas[nombre] += parseFloat(r.mm) || 0;
     }
-    if(mmValor > 0) {
-      if(!totales[g][mes]) totales[g][mes] = 0;
-      totales[g][mes] += mmValor;
+  });
+
+  // Calcular promedio campo por gestión+mes
+  const totales = {};
+  Object.values(grupos).forEach(g => {
+    if(!totales[g.gestion]) totales[g.gestion] = {};
+    const vals = Object.values(g.sumas).filter(v => v > 0);
+    if(vals.length > 0) {
+      totales[g.gestion][g.mes] = vals.reduce((s,v)=>s+v,0) / vals.length;
     }
   });
 
   const filas = GESTIONES.map(g => {
     const mesesData = totales[g] || {};
-    const vals = MESES.map(m => mesesData[m] || 0);
-    const total = vals.reduce((s,v)=>s+v, 0);
+    const vals = MESES.map(m => Math.round((mesesData[m] || 0) * 10) / 10);
+    const total = Math.round(vals.reduce((s,v)=>s+v, 0) * 10) / 10;
     const cols = vals.map(v => v > 0
       ? `<td class="td-mono" style="color:var(--blue);">${Math.round(v)}</td>`
       : `<td class="td-mono" style="color:var(--text3);">0</td>`
