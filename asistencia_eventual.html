@@ -85,18 +85,24 @@ async function fbRrhhSet(key, val) {
 async function syncRrhhFromFirebase() {
   try {
     const r = await fetch(FB_RRHH_URL + '.json');
+    if(!r.ok) {
+      console.error('syncRrhhFromFirebase: HTTP ' + r.status);
+      return false;
+    }
     const data = await r.json();
     if(data) {
       Object.entries(data).forEach(([key, val]) => {
         if(val !== null) {
-          // Guardar sin double-encoding: strings simples directo, objetos con JSON.stringify
           const stored = (typeof val === 'object') ? JSON.stringify(val) : String(val);
           _origSetItem(key, stored);
         }
       });
     }
     return true;
-  } catch(e) { return false; }
+  } catch(e) {
+    console.error('syncRrhhFromFirebase error:', e);
+    return false;
+  }
 }
 
 // Interceptar localStorage para auto-sincronizar a Firebase
@@ -111,9 +117,25 @@ localStorage.setItem = function(key, value) {
   }
 };
 
-// Sincronizar al cargar
+// Sincronizar al cargar — con indicador visible
 (async function() {
-  await syncRrhhFromFirebase();
+  const statusDiv = document.createElement('div');
+  statusDiv.id = 'fb-sync-status';
+  statusDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#1565c0;color:#fff;text-align:center;padding:6px;font-size:13px;z-index:9999;';
+  statusDiv.textContent = '⏳ Cargando datos desde Firebase...';
+  document.body.appendChild(statusDiv);
+
+  const ok = await syncRrhhFromFirebase();
+
+  if(ok) {
+    statusDiv.style.background = '#2e7d32';
+    statusDiv.textContent = '✅ Datos cargados desde Firebase';
+    setTimeout(function(){ statusDiv.remove(); }, 2500);
+  } else {
+    statusDiv.style.background = '#b71c1c';
+    statusDiv.textContent = '🔴 No se pudo cargar Firebase — trabajando con datos locales del navegador';
+    setTimeout(function(){ statusDiv.remove(); }, 6000);
+  }
 })();
 
 </script>
@@ -1323,29 +1345,59 @@ function renderTablaPrestamos() {
 // FIN GESTIÓN DE PRÉSTAMOS
 // ═══════════════════════════════════════
 
-function guardarAsistencia() {
+async function guardarAsistencia() {
     const btn = document.getElementById('btn-guardar-asist');
     if(btn) { btn.textContent = '⏳ Guardando...'; btn.disabled = true; }
 
+    // 1. Verificar conexión a Firebase antes de continuar
+    try {
+        const testR = await fetch(FB_RRHH_URL + '.json?shallow=true', { method: 'GET' });
+        if(!testR.ok) {
+            const errText = await testR.text().catch(()=>'');
+            if(btn) {
+                btn.textContent = '🔴 Sin acceso a Firebase (' + testR.status + ')';
+                btn.style.background = '#b71c1c';
+                btn.disabled = false;
+            }
+            alert('⚠️ No se puede guardar en Firebase.\n\nError ' + testR.status + ': ' + errText + '\n\nLos datos están guardados en este navegador, pero NO en la nube.\nVerificá la conexión a internet o los permisos de la base de datos.');
+            return;
+        }
+    } catch(netErr) {
+        if(btn) {
+            btn.textContent = '🔴 Sin internet';
+            btn.style.background = '#b71c1c';
+            btn.disabled = false;
+        }
+        alert('⚠️ Sin conexión a internet.\n\nLos datos están guardados en este navegador, pero NO en la nube.\nConectate a internet y volvé a guardar.');
+        return;
+    }
+
     const prefijos = ['evAsist_','evAct_','evRol_','evMoto_'];
     const promises = [];
+    let errores = 0;
 
     // Subir todas las claves de asistencia
+    const allKeys = [];
     for(let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if(!key) continue;
-        if(prefijos.some(p => key.startsWith(p))) {
-            const val = localStorage.getItem(key);
-            if(val !== null) {
-                // Guardar string directo (sin JSON.parse para evitar double-encoding)
-                promises.push(
-                    fetch(FB_RRHH_URL + '/' + key + '.json', {
-                        method: 'PUT',
-                        headers: {'Content-Type':'application/json'},
-                        body: JSON.stringify(val)
-                    }).catch(e => console.log('Error guardando ' + key, e))
-                );
-            }
+        if(key && prefijos.some(p => key.startsWith(p))) allKeys.push(key);
+    }
+
+    for(const key of allKeys) {
+        const val = localStorage.getItem(key);
+        if(val !== null) {
+            promises.push(
+                fetch(FB_RRHH_URL + '/' + key + '.json', {
+                    method: 'PUT',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify(val)
+                }).then(function(r) {
+                    if(!r.ok) { errores++; console.error('Firebase rechazó ' + key + ': HTTP ' + r.status); }
+                }).catch(function(e) {
+                    errores++;
+                    console.error('Error de red guardando ' + key, e);
+                })
+            );
         }
     }
 
@@ -1360,28 +1412,31 @@ function guardarAsistencia() {
                     method: 'PUT',
                     headers: {'Content-Type':'application/json'},
                     body: JSON.stringify(parsed)
-                }).catch(e => {})
+                }).then(function(r) {
+                    if(!r.ok) { errores++; }
+                }).catch(function() { errores++; })
             );
         }
     });
 
-    Promise.all(promises).then(function() {
-        if(btn) {
-            btn.textContent = '✅ Guardado (' + promises.length + ' claves)';
+    await Promise.all(promises);
+
+    if(btn) {
+        if(errores > 0) {
+            btn.textContent = '⚠️ ' + errores + ' errores al guardar';
+            btn.style.background = '#e65100';
+            btn.disabled = false;
+            alert('⚠️ Se guardaron ' + (promises.length - errores) + ' de ' + promises.length + ' registros en Firebase.\n' + errores + ' registros tuvieron error.\n\nRevisá la consola del navegador (F12) para ver los detalles.');
+        } else {
+            btn.textContent = '✅ Guardado en Firebase (' + promises.length + ' registros)';
             btn.style.background = '#2e7d32';
             setTimeout(function() {
                 btn.textContent = '💾 Guardar Asistencia';
                 btn.style.background = '#e65100';
                 btn.disabled = false;
-            }, 3000);
+            }, 4000);
         }
-    }).catch(function() {
-        if(btn) {
-            btn.textContent = '❌ Error — reintentá';
-            btn.style.background = '#b71c1c';
-            btn.disabled = false;
-        }
-    });
+    }
 }
 
 window.onload = init;
