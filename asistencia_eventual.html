@@ -88,7 +88,11 @@ async function syncRrhhFromFirebase() {
     const data = await r.json();
     if(data) {
       Object.entries(data).forEach(([key, val]) => {
-        if(val !== null) localStorage.setItem(key, JSON.stringify(val));
+        if(val !== null) {
+          // Guardar sin double-encoding: strings simples directo, objetos con JSON.stringify
+          const stored = (typeof val === 'object') ? JSON.stringify(val) : String(val);
+          _origSetItem(key, stored);
+        }
       });
     }
     return true;
@@ -1323,69 +1327,66 @@ function guardarAsistencia() {
     const btn = document.getElementById('btn-guardar-asist');
     if(btn) { btn.textContent = '⏳ Guardando...'; btn.disabled = true; }
 
-    // Subir todas las claves de asistencia (evAsist_*, evAct_*, evRol_*, evMoto_*)
-    let count = 0;
     const prefijos = ['evAsist_','evAct_','evRol_','evMoto_'];
+    const promises = [];
+
+    // Subir todas las claves de asistencia
     for(let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if(key && prefijos.some(p => key.startsWith(p))) {
+        if(!key) continue;
+        if(prefijos.some(p => key.startsWith(p))) {
             const val = localStorage.getItem(key);
             if(val !== null) {
-                try { fbRrhhSet(key, JSON.parse(val)); } catch(e) {
-                    try { fbRrhhSet(key, val); } catch(e2) {}
-                }
-                count++;
+                // Guardar string directo (sin JSON.parse para evitar double-encoding)
+                promises.push(
+                    fetch(FB_RRHH_URL + '/' + key + '.json', {
+                        method: 'PUT',
+                        headers: {'Content-Type':'application/json'},
+                        body: JSON.stringify(val)
+                    }).catch(e => console.log('Error guardando ' + key, e))
+                );
             }
         }
     }
+
     // También subir las claves estándar
     FB_RRHH_KEYS.forEach(function(key) {
         const val = localStorage.getItem(key);
         if(val !== null) {
-            try { fbRrhhSet(key, JSON.parse(val)); } catch(e) {}
+            let parsed;
+            try { parsed = JSON.parse(val); } catch(e) { parsed = val; }
+            promises.push(
+                fetch(FB_RRHH_URL + '/' + key + '.json', {
+                    method: 'PUT',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify(parsed)
+                }).catch(e => {})
+            );
         }
     });
 
-    setTimeout(function() {
+    Promise.all(promises).then(function() {
         if(btn) {
-            btn.textContent = '✅ Guardado';
+            btn.textContent = '✅ Guardado (' + promises.length + ' claves)';
             btn.style.background = '#2e7d32';
             setTimeout(function() {
                 btn.textContent = '💾 Guardar Asistencia';
                 btn.style.background = '#e65100';
                 btn.disabled = false;
-            }, 2500);
+            }, 3000);
         }
-    }, 1000);
+    }).catch(function() {
+        if(btn) {
+            btn.textContent = '❌ Error — reintentá';
+            btn.style.background = '#b71c1c';
+            btn.disabled = false;
+        }
+    });
 }
 
 window.onload = init;
 </script>
 <script>
-(function() {
-  var FB_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com';
-  var RRHH_KEYS = ['personalFijoDB','personalEventualDB','actividadesDB',
-    'asistFijoCierres','asistFijoPeriodoInicio','prestamosEventualDB',
-    'retirosDB','saldoOcultos','smn_prado','bonifEventualDB','quinEvCierres','gasPrecioEventualDB'];
-  function fbWrite(path, val) {
-    fetch(FB_URL + path + '.json', {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(val)}).catch(function(){});
-  }
-  var _orig = Storage.prototype.setItem;
-  Storage.prototype.setItem = function(key, value) {
-    _orig.call(this, key, value);
-    try { if(RRHH_KEYS.indexOf(key) >= 0) fbWrite('/rrhh/' + key, JSON.parse(value)); } catch(e) {}
-  };
-  window.addEventListener('load', function() {
-    fetch(FB_URL + '/rrhh.json').then(function(r){ return r.json(); }).then(function(data) {
-      if(data && typeof data === 'object') {
-        Object.keys(data).forEach(function(key) {
-          if(data[key] !== null) _orig.call(localStorage, key, JSON.stringify(data[key]));
-        });
-        if(typeof init === 'function') setTimeout(init, 200);
-      }
-    }).catch(function(){});
-  });
-})();
 </script>
 </body>
 </html>
