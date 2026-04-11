@@ -3372,16 +3372,19 @@ function parsearPDFBrom(input) {
     // Usar pdfjsLib si está disponible
     if(typeof pdfjsLib !== 'undefined') {
       pdfjsLib.getDocument(typedArray).promise.then(pdf => {
-        let textoTotal = '';
+        // Usar array indexado para garantizar orden correcto (evita race condition)
+        const textosPaginas = new Array(pdf.numPages).fill('');
         const promesas = [];
         for(let i=1; i<=pdf.numPages; i++) {
+          const idx = i - 1;
           promesas.push(pdf.getPage(i).then(page =>
             page.getTextContent().then(tc => {
-              textoTotal += tc.items.map(s=>s.str).join(' ') + ' ';
+              textosPaginas[idx] = tc.items.map(s=>s.str).join(' ') + ' ';
             })
           ));
         }
         Promise.all(promesas).then(() => {
+          const textoTotal = textosPaginas.join('');
           extraerValoresBrom(textoTotal);
           // ── Auto-detectar potrero desde PDF y seleccionar pluviómetro ──
           autoDetectarPluvioDesdeTexto(textoTotal);
@@ -3437,12 +3440,12 @@ function extraerValoresBrom(texto) {
     { patron: 'material\\s*mineral|cenizas', id: 'brom_cenizas' },
   ];
 
-  // Parsear campos normales
+  // Parsear campos normales — PDF siempre rellena (overwrite)
   campos.forEach(({patron, id}) => {
     const val = buscar(patron, textoRes);
     if(val !== null) {
       const el = document.getElementById(id);
-      if(el && !el.value) el.value = val;
+      if(el) el.value = val;
     }
   });
 
@@ -3465,7 +3468,7 @@ function extraerValoresBrom(texto) {
     const val = buscar(patron, textoMin, max);
     if(val !== null && val >= 0 && val <= max) {
       const el = document.getElementById(id);
-      if(el && !el.value) el.value = val;
+      if(el) el.value = val;
     }
   });
 
