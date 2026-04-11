@@ -3385,6 +3385,18 @@ function parsearPDFBrom(input) {
         }
         Promise.all(promesas).then(() => {
           const textoTotal = textosPaginas.join('');
+          
+          // ── DEBUG PANEL ──
+          let dbg = document.getElementById('brom-debug');
+          if(!dbg) {
+            dbg = document.createElement('div');
+            dbg.id = 'brom-debug';
+            dbg.style.cssText = 'background:#111;color:#0f0;font-family:monospace;font-size:11px;padding:10px;margin-top:10px;border-radius:6px;max-height:200px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;';
+            const formBrom = document.getElementById('bromPDFNombre');
+            if(formBrom) formBrom.parentNode.parentNode.appendChild(dbg);
+          }
+          dbg.textContent = '📄 TEXTO EXTRAÍDO (primeros 600 chars):\n' + textoTotal.substring(0,600) + '\n\n...FIN PRIMEROS 600...\n\nÚLTIMOS 300:\n' + textoTotal.slice(-300);
+          
           extraerValoresBrom(textoTotal);
           // ── Auto-detectar potrero desde PDF y seleccionar pluviómetro ──
           autoDetectarPluvioDesdeTexto(textoTotal);
