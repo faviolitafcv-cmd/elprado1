@@ -3383,6 +3383,8 @@ function parsearPDFBrom(input) {
         }
         Promise.all(promesas).then(() => {
           extraerValoresBrom(textoTotal);
+          // ── Auto-detectar potrero desde PDF y seleccionar pluviómetro ──
+          autoDetectarPluvioDesdeTexto(textoTotal);
           notif('✅ PDF leído — verificá los valores');
         });
       }).catch(() => notif('No se pudo leer el PDF automáticamente — ingresá los valores manualmente', true));
@@ -3444,35 +3446,26 @@ function extraerValoresBrom(texto) {
     }
   });
 
-  // Parsear Ca, P, Mg, K, S, Cl con estrategia específica:
-  // Buscar líneas tipo "Ca 0.92 %" — el valor DEBE ser < 10 para minerales
-  // Si pdf.js une texto, buscar el patrón: "Ca" seguido de número <= 10
+  // Parsear Ca, P, Mg, K, S, Cl — usando buscar() igual que los otros campos
+  // (tolerancia de 40 chars en lugar de 5 espacios, para manejar tablas en pdf.js)
   const minerales = [
-    {key: 'Ca', id: 'brom_ca', max: 10},
-    {key: 'P',  id: 'brom_p',  max: 10},
-    {key: 'Mg', id: 'brom_mg', max: 10},
-    {key: 'K',  id: 'brom_k',  max: 20},
-    {key: 'S',  id: 'brom_s',  max: 10},
-    {key: 'Cl', id: 'brom_cl', max: 10},
+    {patron: '\\bCa\\b', id: 'brom_ca', max: 10},
+    {patron: '\\bP\\b',  id: 'brom_p',  max: 10},
+    {patron: '\\bMg\\b', id: 'brom_mg', max: 10},
+    {patron: '\\bK\\b',  id: 'brom_k',  max: 20},
+    {patron: '\\bS\\b',  id: 'brom_s',  max: 10},
+    {patron: '\\bCl\\b', id: 'brom_cl', max: 10},
   ];
 
-  minerales.forEach(({key, id, max}) => {
-    // Buscar en textoRes: "Ca" + espacios + número <= max
-    // Usar \b para boundary, y buscar múltiples formas
-    const patterns = [
-      new RegExp('\\b' + key + '\\b\\s{0,5}(\\d+[\\.,]\\d+)\\s*%', 'i'),
-      new RegExp('\\b' + key + '\\b\\s{0,5}(\\d+)\\s*%', 'i'),
-      new RegExp('\\b' + key + '\\b[^\\d]{0,5}(\\d+[\\.,]\\d+)', 'i'),
-    ];
-    for(const re of patterns) {
-      const m = textoRes.match(re);
-      if(m) {
-        const val = parseFloat(m[1].replace(',','.'));
-        if(val >= 0 && val <= max) {
-          const el = document.getElementById(id);
-          if(el && !el.value) { el.value = val; break; }
-        }
-      }
+  // Buscamos los minerales DESPUÉS de "Material Mineral" para evitar falsos positivos
+  const idxMin = textoRes.search(/material\s*mineral|Ca\s+\d/i);
+  const textoMin = idxMin >= 0 ? textoRes.slice(idxMin) : textoRes;
+
+  minerales.forEach(({patron, id, max}) => {
+    const val = buscar(patron, textoMin, max);
+    if(val !== null && val >= 0 && val <= max) {
+      const el = document.getElementById(id);
+      if(el && !el.value) el.value = val;
     }
   });
 
@@ -3482,16 +3475,50 @@ function extraerValoresBrom(texto) {
     if(el && parseFloat(el.value) > 10) el.value = '';
   });
 
-  calcFDNPromedio();
+  // Forzar recálculo del FDN Promedio siempre (aunque los campos ya tuvieran valor)
+  calcFDNPromedio(true);
 }
 
-function calcFDNPromedio() {
-  const fdn = parseFloat(document.getElementById('brom_fdn')?.value) || 0;
-  const afdn = parseFloat(document.getElementById('brom_afdn')?.value) || 0;
+function calcFDNPromedio(forzar) {
+  const fdnEl = document.getElementById('brom_fdn');
+  const afdnEl = document.getElementById('brom_afdn');
   const el = document.getElementById('brom_fdn_prom');
-  if(!el) return;
-  if(fdn > 0 && afdn > 0) { el.value = ((fdn+afdn)/2).toFixed(2); el.style.borderColor='var(--gold2)'; }
-  else if(fdn > 0) { el.value = fdn.toFixed(2); }
+  if(!el || !fdnEl || !afdnEl) return;
+  const fdn = parseFloat(fdnEl.value) || 0;
+  const afdn = parseFloat(afdnEl.value) || 0;
+  // Si forzar=true (desde PDF) siempre recalcula; si no, solo si el campo está vacío
+  if(forzar || !el.value) {
+    if(fdn > 0 && afdn > 0) { el.value = ((fdn+afdn)/2).toFixed(2); el.style.borderColor='var(--gold2)'; }
+    else if(fdn > 0) { el.value = fdn.toFixed(2); el.style.borderColor='var(--gold2)'; }
+  }
+}
+
+// Auto-detectar potrero desde texto del PDF y seleccionar pluviómetro correspondiente
+function autoDetectarPluvioDesdeTexto(texto) {
+  // Buscar "Potrero XX" en el texto (incluyendo la sección Nota del PDF)
+  const mPotrero = texto.match(/potrero\s+([A-Z0-9\-]+)/i);
+  if(!mPotrero) return;
+  const potreroDetectado = mPotrero[1].trim().toUpperCase();
+
+  // Buscar en la lista de pluviómetros cuál tiene ese potrero asignado
+  const pluvios = getPluviometros();
+  const pluvioEncontrado = pluvios.find(p =>
+    (p.potreros || []).some(pt => pt.toUpperCase() === potreroDetectado)
+  );
+
+  if(!pluvioEncontrado) return; // Potrero no asignado todavía — no hacer nada
+
+  // Seleccionar el pluviómetro en el selector bromZona
+  const sel = document.getElementById('bromZona');
+  if(!sel) return;
+  for(let i = 0; i < sel.options.length; i++) {
+    if(sel.options[i].text.includes(pluvioEncontrado.nombre)) {
+      sel.selectedIndex = i;
+      sel.dispatchEvent(new Event('change'));
+      notif('📍 Pluviómetro auto-detectado: ' + pluvioEncontrado.nombre + ' (Potrero ' + potreroDetectado + ')');
+      return;
+    }
+  }
 }
 
 function previewBromAsignados() {
