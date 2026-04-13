@@ -105,7 +105,14 @@ async function syncRrhhFromFirebase() {
   }
 }
 
-// Interceptar localStorage para auto-sincronizar a Firebase
+// Eliminar clave de Firebase (DELETE real)
+async function fbRrhhDelete(key) {
+  try {
+    await fetch(FB_RRHH_URL + '/' + key + '.json', { method: 'DELETE' });
+  } catch(e) { console.log('FB RRHH delete error:', e); }
+}
+
+// Interceptar localStorage.setItem → auto-sync a Firebase
 const _origSetItem = localStorage.setItem.bind(localStorage);
 localStorage.setItem = function(key, value) {
   _origSetItem(key, value);
@@ -114,6 +121,16 @@ localStorage.setItem = function(key, value) {
     try { fbRrhhSet(key, JSON.parse(value)); } catch(e) {
       try { fbRrhhSet(key, value); } catch(e2) {}
     }
+  }
+};
+
+// Interceptar localStorage.removeItem → también borra en Firebase
+const _origRemoveItem = localStorage.removeItem.bind(localStorage);
+localStorage.removeItem = function(key) {
+  _origRemoveItem(key);
+  const prefijos = ['evAsist_','evAct_','evRol_','evMoto_'];
+  if(prefijos.some(function(p){ return key.startsWith(p); })) {
+    fbRrhhDelete(key);
   }
 };
 
@@ -131,6 +148,12 @@ localStorage.setItem = function(key, value) {
     statusDiv.style.background = '#2e7d32';
     statusDiv.textContent = '✅ Datos cargados desde Firebase';
     setTimeout(function(){ statusDiv.remove(); }, 2500);
+    // ── FIX: Re-renderizar tabla con los datos de Firebase ──
+    // Si init() ya corrió (window.onload), re-renderizamos con datos actualizados.
+    // Si todavía no corrió, Firebase ya está en localStorage y init() leerá datos correctos.
+    if(typeof renderTodo === 'function') {
+      renderTodo();
+    }
   } else {
     statusDiv.style.background = '#b71c1c';
     statusDiv.textContent = '🔴 No se pudo cargar Firebase — trabajando con datos locales del navegador';
