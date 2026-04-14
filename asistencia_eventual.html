@@ -1368,119 +1368,112 @@ function renderTablaPrestamos() {
 // FIN GESTIÓN DE PRÉSTAMOS
 // ═══════════════════════════════════════
 
+// ── Helper: fetch con timeout ─────────────────────────────────────────
+function fetchTimeout(url, opts, ms) {
+    var ctrl = new AbortController();
+    var t = setTimeout(function(){ ctrl.abort(); }, ms || 12000);
+    return fetch(url, Object.assign({}, opts, {signal: ctrl.signal}))
+        .finally(function(){ clearTimeout(t); });
+}
+
+// ── Enviar un lote de {key:val} a Firebase en paralelo ────────────────
+async function enviarLote(pares, erroresRef) {
+    await Promise.all(pares.map(function(par) {
+        return fetchTimeout(
+            FB_RRHH_URL + '/' + par.key + '.json',
+            { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(par.val) },
+            10000
+        ).then(function(r) {
+            if(!r.ok) { erroresRef.count++; console.error('Firebase rechazó ' + par.key + ': HTTP ' + r.status); }
+        }).catch(function(e) {
+            erroresRef.count++;
+            console.error('Error guardando ' + par.key, e.name==='AbortError' ? 'TIMEOUT' : e);
+        });
+    }));
+}
+
+// ── GUARDAR ASISTENCIA — solo quincena actual ─────────────────────────
 async function guardarAsistencia() {
     const btn = document.getElementById('btn-guardar-asist');
     if(btn) { btn.textContent = '⏳ Guardando...'; btn.disabled = true; }
 
-    // ── Helper: fetch con timeout via AbortController ──────────────────
-    function fetchTimeout(url, opts, ms) {
-        var ctrl = new AbortController();
-        var t = setTimeout(function(){ ctrl.abort(); }, ms || 12000);
-        return fetch(url, Object.assign({}, opts, {signal: ctrl.signal}))
-            .finally(function(){ clearTimeout(t); });
-    }
-
-    // ── Timer de seguridad: desbloquea el botón pase lo que pase ───────
     var safetyTimer = setTimeout(function() {
         if(btn && btn.disabled) {
             btn.textContent = '💾 Guardar Asistencia';
             btn.style.background = '#e65100';
             btn.disabled = false;
-            console.warn('guardarAsistencia: desbloqueado por timeout de seguridad');
         }
-    }, 90000);
+    }, 60000);
 
     try {
-        // 1. Test de conectividad — timeout 8 segundos
-        var testR;
+        // Test de conexión (timeout 8s)
         try {
-            testR = await fetchTimeout(FB_RRHH_URL + '.json?shallow=true', {method:'GET'}, 8000);
-        } catch(netErr) {
+            var testR = await fetchTimeout(FB_RRHH_URL + '.json?shallow=true', {method:'GET'}, 8000);
+            if(!testR.ok) throw new Error('HTTP ' + testR.status);
+        } catch(e) {
             clearTimeout(safetyTimer);
-            if(btn) { btn.textContent = '🔴 Sin internet / Firebase no responde'; btn.style.background = '#b71c1c'; btn.disabled = false; }
-            alert('⚠️ No se pudo conectar a Firebase (timeout 8s).\n\nLos datos están guardados en ESTE navegador, pero NO en la nube.\nVerificá tu conexión a internet y volvé a intentar.');
-            return;
-        }
-        if(!testR.ok) {
-            clearTimeout(safetyTimer);
-            var errText = await testR.text().catch(function(){ return ''; });
-            if(btn) { btn.textContent = '🔴 Sin acceso (' + testR.status + ')'; btn.style.background = '#b71c1c'; btn.disabled = false; }
-            alert('⚠️ Firebase rechazó la conexión.\nError ' + testR.status + ': ' + errText + '\n\nVerificá los permisos de la base de datos.');
+            if(btn) { btn.textContent = '🔴 Sin conexión'; btn.style.background = '#b71c1c'; btn.disabled = false; }
+            alert('⚠️ No se pudo conectar a Firebase.\nVerificá tu internet y volvé a intentar.\n\n(Los datos siguen guardados en este navegador)');
             return;
         }
 
-        // 2. Recolectar todas las claves a subir
+        // ── Claves de la quincena actual SOLAMENTE ────────────────────
+        var d = getDias();
         var prefijos = ['evAsist_','evAct_','evRol_','evMoto_'];
-        var allKeys = [];
-        for(var i = 0; i < localStorage.length; i++) {
-            var k = localStorage.key(i);
-            if(k && prefijos.some(function(p){ return k.startsWith(p); })) allKeys.push(k);
-        }
-        FB_RRHH_KEYS.forEach(function(k) {
-            if(localStorage.getItem(k) !== null) allKeys.push(k);
+        var personal = getPersonal();
+        var pares = [];
+
+        personal.forEach(function(p) {
+            for(var dia = d.inicio; dia <= d.fin; dia++) {
+                prefijos.forEach(function(pref) {
+                    var key = pref + p.ci + '_' + d.anio + '_' + d.mes + '_' + dia;
+                    var raw = localStorage.getItem(key);
+                    if(raw !== null) pares.push({ key: key, val: raw });
+                });
+            }
         });
 
-        var total    = allKeys.length;
-        var errores  = 0;
-        var enviados = 0;
-        var LOTE     = 10; // máximo 10 requests simultáneos por lote
+        // ── Claves estándar (personal, actividades, préstamos, cierres) ─
+        FB_RRHH_KEYS.forEach(function(k) {
+            var raw = localStorage.getItem(k);
+            if(raw !== null) {
+                var val; try { val = JSON.parse(raw); } catch(e) { val = raw; }
+                pares.push({ key: k, val: val });
+            }
+        });
 
-        // 3. Enviar en lotes para no saturar el navegador ni Firebase
-        for(var b = 0; b < allKeys.length; b += LOTE) {
-            var lote = allKeys.slice(b, b + LOTE);
+        var total    = pares.length;
+        var errores  = { count: 0 };
+        var LOTE     = 20;
 
-            // Actualizar progreso en el botón
-            if(btn) btn.textContent = '⏳ ' + Math.min(b + LOTE, total) + ' / ' + total + '...';
-
-            await Promise.all(lote.map(function(key) {
-                var raw = localStorage.getItem(key);
-                if(raw === null) return Promise.resolve();
-
-                var val;
-                if(FB_RRHH_KEYS.includes(key)) {
-                    // Claves estándar: parsear y re-serializar correctamente
-                    try { val = JSON.parse(raw); } catch(e) { val = raw; }
-                } else {
-                    // Claves de asistencia (evAsist_, evAct_, etc.): son strings simples
-                    val = raw;
-                }
-                enviados++;
-                return fetchTimeout(
-                    FB_RRHH_URL + '/' + key + '.json',
-                    { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(val) },
-                    10000
-                ).then(function(r) {
-                    if(!r.ok) { errores++; console.error('Firebase rechazó ' + key + ': HTTP ' + r.status); }
-                }).catch(function(e) {
-                    errores++;
-                    console.error('Timeout o error guardando ' + key, e.name === 'AbortError' ? 'TIMEOUT 10s' : e);
-                });
-            }));
+        for(var b = 0; b < pares.length; b += LOTE) {
+            if(btn) btn.textContent = '⏳ ' + Math.min(b + LOTE, total) + ' / ' + total;
+            await enviarLote(pares.slice(b, b + LOTE), errores);
         }
 
         clearTimeout(safetyTimer);
 
-        if(errores > 0) {
-            if(btn) { btn.textContent = '⚠️ ' + errores + ' errores al guardar'; btn.style.background = '#e65100'; btn.disabled = false; }
-            alert('⚠️ ' + (enviados - errores) + ' de ' + enviados + ' registros guardados.\n' + errores + ' fallaron (ver consola F12).\nVolvé a presionar Guardar para reintentar.');
+        if(errores.count > 0) {
+            if(btn) { btn.textContent = '⚠️ ' + errores.count + ' errores'; btn.style.background = '#e65100'; btn.disabled = false; }
+            alert('⚠️ ' + (total - errores.count) + ' de ' + total + ' registros guardados.\n' + errores.count + ' fallaron. Volvé a intentar.');
         } else {
             if(btn) {
-                btn.textContent = '✅ Guardado (' + enviados + ' registros)';
+                btn.textContent = '✅ Guardado (' + total + ')';
                 btn.style.background = '#2e7d32';
                 setTimeout(function() {
                     btn.textContent = '💾 Guardar Asistencia';
                     btn.style.background = '#e65100';
                     btn.disabled = false;
-                }, 4000);
+                }, 3500);
             }
         }
-
-    } catch(unexpectedErr) {
+    } catch(err) {
         clearTimeout(safetyTimer);
-        console.error('guardarAsistencia — error inesperado:', unexpectedErr);
-        if(btn) { btn.textContent = '⚠️ Error inesperado — intentar de nuevo'; btn.style.background = '#e65100'; btn.disabled = false; }
+        console.error('guardarAsistencia error:', err);
+        if(btn) { btn.textContent = '⚠️ Error — intentar de nuevo'; btn.style.background = '#e65100'; btn.disabled = false; }
     }
 }
+
 
 window.onload = init;
 </script>
