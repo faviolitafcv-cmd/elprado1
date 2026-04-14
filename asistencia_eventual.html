@@ -124,15 +124,9 @@ localStorage.setItem = function(key, value) {
   }
 };
 
-// Interceptar localStorage.removeItem → también borra en Firebase
-const _origRemoveItem = localStorage.removeItem.bind(localStorage);
-localStorage.removeItem = function(key) {
-  _origRemoveItem(key);
-  const prefijos = ['evAsist_','evAct_','evRol_','evMoto_'];
-  if(prefijos.some(function(p){ return key.startsWith(p); })) {
-    fbRrhhDelete(key);
-  }
-};
+// NOTA: removeItem NO se sincroniza a Firebase intencionalmente.
+// Los removes siempre van seguidos de setItem para la misma clave,
+// y un DELETE async puede llegar DESPUÉS del SET y borrar el dato.
 
 // Sincronizar al cargar — con indicador visible
 (async function() {
