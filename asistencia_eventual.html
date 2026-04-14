@@ -91,8 +91,13 @@ async function syncRrhhFromFirebase() {
     }
     const data = await r.json();
     if(data) {
+      const asistPrefijos = ['evAsist_','evAct_','evRol_','evMoto_'];
       Object.entries(data).forEach(([key, val]) => {
         if(val !== null) {
+          const esAsistencia = asistPrefijos.some(function(p){ return key.startsWith(p); });
+          // Claves de asistencia: solo cargar si NO existen en localStorage
+          // (localStorage es fuente de verdad — no pisamos cambios locales)
+          if(esAsistencia && localStorage.getItem(key) !== null) return;
           const stored = (typeof val === 'object') ? JSON.stringify(val) : String(val);
           _origSetItem(key, stored);
         }
@@ -140,14 +145,10 @@ localStorage.setItem = function(key, value) {
 
   if(ok) {
     statusDiv.style.background = '#2e7d32';
-    statusDiv.textContent = '✅ Datos cargados desde Firebase';
-    setTimeout(function(){ statusDiv.remove(); }, 2500);
-    // ── FIX: Re-renderizar tabla con los datos de Firebase ──
-    // Si init() ya corrió (window.onload), re-renderizamos con datos actualizados.
-    // Si todavía no corrió, Firebase ya está en localStorage y init() leerá datos correctos.
-    if(typeof renderTodo === 'function') {
-      renderTodo();
-    }
+    statusDiv.textContent = '✅ Datos sincronizados';
+    setTimeout(function(){ statusDiv.remove(); }, 2000);
+    // renderTodo() NO se llama aquí intencionalmente.
+    // El sync solo carga datos faltantes; init() ya renderizó con datos locales correctos.
   } else {
     statusDiv.style.background = '#b71c1c';
     statusDiv.textContent = '🔴 No se pudo cargar Firebase — trabajando con datos locales del navegador';
