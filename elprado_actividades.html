@@ -3514,34 +3514,32 @@ function extraerValoresBrom(texto) {
     }
   });
 
-  // Parsear Ca, P, Mg, K, S, Cl — usando buscar() igual que los otros campos
-  // (tolerancia de 40 chars en lugar de 5 espacios, para manejar tablas en pdf.js)
-  const minerales = [
-    {patron: '\\bCa\\b', id: 'brom_ca', max: 10},
-    {patron: '\\bP\\b',  id: 'brom_p',  max: 10},
-    {patron: '\\bMg\\b', id: 'brom_mg', max: 10},
-    {patron: '\\bK\\b',  id: 'brom_k',  max: 20},
-    {patron: '\\bS\\b',  id: 'brom_s',  max: 10},
-    {patron: '\\bCl\\b', id: 'brom_cl', max: 10},
+  // Parsear Ca, P, Mg, K, S, Cl — método directo sobre texto completo
+  // Busca "Ca" seguido de espacio(s) y número, en cualquier parte del texto
+  function extraerMineral(nombre, textoCompleto, maxVal) {
+    // Patron: nombre del mineral + espacios + numero decimal o entero
+    const re = new RegExp('(?:^|[\\s%])' + nombre + '\\s+(\\d+[\\.,]\\d+|\\d+)(?:\\s*%|\\s|$)', 'im');
+    const m = textoCompleto.match(re);
+    if(!m) return null;
+    const val = parseFloat(m[1].replace(',','.'));
+    return (val >= 0 && val <= maxVal) ? val : null;
+  }
+
+  const mineralesDirectos = [
+    {nombre: 'Ca',  id: 'brom_ca', max: 10},
+    {nombre: 'P',   id: 'brom_p',  max: 10},
+    {nombre: 'Mg',  id: 'brom_mg', max: 10},
+    {nombre: 'K',   id: 'brom_k',  max: 20},
+    {nombre: 'S',   id: 'brom_s',  max: 10},
+    {nombre: 'Cl',  id: 'brom_cl', max: 10},
   ];
 
-  // Buscamos los minerales en el TEXTO COMPLETO (no solo desde Resultados)
-  // porque a veces la página 2 llega antes que la página 1
-  const idxMin = t.search(/material\s*mineral/i);
-  const textoMin = idxMin >= 0 ? t.slice(idxMin) : t;
-
-  minerales.forEach(({patron, id, max}) => {
-    const val = buscar(patron, textoMin, max);
-    if(val !== null && val >= 0 && val <= max) {
+  mineralesDirectos.forEach(({nombre, id, max}) => {
+    const val = extraerMineral(nombre, t, max);
+    if(val !== null) {
       const el = document.getElementById(id);
       if(el) el.value = val;
     }
-  });
-
-  // Limpiar cualquier valor absurdo que pudo haber quedado
-  ['brom_ca','brom_p','brom_s'].forEach(id => {
-    const el = document.getElementById(id);
-    if(el && parseFloat(el.value) > 10) el.value = '';
   });
 
   // Forzar recálculo del FDN Promedio siempre (aunque los campos ya tuvieran valor)
