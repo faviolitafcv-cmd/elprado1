@@ -3491,7 +3491,7 @@ function extraerValoresBrom(texto) {
 
   // Helper: buscar parámetro en texto, con sanity check (0-100)
   function buscar(patron, texto, maxVal) {
-    const re = new RegExp(patron + '[\\s\\S]{0,40}?' + NUM, 'i');
+    const re = new RegExp('(?:' + patron + ')[\\s\\S]{0,40}?' + NUM, 'i');
     const m = texto.match(re);
     if(!m) return null;
     const val = parseFloat(m[1].replace(',','.'));
