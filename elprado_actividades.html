@@ -3443,13 +3443,6 @@ function parsearPDFBrom(input) {
         }
         Promise.all(promesas).then(() => {
           const textoTotal = textosPaginas.join('');
-          // DIAGNÓSTICO TEMPORAL
-          const t2 = textoTotal.replace(/\r/g,'').replace(/\t/g,' ');
-          const idxRes2 = t2.search(/result[a-z]*\s*:/i);
-          const textoRes2 = idxRes2 >= 0 ? t2.slice(idxRes2) : t2;
-          const idxMin2 = textoRes2.search(/material\s*mineral|Ca\s+\d/i);
-          const textoMin2 = idxMin2 >= 0 ? textoRes2.slice(idxMin2, idxMin2+200) : 'NO ENCONTRADO';
-          alert('🔍 DIAGNÓSTICO PDF:\n\nPáginas: ' + pdf.numPages + '\nTotal chars: ' + textoTotal.length + '\n\nResultados pos: ' + idxRes2 + '\nMaterial Mineral pos: ' + idxMin2 + '\n\nTexto minerales:\n' + textoMin2);
           extraerValoresBrom(textoTotal);
           // ── Auto-detectar potrero desde PDF y seleccionar pluviómetro ──
           autoDetectarPluvioDesdeTexto(textoTotal);
@@ -3534,13 +3527,33 @@ function extraerValoresBrom(texto) {
       const val = parseFloat(palabras[i+1].replace(',','.'));
       if(!isNaN(val) && val >= 0 && val <= mineral.max) {
         const el = document.getElementById(mineral.id);
-        if(el) el.value = val;
+        if(el) {
+          el.value = val;
+          el.dispatchEvent(new Event('input', {bubbles:true}));
+        }
       }
     }
   }
 
-  // Forzar recálculo del FDN Promedio siempre (aunque los campos ya tuvieran valor)
-  calcFDNPromedio(true);
+  // Calcular FDN Promedio directamente (sin depender de calcFDNPromedio)
+  setTimeout(function() {
+    const fdnEl2 = document.getElementById('brom_fdn');
+    const afdnEl2 = document.getElementById('brom_afdn');
+    const promEl = document.getElementById('brom_fdn_prom');
+    if(fdnEl2 && afdnEl2 && promEl) {
+      const fdn2 = parseFloat(fdnEl2.value) || 0;
+      const afdn2 = parseFloat(afdnEl2.value) || 0;
+      if(fdn2 > 0 && afdn2 > 0) {
+        promEl.value = ((fdn2 + afdn2) / 2).toFixed(2);
+        promEl.style.borderColor = 'var(--gold2)';
+      } else if(fdn2 > 0) {
+        promEl.value = fdn2.toFixed(2);
+        promEl.style.borderColor = 'var(--gold2)';
+      }
+    }
+    // También disparar recálculo vía función existente
+    calcFDNPromedio(true);
+  }, 200);
 }
 
 function calcFDNPromedio(forzar) {
