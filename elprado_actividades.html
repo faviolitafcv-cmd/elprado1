@@ -3443,6 +3443,13 @@ function parsearPDFBrom(input) {
         }
         Promise.all(promesas).then(() => {
           const textoTotal = textosPaginas.join('');
+          // DIAGNÓSTICO TEMPORAL
+          const t2 = textoTotal.replace(/\r/g,'').replace(/\t/g,' ');
+          const idxRes2 = t2.search(/result[a-z]*\s*:/i);
+          const textoRes2 = idxRes2 >= 0 ? t2.slice(idxRes2) : t2;
+          const idxMin2 = textoRes2.search(/material\s*mineral|Ca\s+\d/i);
+          const textoMin2 = idxMin2 >= 0 ? textoRes2.slice(idxMin2, idxMin2+200) : 'NO ENCONTRADO';
+          alert('🔍 DIAGNÓSTICO PDF:\n\nPáginas: ' + pdf.numPages + '\nTotal chars: ' + textoTotal.length + '\n\nResultados pos: ' + idxRes2 + '\nMaterial Mineral pos: ' + idxMin2 + '\n\nTexto minerales:\n' + textoMin2);
           extraerValoresBrom(textoTotal);
           // ── Auto-detectar potrero desde PDF y seleccionar pluviómetro ──
           autoDetectarPluvioDesdeTexto(textoTotal);
