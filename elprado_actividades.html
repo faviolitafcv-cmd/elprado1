@@ -3447,6 +3447,28 @@ function parsearPDFBrom(input) {
           // ── Auto-detectar potrero desde PDF y seleccionar pluviómetro ──
           autoDetectarPluvioDesdeTexto(textoTotal);
           notif('✅ PDF leído — verificá los valores');
+          // Panel de verificación visual
+          setTimeout(function() {
+            const ca = document.getElementById('brom_ca')?.value || '?';
+            const p  = document.getElementById('brom_p')?.value  || '?';
+            const mg = document.getElementById('brom_mg')?.value || '?';
+            const k  = document.getElementById('brom_k')?.value  || '?';
+            const fdn = document.getElementById('brom_fdn')?.value || '?';
+            const afdn = document.getElementById('brom_afdn')?.value || '?';
+            const prom = document.getElementById('brom_fdn_prom')?.value || '?';
+            let panel = document.getElementById('_bromDebug');
+            if(!panel) {
+              panel = document.createElement('div');
+              panel.id = '_bromDebug';
+              panel.style.cssText = 'position:fixed;top:60px;right:10px;background:#1a3320;border:2px solid #4ab63a;border-radius:8px;padding:12px 16px;z-index:99999;font-size:12px;color:#7de06a;font-family:monospace;';
+              document.body.appendChild(panel);
+            }
+            panel.innerHTML = '<strong style="color:#fff">🔬 VALORES EXTRAÍDOS DEL PDF:</strong><br>' +
+              'FDN: ' + fdn + ' | aFDNmo: ' + afdn + ' | FDN Prom: ' + prom + '<br>' +
+              'Ca: ' + ca + ' | P: ' + p + ' | Mg: ' + mg + ' | K: ' + k + '<br>' +
+              '<span style="font-size:10px;color:#aaa">Cerrá este panel haciendo clic aquí</span>';
+            panel.onclick = function() { panel.remove(); };
+          }, 500);
         });
       }).catch(() => notif('No se pudo leer el PDF automáticamente — ingresá los valores manualmente', true));
     } else {
