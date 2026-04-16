@@ -3505,9 +3505,9 @@ function extraerValoresBrom(texto) {
     { patron: 'material\\s*mineral|cenizas', id: 'brom_cenizas' },
   ];
 
-  // Parsear campos normales — PDF siempre rellena (overwrite)
+  // Parsear campos normales — buscar en texto completo para manejar páginas fuera de orden
   campos.forEach(({patron, id}) => {
-    const val = buscar(patron, textoRes);
+    const val = buscar(patron, t);
     if(val !== null) {
       const el = document.getElementById(id);
       if(el) el.value = val;
@@ -3525,9 +3525,10 @@ function extraerValoresBrom(texto) {
     {patron: '\\bCl\\b', id: 'brom_cl', max: 10},
   ];
 
-  // Buscamos los minerales DESPUÉS de "Material Mineral" para evitar falsos positivos
-  const idxMin = textoRes.search(/material\s*mineral|Ca\s+\d/i);
-  const textoMin = idxMin >= 0 ? textoRes.slice(idxMin) : textoRes;
+  // Buscamos los minerales en el TEXTO COMPLETO (no solo desde Resultados)
+  // porque a veces la página 2 llega antes que la página 1
+  const idxMin = t.search(/material\s*mineral/i);
+  const textoMin = idxMin >= 0 ? t.slice(idxMin) : t;
 
   minerales.forEach(({patron, id, max}) => {
     const val = buscar(patron, textoMin, max);
