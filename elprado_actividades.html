@@ -1363,6 +1363,14 @@ tr:hover td { background: rgba(255,255,255,.02); }
 
 <!-- ════════════════ CAMPO ════════════════ -->
 <div class="page" id="page-campo">
+  <!-- Alertas del capataz -->
+  <div class="card" id="capAlertasCard" style="display:none;">
+    <div class="card-title"><span>🔔</span> Modificaciones del Capataz
+      <button class="btn btn-secondary btn-sm" style="margin-left:auto;" onclick="limpiarCapAlerts()">Limpiar</button>
+    </div>
+    <div id="capAlertasAdmin"></div>
+  </div>
+
   <div class="card">
     <div class="card-title">
       <span>📍</span> Estado del Campo
@@ -1705,7 +1713,7 @@ async function fbSet(key, val) {
 }
 
 async function pushAllToFirebase() {
-  const keys = ['actividades','grupos','vaqueros','plan','pedidos','pluviometros','lluvia','bromatologicos','potreroAreas','potreroConfig','finVuelta'];
+  const keys = ['actividades','grupos','vaqueros','plan','pedidos','pluviometros','lluvia','bromatologicos','potreroAreas','potreroConfig','finVuelta','capAlerts'];
   let count = 0;
   for(const key of keys) {
     const val = getData(key, null);
@@ -2315,6 +2323,31 @@ function renderMetricasHA() {
 }
 
 // ─── FIN MÉTRICAS HA ───
+
+// ─── ALERTAS CAPATAZ ───
+function renderCapAlertasAdmin() {
+  const el = document.getElementById('capAlertasAdmin');
+  const card = document.getElementById('capAlertasCard');
+  if(!el || !card) return;
+  const alertas = getData('capAlerts', []);
+  if(!alertas.length) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  el.innerHTML = alertas.slice(0,10).map(a => `
+    <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+      <span style="font-size:20px;">✏️</span>
+      <div style="flex:1;">
+        <div style="font-size:12px;font-weight:700;color:var(--gold2);">${a.quien||'Capataz'} — ${a.desc||''}</div>
+        <div style="font-size:11px;color:var(--text3);">${new Date(a.ts).toLocaleString('es-BO')}</div>
+      </div>
+    </div>`).join('');
+}
+function limpiarCapAlerts() {
+  if(!confirm('¿Eliminar todas las alertas del capataz?')) return;
+  setData('capAlerts', []);
+  fbSet('capAlerts', []);
+  renderCapAlertasAdmin();
+}
+
 
 function validarParcelaDuplicada(potrero, lote, parcela, fechaIng, editId) {
   const acts = getActividades().filter(a =>
@@ -3339,17 +3372,34 @@ function parsearPDFBrom(input) {
     // Usar pdfjsLib si está disponible
     if(typeof pdfjsLib !== 'undefined') {
       pdfjsLib.getDocument(typedArray).promise.then(pdf => {
-        let textoTotal = '';
+        // Usar array indexado para garantizar orden correcto (evita race condition)
+        const textosPaginas = new Array(pdf.numPages).fill('');
         const promesas = [];
         for(let i=1; i<=pdf.numPages; i++) {
+          const idx = i - 1;
           promesas.push(pdf.getPage(i).then(page =>
             page.getTextContent().then(tc => {
-              textoTotal += tc.items.map(s=>s.str).join(' ') + ' ';
+              textosPaginas[idx] = tc.items.map(s=>s.str).join(' ') + ' ';
             })
           ));
         }
         Promise.all(promesas).then(() => {
+          const textoTotal = textosPaginas.join('');
+          
+          // ── DEBUG PANEL ──
+          let dbg = document.getElementById('brom-debug');
+          if(!dbg) {
+            dbg = document.createElement('div');
+            dbg.id = 'brom-debug';
+            dbg.style.cssText = 'background:#111;color:#0f0;font-family:monospace;font-size:11px;padding:10px;margin-top:10px;border-radius:6px;max-height:200px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;';
+            const formBrom = document.getElementById('bromPDFNombre');
+            if(formBrom) formBrom.parentNode.parentNode.appendChild(dbg);
+          }
+          dbg.textContent = '📄 TEXTO EXTRAÍDO (primeros 600 chars):\n' + textoTotal.substring(0,600) + '\n\n...FIN PRIMEROS 600...\n\nÚLTIMOS 300:\n' + textoTotal.slice(-300);
+          
           extraerValoresBrom(textoTotal);
+          // ── Auto-detectar potrero desde PDF y seleccionar pluviómetro ──
+          autoDetectarPluvioDesdeTexto(textoTotal);
           notif('✅ PDF leído — verificá los valores');
         });
       }).catch(() => notif('No se pudo leer el PDF automáticamente — ingresá los valores manualmente', true));
@@ -3402,44 +3452,35 @@ function extraerValoresBrom(texto) {
     { patron: 'material\\s*mineral|cenizas', id: 'brom_cenizas' },
   ];
 
-  // Parsear campos normales
+  // Parsear campos normales — PDF siempre rellena (overwrite)
   campos.forEach(({patron, id}) => {
     const val = buscar(patron, textoRes);
     if(val !== null) {
       const el = document.getElementById(id);
-      if(el && !el.value) el.value = val;
+      if(el) el.value = val;
     }
   });
 
-  // Parsear Ca, P, Mg, K, S, Cl con estrategia específica:
-  // Buscar líneas tipo "Ca 0.92 %" — el valor DEBE ser < 10 para minerales
-  // Si pdf.js une texto, buscar el patrón: "Ca" seguido de número <= 10
+  // Parsear Ca, P, Mg, K, S, Cl — usando buscar() igual que los otros campos
+  // (tolerancia de 40 chars en lugar de 5 espacios, para manejar tablas en pdf.js)
   const minerales = [
-    {key: 'Ca', id: 'brom_ca', max: 10},
-    {key: 'P',  id: 'brom_p',  max: 10},
-    {key: 'Mg', id: 'brom_mg', max: 10},
-    {key: 'K',  id: 'brom_k',  max: 20},
-    {key: 'S',  id: 'brom_s',  max: 10},
-    {key: 'Cl', id: 'brom_cl', max: 10},
+    {patron: '\\bCa\\b', id: 'brom_ca', max: 10},
+    {patron: '\\bP\\b',  id: 'brom_p',  max: 10},
+    {patron: '\\bMg\\b', id: 'brom_mg', max: 10},
+    {patron: '\\bK\\b',  id: 'brom_k',  max: 20},
+    {patron: '\\bS\\b',  id: 'brom_s',  max: 10},
+    {patron: '\\bCl\\b', id: 'brom_cl', max: 10},
   ];
 
-  minerales.forEach(({key, id, max}) => {
-    // Buscar en textoRes: "Ca" + espacios + número <= max
-    // Usar \b para boundary, y buscar múltiples formas
-    const patterns = [
-      new RegExp('\\b' + key + '\\b\\s{0,5}(\\d+[\\.,]\\d+)\\s*%', 'i'),
-      new RegExp('\\b' + key + '\\b\\s{0,5}(\\d+)\\s*%', 'i'),
-      new RegExp('\\b' + key + '\\b[^\\d]{0,5}(\\d+[\\.,]\\d+)', 'i'),
-    ];
-    for(const re of patterns) {
-      const m = textoRes.match(re);
-      if(m) {
-        const val = parseFloat(m[1].replace(',','.'));
-        if(val >= 0 && val <= max) {
-          const el = document.getElementById(id);
-          if(el && !el.value) { el.value = val; break; }
-        }
-      }
+  // Buscamos los minerales DESPUÉS de "Material Mineral" para evitar falsos positivos
+  const idxMin = textoRes.search(/material\s*mineral|Ca\s+\d/i);
+  const textoMin = idxMin >= 0 ? textoRes.slice(idxMin) : textoRes;
+
+  minerales.forEach(({patron, id, max}) => {
+    const val = buscar(patron, textoMin, max);
+    if(val !== null && val >= 0 && val <= max) {
+      const el = document.getElementById(id);
+      if(el) el.value = val;
     }
   });
 
@@ -3449,16 +3490,50 @@ function extraerValoresBrom(texto) {
     if(el && parseFloat(el.value) > 10) el.value = '';
   });
 
-  calcFDNPromedio();
+  // Forzar recálculo del FDN Promedio siempre (aunque los campos ya tuvieran valor)
+  calcFDNPromedio(true);
 }
 
-function calcFDNPromedio() {
-  const fdn = parseFloat(document.getElementById('brom_fdn')?.value) || 0;
-  const afdn = parseFloat(document.getElementById('brom_afdn')?.value) || 0;
+function calcFDNPromedio(forzar) {
+  const fdnEl = document.getElementById('brom_fdn');
+  const afdnEl = document.getElementById('brom_afdn');
   const el = document.getElementById('brom_fdn_prom');
-  if(!el) return;
-  if(fdn > 0 && afdn > 0) { el.value = ((fdn+afdn)/2).toFixed(2); el.style.borderColor='var(--gold2)'; }
-  else if(fdn > 0) { el.value = fdn.toFixed(2); }
+  if(!el || !fdnEl || !afdnEl) return;
+  const fdn = parseFloat(fdnEl.value) || 0;
+  const afdn = parseFloat(afdnEl.value) || 0;
+  // Si forzar=true (desde PDF) siempre recalcula; si no, solo si el campo está vacío
+  if(forzar || !el.value) {
+    if(fdn > 0 && afdn > 0) { el.value = ((fdn+afdn)/2).toFixed(2); el.style.borderColor='var(--gold2)'; }
+    else if(fdn > 0) { el.value = fdn.toFixed(2); el.style.borderColor='var(--gold2)'; }
+  }
+}
+
+// Auto-detectar potrero desde texto del PDF y seleccionar pluviómetro correspondiente
+function autoDetectarPluvioDesdeTexto(texto) {
+  // Buscar "Potrero XX" en el texto (incluyendo la sección Nota del PDF)
+  const mPotrero = texto.match(/potrero\s+([A-Z0-9\-]+)/i);
+  if(!mPotrero) return;
+  const potreroDetectado = mPotrero[1].trim().toUpperCase();
+
+  // Buscar en la lista de pluviómetros cuál tiene ese potrero asignado
+  const pluvios = getPluviometros();
+  const pluvioEncontrado = pluvios.find(p =>
+    (p.potreros || []).some(pt => pt.toUpperCase() === potreroDetectado)
+  );
+
+  if(!pluvioEncontrado) return; // Potrero no asignado todavía — no hacer nada
+
+  // Seleccionar el pluviómetro en el selector bromZona
+  const sel = document.getElementById('bromZona');
+  if(!sel) return;
+  for(let i = 0; i < sel.options.length; i++) {
+    if(sel.options[i].text.includes(pluvioEncontrado.nombre)) {
+      sel.selectedIndex = i;
+      sel.dispatchEvent(new Event('change'));
+      notif('📍 Pluviómetro auto-detectado: ' + pluvioEncontrado.nombre + ' (Potrero ' + potreroDetectado + ')');
+      return;
+    }
+  }
 }
 
 function previewBromAsignados() {
@@ -4885,7 +4960,7 @@ function showPage(id) {
   if(id==='plan') { renderPlan(); }
   if(id==='pedidos') { renderPedidos(); }
   if(id==='calidad') { renderBromatologicos(); poblarSelectorZonas(); preLlenarFechasBrom(); }
-  if(id==='campo') { campoIrHoy(); }
+  if(id==='campo') { campoIrHoy(); renderCapAlertasAdmin(); }
   if(id==='lluvia') {
     renderAnalisisGestion();
     renderResumenLluvia();
