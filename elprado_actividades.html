@@ -1693,7 +1693,7 @@ const NO_CUENTA_DESCANSO = ['SIEMBRA'];
 // ═══════════════════════════════════════
 // FIREBASE CONFIG
 // ═══════════════════════════════════════
-const FB_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com/elprado';
+const FB_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com/elprado1';
 
 async function fbGet(key) {
   try {
@@ -5713,7 +5713,7 @@ function borrarSeleccionados() {
     });
     
     // Bajar datos PASTURAS (prefijo elprado_)
-    fbRead('/elprado', function(data) {
+    fbRead('/elprado1', function(data) {
       if(data && typeof data === 'object') {
         Object.keys(data).forEach(function(key) {
           if(data[key] !== null && key !== 'usuario') {
