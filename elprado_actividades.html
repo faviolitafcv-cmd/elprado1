@@ -1726,13 +1726,71 @@ async function pushAllToFirebase() {
 }
 
 async function subirAFirebase() {
-  const btn = event.target;
-  btn.textContent = '⏳ Subiendo...';
-  btn.disabled = true;
+  const actLocal = getActividades();
+  const nLocal = actLocal.length;
+
+  // 1. Verificar cuántos registros hay en Firebase
+  let nFirebase = 0;
+  try {
+    const r = await fetch(FB_URL + '/actividades.json?shallow=true');
+    const data = await r.json();
+    if(data) nFirebase = Array.isArray(data) ? data.length : Object.keys(data).length;
+  } catch(e) {}
+
+  // 2. Advertencia si va a subir MENOS datos que los que hay en Firebase
+  if(nLocal < nFirebase) {
+    const ok = confirm(
+      '⚠️ ADVERTENCIA IMPORTANTE ⚠️\n\n' +
+      'Estás a punto de subir a Firebase:\n' +
+      '  📱 Esta pantalla tiene: ' + nLocal + ' registros\n' +
+      '  ☁️ Firebase tiene ahora: ' + nFirebase + ' registros\n\n' +
+      '⛔ Si continuás, Firebase va a quedar con MENOS datos.\n' +
+      'Esto puede borrar registros que otros usuarios cargaron.\n\n' +
+      '¿Estás SEGURA de que querés continuar?'
+    );
+    if(!ok) return;
+    const ok2 = confirm(
+      '🔴 SEGUNDA CONFIRMACIÓN 🔴\n\n' +
+      'Se van a perder ' + (nFirebase - nLocal) + ' registros de Firebase.\n\n' +
+      '¿Confirmás que querés sobreescribir Firebase con ' + nLocal + ' registros?'
+    );
+    if(!ok2) return;
+  } else {
+    const ok = confirm(
+      '☁️ Subir datos a Firebase\n\n' +
+      '  📱 Esta pantalla tiene: ' + nLocal + ' registros\n' +
+      '  ☁️ Firebase tiene ahora: ' + nFirebase + ' registros\n\n' +
+      '¿Confirmás la sincronización?'
+    );
+    if(!ok) return;
+  }
+
+  // 3. Hacer backup automático ANTES de subir
+  try {
+    const backupData = {
+      fecha: new Date().toISOString(),
+      actividades: actLocal,
+      grupos: getData('grupos', []),
+      plan: getData('plan', [])
+    };
+    const blob = new Blob([JSON.stringify(backupData, null, 2)], {type: 'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'backup_elprado.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    await new Promise(r => setTimeout(r, 500));
+  } catch(e) { console.log('Backup error:', e); }
+
+  // 4. Subir a Firebase
+  const btn = document.querySelector('[onclick="subirAFirebase()"]');
+  if(btn) { btn.textContent = '⏳ Subiendo...'; btn.disabled = true; }
   const count = await pushAllToFirebase();
-  btn.textContent = '✅ Datos subidos a Firebase';
-  setTimeout(()=>{ btn.textContent='☁ Subir todos mis datos a Firebase'; btn.disabled=false; }, 3000);
-  notif('✓ Datos sincronizados con Firebase correctamente');
+  if(btn) {
+    btn.textContent = '✅ Datos subidos a Firebase';
+    setTimeout(()=>{ btn.textContent='☁ Subir todos mis datos a Firebase'; btn.disabled=false; }, 3000);
+  }
+  notif('✓ Backup descargado y datos sincronizados con Firebase (' + nLocal + ' registros)');
 }
 
 async function syncFromFirebase() {
@@ -3385,18 +3443,6 @@ function parsearPDFBrom(input) {
         }
         Promise.all(promesas).then(() => {
           const textoTotal = textosPaginas.join('');
-          
-          // ── DEBUG PANEL ──
-          let dbg = document.getElementById('brom-debug');
-          if(!dbg) {
-            dbg = document.createElement('div');
-            dbg.id = 'brom-debug';
-            dbg.style.cssText = 'background:#111;color:#0f0;font-family:monospace;font-size:11px;padding:10px;margin-top:10px;border-radius:6px;max-height:200px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;';
-            const formBrom = document.getElementById('bromPDFNombre');
-            if(formBrom) formBrom.parentNode.parentNode.appendChild(dbg);
-          }
-          dbg.textContent = '📄 TEXTO EXTRAÍDO (primeros 600 chars):\n' + textoTotal.substring(0,600) + '\n\n...FIN PRIMEROS 600...\n\nÚLTIMOS 300:\n' + textoTotal.slice(-300);
-          
           extraerValoresBrom(textoTotal);
           // ── Auto-detectar potrero desde PDF y seleccionar pluviómetro ──
           autoDetectarPluvioDesdeTexto(textoTotal);
@@ -5723,74 +5769,7 @@ function borrarSeleccionados() {
       }
     });
 
-    // Botón flotante para subida manual (primera vez)
-    var btn = document.createElement('button');
-    btn.id = 'btnFbUpload';
-    btn.innerHTML = '&#x2601; Subir a Firebase';
-    btn.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:99999;' +
-      'background:#e67e22;color:white;border:none;padding:10px 16px;' +
-      'border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;' +
-      'box-shadow:0 2px 8px rgba(0,0,0,.3);';
-    btn.onclick = function() {
-      btn.innerHTML = '&#x23F3; Subiendo...';
-      btn.disabled = true;
-      // Subir RRHH
-      RRHH_KEYS.forEach(function(key) {
-        var v = localStorage.getItem(key);
-        if(v) { try { fbWrite('/rrhh/' + key, JSON.parse(v)); } catch(e){} }
-      });
-      // Subir PASTURAS
-      Object.keys(localStorage).forEach(function(key) {
-        if(key.indexOf('elprado_') === 0 && key !== 'elprado_usuario') {
-          var subkey = key.replace('elprado_','');
-          var v = localStorage.getItem(key);
-          if(v) { try { fbWrite('/elprado1/' + subkey, JSON.parse(v)); } catch(e){} }
-        }
-      });
-      setTimeout(function() {
-        btn.innerHTML = '&#x2705; Subido!';
-        setTimeout(function() {
-          btn.innerHTML = '&#x2601; Subir a Firebase';
-          btn.disabled = false;
-        }, 3000);
-      }, 2000);
-    };
-
-    // ── Botón diagnóstico Firebase ──
-    var btnDiag = document.createElement('button');
-    btnDiag.innerHTML = '🔍 Diagnóstico Firebase';
-    btnDiag.style.cssText = 'position:fixed;bottom:56px;right:16px;z-index:99999;' +
-      'background:#1565c0;color:white;border:none;padding:8px 14px;' +
-      'border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;' +
-      'box-shadow:0 2px 8px rgba(0,0,0,.3);';
-    btnDiag.onclick = function() {
-      btnDiag.innerHTML = '⏳ Leyendo...';
-      // Leer /elprado1/actividades
-      fetch('https://elprado1-153ef-default-rtdb.firebaseio.com/elprado1/actividades.json')
-        .then(function(r){ return r.json(); })
-        .then(function(data) {
-          var n = data ? (Array.isArray(data) ? data.length : Object.keys(data).length) : 0;
-          // Leer /elprado/actividades también
-          return fetch('https://elprado1-153ef-default-rtdb.firebaseio.com/elprado/actividades.json')
-            .then(function(r2){ return r2.json(); })
-            .then(function(data2) {
-              var n2 = data2 ? (Array.isArray(data2) ? data2.length : Object.keys(data2).length) : 0;
-              var local = JSON.parse(localStorage.getItem('elprado_actividades')||'[]').length;
-              alert('📊 DIAGNÓSTICO FIREBASE:\n\n' +
-                '🔵 /elprado1/actividades: ' + n + ' registros\n' +
-                '🟡 /elprado/actividades: ' + n2 + ' registros\n' +
-                '💾 localStorage: ' + local + ' registros\n\n' +
-                (n2 > n ? '⚠️ Los datos están en /elprado/ — presioná "Subir a Firebase" para moverlos a /elprado1/' : 
-                 n > 0 ? '✅ Datos en /elprado1/ correctamente' : '❌ No hay datos en Firebase'));
-              btnDiag.innerHTML = '🔍 Diagnóstico Firebase';
-            });
-        }).catch(function(e) {
-          alert('Error: ' + e.message);
-          btnDiag.innerHTML = '🔍 Diagnóstico Firebase';
-        });
-    };
-    document.body.appendChild(btnDiag);
-    document.body.appendChild(btn);
+    // Botón flotante eliminado — usar ⚙ Configuración → "Subir todos mis datos a Firebase"
   });
 })();
 </script>
