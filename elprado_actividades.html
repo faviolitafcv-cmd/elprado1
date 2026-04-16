@@ -5694,7 +5694,7 @@ function borrarSeleccionados() {
         fbWrite('/rrhh/' + key, val);
       } else if(key.indexOf('elprado_') === 0 && key !== 'elprado_usuario') {
         var subkey = key.replace('elprado_','');
-        fbWrite('/elprado/' + subkey, val);
+        fbWrite('/elprado1/' + subkey, val);
       }
     } catch(e) {}
   };
@@ -5744,7 +5744,7 @@ function borrarSeleccionados() {
         if(key.indexOf('elprado_') === 0 && key !== 'elprado_usuario') {
           var subkey = key.replace('elprado_','');
           var v = localStorage.getItem(key);
-          if(v) { try { fbWrite('/elprado/' + subkey, JSON.parse(v)); } catch(e){} }
+          if(v) { try { fbWrite('/elprado1/' + subkey, JSON.parse(v)); } catch(e){} }
         }
       });
       setTimeout(function() {
@@ -5755,6 +5755,41 @@ function borrarSeleccionados() {
         }, 3000);
       }, 2000);
     };
+
+    // ── Botón diagnóstico Firebase ──
+    var btnDiag = document.createElement('button');
+    btnDiag.innerHTML = '🔍 Diagnóstico Firebase';
+    btnDiag.style.cssText = 'position:fixed;bottom:56px;right:16px;z-index:99999;' +
+      'background:#1565c0;color:white;border:none;padding:8px 14px;' +
+      'border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;' +
+      'box-shadow:0 2px 8px rgba(0,0,0,.3);';
+    btnDiag.onclick = function() {
+      btnDiag.innerHTML = '⏳ Leyendo...';
+      // Leer /elprado1/actividades
+      fetch('https://elprado1-153ef-default-rtdb.firebaseio.com/elprado1/actividades.json')
+        .then(function(r){ return r.json(); })
+        .then(function(data) {
+          var n = data ? (Array.isArray(data) ? data.length : Object.keys(data).length) : 0;
+          // Leer /elprado/actividades también
+          return fetch('https://elprado1-153ef-default-rtdb.firebaseio.com/elprado/actividades.json')
+            .then(function(r2){ return r2.json(); })
+            .then(function(data2) {
+              var n2 = data2 ? (Array.isArray(data2) ? data2.length : Object.keys(data2).length) : 0;
+              var local = JSON.parse(localStorage.getItem('elprado_actividades')||'[]').length;
+              alert('📊 DIAGNÓSTICO FIREBASE:\n\n' +
+                '🔵 /elprado1/actividades: ' + n + ' registros\n' +
+                '🟡 /elprado/actividades: ' + n2 + ' registros\n' +
+                '💾 localStorage: ' + local + ' registros\n\n' +
+                (n2 > n ? '⚠️ Los datos están en /elprado/ — presioná "Subir a Firebase" para moverlos a /elprado1/' : 
+                 n > 0 ? '✅ Datos en /elprado1/ correctamente' : '❌ No hay datos en Firebase'));
+              btnDiag.innerHTML = '🔍 Diagnóstico Firebase';
+            });
+        }).catch(function(e) {
+          alert('Error: ' + e.message);
+          btnDiag.innerHTML = '🔍 Diagnóstico Firebase';
+        });
+    };
+    document.body.appendChild(btnDiag);
     document.body.appendChild(btn);
   });
 })();
