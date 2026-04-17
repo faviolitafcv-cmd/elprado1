@@ -1118,6 +1118,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
       <button class="btn btn-secondary btn-sm" onclick="abrirModalGrupo()">+ Agregar Grupo</button>
       <button class="btn btn-secondary btn-sm" style="border-color:var(--gold);color:var(--gold2);" onclick="abrirModalGananciaGlobal()">⚖️ Actualizar ganancia a todos los grupos</button>
+      <button class="btn btn-secondary btn-sm" style="border-color:#f44336;color:#f44336;margin-top:8px;" onclick="migrarGruposYRegistros()">🔄 Migrar nombres de grupos (hacer 1 sola vez)</button>
     </div>
   </div>
   <div class="card">
@@ -1457,21 +1458,9 @@ tr:hover td { background: rgba(255,255,255,.02); }
       <button class="modal-close" onclick="cerrarModal('modalGrupo')">✕</button>
     </div>
     <div class="form-grid">
-      <div class="form-group">
-        <label>Tipo</label>
-        <select id="mgTipo">
-          <option>FAENA</option>
-          <option>PIE DE CRIA</option>
-          <option>OTRO</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Categoría</label>
-        <input type="text" id="mgCategoria" placeholder="Vaquilla, Torillo...">
-      </div>
       <div class="form-group full">
         <label>Nombre del Grupo</label>
-        <input type="text" id="mgGrupo" placeholder="CABEZA, CUERPO, COLA 1...">
+        <input type="text" id="mgNombre" placeholder="VAQ. CABEZA, TOR. COLA 1...">
       </div>
       <div class="form-group">
         <label>Cabezas actuales</label>
@@ -1667,22 +1656,108 @@ const TRIMESTRES = {
 };
 
 const GRUPOS_BASE = [
-  {tipo:'FAENA',categoria:'Vaquilla',grupo:'VENTA',cabezas:0,peso:0},
-  {tipo:'FAENA',categoria:'Vaquilla',grupo:'CABEZA',cabezas:0,peso:0},
-  {tipo:'FAENA',categoria:'Vaquilla',grupo:'CUERPO',cabezas:0,peso:0},
-  {tipo:'FAENA',categoria:'Vaquilla',grupo:'COLA 1',cabezas:0,peso:0},
-  {tipo:'FAENA',categoria:'Vaquilla',grupo:'COLA 2',cabezas:0,peso:0},
-  {tipo:'FAENA',categoria:'Torillo',grupo:'VENTA',cabezas:0,peso:0},
-  {tipo:'FAENA',categoria:'Torillo',grupo:'CABEZA',cabezas:0,peso:0},
-  {tipo:'FAENA',categoria:'Torillo',grupo:'CUERPO',cabezas:0,peso:0},
-  {tipo:'FAENA',categoria:'Torillo',grupo:'COLA 1',cabezas:0,peso:0},
-  {tipo:'FAENA',categoria:'Torillo',grupo:'COLA 2',cabezas:0,peso:0},
-  {tipo:'FAENA',categoria:'Torillo',grupo:'COLA 3',cabezas:0,peso:0},
-  {tipo:'PIE DE CRIA',categoria:'Vaquilla',grupo:'L.A. CABEZA',cabezas:0,peso:0},
-  {tipo:'PIE DE CRIA',categoria:'Vaquilla',grupo:'L.A. CUERPO',cabezas:0,peso:0},
-  {tipo:'PIE DE CRIA',categoria:'Vaquilla',grupo:'L.A. COLA 1',cabezas:0,peso:0},
-  {tipo:'PIE DE CRIA',categoria:'Vaquilla',grupo:'L.A. COLA 2',cabezas:0,peso:0},
+  {nombre:'VAQ. VENTA',      cabezas:0, peso:0},
+  {nombre:'VAQ. CABEZA',     cabezas:0, peso:0},
+  {nombre:'VAQ. CUERPO',     cabezas:0, peso:0},
+  {nombre:'VAQ. COLA 1',     cabezas:0, peso:0},
+  {nombre:'VAQ. COLA 2',     cabezas:0, peso:0},
+  {nombre:'VAQ. COLA 3',     cabezas:0, peso:0},
+  {nombre:'TOR. VENTA',      cabezas:0, peso:0},
+  {nombre:'TOR. CABEZA',     cabezas:0, peso:0},
+  {nombre:'TOR. CUERPO',     cabezas:0, peso:0},
+  {nombre:'TOR. COLA 1',     cabezas:0, peso:0},
+  {nombre:'TOR. COLA 2',     cabezas:0, peso:0},
+  {nombre:'TOR. COLA 3',     cabezas:0, peso:0},
+  {nombre:'VAQ. CRIA CABEZA',cabezas:0, peso:0},
+  {nombre:'VAQ. CRIA CUERPO',cabezas:0, peso:0},
+  {nombre:'VAQ. CRIA COLA 1',cabezas:0, peso:0},
+  {nombre:'VAQ. CRIA COLA 2',cabezas:0, peso:0},
+  {nombre:'TOR. CRIA CABEZA',cabezas:0, peso:0},
+  {nombre:'TOR. CRIA CUERPO',cabezas:0, peso:0},
 ];
+
+
+// ═══════════════════════════════════════════════════════════════════
+// MIGRACIÓN: convierte grupos y registros del formato viejo al nuevo
+// ═══════════════════════════════════════════════════════════════════
+function migrarGruposYRegistros() {
+  if(!confirm('¿Migrar grupos y registros al nuevo formato de nombres?\n\nEsto actualiza los nombres de los grupos en todos tus aforos y planificaciones existentes.\nNO se borra ningún dato. Solo se cambian los nombres.')) return;
+
+  const MAPA = {
+    'FAENA|Vaquilla|VENTA':         'VAQ. VENTA',
+    'FAENA|Vaquilla|CABEZA':        'VAQ. CABEZA',
+    'FAENA|Vaquilla|CUERPO':        'VAQ. CUERPO',
+    'FAENA|Vaquilla|COLA 1':        'VAQ. COLA 1',
+    'FAENA|Vaquilla|COLA 2':        'VAQ. COLA 2',
+    'FAENA|Vaquilla|COLA 3':        'VAQ. COLA 3',
+    'FAENA|Torillo|VENTA':          'TOR. VENTA',
+    'FAENA|Torillo|CABEZA':         'TOR. CABEZA',
+    'FAENA|Torillo|CUERPO':         'TOR. CUERPO',
+    'FAENA|Torillo|COLA 1':         'TOR. COLA 1',
+    'FAENA|Torillo|COLA 2':         'TOR. COLA 2',
+    'FAENA|Torillo|COLA 3':         'TOR. COLA 3',
+    'PIE DE CRIA|Vaquilla|L.A. CABEZA': 'VAQ. CRIA CABEZA',
+    'PIE DE CRIA|Vaquilla|L.A. CUERPO': 'VAQ. CRIA CUERPO',
+    'PIE DE CRIA|Vaquilla|L.A. COLA 1': 'VAQ. CRIA COLA 1',
+    'PIE DE CRIA|Vaquilla|L.A. COLA 2': 'VAQ. CRIA COLA 2',
+  };
+
+  function mapNombre(val) {
+    return MAPA[val] || val;
+  }
+
+  let cambios = 0;
+
+  // 1. Migrar array de grupos
+  const grupos = getGrupos();
+  const gruposNuevos = grupos.map(g => {
+    if(g.nombre) return g; // ya migrado
+    const oldKey = g.tipo+'|'+g.categoria+'|'+g.grupo;
+    const nombre = mapNombre(oldKey);
+    cambios++;
+    return {nombre, cabezas:g.cabezas||0, peso:g.peso||0,
+      gananciaDiaria:g.gananciaDiaria||null,
+      pesoBase:g.pesoBase||g.peso||0,
+      fechaBase:g.fechaBase||''};
+  });
+  setData('grupos', gruposNuevos);
+  fbSet('grupos', gruposNuevos);
+
+  // 2. Migrar actividades (campo lote)
+  const acts = getActividades();
+  const actsNuevas = acts.map(a => {
+    if(!a.lote) return a;
+    const nuevo = mapNombre(a.lote);
+    if(nuevo !== a.lote) cambios++;
+    return {...a, lote: nuevo};
+  });
+  setData('actividades', actsNuevas);
+  fbSet('actividades', actsNuevas);
+
+  // 3. Migrar plan (campo lote)
+  const plan = getData('plan', []);
+  const planNuevo = plan.map(p => {
+    if(!p.lote) return p;
+    const nuevo = mapNombre(p.lote);
+    if(nuevo !== p.lote) cambios++;
+    return {...p, lote: nuevo};
+  });
+  setData('plan', planNuevo);
+  fbSet('plan', planNuevo);
+
+  // 4. Migrar vaqueros (grupos asignados)
+  const vaqueros = getData('vaqueros', []);
+  const vaquerosNuevos = vaqueros.map(v => {
+    if(!v.grupos) return v;
+    const gruposMigrados = v.grupos.map(g => mapNombre(g));
+    return {...v, grupos: gruposMigrados};
+  });
+  setData('vaqueros', vaquerosNuevos);
+  fbSet('vaqueros', vaquerosNuevos);
+
+  notif('✅ Migración completa — ' + cambios + ' registros actualizados');
+  setTimeout(() => location.reload(), 1500);
+}
 
 // Actividades que afectan contador de retorno
 const AFECTA_RETORNO = ['INGRESO HDA','DESBROZAR','ROLO','SIEMBRA'];
@@ -3350,31 +3425,19 @@ function renderGrupos() {
   const grupos = getGrupos();
   const el = document.getElementById('listaGrupos');
 
-  const byTipo = {};
-  grupos.forEach((g,i) => {
-    if(!byTipo[g.tipo]) byTipo[g.tipo] = [];
-    byTipo[g.tipo].push({...g, _i: i});
-  });
-
-  el.innerHTML = Object.entries(byTipo).map(([tipo, gs]) => `
-    <div style="margin-bottom:12px;">
-      <div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">${tipo}</div>
-      <table style="width:100%"><thead><tr>
-        <th>Categoría</th><th>Grupo</th><th>Cabezas</th><th>Peso medio</th><th></th>
-      </tr></thead><tbody>
-      ${gs.map(g=>`<tr>
-        <td>${g.categoria}</td>
-        <td><strong>${g.grupo}</strong></td>
-        <td class="td-mono">${g.cabezas||'—'}</td>
-        <td class="td-mono">${g.peso?g.peso+' kg':'—'}</td>
-        <td>
-          <button class="btn btn-secondary btn-sm" onclick="editarGrupo(${g._i})">✏</button>
-          <button class="btn btn-danger" onclick="borrarGrupo(${g._i})">✕</button>
-        </td>
-      </tr>`).join('')}
-      </tbody></table>
-    </div>
-  `).join('');
+  el.innerHTML = `<table style="width:100%"><thead><tr>
+      <th>Grupo</th><th>Cabezas</th><th>Peso medio</th><th></th>
+    </tr></thead><tbody>
+    ${grupos.map((g,i)=>`<tr>
+      <td><strong>${g.nombre}</strong></td>
+      <td class="td-mono">${g.cabezas||'—'}</td>
+      <td class="td-mono">${g.peso?g.peso+' kg':'—'}</td>
+      <td>
+        <button class="btn btn-secondary btn-sm" onclick="editarGrupo(${i})">✏</button>
+        <button class="btn btn-danger" onclick="borrarGrupo(${i})">✕</button>
+      </td>
+    </tr>`).join('')}
+    </tbody></table>`;
 
   // Storage info
   const total = JSON.stringify(getActividades()).length;
@@ -3945,7 +4008,7 @@ function exportarCampoExcel() {
   for(let i = -3; i <= 3; i++) dias.push(sumarDias(campoFechaBase, i));
 
   const gruposConfig = getGrupos();
-  const lotes = gruposConfig.map(g => `${g.tipo}|${g.categoria}|${g.grupo}`);
+  const lotes = gruposConfig.map(g => g.nombre);
   const acts = getActividades().filter(a => a.actividad === 'MATERIA SECA' && a.fechaIng && a.lote);
 
   // Cabecera
@@ -3959,8 +4022,7 @@ function exportarCampoExcel() {
   const rows = [['Grupo', ...diasLabels]];
 
   lotes.forEach(lote => {
-    const lparts = lote.split('|');
-    const loteLabel = lparts.length >= 3 ? lparts[1]+' · '+lparts[2] : lote;
+    const loteLabel = lote;
     const fila = [loteLabel];
     dias.forEach(d => {
       const candidatos = acts.filter(a =>
@@ -4030,7 +4092,7 @@ function renderCampo() {
 
   // Usar grupos configurados en Configuración
   const gruposConfig = getGrupos();
-  const lotes = gruposConfig.map(g => `${g.tipo}|${g.categoria}|${g.grupo}`);
+  const lotes = gruposConfig.map(g => g.nombre);
 
   const thead = document.getElementById('campoHead');
   const tbody = document.getElementById('campoBody');
@@ -4048,8 +4110,7 @@ function renderCampo() {
 
   // Filas por lote
   tbody.innerHTML = lotes.map(lote => {
-    const lparts = lote.split('|');
-    const loteLabel = lparts.length >= 3 ? lparts[1]+' · '+lparts[2] : lote;
+    const loteLabel = lote;
 
     const celdas = dias.map(d => {
       // Buscar registro activo en este día para este lote
@@ -4785,7 +4846,7 @@ function abrirModalGananciaGlobal() {
     if(!isNaN(gd) && gd > 0) {
       const ejemplos = grupos.slice(0,3).map(g => {
         const p30 = Math.round((g.peso + 30 * gd/1000) * 10) / 10;
-        return `<div>${g.grupo}: ${g.peso} kg → <strong style="color:var(--green-soft);">${p30} kg</strong> en 30 días</div>`;
+        return `<div>${g.nombre}: ${g.peso} kg → <strong style="color:var(--green-soft);">${p30} kg</strong> en 30 días</div>`;
       }).join('');
       document.getElementById('ggPreview').innerHTML =
         `<div style="color:var(--text3);margin-bottom:6px;">Ejemplo de proyección:</div>${ejemplos}`;
@@ -4815,9 +4876,7 @@ function aplicarGananciaGlobal() {
 }
 
 function abrirModalGrupo() {
-  document.getElementById('mgTipo').value='FAENA';
-  document.getElementById('mgCategoria').value='';
-  document.getElementById('mgGrupo').value='';
+  document.getElementById('mgNombre').value='';
   document.getElementById('mgCabezas').value='';
   document.getElementById('mgPeso').value='';
   document.getElementById('mgIndex').value='';
@@ -4826,9 +4885,7 @@ function abrirModalGrupo() {
 
 function editarGrupo(i) {
   const g = getGrupos()[i];
-  document.getElementById('mgTipo').value=g.tipo;
-  document.getElementById('mgCategoria').value=g.categoria;
-  document.getElementById('mgGrupo').value=g.grupo;
+  document.getElementById('mgNombre').value=g.nombre||'';
   document.getElementById('mgCabezas').value=g.cabezas||'';
   document.getElementById('mgPeso').value=g.peso||'';
   const gdEl = document.getElementById('mgGanancia');
@@ -4838,18 +4895,16 @@ function editarGrupo(i) {
 }
 
 function guardarGrupo() {
-  const tipo = document.getElementById('mgTipo').value;
-  const cat = document.getElementById('mgCategoria').value.trim();
-  const grp = document.getElementById('mgGrupo').value.trim().toUpperCase();
+  const nombre = document.getElementById('mgNombre').value.trim().toUpperCase();
   const cab = parseInt(document.getElementById('mgCabezas').value)||0;
   const peso = parseInt(document.getElementById('mgPeso').value)||0;
-  if(!cat||!grp) { notif('Completá categoría y nombre', true); return; }
+  if(!nombre) { notif('Ingresá el nombre del grupo', true); return; }
   const grupos = getGrupos();
   const idx = document.getElementById('mgIndex').value;
   const gdStr = document.getElementById('mgGanancia')?.value;
   const gd = gdStr !== '' && gdStr !== undefined ? parseFloat(gdStr) : null;
   const hoy = new Date().toISOString().split('T')[0];
-  const obj = {tipo, categoria:cat, grupo:grp, cabezas:cab, peso,
+  const obj = {nombre, cabezas:cab, peso,
     gananciaDiaria: gd !== null && !isNaN(gd) ? gd : null,
     pesoBase: peso,
     fechaBase: hoy
@@ -4891,7 +4946,7 @@ function cerrarModal(id) {
 function poblarSelectGrupos() {
   const grupos = getGrupos();
   const opts = ['<option value="" data-cab="" data-peso="">— elegir —</option>',
-    ...grupos.map(g=>`<option value="${g.tipo}|${g.categoria}|${g.grupo}" data-cab="${g.cabezas||0}" data-peso="${g.peso||0}" data-gd="${g.gananciaDiaria||0}" data-pb="${g.pesoBase||g.peso||0}" data-fb="${g.fechaBase||''}">${g.tipo} · ${g.categoria} · ${g.grupo}</option>`)
+    ...grupos.map(g=>`<option value="${g.nombre}" data-cab="${g.cabezas||0}" data-peso="${g.peso||0}" data-gd="${g.gananciaDiaria||0}" data-pb="${g.pesoBase||g.peso||0}" data-fb="${g.fechaBase||''}">${g.nombre}</option>`)
   ].join('');
   document.getElementById('fLote').innerHTML = opts;
   document.getElementById('fLoteIng').innerHTML = opts;
@@ -5423,10 +5478,10 @@ function renderCheckboxGrupos(seleccionados) {
   const grupos = getGrupos();
   const cont = document.getElementById('mvGruposCheck');
   cont.innerHTML = grupos.map(g => {
-    const key = `${g.tipo}|${g.categoria}|${g.grupo}`;
+    const key = g.nombre;
     const checked = seleccionados.includes(key);
     return `<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;background:var(--card2);padding:5px 10px;border-radius:6px;border:1px solid ${checked?'var(--green2)':'var(--border)'};color:${checked?'var(--green-soft)':'var(--text2)'};" onclick="toggleGrupoCheck(this,'${key}')">
-      <input type="checkbox" ${checked?'checked':''} style="width:14px;height:14px;" onchange="this.parentElement.click()"> ${g.categoria} · ${g.grupo}
+      <input type="checkbox" ${checked?'checked':''} style="width:14px;height:14px;" onchange="this.parentElement.click()"> ${g.nombre}
     </label>`;
   }).join('');
 }
@@ -5527,12 +5582,12 @@ function cerrarDropPotreroP() {
 function poblarSelectPlan() {
   const grupos = getGrupos();
   const opts = ['<option value="">— elegir grupo —</option>',
-    ...grupos.map(g=>`<option value="${g.tipo}|${g.categoria}|${g.grupo}">${g.tipo} · ${g.categoria} · ${g.grupo}</option>`)
+    ...grupos.map(g=>`<option value="${g.nombre}">${g.nombre}</option>`)
   ].join('');
   const sel = document.getElementById('pLote');
   if(sel) sel.innerHTML = opts;
   const filt = document.getElementById('planFiltroGrupo');
-  if(filt) filt.innerHTML = '<option value="">Todos los grupos</option>' + grupos.map(g=>`<option value="${g.tipo}|${g.categoria}|${g.grupo}">${g.categoria} · ${g.grupo}</option>`).join('');
+  if(filt) filt.innerHTML = '<option value="">Todos los grupos</option>' + grupos.map(g=>`<option value="${g.nombre}">${g.nombre}</option>`).join('');
 }
 
 function guardarPlan() {
