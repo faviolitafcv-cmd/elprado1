@@ -1190,15 +1190,7 @@ function showImportPrev(data, noEnc=[]){
         ${!d.existente?'<span class="bg bg-vi">Nuevo</span>':''}
       </td>
     </tr>`).join('');
-  if(nvos>0){
-    document.getElementById('iNuevos').innerHTML=`
-      <div style="background:rgba(109,186,58,.07);border:1px solid var(--brd2);border-radius:6px;padding:10px;font-size:12px;">
-        ⚠️ <b style="color:var(--gold)">${nvos} animales nuevos</b> se crearán con los datos de la balanza.
-        Podés completar precio de compra y otros datos desde la ficha individual después.
-      </div>`;
-  }else{
-    document.getElementById('iNuevos').innerHTML='';
-  }
+  document.getElementById('iNuevos').innerHTML='';
   document.getElementById('iPrev').style.display='block';
   document.getElementById('btnCI').style.display='inline-flex';
   const btnNE=document.getElementById('btnDescNE');
