@@ -226,6 +226,7 @@ tr:hover td{background:rgba(109,186,58,.04);}
     <button class="btn bp" onclick="openMA()">+ Agregar Animal</button>
     <button class="btn bs" onclick="openImport()">📥 Importar Pesaje</button>
     <button class="btn bs" style="border-color:var(--gr);color:var(--gr);" onclick="openImportInv()">📋 Importar Inventario Inicial</button>
+    <button class="btn bs" style="border-color:var(--red);color:var(--red);" onclick="limpiarInventario()">🗑 Limpiar Inventario</button>
     <div class="sp"></div>
     <span id="aCount" style="font-size:11px;color:var(--t3);">Cargando...</span>
   </div>
@@ -961,6 +962,21 @@ function readInvExcel(file){
     }catch(err){ntf('Error leyendo Excel: '+err.message,true);}
   };
   reader.readAsArrayBuffer(file);
+}
+
+
+function limpiarInventario(){
+  const conf = prompt('Esta acción elimina TODOS los animales del sistema.\n\nPara confirmar escribí exactamente:\nELIMINAR TODO');
+  if(conf !== 'ELIMINAR TODO'){ ntf('Operación cancelada'); return; }
+  const conf2 = confirm('¿Estás SEGURA? Se borrarán los ' + Object.keys(animales).length + ' animales de Firebase.');
+  if(!conf2) return;
+  fetch(FB+'/animales.json', {method:'DELETE'})
+    .then(()=>{
+      animales={};
+      renderDash(); renderA();
+      ntf('✅ Inventario eliminado correctamente');
+    })
+    .catch(e=>ntf('Error: '+e.message, true));
 }
 
 async function confirmarImportInv(){
