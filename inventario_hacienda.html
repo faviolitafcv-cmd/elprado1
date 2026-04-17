@@ -967,7 +967,7 @@ function verDet(ide){
   const est=calcEst(a);
   const lastP=pAnim[0];
   const pesoHoy=lastP?(Math.round((lastP.peso+(lastP.gmd||0)*Math.floor((Date.now()-new Date(lastP.fecha+'T12:00:00'))/86400000))*10)/10):a.pesoIngreso;
-  const gdmAcum=lastP&&lastP.gmd!=null?Number(lastP.gmd).toFixed(3)+'—';
+  const gdmAcum=lastP&&lastP.gmd!=null?Number(lastP.gmd).toFixed(3):'—';
 
   let html=`<div class="dg">
     <div class="di"><div class="di-l">IDE Chip</div><div class="di-v mn tg" style="font-size:14px;font-weight:700;">${a.ide}</div></div>
