@@ -662,6 +662,30 @@ async function loadAll(){
       fbGet('bajas'),    fbGet('compras')
     ]);
     animales = rA || {};
+    // Normalizar categorías viejas al formato nuevo
+    const NORM_CAT = {
+      'VQ_INV':{tipo:'INVERNADA',   categoria:'VAQUILLA'},
+      'VQ_PDC':{tipo:'CRIA-REPRODUCTORES', categoria:'VAQUILLA'},
+      'TR_INV':{tipo:'INVERNADA',   categoria:'TORILLO'},
+      'TR_REP':{tipo:'CRIA-REPRODUCTORES', categoria:'TORILLO'},
+      'VC_INV':{tipo:'INVERNADA',   categoria:'VACA'}
+    };
+    const updates_norm = {};
+    Object.values(animales).forEach(a=>{
+      if(NORM_CAT[a.categoria]){
+        const norm = NORM_CAT[a.categoria];
+        if(!a.tipo || a.tipo !== norm.tipo){
+          a.tipo = norm.tipo;
+          a.categoria = norm.categoria;
+          updates_norm['animales/'+a.ide+'/tipo'] = norm.tipo;
+          updates_norm['animales/'+a.ide+'/categoria'] = norm.categoria;
+        }
+      }
+    });
+    if(Object.keys(updates_norm).length>0){
+      fbPatch('', updates_norm).catch(()=>{});
+      console.log('Normalizados '+Object.keys(updates_norm).length/2+' animales con categoría vieja');
+    }
     pesajes  = toArr(rP).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
     bajas    = toArr(rB).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
     compras  = toArr(rC).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
@@ -685,6 +709,7 @@ function showPg(id){
   if(id==='compras')   renderCo();
 }
 function filtQuick(tipo, cat){
+  // Normalizar: acepta tanto formato nuevo como viejo
   showPg('animales');
   document.getElementById('fCat').value = cat;
   filtA();
@@ -694,11 +719,17 @@ function filtQuick(tipo, cat){
 function renderDash(){
   const act = Object.values(animales).filter(a=>a.estado==='ACTIVO');
   document.getElementById('dTot').textContent = act.length;
-  document.getElementById('dVI').textContent  = act.filter(a=>a.tipo==='INVERNADA'&&a.categoria==='VAQUILLA').length;
-  document.getElementById('dTI').textContent  = act.filter(a=>a.tipo==='INVERNADA'&&a.categoria==='TORILLO').length;
-  document.getElementById('dVC').textContent  = act.filter(a=>a.tipo==='INVERNADA'&&a.categoria==='VACA').length;
-  document.getElementById('dCV').textContent  = act.filter(a=>a.tipo==='CRIA-REPRODUCTORES'&&a.categoria==='VAQUILLA').length;
-  document.getElementById('dCT').textContent  = act.filter(a=>a.tipo==='CRIA-REPRODUCTORES'&&a.categoria==='TORILLO').length;
+  // Función helper que normaliza categorías viejas y nuevas
+  function esInvVaq(a){ return (a.tipo==='INVERNADA'&&a.categoria==='VAQUILLA')||a.categoria==='VQ_INV'; }
+  function esInvTor(a){ return (a.tipo==='INVERNADA'&&a.categoria==='TORILLO')||a.categoria==='TR_INV'; }
+  function esInvVac(a){ return (a.tipo==='INVERNADA'&&a.categoria==='VACA')||a.categoria==='VC_INV'; }
+  function esCriaVaq(a){ return (a.tipo==='CRIA-REPRODUCTORES'&&a.categoria==='VAQUILLA')||a.categoria==='VQ_PDC'; }
+  function esCriaTor(a){ return (a.tipo==='CRIA-REPRODUCTORES'&&a.categoria==='TORILLO')||a.categoria==='TR_REP'; }
+  document.getElementById('dVI').textContent  = act.filter(esInvVaq).length;
+  document.getElementById('dTI').textContent  = act.filter(esInvTor).length;
+  document.getElementById('dVC').textContent  = act.filter(esInvVac).length;
+  document.getElementById('dCV').textContent  = act.filter(esCriaVaq).length;
+  document.getElementById('dCT').textContent  = act.filter(esCriaTor).length;
 
   // Build groups summary
   const gmap = {};
