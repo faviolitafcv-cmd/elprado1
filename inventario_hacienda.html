@@ -453,6 +453,7 @@ tr:hover td{background:rgba(109,186,58,.04);}
     </div>
     <div class="mf">
       <button class="btn bs" onclick="cerrar('moI')">Cancelar</button>
+      <button class="btn bs" id="btnDescNE" style="display:none;border-color:var(--red);color:var(--red);" onclick="descargarNoEncontrados()">⬇ Descargar IDEs no encontrados</button>
       <button class="btn bp" id="btnCI" style="display:none" onclick="confirmarI()">✅ Confirmar e Importar</button>
     </div>
   </div>
@@ -1073,54 +1074,78 @@ function readBalanza(file){
       const hdr=rows[0];
       const gc=n=>hdr.findIndex(h=>h&&String(h).toLowerCase().includes(n.toLowerCase()));
 
-      // Detect columns
-      const cPeso=gc('peso'), cGdm=gc('gdm')>=0?gc('gdm'):gc('GDM');
-      const cClasf=gc('clasf'); const cCat=gc('categ');
-      const cIde=gc('ide'); const cOri=gc('origen');
-      const cFecha=gc('fecha')<0?gc('Fecha'):gc('fecha');
-      const cRaza=gc('raza'); const cPAnt=gc('peso ant');
-      const cDias=gc('días')>=0?gc('días'):gc('dias')>=0?gc('dias'):gc('total');
-      const cFIngreso=gc('fecha ingre')>=0?gc('fecha ingre'):gc('ingreso');
+      // Solo tomamos: IDE, Peso, Clasf. Pesaj, Fecha
+      const cIde   = gc('ide');
+      const cPeso  = gc('peso');
+      const cClasf = gc('clasf');
+      const cFecha = hdr.findIndex(h=>h&&String(h).toLowerCase()==='fecha');
 
+      if(cIde<0||cPeso<0){ntf('No se encontraron columnas IDE/Peso',true);return;}
+
+      const noEncontrados=[];
       const res=[];
+
       for(let i=1;i<rows.length;i++){
         const r=rows[i];
         if(!r||!r[cIde])continue;
-        const ide=String(r[cIde]).trim();
-        if(!ide||ide==='undefined')continue;
+        const ideOrig=String(r[cIde]).trim();
+        if(!ideOrig||ideOrig==='undefined')continue;
+
         const pNuevo=parseFloat(String(r[cPeso]||0).replace(',','.'));
         if(isNaN(pNuevo)||pNuevo<=0)continue;
-        const gmd=cGdm>=0?parseFloat(String(r[cGdm]||0).replace(',','.')):null;
-        const clsf=cClasf>=0?normGru(r[cClasf]):null;
-        const catB=cCat>=0?String(r[cCat]||''):'';
-        const ori=cOri>=0?String(r[cOri]||'').trim():'';
-        const raza=cRaza>=0?String(r[cRaza]||'').trim():'';
-        const pAnt=cPAnt>=0?parseFloat(String(r[cPAnt]||0).replace(',','.')):null;
-        const dias=cDias>=0?parseInt(r[cDias]):null;
+
+        const clsf=cClasf>=0&&r[cClasf]?String(r[cClasf]).trim():null;
+
         let fecha=new Date().toISOString().split('T')[0];
         if(cFecha>=0&&r[cFecha]){fecha=parseFecha(r[cFecha]);}
-        let fiAnim=null;
-        if(cFIngreso>=0&&r[cFIngreso]){fiAnim=parseFecha(r[cFIngreso]);}
 
-        const aEx=animales[ide];
-        const gruAnt=aEx?.grupo||null;
-        const catAct=aEx?.categoria||normCat(catB);
+        // Buscar animal con y sin ceros al inicio
+        const ideNorm=ideOrig.replace(/^0+/,'');
+        const aEx=animales[ideOrig]||
+                  Object.values(animales).find(a=>String(a.ide).replace(/^0+/,'')==ideNorm);
+
+        if(!aEx){
+          noEncontrados.push({ide:ideOrig, peso:pNuevo, clasf:clsf||'—', fecha});
+          continue;
+        }
+
+        const ideKey=aEx.ide;
+        const gruAnt=aEx.grupo||null;
         const gruNvo=clsf||gruAnt;
-        const migro=gruAnt&&gruNvo&&gruAnt!==gruNvo;
+        const migro=!!(gruAnt&&gruNvo&&gruAnt!==gruNvo);
+
+        // Calcular GMD desde el sistema (no de la balanza)
+        const pesAnim=pesajes.filter(p=>String(p.ide)===String(ideKey))
+                             .sort((a,b)=>b.fecha.localeCompare(a.fecha));
+        let pAnt=null, fechaAnt=null;
+        if(pesAnim.length>0){
+          pAnt=pesAnim[0].peso;
+          fechaAnt=pesAnim[0].fecha;
+        } else if(aEx.pesoIngreso&&aEx.fechaIngreso){
+          pAnt=aEx.pesoIngreso;
+          fechaAnt=aEx.fechaIngreso;
+        }
+
+        let gmdCalc=null;
+        if(pAnt!=null&&fechaAnt){
+          const dias=Math.max(1,Math.round((new Date(fecha)-new Date(fechaAnt))/86400000));
+          gmdCalc=Math.round((pNuevo-pAnt)/dias*1000)/1000;
+        }
 
         res.push({
-          ide,fecha,peso:pNuevo,gmd:isNaN(gmd)?null:gmd,
-          grupoAnterior:gruAnt,grupoNuevo:gruNvo,
-          pesoAnterior:isNaN(pAnt)?null:pAnt,
-          diasDesde:isNaN(dias)?null:dias,
-          origen:ori,raza,fechaIngreso:fiAnim,
-          categoriaBalanza:catB,catActual:catAct,
-          existente:!!aEx,migro,fuente:'BALANZA'
+          ide:ideKey, fecha, peso:pNuevo,
+          gmd:gmdCalc,
+          grupoAnterior:gruAnt, grupoNuevo:gruNvo,
+          pesoAnterior:pAnt,
+          catActual:aEx.categoria,
+          existente:true, migro, fuente:'BALANZA'
         });
       }
-      if(!res.length){ntf('Sin registros válidos',true);return;}
+
+      if(!res.length&&!noEncontrados.length){ntf('Sin registros válidos',true);return;}
       importD=res;
-      showImportPrev(res);
+      importD._noEncontrados=noEncontrados;
+      showImportPrev(res, noEncontrados);
     }catch(err){
       console.error(err);
       ntf('Error al leer archivo: '+err.message,true);
@@ -1144,14 +1169,12 @@ function parseFecha(v){
   return new Date().toISOString().split('T')[0];
 }
 
-function showImportPrev(data){
+function showImportPrev(data, noEnc=[]){
   const tot=data.length, mig=data.filter(d=>d.migro).length;
-  const nvos=data.filter(d=>!d.existente).length, known=data.filter(d=>d.existente).length;
   document.getElementById('iSum').innerHTML=`
-    <div class="ist"><span>📊</span><b>${tot}</b> registros en el archivo</div>
-    <div class="ist"><span>✅</span><b>${known}</b> animales ya en inventario</div>
-    <div class="ist"><span>🆕</span><b>${nvos}</b> animales nuevos (se crearán)</div>
-    <div class="ist"><span>🔄</span><b>${mig}</b> animales cambian de grupo</div>`;
+    <div class="ist"><span>📊</span><b>${tot}</b> pesajes listos para importar</div>
+    <div class="ist"><span>🔄</span><b>${mig}</b> animales cambian de grupo</div>
+    ${noEnc.length>0?`<div class="ist" style="color:var(--red);"><span>⚠️</span><b>${noEnc.length}</b> IDEs NO encontrados en el sistema</div>`:''}`;
   document.getElementById('iPB').innerHTML=data.slice(0,20).map(d=>`
     <tr class="${d.migro?'row-mig':d.existente?'':'row-new'}">
       <td class="mn tg" style="font-size:11px;cursor:pointer" onclick="verDet('${d.ide}')">${d.ide}</td>
@@ -1178,6 +1201,19 @@ function showImportPrev(data){
   }
   document.getElementById('iPrev').style.display='block';
   document.getElementById('btnCI').style.display='inline-flex';
+  const btnNE=document.getElementById('btnDescNE');
+  if(btnNE) btnNE.style.display=(noEnc&&noEnc.length>0)?'inline-flex':'none';
+}
+
+
+function descargarNoEncontrados(){
+  const ne=importD?._noEncontrados||[];
+  if(!ne.length){ntf('No hay IDEs sin encontrar');return;}
+  const rows=[['IDE','Peso','Clasificación','Fecha'],...ne.map(x=>[x.ide,x.peso,x.clasf,x.fecha])];
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'No Encontrados');
+  XLSX.writeFile(wb,'IDEs_no_encontrados.xlsx');
 }
 
 async function confirmarI(){
