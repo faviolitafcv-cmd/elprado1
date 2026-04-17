@@ -939,8 +939,10 @@ async function confirmarImportInv(){
   btn.disabled=true; btn.textContent='⏳ Importando...';
 
   const usuario = sessionStorage.getItem('ep_usuario')||'IMPORT';
-  const BATCH=50;
-  let ok=0, err=0;
+  const BATCH=20; // lotes chicos para evitar timeout
+  const MAX_REINTENTOS=3;
+  let ok=0, err=0, reintentos=0;
+
   for(let i=0;i<data.length;i+=BATCH){
     const batch=data.slice(i,i+BATCH);
     const updates={};
@@ -949,16 +951,36 @@ async function confirmarImportInv(){
       updates['animales/'+key]={...d, usuario};
       animales[key]={...d, usuario};
     });
-    try{ await fbPatch('', updates); ok+=batch.length; }
-    catch(e){ err+=batch.length; }
-    btn.textContent=`⏳ ${ok}/${data.length}...`;
-    await new Promise(r=>setTimeout(r,120));
+
+    let exito=false;
+    for(let intento=0;intento<MAX_REINTENTOS;intento++){
+      try{
+        await fbPatch('', updates);
+        exito=true;
+        break;
+      }catch(e){
+        reintentos++;
+        await new Promise(r=>setTimeout(r,500*(intento+1))); // espera creciente
+      }
+    }
+
+    if(exito){ ok+=batch.length; }
+    else { err+=batch.length; }
+
+    btn.textContent=`⏳ ${ok}/${data.length}...${err>0?' ⚠️'+err+' err':''}`;
+    await new Promise(r=>setTimeout(r,200));
   }
+
   btn.disabled=false;
   window._invData=null;
-  cerrar('moImportInv');
+
+  if(err>0){
+    ntf(`⚠️ ${ok} importados, ${err} fallaron. Volvé a importar para completar.`, true);
+  } else {
+    cerrar('moImportInv');
+    ntf(`✅ ${ok} animales importados correctamente`);
+  }
   renderDash(); renderA();
-  ntf(`✅ ${ok} animales importados${err?` — ⚠️ ${err} errores`:''}`);
 }
 
 // ═══════════ ANIMAL DETAIL ═══════════
