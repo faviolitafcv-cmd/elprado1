@@ -65,6 +65,7 @@ html,body{height:100%;font-family:'Segoe UI',Arial,sans-serif;overflow:hidden}
 .mod-rrhh .modulo-tag{background:rgba(76,175,80,.2);color:#81c784;border:1px solid rgba(76,175,80,.3)}
 .mod-pasturas{border-top:3px solid #6dba3a}
 .mod-pasturas .modulo-tag{background:rgba(109,186,58,.2);color:#a8d878;border:1px solid rgba(109,186,58,.3)}
+.mod-stock .modulo-tag{background:rgba(74,154,186,.2);color:#7ec8e3;border:1px solid rgba(74,154,186,.3)}
 
 .footer-txt{color:rgba(255,255,255,.3);font-size:10px;letter-spacing:2px}
 
@@ -148,6 +149,19 @@ html,body{height:100%;font-family:'Segoe UI',Arial,sans-serif;overflow:hidden}
         </div>
       </div>
 
+      <div class="modulo-card mod-stock" onclick="abrirModulo('stock')">
+        <div class="modulo-icono">🐄</div>
+        <div class="modulo-tag">STOCK DE HACIENDA</div>
+        <div class="modulo-nombre">Inventario de Animales</div>
+        <div class="modulo-desc">Seguimiento individual, pesajes, compras y bajas</div>
+        <div class="modulo-submods">
+          <span class="submod">Animales</span>
+          <span class="submod">Pesajes</span>
+          <span class="submod">Compras</span>
+          <span class="submod">Informes</span>
+        </div>
+      </div>
+
     </div>
 
     <div class="footer-txt">Sistema de Gestión El Prado 1 &nbsp;|&nbsp; 2026</div>
@@ -191,6 +205,10 @@ const MODULOS = {
   pasturas: {
     nombre: 'Gestión de Pasturas — Historia de Lote',
     archivo: 'elprado_actividades.html'
+  },
+  stock: {
+    nombre: 'Stock de Hacienda — Inventario',
+    archivo: 'inventario_hacienda.html'
   }
 };
 
