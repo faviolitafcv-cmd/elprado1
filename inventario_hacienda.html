@@ -1258,7 +1258,7 @@ async function savePM(){
   const p={id:pid,ide,fecha,peso,gmd,pesoAnterior:pAnt,diasDesde:dias,
     grupoAnterior:a.grupo,grupoNuevo:gruFinal,migro,fuente:'MANUAL',origen:a.origen,usuario};
   try{
-    const upd={'pesajes/'+pid:p};
+    const upd={['pesajes/'+pid]:p};
     if(migro) upd['animales/'+ide+'/grupo']=gruFinal;
     await fbPatch('',upd);
     pesajes.unshift(p); pesajes.sort((a,b)=>b.fecha.localeCompare(a.fecha));
@@ -1450,7 +1450,7 @@ async function saveV(){
     destino:dest,mercado:mer,categoriaAnimal:a.categoria,
     grupoAnimal:a.grupo,origenAnimal:a.origen,usuario};
   try{
-    await fbPatch('',{'animales/'+ide+'/estado':'VENDIDO','bajas/'+bid:b});
+    await fbPatch('',{['animales/'+ide+'/estado']:'VENDIDO',['bajas/'+bid]:b});
     animales[ide].estado='VENDIDO'; bajas.unshift(b);
     cerrar('moV'); renderDash(); renderA(); renderB();
     ntf('✅ Venta registrada correctamente');
@@ -1469,7 +1469,7 @@ async function saveM(){
   const b={id:bid,ide,tipo:'MUERTE',fecha,causaMuerte:causa,observaciones:obs,
     categoriaAnimal:a.categoria,grupoAnimal:a.grupo,origenAnimal:a.origen,usuario};
   try{
-    await fbPatch('',{'animales/'+ide+'/estado':'MUERTO','bajas/'+bid:b});
+    await fbPatch('',{['animales/'+ide+'/estado']:'MUERTO',['bajas/'+bid]:b});
     animales[ide].estado='MUERTO'; bajas.unshift(b);
     cerrar('moM'); renderDash(); renderA(); renderB();
     ntf('✅ Muerte registrada');
