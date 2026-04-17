@@ -196,17 +196,17 @@ tr:hover td{background:rgba(109,186,58,.04);}
 <div class="pg active" id="pg-dash">
   <div class="stats" id="dStats">
     <div class="sc" onclick="showPg('animales')"><div class="sc-v" id="dTot">—</div><div class="sc-l">Total Activos</div></div>
-    <div class="sc" onclick="filtQuick('VQ_INV')"><div class="sc-v" id="dVI">—</div><div class="sc-l">Vaq. Invernada</div></div>
-    <div class="sc" onclick="filtQuick('VQ_PDC')"><div class="sc-v" id="dVP">—</div><div class="sc-l">Vaq. Pie de Cría</div></div>
-    <div class="sc" onclick="filtQuick('TR_INV')"><div class="sc-v" id="dTI">—</div><div class="sc-l">Torillos Inv.</div></div>
-    <div class="sc" onclick="filtQuick('TR_REP')"><div class="sc-v" id="dTR">—</div><div class="sc-l">Torillos Rep.</div></div>
-    <div class="sc" onclick="filtQuick('VC_INV')"><div class="sc-v" id="dVC">—</div><div class="sc-l">Vacas Inv.</div></div>
+    <div class="sc" onclick="filtQuick('INVERNADA','VAQUILLA')"><div class="sc-v" id="dVI">—</div><div class="sc-l">Inv. Vaquilla</div></div>
+    <div class="sc" onclick="filtQuick('INVERNADA','TORILLO')"><div class="sc-v" id="dTI">—</div><div class="sc-l">Inv. Torillo</div></div>
+    <div class="sc" onclick="filtQuick('INVERNADA','VACA')"><div class="sc-v" id="dVC">—</div><div class="sc-l">Inv. Vaca</div></div>
+    <div class="sc" onclick="filtQuick('CRIA-REPRODUCTORES','VAQUILLA')"><div class="sc-v" id="dCV">—</div><div class="sc-l">Cría Vaquilla</div></div>
+    <div class="sc" onclick="filtQuick('CRIA-REPRODUCTORES','TORILLO')"><div class="sc-v" id="dCT">—</div><div class="sc-l">Cría Torillo</div></div>
   </div>
 
   <div class="card">
     <div class="ch"><div class="ct">📊 Inventario por Grupo</div></div>
     <div class="tw"><table>
-      <thead><tr><th>Categoría</th><th>Grupo</th><th>Cabezas</th><th>Peso Ing. Prom.</th><th>Ult. GMD Prom.</th><th>Orígenes</th></tr></thead>
+      <thead><tr><th>Tipo</th><th>Categoría</th><th>Grupo</th><th>Cabezas</th><th>Peso Ing. Prom.</th><th>Ult. GMD Prom.</th><th>Orígenes</th></tr></thead>
       <tbody id="dGrupos"><tr><td colspan="6"><div class="ldr"><div class="ls"></div></div></td></tr></tbody>
     </table></div>
   </div>
@@ -259,7 +259,7 @@ tr:hover td{background:rgba(109,186,58,.04);}
   <div class="card">
     <div class="tw"><table>
       <thead><tr>
-        <th>IDE (Chip)</th><th>Caravana</th><th>Categoría</th><th>Grupo</th><th>Origen</th>
+        <th>IDE (Chip)</th><th>Caravana</th><th>Tipo</th><th>Categoría</th><th>Grupo</th><th>Origen</th>
         <th>F. Ingreso</th><th>Peso Ing.</th><th>Precio</th><th>Raza</th><th>Estado</th><th></th>
       </tr></thead>
       <tbody id="aBody"><tr><td colspan="11"><div class="ldr"><div class="ls"></div></div></td></tr></tbody>
@@ -683,7 +683,7 @@ function showPg(id){
   if(id==='informes')  renderInf();
   if(id==='compras')   renderCo();
 }
-function filtQuick(cat){
+function filtQuick(tipo, cat){
   showPg('animales');
   document.getElementById('fCat').value = cat;
   filtA();
@@ -693,17 +693,17 @@ function filtQuick(cat){
 function renderDash(){
   const act = Object.values(animales).filter(a=>a.estado==='ACTIVO');
   document.getElementById('dTot').textContent = act.length;
-  document.getElementById('dVI').textContent  = act.filter(a=>a.categoria==='VQ_INV').length;
-  document.getElementById('dVP').textContent  = act.filter(a=>a.categoria==='VQ_PDC').length;
-  document.getElementById('dTI').textContent  = act.filter(a=>a.categoria==='TR_INV').length;
-  document.getElementById('dTR').textContent  = act.filter(a=>a.categoria==='TR_REP').length;
-  document.getElementById('dVC').textContent  = act.filter(a=>a.categoria==='VC_INV').length;
+  document.getElementById('dVI').textContent  = act.filter(a=>a.tipo==='INVERNADA'&&a.categoria==='VAQUILLA').length;
+  document.getElementById('dTI').textContent  = act.filter(a=>a.tipo==='INVERNADA'&&a.categoria==='TORILLO').length;
+  document.getElementById('dVC').textContent  = act.filter(a=>a.tipo==='INVERNADA'&&a.categoria==='VACA').length;
+  document.getElementById('dCV').textContent  = act.filter(a=>a.tipo==='CRIA-REPRODUCTORES'&&a.categoria==='VAQUILLA').length;
+  document.getElementById('dCT').textContent  = act.filter(a=>a.tipo==='CRIA-REPRODUCTORES'&&a.categoria==='TORILLO').length;
 
   // Build groups summary
   const gmap = {};
   act.forEach(a=>{
-    const k = a.categoria+'|'+a.grupo;
-    if(!gmap[k]) gmap[k]={cat:a.categoria,grupo:a.grupo,n:0,ps:0,orig:new Set()};
+    const k = a.tipo+'|'+a.categoria+'|'+a.grupo;
+    if(!gmap[k]) gmap[k]={tipo:a.tipo,cat:a.categoria,grupo:a.grupo,n:0,ps:0,orig:new Set()};
     gmap[k].n++; gmap[k].ps+=a.pesoIngreso||0;
     if(a.origen) gmap[k].orig.add(a.origen);
   });
@@ -715,7 +715,7 @@ function renderDash(){
   });
   const gmdG = {};
   act.forEach(a=>{
-    const k = a.categoria+'|'+a.grupo;
+    const k = a.tipo+'|'+a.categoria+'|'+a.grupo;
     const g = lastGmd[a.ide];
     if(g!=null){ if(!gmdG[k]){gmdG[k]={s:0,n:0};} gmdG[k].s+=g; gmdG[k].n++; }
   });
@@ -732,7 +732,8 @@ function renderDash(){
     const gdStr = gd&&gd.n>0 ? (gd.s/gd.n).toFixed(3)+' kg/d' : '—';
     const origStr = [...g.orig].slice(0,4).join(', ')+(g.orig.size>4?'...':'');
     return`<tr>
-      <td><span class="bg ${CBADGE[g.cat]||''}">${CATS[g.cat]||g.cat}</span></td>
+      <td style="font-size:11px;font-weight:600;color:var(--t2);">${g.tipo||'—'}</td>
+      <td><span class="bg ${CBADGE[g.cat]||''}">${g.cat||'—'}</span></td>
       <td><strong>${GRUS[g.grupo]||g.grupo}</strong></td>
       <td class="mn tg">${g.n}</td>
       <td class="mn">${g.n>0?(g.ps/g.n).toFixed(0)+' kg':'—'}</td>
@@ -777,8 +778,9 @@ function filtA(){
     }
     return true;
   }).sort((a,b)=>{
-    const co=CAT_ORD.indexOf(a.categoria)-CAT_ORD.indexOf(b.categoria);
-    return co||GRU_ORD.indexOf(a.grupo)-GRU_ORD.indexOf(b.grupo)||String(a.origen).localeCompare(String(b.origen));
+    const to=(a.tipo||'').localeCompare(b.tipo||'');
+    const co=(a.categoria||'').localeCompare(b.categoria||'');
+    return to||co||String(a.grupo).localeCompare(String(b.grupo))||String(a.origen).localeCompare(String(b.origen));
   });
   pA=1; renderAT();
 }
@@ -793,7 +795,8 @@ function renderAT(){
   tb.innerHTML=sl.map(a=>`<tr>
     <td class="mn tg" style="font-size:11px;cursor:pointer;" onclick="verDet('${a.ide}')">${a.ide}</td>
     <td class="mn" style="font-size:11px;">${a.ida||'—'}</td>
-    <td><span class="bg ${CBADGE[a.categoria]||''}">${CATS[a.categoria]||a.categoria}</span></td>
+    <td style="font-size:11px;color:var(--t2);">${a.tipo||'—'}</td>
+    <td><span class="bg ${CBADGE[a.categoria]||''}">${a.categoria||'—'}</span></td>
     <td><b>${GRUS[a.grupo]||a.grupo||'—'}</b></td>
     <td style="font-size:11px;">${a.origen||'—'}</td>
     <td class="mn" style="font-size:11px;">${a.fechaIngreso||'—'}</td>
