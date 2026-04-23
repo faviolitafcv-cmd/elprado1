@@ -188,6 +188,7 @@ tr:hover td{background:rgba(109,186,58,.04);}
   <div class="tab" onclick="showPg('animales')">🐄 Animales</div>
   <div class="tab" onclick="showPg('pesajes')">⚖️ Pesajes</div>
   <div class="tab" onclick="showPg('compras')">📥 Compras</div>
+  <div class="tab" onclick="showPg('ventas')">💰 Ventas</div>
   <div class="tab" onclick="showPg('bajas')">📤 Bajas</div>
   <div class="tab" onclick="showPg('informes')">📋 Informes</div>
 </div>
@@ -231,23 +232,37 @@ tr:hover td{background:rgba(109,186,58,.04);}
     <span id="aCount" style="font-size:11px;color:var(--t3);">Cargando...</span>
   </div>
   <div class="fr">
+    <select id="fTipo" onchange="filtA()">
+      <option value="">Todos los tipos</option>
+      <option value="INVERNADA">INVERNADA</option>
+      <option value="CRIA-REPRODUCTORES">CRIA-REPRODUCTORES</option>
+    </select>
     <select id="fCat" onchange="filtA()">
       <option value="">Todas las categorías</option>
-      <option value="VQ_INV">Vaquilla Invernada</option>
-      <option value="VQ_PDC">Vaquilla Pie de Cría</option>
-      <option value="TR_INV">Torillo Invernada</option>
-      <option value="TR_REP">Torillo Reproductor</option>
-      <option value="VC_INV">Vaca Invernada</option>
+      <option value="VAQUILLA">Vaquilla</option>
+      <option value="TORILLO">Torillo</option>
+      <option value="VACA">Vaca</option>
     </select>
     <select id="fGrupo" onchange="filtA()">
       <option value="">Todos los grupos</option>
-      <option value="CABEZA">Cabeza</option>
-      <option value="CUERPO">Cuerpo</option>
-      <option value="COLA1">Cola 1</option>
-      <option value="COLA2">Cola 2</option>
-      <option value="COLA3">Cola 3</option>
-      <option value="VENTA">Venta</option>
-      <option value="REPRODUCTOR">Reproductor</option>
+      <option value="VAQ. VENTA">VAQ. VENTA</option>
+      <option value="VAQ. CABEZA">VAQ. CABEZA</option>
+      <option value="VAQ. CUERPO">VAQ. CUERPO</option>
+      <option value="VAQ. COLA 1">VAQ. COLA 1</option>
+      <option value="VAQ. COLA 2">VAQ. COLA 2</option>
+      <option value="VAQ. COLA 3">VAQ. COLA 3</option>
+      <option value="TOR. VENTA">TOR. VENTA</option>
+      <option value="TOR. CABEZA">TOR. CABEZA</option>
+      <option value="TOR. CUERPO">TOR. CUERPO</option>
+      <option value="TOR. COLA 1">TOR. COLA 1</option>
+      <option value="TOR. COLA 2">TOR. COLA 2</option>
+      <option value="TOR. COLA 3">TOR. COLA 3</option>
+      <option value="VAQ. CRIA CABEZA">VAQ. CRIA CABEZA</option>
+      <option value="VAQ. CRIA CUERPO">VAQ. CRIA CUERPO</option>
+      <option value="VAQ. CRIA COLA 1">VAQ. CRIA COLA 1</option>
+      <option value="VAQ. CRIA COLA 2">VAQ. CRIA COLA 2</option>
+      <option value="TOR. CRIA CABEZA">TOR. CRIA CABEZA</option>
+      <option value="TOR. CRIA CUERPO">TOR. CRIA CUERPO</option>
     </select>
     <select id="fEst" onchange="filtA()">
       <option value="ACTIVO">Activos</option>
@@ -260,8 +275,16 @@ tr:hover td{background:rgba(109,186,58,.04);}
   <div class="card">
     <div class="tw"><table>
       <thead><tr>
-        <th>IDE (Chip)</th><th>Caravana</th><th>Tipo</th><th>Categoría</th><th>Grupo</th><th>Origen</th>
-        <th>F. Ingreso</th><th>Peso Ing.</th><th>Precio</th><th>Raza</th><th>Estado</th><th></th>
+        <th style="cursor:pointer;" onclick="sortA('ide')">IDE (Chip) ↕</th>
+        <th>Caravana</th>
+        <th style="cursor:pointer;" onclick="sortA('tipo')">Tipo ↕</th>
+        <th style="cursor:pointer;" onclick="sortA('categoria')">Categoría ↕</th>
+        <th style="cursor:pointer;" onclick="sortA('grupo')">Grupo ↕</th>
+        <th style="cursor:pointer;" onclick="sortA('origen')">Origen ↕</th>
+        <th style="cursor:pointer;" onclick="sortA('fechaIngreso')">F. Ingreso ↕</th>
+        <th style="cursor:pointer;" onclick="sortA('pesoIngreso')">Peso Ing. ↕</th>
+        <th style="cursor:pointer;" onclick="sortA('precioCompra')">Precio ↕</th>
+        <th>Raza</th><th>Estado</th><th></th>
       </tr></thead>
       <tbody id="aBody"><tr><td colspan="11"><div class="ldr"><div class="ls"></div></div></td></tr></tbody>
     </table></div>
@@ -325,8 +348,22 @@ tr:hover td{background:rgba(109,186,58,.04);}
   <div class="card">
     <div class="ch"><div class="ct">📥 Historial de Compras</div></div>
     <div class="tw"><table>
-      <thead><tr><th>Fecha</th><th>Origen/Predio</th><th>Municipio</th><th>Categoría</th><th>Cabezas</th><th>Peso Prom.</th><th>Precio Prom.</th><th>Total Bs</th><th>Raza</th></tr></thead>
-      <tbody id="cBody"><tr><td colspan="9"><div class="emp"><div class="emp-ic">📥</div>Sin compras registradas</div></td></tr></tbody>
+      <thead><tr><th>Código</th><th>Fecha</th><th>Origen/Predio</th><th>Municipio</th><th>Tipo</th><th>Cabezas</th><th>Kg Total</th><th>Total Bs</th><th>Bs/kg</th><th></th></tr></thead>
+      <tbody id="cBody"><tr><td colspan="10"><div class="emp"><div class="emp-ic">📥</div>Sin compras registradas</div></td></tr></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- ═══════ VENTAS ═══════ -->
+<div class="pg" id="pg-ventas">
+  <div class="ar">
+    <button class="btn bp" onclick="openV()">💰 Registrar Venta</button>
+  </div>
+  <div class="card">
+    <div class="ch"><div class="ct">💰 Historial de Ventas</div></div>
+    <div class="tw"><table>
+      <thead><tr><th>Código</th><th>Fecha</th><th>Destino</th><th>Tipo</th><th>Cabezas</th><th>Kg Total</th><th>Total Bs</th><th>Bs/kg</th><th></th></tr></thead>
+      <tbody id="vBody"><tr><td colspan="9"><div class="emp"><div class="emp-ic">💰</div>Sin ventas registradas</div></td></tr></tbody>
     </table></div>
   </div>
 </div>
@@ -481,6 +518,63 @@ tr:hover td{background:rgba(109,186,58,.04);}
 </div>
 
 <!-- Modal: Compra -->
+
+<!-- Modal: Editar Animal -->
+<div class="mo" id="moEditA">
+  <div class="md">
+    <div class="mh"><div class="mt" id="moEditAT">✏️ Editar Animal</div><button class="mc" onclick="cerrar('moEditA')">✕</button></div>
+    <div class="mb">
+      <div class="fg">
+        <div class="fm full"><label>IDE (Chip)</label><input id="eaIde" type="text" readonly style="opacity:.6;"></div>
+        <div class="fm"><label>Tipo</label>
+          <select id="eaTipo">
+            <option value="">— Sin tipo —</option>
+            <option value="INVERNADA">INVERNADA</option>
+            <option value="CRIA-REPRODUCTORES">CRIA-REPRODUCTORES</option>
+          </select>
+        </div>
+        <div class="fm"><label>Categoría</label>
+          <select id="eaCat">
+            <option value="">— Seleccionar —</option>
+            <option value="VAQUILLA">VAQUILLA</option>
+            <option value="TORILLO">TORILLO</option>
+            <option value="VACA">VACA</option>
+          </select>
+        </div>
+        <div class="fm"><label>Grupo</label>
+          <select id="eaGrupo">
+            <option value="">— Seleccionar —</option>
+            <option>VAQ. VENTA</option><option>VAQ. CABEZA</option><option>VAQ. CUERPO</option>
+            <option>VAQ. COLA 1</option><option>VAQ. COLA 2</option><option>VAQ. COLA 3</option>
+            <option>TOR. VENTA</option><option>TOR. CABEZA</option><option>TOR. CUERPO</option>
+            <option>TOR. COLA 1</option><option>TOR. COLA 2</option><option>TOR. COLA 3</option>
+            <option>VAQ. CRIA CABEZA</option><option>VAQ. CRIA CUERPO</option>
+            <option>VAQ. CRIA COLA 1</option><option>VAQ. CRIA COLA 2</option>
+            <option>TOR. CRIA CABEZA</option><option>TOR. CRIA CUERPO</option>
+          </select>
+        </div>
+        <div class="fm"><label>Identificación Anterior (IDA)</label><input id="eaIda" type="text"></div>
+        <div class="fm"><label>Origen / Predio</label><input id="eaOrigen" type="text"></div>
+        <div class="fm"><label>Fecha Ingreso</label><input id="eaFecha" type="date"></div>
+        <div class="fm"><label>Peso Ingreso (kg)</label><input id="eaPeso" type="number" step="0.1"></div>
+        <div class="fm"><label>Precio Compra (Bs)</label><input id="eaPrecio" type="number" step="0.01"></div>
+        <div class="fm"><label>Raza</label><input id="eaRaza" type="text"></div>
+        <div class="fm"><label>Estado</label>
+          <select id="eaEstado">
+            <option value="ACTIVO">ACTIVO</option>
+            <option value="VENDIDO">VENDIDO</option>
+            <option value="MUERTO">MUERTO</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn bs" onclick="cerrar('moEditA')">Cancelar</button>
+      <button class="btn bp" onclick="guardarEditAnimal()">💾 Guardar Cambios</button>
+    </div>
+  </div>
+</div>
+
 <div class="mo" id="moC">
   <div class="md md-lg" style="max-width:680px;">
     <div class="mh"><div class="mt">📥 Registrar Compra de Animales</div><button class="mc" onclick="cerrar('moC')">✕</button></div>
@@ -513,6 +607,13 @@ tr:hover td{background:rgba(109,186,58,.04);}
           <input id="cPrecKg" type="text" readonly style="background:rgba(109,186,58,.1);font-weight:700;color:var(--gr);">
         </div>
 
+        <div class="sep" style="grid-column:1/-1;">Cuentas Bancarias (a quién se paga)</div>
+        <div style="grid-column:1/-1;">
+          <div id="cCuentas"></div>
+          <button class="btn bs btn-sm" style="margin-top:8px;" onclick="agregarCuentaCompra()">+ Agregar cuenta</button>
+          <div id="cCuentasTotal" style="margin-top:8px;font-size:12px;color:var(--t3);"></div>
+        </div>
+
         <div class="sep" style="grid-column:1/-1;">Animales del Lote — Planilla de Balanza</div>
         <div class="fm" style="grid-column:1/-1;">
           <label>Subí el Excel de la balanza (se lee: IDE, Peso, Raza, Categoría, Clasificación)</label>
@@ -524,6 +625,67 @@ tr:hover td{background:rgba(109,186,58,.04);}
     <div class="mf">
       <button class="btn bs" onclick="cerrar('moC')">Cancelar</button>
       <button class="btn bp" id="btnSaveC" onclick="saveC()">💾 Registrar Compra</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Modal: Registrar Venta -->
+<div class="mo" id="moV2">
+  <div class="md md-lg" style="max-width:720px;">
+    <div class="mh"><div class="mt" id="moV2T">💰 Registrar Venta de Animales</div><button class="mc" onclick="cerrar('moV2')">✕</button></div>
+    <div class="mb">
+      <div class="fg">
+        <div class="sep">Datos Generales del Lote</div>
+        <div class="fm"><label>Fecha de Venta *</label><input id="vF2" type="date"></div>
+        <div class="fm"><label>Destino / Comprador *</label><input id="vDest" type="text" placeholder="Nombre del comprador"></div>
+        <div class="fm"><label>Municipio</label><input id="vMun" type="text" placeholder="San Ignacio..."></div>
+        <div class="fm"><label>Tipo *</label>
+          <select id="vTipo">
+            <option value="">— Seleccionar —</option>
+            <option value="INVERNADA">INVERNADA</option>
+            <option value="CRIA-REPRODUCTORES">CRIA-REPRODUCTORES</option>
+          </select>
+        </div>
+
+        <div class="sep">Precio de la Venta</div>
+        <div class="fm"><label>Kg Total del Lote *</label><input id="vKgTot" type="number" step="0.1" placeholder="0.0" oninput="calcVenta()"></div>
+        <div class="fm"><label>Precio Bruto Total (Bs) *</label><input id="vPrecBruto" type="number" step="0.01" placeholder="0.00" oninput="calcVenta()"></div>
+        <div class="fm"><label>Comisionista</label><input id="vComNombre" type="text" placeholder="Nombre del comisionista"></div>
+        <div class="fm"><label>Comisión (Bs)</label><input id="vComPrecio" type="number" step="0.01" placeholder="0.00" value="0" oninput="calcVenta()"></div>
+        <div class="fm"><label>Transporte (Bs)</label><input id="vTransporte" type="number" step="0.01" placeholder="0.00" value="0" oninput="calcVenta()"></div>
+        <div class="fm"><label>Total a Cobrar (Bs)</label>
+          <input id="vTotalCobrar" type="text" readonly style="background:rgba(109,186,58,.1);font-weight:700;color:var(--gr);">
+        </div>
+        <div class="fm"><label>Precio por Kg (Bs/kg)</label>
+          <input id="vPrecKg" type="text" readonly style="background:rgba(109,186,58,.1);font-weight:700;color:var(--gr);">
+        </div>
+
+        <div class="sep" style="grid-column:1/-1;">Cuentas Bancarias (donde depositan)</div>
+        <div style="grid-column:1/-1;" id="vCuentasWrap">
+          <div id="vCuentas"></div>
+          <button class="btn bs btn-sm" style="margin-top:8px;" onclick="agregarCuentaVenta()">+ Agregar cuenta</button>
+          <div id="vCuentasTotal" style="margin-top:8px;font-size:12px;color:var(--t3);"></div>
+        </div>
+
+        <div class="sep" style="grid-column:1/-1;">Cuentas Bancarias (a quién se paga)</div>
+        <div style="grid-column:1/-1;">
+          <div id="cCuentas"></div>
+          <button class="btn bs btn-sm" style="margin-top:8px;" onclick="agregarCuentaCompra()">+ Agregar cuenta</button>
+          <div id="cCuentasTotal" style="margin-top:8px;font-size:12px;color:var(--t3);"></div>
+        </div>
+
+        <div class="sep" style="grid-column:1/-1;">Animales del Lote — Planilla de Balanza</div>
+        <div class="fm" style="grid-column:1/-1;">
+          <label>Subí el Excel de la balanza (IDE, Peso, Raza, Categoría, Clasificación)</label>
+          <input type="file" id="vXls" accept=".xls,.xlsx" style="font-size:12px;margin-top:4px;" onchange="readVentaXls(this.files[0])">
+        </div>
+        <div id="vXlsPrev" style="grid-column:1/-1;font-size:12px;color:var(--t2);"></div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn bs" onclick="cerrar('moV2')">Cancelar</button>
+      <button class="btn bp" id="btnSaveV" onclick="saveVenta()">💰 Registrar Venta</button>
     </div>
   </div>
 </div>
@@ -639,6 +801,7 @@ let animales = {};   // keyed by IDE
 let pesajes  = [];   // sorted desc by fecha
 let bajas    = [];   // sorted desc by fecha
 let compras  = [];
+let ventas   = [];
 let aFilt    = [];
 let pA = 1, pP = 1, pB = 1;
 const PXP = 50;
@@ -701,13 +864,15 @@ async function loadAll(){
     pesajes  = toArr(rP).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
     bajas    = toArr(rB).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
     compras  = toArr(rC).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+    const rV = await fbGet('ventas');
+    ventas   = toArr(rV).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
   } catch(e){ ntf('Error al cargar datos: '+e.message, true); }
 }
 
 function toArr(v){ return v ? (Array.isArray(v) ? v : Object.values(v)) : []; }
 
 // ═══════════ NAVIGATION ═══════════
-const TABS = ['dash','animales','pesajes','compras','bajas','informes'];
+const TABS = ['dash','animales','pesajes','compras','ventas','bajas','informes'];
 function showPg(id){
   document.querySelectorAll('.pg').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -719,6 +884,7 @@ function showPg(id){
   if(id==='bajas')     renderB();
   if(id==='informes')  renderInf();
   if(id==='compras')   renderCo();
+  if(id==='ventas')    renderV();
 }
 function filtQuick(tipo, cat){
   // Normalizar: acepta tanto formato nuevo como viejo
@@ -807,24 +973,36 @@ function renderDash(){
 }
 
 // ═══════════ ANIMALES ═══════════
+let aSortField='grupo', aSortDir=1;
+
+function sortA(field){
+  if(aSortField===field){ aSortDir*=-1; } else { aSortField=field; aSortDir=1; }
+  filtA();
+}
+
 function filtA(){
+  const tipo=document.getElementById('fTipo')?.value||'';
   const cat=document.getElementById('fCat').value;
   const gru=document.getElementById('fGrupo').value;
   const est=document.getElementById('fEst').value;
   const bus=document.getElementById('fBus').value.trim().toLowerCase();
   aFilt=Object.values(animales).filter(a=>{
-    if(cat&&a.categoria!==cat)return false;
-    if(gru&&a.grupo!==gru)return false;
+    if(tipo&&(a.tipo||'')!==tipo)return false;
+    if(cat&&(a.categoria||'')!==cat)return false;
+    if(gru&&(a.grupo||'')!==gru)return false;
     if(est&&a.estado!==est)return false;
     if(bus){
-      const s=String(a.ide).toLowerCase()+(a.ida||'').toLowerCase()+(a.origen||'').toLowerCase();
+      const s=String(a.ide).toLowerCase()+(a.ida||'').toLowerCase()+(a.origen||'').toLowerCase()+(a.grupo||'').toLowerCase();
       if(!s.includes(bus))return false;
     }
     return true;
   }).sort((a,b)=>{
-    const to=(a.tipo||'').localeCompare(b.tipo||'');
-    const co=(a.categoria||'').localeCompare(b.categoria||'');
-    return to||co||String(a.grupo).localeCompare(String(b.grupo))||String(a.origen).localeCompare(String(b.origen));
+    const vA=String(a[aSortField]||'').toLowerCase();
+    const vB=String(b[aSortField]||'').toLowerCase();
+    const numA=parseFloat(a[aSortField]);
+    const numB=parseFloat(b[aSortField]);
+    if(!isNaN(numA)&&!isNaN(numB)) return (numA-numB)*aSortDir;
+    return vA.localeCompare(vB)*aSortDir;
   });
   pA=1; renderAT();
 }
@@ -848,9 +1026,67 @@ function renderAT(){
     <td class="mn tgo" style="font-size:11px;">Bs ${fmt(a.precioCompra)}</td>
     <td style="font-size:11px;color:var(--t3);">${a.raza||'—'}</td>
     <td><span class="bg bg-${(a.estado||'activo').toLowerCase()}">${a.estado||'ACTIVO'}</span></td>
-    <td><button class="btn bs btn-sm" onclick="verDet('${a.ide}')">📋</button></td>
+    <td style="white-space:nowrap;">
+      <button class="btn bs btn-sm" onclick="verDet('${a.ide}')" title="Ver detalle">📋</button>
+      <button class="btn bs btn-sm" style="border-color:var(--gold);color:var(--gold);" onclick="editarAnimal('${a.ide}')" title="Editar">✏️</button>
+      <button class="btn bd btn-sm" onclick="eliminarAnimal('${a.ide}')" title="Eliminar">✕</button>
+    </td>
   </tr>`).join('');
   renderPag('aPag',tot,pA,n=>{pA=n;renderAT();});
+}
+
+
+// ═══════════ EDITAR / ELIMINAR ANIMAL ═══════════
+function editarAnimal(ide){
+  const a=animales[ide];
+  if(!a){ntf('Animal no encontrado',true);return;}
+  document.getElementById('eaIde').value    = ide;
+  document.getElementById('eaTipo').value   = a.tipo||'';
+  document.getElementById('eaCat').value    = a.categoria||'';
+  document.getElementById('eaGrupo').value  = a.grupo||'';
+  document.getElementById('eaIda').value    = a.ida||'';
+  document.getElementById('eaOrigen').value = a.origen||'';
+  document.getElementById('eaFecha').value  = a.fechaIngreso||'';
+  document.getElementById('eaPeso').value   = a.pesoIngreso||'';
+  document.getElementById('eaPrecio').value = a.precioCompra||'';
+  document.getElementById('eaRaza').value   = a.raza||'';
+  document.getElementById('eaEstado').value = a.estado||'ACTIVO';
+  document.getElementById('moEditA').classList.add('open');
+}
+
+async function guardarEditAnimal(){
+  const ide   = document.getElementById('eaIde').value;
+  const tipo  = document.getElementById('eaTipo').value;
+  const cat   = document.getElementById('eaCat').value;
+  const gru   = document.getElementById('eaGrupo').value;
+  const ida   = document.getElementById('eaIda').value.trim()||null;
+  const ori   = document.getElementById('eaOrigen').value.trim();
+  const fecha = document.getElementById('eaFecha').value;
+  const peso  = parseFloat(document.getElementById('eaPeso').value)||0;
+  const prec  = parseFloat(document.getElementById('eaPrecio').value)||0;
+  const raza  = document.getElementById('eaRaza').value.trim()||null;
+  const est   = document.getElementById('eaEstado').value;
+  if(!ide){ntf('Error: sin IDE',true);return;}
+  const upd={tipo,categoria:cat,grupo:gru,ida,origen:ori,fechaIngreso:fecha,
+    pesoIngreso:peso,precioCompra:prec,raza,estado:est};
+  try{
+    const updObj={}; updObj['animales/'+ide]={...animales[ide],...upd}; await fbPatch('',updObj);
+    animales[ide]={...animales[ide],...upd};
+    cerrar('moEditA'); renderDash(); renderA();
+    ntf('✅ Animal actualizado');
+  }catch(e){ntf('Error: '+e.message,true);}
+}
+
+async function eliminarAnimal(ide){
+  const a=animales[ide];
+  if(!a){ntf('Animal no encontrado',true);return;}
+  if(!confirm('¿Eliminar animal IDE '+ide+'?\nEsta acción no se puede deshacer.')) return;
+  try{
+    await fetch(FB+'/animales/'+ide+'.json',{method:'DELETE'});
+    delete animales[ide];
+    renderDash(); renderA();
+    ntf('✅ Animal eliminado');
+  }catch(e){ntf('Error: '+e.message,true);}
 }
 
 // ═══════════ ANIMAL MODAL ═══════════
@@ -1652,10 +1888,310 @@ function verReciboCompra(cId){
 }
 
 
+
+
+// ═══════════ VENTAS ═══════════
+let _ventaAnimales = [];
+let _cuentasVenta = [];
+let _cuentasCompra = [];
+
+function calcGestionVenta(){
+  const hoy=new Date();
+  return hoy.getMonth()>=7?hoy.getFullYear()+1:hoy.getFullYear();
+}
+function genCodigoVenta(){
+  const g=calcGestionVenta();
+  const prev=ventas.filter(v=>v.codigo&&v.codigo.startsWith(String(g)+'-V'));
+  return g+'-V'+String(prev.length+1).padStart(3,'0');
+}
+
+// ── Cuentas bancarias dinámicas ─────────────────────────────────────────────
+function renderCuentas(arr, contId, totalId, totalRef){
+  const cont=document.getElementById(contId);
+  if(!cont)return;
+  cont.innerHTML=arr.map((cu,i)=>`
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr auto;gap:6px;align-items:end;margin-bottom:8px;padding:8px;background:var(--card2);border-radius:6px;border:1px solid var(--brd);">
+      <div><label style="font-size:10px;color:var(--t3);">Titular</label><input value="${cu.titular||''}" oninput="updCuenta('${contId}',${i},'titular',this.value)" style="width:100%;background:var(--bg);border:1px solid var(--brd);color:var(--text);padding:5px;border-radius:4px;font-size:12px;"></div>
+      <div><label style="font-size:10px;color:var(--t3);">CI</label><input value="${cu.ci||''}" oninput="updCuenta('${contId}',${i},'ci',this.value)" style="width:100%;background:var(--bg);border:1px solid var(--brd);color:var(--text);padding:5px;border-radius:4px;font-size:12px;"></div>
+      <div><label style="font-size:10px;color:var(--t3);">Banco</label><input value="${cu.banco||''}" oninput="updCuenta('${contId}',${i},'banco',this.value)" style="width:100%;background:var(--bg);border:1px solid var(--brd);color:var(--text);padding:5px;border-radius:4px;font-size:12px;"></div>
+      <div><label style="font-size:10px;color:var(--t3);">N° Cuenta</label><input value="${cu.nroCuenta||''}" oninput="updCuenta('${contId}',${i},'nroCuenta',this.value)" style="width:100%;background:var(--bg);border:1px solid var(--brd);color:var(--text);padding:5px;border-radius:4px;font-size:12px;"></div>
+      <div><label style="font-size:10px;color:var(--t3);">Monto (Bs)</label><input type="number" value="${cu.monto||''}" oninput="updCuenta('${contId}',${i},'monto',parseFloat(this.value)||0);actualizarTotalCuentas('${contId}','${totalId}',${totalRef})" style="width:100%;background:var(--bg);border:1px solid var(--brd);color:var(--text);padding:5px;border-radius:4px;font-size:12px;"></div>
+      <button onclick="quitarCuenta('${contId}',${i},'${totalId}',${totalRef})" style="background:var(--red);border:none;color:#fff;border-radius:4px;padding:5px 8px;cursor:pointer;font-size:12px;">✕</button>
+    </div>`).join('');
+  actualizarTotalCuentas(contId, totalId, totalRef);
+}
+
+function updCuenta(contId, i, field, val){
+  const arr = contId==='cCuentas' ? _cuentasCompra : _cuentasVenta;
+  arr[i][field]=val;
+}
+
+function quitarCuenta(contId, i, totalId, totalRef){
+  const arr = contId==='cCuentas' ? _cuentasCompra : _cuentasVenta;
+  arr.splice(i,1);
+  renderCuentas(arr, contId, totalId, totalRef);
+}
+
+function actualizarTotalCuentas(contId, totalId, totalRef){
+  const arr = contId==='cCuentas' ? _cuentasCompra : _cuentasVenta;
+  const suma = arr.reduce((s,cu)=>s+(parseFloat(cu.monto)||0),0);
+  const div = document.getElementById(totalId);
+  if(!div) return;
+  const ok = Math.abs(suma-totalRef)<1;
+  div.innerHTML=`Total cuentas: <strong style="color:${ok?'var(--gr)':'var(--red)'}">Bs ${suma.toLocaleString('es-BO',{minimumFractionDigits:2})}</strong> ${ok?'✅':'⚠️ No coincide con el total (Bs '+totalRef.toLocaleString('es-BO',{minimumFractionDigits:2})+')'}`;
+}
+
+function agregarCuentaCompra(){
+  const total=parseFloat(document.getElementById('cTotalPagar')?.value?.replace(/[^0-9.]/g,'')||0);
+  _cuentasCompra.push({titular:'',ci:'',banco:'',nroCuenta:'',monto:0});
+  renderCuentas(_cuentasCompra,'cCuentas','cCuentasTotal',total);
+}
+
+function agregarCuentaVenta(){
+  const total=parseFloat(document.getElementById('vTotalCobrar')?.value?.replace(/[^0-9.]/g,'')||0);
+  _cuentasVenta.push({titular:'',ci:'',banco:'',nroCuenta:'',monto:0});
+  renderCuentas(_cuentasVenta,'vCuentas','vCuentasTotal',total);
+}
+
+function calcVenta(){
+  const bruto=parseFloat(document.getElementById('vPrecBruto').value)||0;
+  const com=parseFloat(document.getElementById('vComPrecio').value)||0;
+  const trans=parseFloat(document.getElementById('vTransporte').value)||0;
+  const kgTot=parseFloat(document.getElementById('vKgTot').value)||0;
+  const total=bruto-com-trans; // en venta se descuentan comisión y transporte
+  const pKg=kgTot>0?total/kgTot:0;
+  document.getElementById('vTotalCobrar').value=total>0?'Bs '+total.toLocaleString('es-BO',{minimumFractionDigits:2}):'';
+  document.getElementById('vPrecKg').value=pKg>0?'Bs '+pKg.toFixed(4)+'/kg':'';
+  // Actualizar totales cuentas
+  if(_cuentasVenta.length) actualizarTotalCuentas('vCuentas','vCuentasTotal',total);
+}
+
+function readVentaXls(file){
+  if(!file)return;
+  const rd=new FileReader();
+  rd.onload=e=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1});
+      if(rows.length<2){ntf('Archivo vacío',true);return;}
+      const hdr=rows[0].map(h=>String(h||'').trim().toUpperCase());
+      const ci=hdr.findIndex(h=>h.includes('IDE')||h.includes('CHIP'));
+      const cp=hdr.findIndex(h=>h==='PESO'||h.includes('PESO'));
+      const cr=hdr.findIndex(h=>h==='RAZA');
+      const ccat=hdr.findIndex(h=>h.includes('CATEG'));
+      const ccl=hdr.findIndex(h=>h.includes('CLASF')||h.includes('CLASIF'));
+      if(ci<0||cp<0){ntf('No se encontraron columnas IDE/Peso',true);return;}
+      _ventaAnimales=[];
+      let noEnc=[];
+      for(let i=1;i<rows.length;i++){
+        const r=rows[i];
+        if(!r||!r[ci])continue;
+        const ide=String(r[ci]).trim();
+        if(!ide||ide==='undefined')continue;
+        const peso=parseFloat(String(r[cp]||0).replace(',','.'));
+        if(isNaN(peso)||peso<=0)continue;
+        const aEx=animales[ide]||Object.values(animales).find(a=>String(a.ide).replace(/^0+/,'')==ide.replace(/^0+/,''));
+        if(!aEx){noEnc.push(ide);continue;}
+        _ventaAnimales.push({ide:aEx.ide,peso,raza:cr>=0&&r[cr]?String(r[cr]).trim():null,
+          categoria:ccat>=0&&r[ccat]?String(r[ccat]).trim():null,
+          grupo:ccl>=0&&r[ccl]?String(r[ccl]).trim():null});
+      }
+      const kgTot=_ventaAnimales.reduce((s,a)=>s+a.peso,0);
+      document.getElementById('vKgTot').value=kgTot.toFixed(1);
+      calcVenta();
+      document.getElementById('vXlsPrev').innerHTML=`
+        <div style="margin-top:8px;padding:10px;background:rgba(109,186,58,.07);border-radius:6px;border:1px solid var(--brd2);">
+          <div style="font-weight:700;color:var(--gr);margin-bottom:4px;">✅ ${_ventaAnimales.length} animales leídos</div>
+          <div style="font-size:11px;color:var(--t3);">Kg total: <strong>${kgTot.toFixed(1)} kg</strong> — Peso promedio: <strong>${(_ventaAnimales.length>0?kgTot/_ventaAnimales.length:0).toFixed(1)} kg</strong></div>
+          ${noEnc.length>0?`<div style="font-size:11px;color:var(--red);margin-top:4px;">⚠️ ${noEnc.length} IDEs no encontrados en el sistema</div>`:''}
+        </div>`;
+    }catch(err){ntf('Error: '+err.message,true);}
+  };
+  rd.readAsArrayBuffer(file);
+}
+
+function openV(){
+  _ventaAnimales=[];_cuentasVenta=[];
+  ['vF2','vDest','vMun','vComNombre'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['vKgTot','vPrecBruto','vComPrecio','vTransporte'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('vTotalCobrar').value='';
+  document.getElementById('vPrecKg').value='';
+  document.getElementById('vCuentas').innerHTML='';
+  document.getElementById('vCuentasTotal').innerHTML='';
+  document.getElementById('vXlsPrev').innerHTML='';
+  document.getElementById('vXls').value='';
+  document.getElementById('vF2').value=new Date().toISOString().split('T')[0];
+  document.getElementById('moV2T').textContent='💰 Registrar Venta de Animales';
+  document.getElementById('btnSaveV').dataset.editId='';
+  document.getElementById('btnSaveV').textContent='💰 Registrar Venta';
+  document.getElementById('moV2').classList.add('open');
+}
+
+async function saveVenta(){
+  const fecha=document.getElementById('vF2').value;
+  const dest=document.getElementById('vDest').value.trim();
+  const mun=document.getElementById('vMun').value.trim();
+  const tipo=document.getElementById('vTipo').value;
+  const bruto=parseFloat(document.getElementById('vPrecBruto').value)||0;
+  const com=parseFloat(document.getElementById('vComPrecio').value)||0;
+  const trans=parseFloat(document.getElementById('vTransporte').value)||0;
+  const kgTot=parseFloat(document.getElementById('vKgTot').value)||0;
+  const comNom=document.getElementById('vComNombre').value.trim();
+  if(!fecha||!dest||!tipo||bruto<=0){ntf('Completá fecha, destino, tipo y precio bruto',true);return;}
+  if(!_ventaAnimales.length){ntf('Subí el Excel de la balanza con los animales',true);return;}
+  const totalCobrar=bruto-com-trans;
+  const precKg=kgTot>0?totalCobrar/kgTot:totalCobrar/_ventaAnimales.length;
+  const codigo=genCodigoVenta();
+  const btn=document.getElementById('btnSaveV');
+  btn.disabled=true;btn.textContent='⏳ Guardando...';
+  const vId='v_'+Date.now();
+  const ventaObj={id:vId,codigo,fecha,destino:dest,municipio:mun,tipo,
+    cabezas:_ventaAnimales.length,kgTotal:kgTot,
+    precioBruto:bruto,comisionista:comNom||null,precioComision:com,
+    transporte:trans,totalCobrar,precioKg:precKg,
+    cuentas:_cuentasVenta.length?_cuentasVenta:null,usuario};
+  const updates={}; updates['ventas/'+vId]=ventaObj;
+  for(const a of _ventaAnimales){
+    const precAnimal=Math.round(a.peso*precKg*100)/100;
+    const bid='b_'+a.ide+'_'+fecha.replace(/-/g,'');
+    updates['animales/'+a.ide+'/estado']='VENDIDO';
+    updates['bajas/'+bid]={id:bid,ide:a.ide,tipo:'VENTA',fecha,
+      pesoVenta:a.peso,precioVenta:precAnimal,
+      destino:dest,ventaId:vId,
+      categoriaAnimal:animales[a.ide]?.categoria||null,
+      grupoAnimal:animales[a.ide]?.grupo||null,
+      origenAnimal:animales[a.ide]?.origen||null,usuario};
+    if(animales[a.ide]){animales[a.ide].estado='VENDIDO';}
+  }
+  try{
+    await fbPatch('',updates);
+    ventas.unshift(ventaObj);
+    cerrar('moV2');renderDash();renderA();renderV();renderB();
+    ntf('✅ Venta '+codigo+' registrada — '+_ventaAnimales.length+' animales');
+    setTimeout(()=>verReciboVenta(vId),500);
+  }catch(e){ntf('Error: '+e.message,true);}
+  finally{btn.disabled=false;btn.textContent='💰 Registrar Venta';}
+}
+
+function renderV(){
+  const tb=document.getElementById('vBody');
+  if(!tb)return;
+  if(!ventas.length){tb.innerHTML='<tr><td colspan="9"><div class="emp"><div class="emp-ic">💰</div>Sin ventas registradas</div></td></tr>';return;}
+  tb.innerHTML=ventas.slice(0,100).map(v=>`<tr>
+    <td class="mn" style="font-size:11px;font-weight:700;color:var(--gold);">${v.codigo||'—'}</td>
+    <td class="mn" style="font-size:11px;">${v.fecha}</td>
+    <td style="font-size:11px;"><b>${v.destino||'—'}</b></td>
+    <td style="font-size:11px;">${v.tipo||'—'}</td>
+    <td class="mn tg">${v.cabezas||'—'}</td>
+    <td class="mn">${v.kgTotal?v.kgTotal.toFixed(0)+' kg':'—'}</td>
+    <td class="mn tgo">Bs ${fmt(v.totalCobrar||0)}</td>
+    <td class="mn">${v.precioKg?'Bs '+Number(v.precioKg).toFixed(2):'—'}</td>
+    <td style="white-space:nowrap;">
+      <button class="btn bs btn-sm" onclick="verReciboVenta('${v.id}')" title="Ver recibo">🧾</button>
+      <button class="btn bd btn-sm" onclick="eliminarVenta('${v.id}')" title="Eliminar">✕</button>
+    </td>
+  </tr>`).join('');
+}
+
+async function eliminarVenta(vId){
+  const v=ventas.find(x=>x.id===vId);
+  if(!v)return;
+  const txt=prompt('Para eliminar la venta '+v.codigo+' escribí: ELIMINAR');
+  if(txt!=='ELIMINAR'){ntf('Operación cancelada');return;}
+  try{
+    await fetch(FB+'/ventas/'+vId+'.json',{method:'DELETE'});
+    ventas=ventas.filter(x=>x.id!==vId);
+    renderV();ntf('✅ Venta eliminada');
+  }catch(e){ntf('Error: '+e.message,true);}
+}
+
+function verReciboVenta(vId){
+  const v=ventas.find(x=>x.id===vId);
+  if(!v){ntf('Venta no encontrada',true);return;}
+  const w=window.open('','_blank','width=800,height=600');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Recibo ${v.codigo}</title>
+  <style>
+    body{font-family:Arial,sans-serif;padding:30px;color:#111;max-width:700px;margin:0 auto;}
+    h1{font-size:20px;margin-bottom:4px;}
+    .sub{font-size:12px;color:#666;margin-bottom:20px;}
+    table{width:100%;border-collapse:collapse;margin:16px 0;font-size:12px;}
+    th{background:#1a3a2a;color:#fff;padding:8px;text-align:left;}
+    td{padding:6px 8px;border-bottom:1px solid #eee;}
+    .total-row td{font-weight:700;background:#f5f5f5;}
+    .footer{margin-top:30px;font-size:11px;color:#999;border-top:1px solid #eee;padding-top:10px;}
+    @media print{button{display:none;}}
+  </style></head><body>
+  <button onclick="window.print()" style="margin-bottom:20px;padding:8px 16px;background:#1a3a2a;color:#fff;border:none;border-radius:4px;cursor:pointer;">🖨 Imprimir</button>
+  <h1>🐄 HACIENDA EL PRADO 1 — VENTA DE ANIMALES</h1>
+  <div class="sub">Código: <strong>${v.codigo}</strong> &nbsp;|&nbsp; Fecha: ${v.fecha} &nbsp;|&nbsp; San Ignacio de Velazco, Bolivia</div>
+  <table>
+    <tr><th colspan="2">Datos de la Venta</th></tr>
+    <tr><td>Destino / Comprador</td><td><strong>${v.destino}</strong></td></tr>
+    <tr><td>Municipio</td><td>${v.municipio||'—'}</td></tr>
+    <tr><td>Tipo</td><td>${v.tipo}</td></tr>
+    <tr><td>Cabezas</td><td><strong>${v.cabezas}</strong></td></tr>
+    <tr><td>Kg Total</td><td>${(v.kgTotal||0).toFixed(1)} kg</td></tr>
+    <tr><td>Peso Promedio</td><td>${v.cabezas>0?((v.kgTotal||0)/v.cabezas).toFixed(1):0} kg/cabeza</td></tr>
+  </table>
+  <table>
+    <tr><th colspan="2">Detalle de Precios</th></tr>
+    <tr><td>Precio Bruto</td><td>Bs ${(v.precioBruto||0).toLocaleString('es-BO',{minimumFractionDigits:2})}</td></tr>
+    <tr><td>Comisionista${v.comisionista?' ('+v.comisionista+')':''}</td><td>Bs ${(v.precioComision||0).toLocaleString('es-BO',{minimumFractionDigits:2})}</td></tr>
+    <tr><td>Transporte</td><td>Bs ${(v.transporte||0).toLocaleString('es-BO',{minimumFractionDigits:2})}</td></tr>
+    <tr class="total-row"><td>TOTAL A COBRAR</td><td>Bs ${(v.totalCobrar||0).toLocaleString('es-BO',{minimumFractionDigits:2})}</td></tr>
+    <tr><td>Precio por Kg</td><td><strong>Bs ${(v.precioKg||0).toFixed(4)}/kg</strong></td></tr>
+  </table>
+  ${v.cuentas&&v.cuentas.length?`
+  <table>
+    <tr><th>Titular</th><th>CI</th><th>Banco</th><th>N° Cuenta</th><th>Monto (Bs)</th></tr>
+    ${v.cuentas.map(cu=>`<tr><td>${cu.titular||'—'}</td><td>${cu.ci||'—'}</td><td>${cu.banco||'—'}</td><td>${cu.nroCuenta||'—'}</td><td>Bs ${(cu.monto||0).toLocaleString('es-BO',{minimumFractionDigits:2})}</td></tr>`).join('')}
+  </table>`:''}
+  <div class="footer">Documento generado por Sistema de Gestión El Prado 1 &nbsp;|&nbsp; ${v.codigo} &nbsp;|&nbsp; ${new Date().toLocaleDateString('es-BO')}<br>Usuario: ${v.usuario||'—'}</div>
+  </body></html>`);
+  w.document.close();
+}
+
+// ═══════════ EDITAR / ELIMINAR COMPRA ═══════════
+function editarCompra(cId){
+  const comp=compras.find(x=>x.id===cId);
+  if(!comp){ntf('Compra no encontrada',true);return;}
+  // Rellenar modal con datos existentes
+  document.getElementById('cF').value        = comp.fecha||'';
+  document.getElementById('cOri').value      = comp.origen||'';
+  document.getElementById('cMun').value      = comp.municipio||'';
+  document.getElementById('cTipo').value     = comp.tipo||'';
+  document.getElementById('cPrecBruto').value= comp.precioBruto||'';
+  document.getElementById('cComNombre').value= comp.comisionista||'';
+  document.getElementById('cComPrecio').value= comp.precioComision||0;
+  document.getElementById('cTransporte').value=comp.transporte||0;
+  document.getElementById('cKgTot').value    = comp.kgTotal||'';
+  calcCompra();
+  // Marcar como edición
+  document.getElementById('btnSaveC').dataset.editId = cId;
+  document.getElementById('btnSaveC').textContent = '💾 Guardar Cambios';
+  document.querySelector('#moC .mt').textContent = '✏️ Editar Compra '+comp.codigo;
+  document.getElementById('moC').classList.add('open');
+}
+
+async function eliminarCompra(cId){
+  const comp=compras.find(x=>x.id===cId);
+  if(!comp){ntf('Compra no encontrada',true);return;}
+  const txt=prompt('Para eliminar la compra '+comp.codigo+' escribí: ELIMINAR');
+  if(txt!=='ELIMINAR'){ntf('Operación cancelada');return;}
+  try{
+    await fetch(FB+'/compras/'+cId+'.json',{method:'DELETE'});
+    compras=compras.filter(x=>x.id!==cId);
+    renderCo();
+    ntf('✅ Compra eliminada');
+  }catch(e){ntf('Error: '+e.message,true);}
+}
+
 function renderCo(){
   const tb=document.getElementById('cBody');
   if(!compras.length){
-    tb.innerHTML='<tr><td colspan="9"><div class="emp"><div class="emp-ic">📥</div>Sin compras registradas</div></td></tr>'; return;
+    tb.innerHTML='<tr><td colspan="10"><div class="emp"><div class="emp-ic">📥</div>Sin compras registradas</div></td></tr>'; return;
   }
   tb.innerHTML=compras.slice(0,100).map(c=>`<tr>
     <td class="mn" style="font-size:11px;font-weight:700;color:var(--gr);">${c.codigo||'—'}</td>
@@ -1665,9 +2201,13 @@ function renderCo(){
     <td style="font-size:11px;">${c.tipo||'—'}</td>
     <td class="mn tg">${c.cabezas||'—'}</td>
     <td class="mn">${c.kgTotal?c.kgTotal.toFixed(0)+' kg':'—'}</td>
-    <td class="mn tgo">Bs ${fmt(c.prBs)}</td>
-    <td class="mn tgo"><b>Bs ${fmt(c.totalBs)}</b></td>
-    <td style="font-size:11px;color:var(--t3);">${c.raza||'—'}</td>
+    <td class="mn tgo">Bs ${fmt(c.totalPagar||c.precioBruto||0)}</td>
+    <td class="mn">${c.precioKg?'Bs '+Number(c.precioKg).toFixed(2):' —'}</td>
+    <td style="white-space:nowrap;">
+      <button class="btn bs btn-sm" onclick="verReciboCompra('${c.id}')" title="Ver recibo">🧾</button>
+      <button class="btn bs btn-sm" style="border-color:var(--gold);color:var(--gold);" onclick="editarCompra('${c.id}')" title="Editar">✏️</button>
+      <button class="btn bd btn-sm" onclick="eliminarCompra('${c.id}')" title="Eliminar">✕</button>
+    </td>
   </tr>`).join('');
 }
 
