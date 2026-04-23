@@ -2178,14 +2178,27 @@ function editarCompra(cId){
 async function eliminarCompra(cId){
   const comp=compras.find(x=>x.id===cId);
   if(!comp){ntf('Compra no encontrada',true);return;}
-  const txt=prompt('Para eliminar la compra '+comp.codigo+' escribí: ELIMINAR');
+
+  // Contar animales de esta compra
+  const animCompra = Object.values(animales).filter(a=>a.compraId===cId);
+  const txt=prompt('Para eliminar la compra '+comp.codigo+' y sus '+animCompra.length+' animales escribí: ELIMINAR');
   if(txt!=='ELIMINAR'){ntf('Operación cancelada');return;}
+
+  const btn = event?.target;
+  if(btn){btn.disabled=true;btn.textContent='⏳';}
+
   try{
-    await fetch(FB+'/compras/'+cId+'.json',{method:'DELETE'});
+    const updates={};
+    updates['compras/'+cId]=null;
+    // Eliminar cada animal de esta compra
+    animCompra.forEach(a=>{ updates['animales/'+a.ide]=null; delete animales[a.ide]; });
+
+    await fbPatch('', updates);
     compras=compras.filter(x=>x.id!==cId);
-    renderCo();
-    ntf('✅ Compra eliminada');
+    renderCo(); renderDash(); renderA();
+    ntf('✅ Compra y '+animCompra.length+' animales eliminados');
   }catch(e){ntf('Error: '+e.message,true);}
+  finally{ if(btn){btn.disabled=false;btn.textContent='✕';} }
 }
 
 function renderCo(){
