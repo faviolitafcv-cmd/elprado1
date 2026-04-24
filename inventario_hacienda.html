@@ -2299,18 +2299,17 @@ function verReciboCompra(cId){
   </div>
 </div>
 
-<!-- Modal: Importar Ventas Históricas -->
 <div class="mo" id="moImportVH">
   <div class="md" style="max-width:540px;">
-    <div class="mh"><div class="mt">📤 Importar Ventas Históricas</div><button class="mc" onclick="cerrar('moImportVH')">✕</button></div>
-    <div style="font-size:11px;color:var(--t2);padding:8px 14px 0;">Columnas: IDE · FECHA_VENTA · FECHA_INGRESO · TIPO_ANIMAL · CATEGORIA · GRUPO · ORIGEN · MERCADO · TIPO_DESTINO · FRIGORIFICO_O_COMPRADOR · PESO_VENTA_KG · PRECIO_VENTA_BS · PESO_INGRESO_KG · PRECIO_COMPRA_BS · RAZA</div>
+    <div class="mh"><div class="mt">Importar Ventas Historicas</div><button class="mc" onclick="cerrar('moImportVH')">X</button></div>
+    <div style="font-size:11px;color:var(--t2);padding:8px 14px 0;">Columnas: IDE, FECHA_VENTA, FECHA_INGRESO, TIPO_ANIMAL, CATEGORIA, GRUPO, ORIGEN, MERCADO, TIPO_DESTINO, FRIGORIFICO_O_COMPRADOR, PESO_VENTA_KG, PRECIO_VENTA_BS, PESO_INGRESO_KG, PRECIO_COMPRA_BS, RAZA</div>
     <div class="mb">
       <input type="file" id="fVH" accept=".xls,.xlsx" style="font-size:12px;margin-bottom:12px;" onchange="readVentasHist(this.files[0])">
       <div id="vhPrev" style="max-height:280px;overflow-y:auto;"></div>
     </div>
     <div class="mf">
       <button class="btn bs" onclick="cerrar('moImportVH')">Cancelar</button>
-      <button class="btn bp" id="btnConfVH" style="display:none;" onclick="confirmarImportVH()">✅ Confirmar e Importar</button>
+      <button class="btn bp" id="btnConfVH" style="display:none;" onclick="confirmarImportVH()">Confirmar e Importar</button>
     </div>
   </div>
 </div>
@@ -3125,18 +3124,17 @@ function verReciboVenta(vId){
   </div>
 </div>
 
-<!-- Modal: Importar Ventas Históricas -->
 <div class="mo" id="moImportVH">
   <div class="md" style="max-width:540px;">
-    <div class="mh"><div class="mt">📤 Importar Ventas Históricas</div><button class="mc" onclick="cerrar('moImportVH')">✕</button></div>
-    <div style="font-size:11px;color:var(--t2);padding:8px 14px 0;">Columnas: IDE · FECHA_VENTA · FECHA_INGRESO · TIPO_ANIMAL · CATEGORIA · GRUPO · ORIGEN · MERCADO · TIPO_DESTINO · FRIGORIFICO_O_COMPRADOR · PESO_VENTA_KG · PRECIO_VENTA_BS · PESO_INGRESO_KG · PRECIO_COMPRA_BS · RAZA</div>
+    <div class="mh"><div class="mt">Importar Ventas Historicas</div><button class="mc" onclick="cerrar('moImportVH')">X</button></div>
+    <div style="font-size:11px;color:var(--t2);padding:8px 14px 0;">Columnas: IDE, FECHA_VENTA, FECHA_INGRESO, TIPO_ANIMAL, CATEGORIA, GRUPO, ORIGEN, MERCADO, TIPO_DESTINO, FRIGORIFICO_O_COMPRADOR, PESO_VENTA_KG, PRECIO_VENTA_BS, PESO_INGRESO_KG, PRECIO_COMPRA_BS, RAZA</div>
     <div class="mb">
       <input type="file" id="fVH" accept=".xls,.xlsx" style="font-size:12px;margin-bottom:12px;" onchange="readVentasHist(this.files[0])">
       <div id="vhPrev" style="max-height:280px;overflow-y:auto;"></div>
     </div>
     <div class="mf">
       <button class="btn bs" onclick="cerrar('moImportVH')">Cancelar</button>
-      <button class="btn bp" id="btnConfVH" style="display:none;" onclick="confirmarImportVH()">✅ Confirmar e Importar</button>
+      <button class="btn bp" id="btnConfVH" style="display:none;" onclick="confirmarImportVH()">Confirmar e Importar</button>
     </div>
   </div>
 </div>
@@ -3465,53 +3463,54 @@ function openImportVentasHist(){
 
 function readVentasHist(file){
   if(!file) return;
-  const rd=new FileReader();
-  rd.onload=e=>{
+  var rd=new FileReader();
+  rd.onload=function(e){
     try{
-      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});
-      const ws=wb.Sheets[wb.SheetNames[0]];
-      const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,dateNF:'yyyy-mm-dd'});
+      var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});
+      var ws=wb.Sheets[wb.SheetNames[0]];
+      var rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,dateNF:'yyyy-mm-dd'});
       if(rows.length<2){ntf('Archivo vacío',true);return;}
-      const hdr=rows[0].map(h=>String(h||'').trim().toUpperCase());
-      const ci=hdr.findIndex(h=>h==='IDE');
-      const cfv=hdr.findIndex(h=>h.includes('FECHA_V'));
-      const cfi=hdr.findIndex(h=>h.includes('FECHA_I'));
-      const ctp=hdr.findIndex(h=>h.includes('TIPO_A'));
-      const ccat=hdr.findIndex(h=>h==='CATEGORIA');
-      const cgr=hdr.findIndex(h=>h==='GRUPO');
-      const cor=hdr.findIndex(h=>h==='ORIGEN');
-      const cmer=hdr.findIndex(h=>h==='MERCADO');
-      const ctd=hdr.findIndex(h=>h.includes('TIPO_D'));
-      const cfrig=hdr.findIndex(h=>h.includes('FRIGORIFICO'));
-      const cpv=hdr.findIndex(h=>h.includes('PESO_V'));
-      const cprv=hdr.findIndex(h=>h.includes('PRECIO_V'));
-      const cpig=hdr.findIndex(h=>h.includes('PESO_I'));
-      const cprc=hdr.findIndex(h=>h.includes('PRECIO_C'));
-      const crz=hdr.findIndex(h=>h==='RAZA');
-      if(ci<0||cfv<0){ntf('No se encontró columna IDE o FECHA_VENTA',true);return;}
-      const byVenta={};
-      let total=0;
-      for(let i=1;i<rows.length;i++){
-        const r=rows[i];
+      var hdr=rows[0].map(function(h){return String(h||'').trim().toUpperCase();});
+      var ci=hdr.findIndex(function(h){return h==='IDE';});
+      var cfv=hdr.findIndex(function(h){return h.indexOf('FECHA_V')>=0;});
+      var cfi=hdr.findIndex(function(h){return h.indexOf('FECHA_I')>=0;});
+      var ctp=hdr.findIndex(function(h){return h.indexOf('TIPO_A')>=0;});
+      var ccat=hdr.findIndex(function(h){return h==='CATEGORIA';});
+      var cgr=hdr.findIndex(function(h){return h==='GRUPO';});
+      var cor=hdr.findIndex(function(h){return h==='ORIGEN';});
+      var cmer=hdr.findIndex(function(h){return h==='MERCADO';});
+      var ctd=hdr.findIndex(function(h){return h.indexOf('TIPO_D')>=0;});
+      var cfrig=hdr.findIndex(function(h){return h.indexOf('FRIGORIFICO')>=0;});
+      var cpv=hdr.findIndex(function(h){return h.indexOf('PESO_V')>=0;});
+      var cprv=hdr.findIndex(function(h){return h.indexOf('PRECIO_V')>=0;});
+      var cpig=hdr.findIndex(function(h){return h.indexOf('PESO_I')>=0;});
+      var cprc=hdr.findIndex(function(h){return h.indexOf('PRECIO_C')>=0;});
+      var crz=hdr.findIndex(function(h){return h==='RAZA';});
+      if(ci<0||cfv<0){ntf('No se encontro columna IDE o FECHA_VENTA',true);return;}
+      var byVenta={};
+      var total=0;
+      for(var i=1;i<rows.length;i++){
+        var r=rows[i];
         if(!r||!r[ci]) continue;
-        let ide=String(r[ci]).trim().replace(/\.0$/,'');
-        if(parseFloat(ide)>0) ide=String(Math.round(parseFloat(ide)));
+        var ide=String(r[ci]).trim().replace('.0','');
+        var ideNum=parseFloat(ide);
+        if(ideNum>0) ide=String(Math.round(ideNum));
         if(!ide||ide==='0') continue;
-        const fv=parseFecha(r[cfv]);
+        var fv=parseFecha(r[cfv]);
         if(!fv) continue;
-        const dest=cfrig>=0&&r[cfrig]?String(r[cfrig]).trim():'';
-        const td=ctd>=0&&r[ctd]?String(r[ctd]).trim():'';
-        const mer=cmer>=0&&r[cmer]?String(r[cmer]).trim():'';
-        const frig=td==='FRIGORIFICO'?dest:'';
-        const vKey=fv+'|'+(dest||'?');
+        var dest=cfrig>=0&&r[cfrig]?String(r[cfrig]).trim():'';
+        var td=ctd>=0&&r[ctd]?String(r[ctd]).trim():'';
+        var mer=cmer>=0&&r[cmer]?String(r[cmer]).trim():'';
+        var frig=td==='FRIGORIFICO'?dest:'';
+        var vKey=fv+'|'+(dest||'?');
         if(!byVenta[vKey]) byVenta[vKey]={fecha:fv,destino:dest,frigorifico:frig||null,mercado:mer,tipoDestino:td,tipo:'',animales:[]};
-        const pv=parseFloat(String(r[cpv]||0).replace(',','.'));
-        const prv=parseFloat(String(r[cprv]||0).replace(',','.'));
-        const pig=cpig>=0?parseFloat(String(r[cpig]||0).replace(',','.')):0;
-        const prc=cprc>=0?parseFloat(String(r[cprc]||0).replace(',','.')):0;
+        var pv=parseFloat(String(r[cpv]||0).replace(',','.'));
+        var prv=parseFloat(String(r[cprv]||0).replace(',','.'));
+        var pig=cpig>=0?parseFloat(String(r[cpig]||0).replace(',','.')):0;
+        var prc=cprc>=0?parseFloat(String(r[cprc]||0).replace(',','.')):0;
         if(ctp>=0&&r[ctp]) byVenta[vKey].tipo=String(r[ctp]).trim();
         byVenta[vKey].animales.push({
-          ide,fechaVenta:fv,
+          ide:ide,fechaVenta:fv,
           fechaIngreso:cfi>=0?parseFecha(r[cfi]):'',
           tipo:ctp>=0&&r[ctp]?String(r[ctp]).trim():'',
           categoria:ccat>=0&&r[ccat]?String(r[ccat]).trim():'',
@@ -3526,11 +3525,11 @@ function readVentasHist(file){
         total++;
       }
       window._vhData=byVenta;
-      const nV=Object.keys(byVenta).length;
-      let prev='<div style="padding:10px;background:rgba(109,186,58,.07);border-radius:6px;">';
-      prev+='<div style="font-weight:700;color:var(--gr);margin-bottom:8px;">✅ '+total+' animales en '+nV+' ventas</div>';
-      Object.values(byVenta).forEach(v=>{
-        prev+='<div style="font-size:12px;color:var(--t2);margin-bottom:3px;">📅 '+v.fecha+' — '+(v.destino||'?')+' — <strong>'+v.animales.length+' animales</strong></div>';
+      var nV=Object.keys(byVenta).length;
+      var prev='<div style="padding:10px;background:rgba(109,186,58,.07);border-radius:6px;">';
+      prev+='<div style="font-weight:700;color:var(--gr);margin-bottom:8px;">OK: '+total+' animales en '+nV+' ventas</div>';
+      Object.values(byVenta).forEach(function(v){
+        prev+='<div style="font-size:12px;color:var(--t2);margin-bottom:3px;">'+v.fecha+' - '+(v.destino||'?')+' - '+v.animales.length+' animales</div>';
       });
       prev+='</div>';
       document.getElementById('vhPrev').innerHTML=prev;
@@ -3541,63 +3540,63 @@ function readVentasHist(file){
 }
 
 async function confirmarImportVH(){
-  const data=window._vhData;
+  var data=window._vhData;
   if(!data) return;
-  const btn=document.getElementById('btnConfVH');
-  btn.disabled=true; btn.textContent='⏳ Importando...';
-  const g=calcGestion();
-  let codigoN=ventas.filter(v=>v.codigo&&v.codigo.startsWith(String(g)+'-V')).length;
-
-  for(const [,vObj] of Object.entries(data)){
+  var btn=document.getElementById('btnConfVH');
+  btn.disabled=true; btn.textContent='Importando...';
+  var g=calcGestion();
+  var codigoN=ventas.filter(function(v){return v.codigo&&v.codigo.indexOf(String(g)+'-V')===0;}).length;
+  var keys=Object.keys(data);
+  for(var ki=0;ki<keys.length;ki++){
+    var vObj=data[keys[ki]];
     codigoN++;
-    const vId='vh_'+vObj.fecha.replace(/-/g,'')+'_'+codigoN;
-    const codigo=g+'-V'+String(codigoN).padStart(3,'0');
-    const kgTot=Math.round(vObj.animales.reduce((s,a)=>s+a.pesoVenta,0)*10)/10;
-    const totalBs=Math.round(vObj.animales.reduce((s,a)=>s+a.precioVenta,0)*100)/100;
-    const precKg=kgTot>0?totalBs/kgTot:0;
-    const ventaObj={id:vId,codigo,fecha:vObj.fecha,destino:vObj.destino,
+    var vId='vh_'+vObj.fecha.replace(/-/g,'')+'_'+codigoN;
+    var codigo=g+'-V'+String(codigoN).padStart(3,'0');
+    var kgTot=Math.round(vObj.animales.reduce(function(s,a){return s+a.pesoVenta;},0)*10)/10;
+    var totalBs=Math.round(vObj.animales.reduce(function(s,a){return s+a.precioVenta;},0)*100)/100;
+    var precKg=kgTot>0?totalBs/kgTot:0;
+    var ventaObj={id:vId,codigo:codigo,fecha:vObj.fecha,destino:vObj.destino,
       frigorifico:vObj.frigorifico||null,mercado:vObj.mercado,
       tipoDestino:vObj.tipoDestino,tipo:vObj.tipo,municipio:'',
       cabezasRegistradas:vObj.animales.length,cabezasTotales:vObj.animales.length,
       kgTotal:kgTot,kgNeto:kgTot,totalCobrar:totalBs,precioKg:precKg,
-      estado:'CERRADA',usuario,importado:true};
-    const updates={};
+      estado:'CERRADA',usuario:usuario,importado:true};
+    var updates={};
     updates['ventas/'+vId]=ventaObj;
-    for(const a of vObj.animales){
-      // NUNCA tocar animales ACTIVOS
-      let ideReg=a.ide;
-      const animalActual=animales[a.ide];
+    for(var ai=0;ai<vObj.animales.length;ai++){
+      var a=vObj.animales[ai];
+      var ideReg=a.ide;
+      var animalActual=animales[a.ide];
       if(animalActual&&animalActual.estado==='ACTIVO') ideReg=a.ide+'R';
-      const bid='b_'+ideReg+'_'+a.fechaVenta.replace(/-/g,'');
+      var bid='b_'+ideReg+'_'+a.fechaVenta.replace(/-/g,'');
       updates['bajas/'+bid]={id:bid,ide:ideReg,tipo:'VENTA',fecha:a.fechaVenta,
         pesoVenta:a.pesoVenta,precioVenta:a.precioVenta,
         destino:vObj.destino,ventaId:vId,
         categoriaAnimal:a.categoria,grupoAnimal:a.grupo||null,
-        origenAnimal:a.origen,usuario,historico:true};
+        origenAnimal:a.origen,usuario:usuario,historico:true};
       if(!animalActual||animalActual.estado!=='ACTIVO'){
         updates['animales/'+ideReg]={ide:ideReg,tipo:a.tipo,categoria:a.categoria,
           grupo:a.grupo||null,origen:a.origen,fechaIngreso:a.fechaIngreso,
           pesoIngreso:a.pesoIngreso,precioCompra:a.precioCompra||null,
-          raza:a.raza||null,estado:'VENDIDO',usuario,historico:true};
+          raza:a.raza||null,estado:'VENDIDO',usuario:usuario,historico:true};
       }
     }
-    const allKeys=Object.keys(updates);
-    for(let i=0;i<allKeys.length;i+=30){
-      const batch={};
-      allKeys.slice(i,i+30).forEach(k=>batch[k]=updates[k]);
+    var allKeys=Object.keys(updates);
+    for(var bi=0;bi<allKeys.length;bi+=30){
+      var batch={};
+      allKeys.slice(bi,bi+30).forEach(function(k){batch[k]=updates[k];});
       try{ await fbPatch('',batch); }catch(e){ console.error(e); }
-      await new Promise(r=>setTimeout(r,150));
+      await new Promise(function(r){setTimeout(r,150);});
     }
   }
-  const [rV,rB]=await Promise.all([fbGet('ventas'),fbGet('bajas')]);
-  if(rV) ventas=Object.values(rV).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
-  if(rB) bajas=Object.values(rB).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  var res=await Promise.all([fbGet('ventas'),fbGet('bajas')]);
+  if(res[0]) ventas=Object.values(res[0]).filter(Boolean).sort(function(a,b){return b.fecha.localeCompare(a.fecha);});
+  if(res[1]) bajas=Object.values(res[1]).filter(Boolean).sort(function(a,b){return b.fecha.localeCompare(a.fecha);});
   btn.disabled=false;
   cerrar('moImportVH');
   renderV();renderDash();renderA();
-  ntf('✅ '+Object.keys(data).length+' ventas históricas importadas — inventario activo intacto');
+  ntf('OK: '+keys.length+' ventas historicas importadas - inventario activo intacto');
 }
-
 </script>
 
 <!-- Modal: Importar Inventario Inicial -->
@@ -3698,21 +3697,23 @@ async function confirmarImportVH(){
   </div>
 </div>
 
-<!-- Modal: Importar Ventas Históricas -->
 <div class="mo" id="moImportVH">
   <div class="md" style="max-width:540px;">
-    <div class="mh"><div class="mt">📤 Importar Ventas Históricas</div><button class="mc" onclick="cerrar('moImportVH')">✕</button></div>
-    <div style="font-size:11px;color:var(--t2);padding:8px 14px 0;">Columnas: IDE · FECHA_VENTA · FECHA_INGRESO · TIPO_ANIMAL · CATEGORIA · GRUPO · ORIGEN · MERCADO · TIPO_DESTINO · FRIGORIFICO_O_COMPRADOR · PESO_VENTA_KG · PRECIO_VENTA_BS · PESO_INGRESO_KG · PRECIO_COMPRA_BS · RAZA</div>
+    <div class="mh"><div class="mt">Importar Ventas Historicas</div><button class="mc" onclick="cerrar('moImportVH')">X</button></div>
+    <div style="font-size:11px;color:var(--t2);padding:8px 14px 0;">Columnas: IDE, FECHA_VENTA, FECHA_INGRESO, TIPO_ANIMAL, CATEGORIA, GRUPO, ORIGEN, MERCADO, TIPO_DESTINO, FRIGORIFICO_O_COMPRADOR, PESO_VENTA_KG, PRECIO_VENTA_BS, PESO_INGRESO_KG, PRECIO_COMPRA_BS, RAZA</div>
     <div class="mb">
       <input type="file" id="fVH" accept=".xls,.xlsx" style="font-size:12px;margin-bottom:12px;" onchange="readVentasHist(this.files[0])">
       <div id="vhPrev" style="max-height:280px;overflow-y:auto;"></div>
     </div>
     <div class="mf">
       <button class="btn bs" onclick="cerrar('moImportVH')">Cancelar</button>
-      <button class="btn bp" id="btnConfVH" style="display:none;" onclick="confirmarImportVH()">✅ Confirmar e Importar</button>
+      <button class="btn bp" id="btnConfVH" style="display:none;" onclick="confirmarImportVH()">Confirmar e Importar</button>
     </div>
   </div>
 </div>
 </body>
 </html>
 
+function openImportVentasHist(){
+  ntf('Próximamente — Importar Ventas Históricas desde Excel');
+}
