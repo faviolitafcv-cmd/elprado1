@@ -255,6 +255,7 @@ tr:hover td{background:rgba(109,186,58,.04);}
   <div class="ar">
     <button class="btn bp" onclick="openMA()">+ Agregar Animal</button>
     <button class="btn bs" onclick="openImport()">📥 Importar Pesaje</button>
+    <span id="aCounter" style="font-size:12px;color:var(--t2);margin-left:auto;align-self:center;"></span>
     <button class="btn bs" id="btnImportInv" style="border-color:var(--gr);color:var(--gr);display:none;" onclick="openImportInv()">📋 Importar Inventario Inicial</button>
     <button class="btn bs" style="border-color:var(--red);color:var(--red);" onclick="limpiarInventario()">🗑 Limpiar Inventario</button>
     <div class="sp"></div>
@@ -315,7 +316,7 @@ tr:hover td{background:rgba(109,186,58,.04);}
         <th style="cursor:pointer;" onclick="sortA('precioCompra')">Precio ↕</th>
         <th>Raza</th><th>Estado</th><th></th>
       </tr></thead>
-      <tbody id="aBody"><tr><td colspan="11"><div class="ldr"><div class="ls"></div></div></td></tr></tbody>
+      <tbody id="aBody"><tr><td colspan="13"><div class="ldr"><div class="ls"></div></div></td></tr></tbody>
     </table></div>
     <div style="padding:10px 14px;border-top:1px solid var(--brd);">
       <div class="pag" id="aPag"></div>
@@ -861,40 +862,19 @@ window.onload = async () => {
 
 async function loadAll(){
   try {
-    const [rA, rP, rB, rC] = await Promise.all([
+    const [rA, rP, rB, rC, rV] = await Promise.all([
       fbGet('animales'), fbGet('pesajes'),
-      fbGet('bajas'),    fbGet('compras')
+      fbGet('bajas'),    fbGet('compras'),
+      fbGet('ventas')
     ]);
     animales = rA || {};
-    // Normalizar categorías viejas al formato nuevo
-    const NORM_CAT = {
-      'VQ_INV':{tipo:'INVERNADA',   categoria:'VAQUILLA'},
-      'VQ_PDC':{tipo:'CRIA-REPRODUCTORES', categoria:'VAQUILLA'},
-      'TR_INV':{tipo:'INVERNADA',   categoria:'TORILLO'},
-      'TR_REP':{tipo:'CRIA-REPRODUCTORES', categoria:'TORILLO'},
-      'VC_INV':{tipo:'INVERNADA',   categoria:'VACA'}
-    };
-    const updates_norm = {};
-    Object.values(animales).forEach(a=>{
-      if(NORM_CAT[a.categoria]){
-        const norm = NORM_CAT[a.categoria];
-        if(!a.tipo || a.tipo !== norm.tipo){
-          a.tipo = norm.tipo;
-          a.categoria = norm.categoria;
-          updates_norm['animales/'+a.ide+'/tipo'] = norm.tipo;
-          updates_norm['animales/'+a.ide+'/categoria'] = norm.categoria;
-        }
-      }
-    });
-    if(Object.keys(updates_norm).length>0){
-      fbPatch('', updates_norm).catch(()=>{});
-      console.log('Normalizados '+Object.keys(updates_norm).length/2+' animales con categoría vieja');
-    }
     pesajes  = toArr(rP).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
     bajas    = toArr(rB).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
     compras  = toArr(rC).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
-    const rV = await fbGet('ventas');
     ventas   = toArr(rV).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+    // Índice de último pesaje por animal (se calcula una vez al cargar)
+    window._lastPes = {};
+    pesajes.forEach(p=>{ if(!window._lastPes[p.ide]||p.fecha>window._lastPes[p.ide].fecha) window._lastPes[p.ide]=p; });
   } catch(e){ ntf('Error al cargar datos: '+e.message, true); }
 }
 
@@ -1196,6 +1176,104 @@ function calcEst(a){
 }
 
 // ═══════════ IMPORT FROM BALANZA ═══════════
+
+// ═══════════ TABLA ANIMALES ═══════════
+let aSortField = 'grupo', aSortDir = 1;
+
+function sortA(field){
+  if(aSortField===field){ aSortDir*=-1; } else { aSortField=field; aSortDir=1; }
+  renderA();
+}
+
+function renderA(){
+  const tipo = document.getElementById('fTipo')?.value||'';
+  const cat  = document.getElementById('fCat')?.value||'';
+  const gru  = document.getElementById('fGrupo')?.value||'';
+  const est  = document.getElementById('fEst')?.value||'';
+  const bus  = document.getElementById('fBus')?.value.trim().toLowerCase()||'';
+  const _lp  = window._lastPes||{};
+
+  aFilt = Object.values(animales).filter(a=>{
+    if(tipo && (a.tipo||'')!==tipo) return false;
+    if(cat  && (a.categoria||'')!==cat) return false;
+    if(gru  && (a.grupo||'')!==gru) return false;
+    if(est  && a.estado!==est) return false;
+    if(bus){
+      const s = String(a.ide||'').toLowerCase()+(a.ida||'').toLowerCase()+
+                (a.origen||'').toLowerCase()+(a.grupo||'').toLowerCase()+
+                (a.raza||'').toLowerCase();
+      if(!s.includes(bus)) return false;
+    }
+    return true;
+  }).sort((a,b)=>{
+    let vA, vB;
+    if(aSortField==='_ultPesaje'){
+      vA = (_lp[a.ide]?.fecha)||'';
+      vB = (_lp[b.ide]?.fecha)||'';
+    } else {
+      vA = String(a[aSortField]||'').toLowerCase();
+      vB = String(b[aSortField]||'').toLowerCase();
+    }
+    const nA = parseFloat(vA), nB = parseFloat(vB);
+    if(!isNaN(nA)&&!isNaN(nB)) return (nA-nB)*aSortDir;
+    return vA.localeCompare(vB)*aSortDir;
+  });
+
+  const tb = document.getElementById('aBody');
+  if(!tb) return;
+
+  const total = aFilt.length;
+  const totalPages = Math.ceil(total/PXP);
+  if(pA > totalPages) pA = Math.max(1, totalPages);
+  const slice = aFilt.slice((pA-1)*PXP, pA*PXP);
+
+  // Contador de animales
+  const counter = document.getElementById('aCounter');
+  if(counter) counter.textContent = total + ' animal' + (total!==1?'es':'');
+
+  if(!slice.length){
+    tb.innerHTML='<tr><td colspan="13"><div class="emp"><div class="emp-ic">🐄</div>Sin animales</div></td></tr>';
+    document.getElementById('aPag').innerHTML=''; return;
+  }
+
+  tb.innerHTML = slice.map(a=>{
+    const lp = _lp[a.ide];
+    const ultPes = lp ? lp.fecha : null;
+    const rowClass = a.estado==='VENDIDO'?'style="opacity:.5;"':a.estado==='MUERTO'?'style="opacity:.4;"':'';
+    return`<tr ${rowClass}>
+      <td class="mn tg" style="font-size:11px;cursor:pointer;" onclick="verDet('${a.ide}')">${a.ide}</td>
+      <td class="mn" style="font-size:11px;">${a.ida||'—'}</td>
+      <td style="font-size:11px;color:var(--t2);">${a.tipo||'—'}</td>
+      <td><span class="bg ${CBADGE[a.categoria]||''}" style="font-size:10px;">${a.categoria||'—'}</span></td>
+      <td style="font-size:11px;font-weight:600;">${a.grupo||'—'}</td>
+      <td style="font-size:11px;">${a.origen||'—'}</td>
+      <td class="mn" style="font-size:11px;">${a.fechaIngreso||'—'}</td>
+      <td class="mn">${a.pesoIngreso?a.pesoIngreso+' kg':'—'}</td>
+      <td class="mn tgo">${a.precioCompra?'Bs '+fmt(a.precioCompra):'—'}</td>
+      <td class="mn" style="font-size:11px;${!ultPes?'color:var(--red);':'color:var(--t2);'}">${ultPes||'⚠️ Sin pesaje'}</td>
+      <td style="font-size:11px;">${a.raza||'—'}</td>
+      <td><span style="font-size:10px;padding:2px 6px;border-radius:4px;background:${a.estado==='ACTIVO'?'rgba(109,186,58,.2)':a.estado==='VENDIDO'?'rgba(100,150,255,.2)':'rgba(255,100,100,.2)'};color:${a.estado==='ACTIVO'?'var(--gr)':a.estado==='VENDIDO'?'#8af':'var(--red)'};">${a.estado||'—'}</span></td>
+      <td style="white-space:nowrap;">
+        <button class="btn bs btn-sm" onclick="verDet('${a.ide}')" title="Ver detalle">📋</button>
+        <button class="btn bs btn-sm" style="border-color:var(--gold);color:var(--gold);" onclick="editarAnimal('${a.ide}')" title="Editar">✏️</button>
+        <button class="btn bd btn-sm" onclick="eliminarAnimal('${a.ide}')" title="Eliminar">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  // Paginación
+  const pag = document.getElementById('aPag');
+  if(pag){
+    let html = '';
+    if(totalPages>1){
+      if(pA>1) html+=`<button class="btn bs btn-sm" onclick="pA--;renderA()">‹ Ant</button> `;
+      html+=`<span style="font-size:12px;color:var(--t2);">Pág ${pA} de ${totalPages}</span>`;
+      if(pA<totalPages) html+=` <button class="btn bs btn-sm" onclick="pA++;renderA()">Sig ›</button>`;
+    }
+    pag.innerHTML=html;
+  }
+}
+
 function openImport(){
   importD=null;
   document.getElementById('iPrev').style.display='none';
