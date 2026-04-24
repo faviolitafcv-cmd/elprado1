@@ -411,7 +411,9 @@ tr:hover td{background:rgba(109,186,58,.04);}
   <div class="card">
     <div class="ch">
       <div class="ct">🐄 Animales Vendidos</div>
-      <span id="vAnimCounter" style="font-size:12px;color:var(--t2);"></span>
+      <span id="vAnimCounter" style="font-size:12px;color:var(--t2);margin-right:auto;"></span>
+      <button class="btn bs btn-sm" onclick="descargarPlantillaVenta()" style="border-color:var(--gold);color:var(--gold);">📥 Descargar Plantilla Ventas</button>
+      <button class="btn bs btn-sm" onclick="openImportVentasHist()" style="border-color:var(--gr);color:var(--gr);">📤 Importar Ventas Históricas</button>
     </div>
     <div class="fr" style="padding:8px 14px;gap:8px;flex-wrap:wrap;">
       <select id="vfVenta" onchange="renderVAnimales()" style="font-size:12px;">
@@ -441,14 +443,38 @@ tr:hover td{background:rgba(109,186,58,.04);}
       <select id="vfOrigen" onchange="renderVAnimales()" style="font-size:12px;">
         <option value="">Todos los orígenes</option>
       </select>
+      <select id="vfMercado" onchange="renderVAnimales()" style="font-size:12px;">
+        <option value="">Todos los mercados</option>
+        <option value="EXPORTACION">EXPORTACIÓN</option>
+        <option value="NACIONAL">NACIONAL</option>
+      </select>
+      <select id="vfFrigorifico" onchange="renderVAnimales()" style="font-size:12px;">
+        <option value="">Todos los destinos</option>
+        <option value="BFC S.A.">BFC S.A.</option>
+        <option value="FRIGOR S.A.">FRIGOR S.A.</option>
+        <option value="FRIGOSI S.A.">FRIGOSI S.A.</option>
+        <option value="FRIDOSA">FRIDOSA</option>
+      </select>
       <input id="vfBus" type="text" placeholder="🔍 Buscar IDE..." oninput="renderVAnimales()" style="font-size:12px;padding:5px 10px;background:var(--card2);border:1px solid var(--brd);color:var(--text);border-radius:6px;">
     </div>
     <div class="tw"><table>
       <thead><tr>
-        <th>IDE</th><th>Tipo</th><th>Categoría</th><th>Grupo (vendido)</th>
-        <th>Origen</th><th>F. Ingreso</th><th>F. Venta</th><th>Mercado</th><th>Destino</th>
-        <th>Peso Venta</th><th>Precio Venta</th><th>Peso Ing.</th><th>Precio Compra</th>
-        <th>GMD Total</th><th>Días campo</th><th>Ganancia (Bs)</th><th>Bs/día</th>
+        <th>IDE</th>
+        <th style="cursor:pointer;" onclick="sortVA('tipo')">Tipo ↕</th>
+        <th style="cursor:pointer;" onclick="sortVA('cat')">Categoría ↕</th>
+        <th style="cursor:pointer;" onclick="sortVA('grupo')">Grupo ↕</th>
+        <th style="cursor:pointer;" onclick="sortVA('origen')">Origen ↕</th>
+        <th style="cursor:pointer;" onclick="sortVA('fechaIngreso')">F. Ingreso ↕</th>
+        <th style="cursor:pointer;" onclick="sortVA('fechaVenta')">F. Venta ↕</th>
+        <th>Mercado</th><th>Destino</th>
+        <th style="cursor:pointer;" onclick="sortVA('pesoVenta')">Peso Venta ↕</th>
+        <th style="cursor:pointer;" onclick="sortVA('precioVenta')">Precio Venta ↕</th>
+        <th>Peso Ing.</th>
+        <th>Precio Compra</th>
+        <th style="cursor:pointer;" onclick="sortVA('gmd')">GMD ↕</th>
+        <th style="cursor:pointer;" onclick="sortVA('dias')">Días campo ↕</th>
+        <th style="cursor:pointer;" onclick="sortVA('ganancia')">Ganancia ↕</th>
+        <th style="cursor:pointer;" onclick="sortVA('bsDia')">Bs/día ↕</th>
       </tr></thead>
       <tbody id="vAnimBody"><tr><td colspan="14" class="emp">—</td></tr></tbody>
     </table></div>
@@ -2220,6 +2246,58 @@ function verReciboCompra(cId){
     </div>
   </div>
 </div>
+
+<!-- Modal: Editar Venta -->
+<div class="mo" id="moEditV">
+  <div class="md" style="max-width:560px;">
+    <div class="mh"><div class="mt">✏️ Editar Venta</div><button class="mc" onclick="cerrar('moEditV')">✕</button></div>
+    <div class="mb">
+      <div class="fg">
+        <div class="fm"><label>Código</label><input id="evCodigo" readonly style="opacity:.6;"></div>
+        <div class="fm"><label>Fecha</label><input id="evFecha" type="date"></div>
+        <div class="fm"><label>Tipo Animal</label>
+          <select id="evTipo">
+            <option value="">— Seleccionar —</option>
+            <option value="INVERNADA">INVERNADA</option>
+            <option value="CRIA-REPRODUCTORES">CRIA-REPRODUCTORES</option>
+          </select>
+        </div>
+        <div class="fm"><label>Municipio</label><input id="evMun" type="text"></div>
+        <div class="fm"><label>Mercado</label>
+          <select id="evMercado">
+            <option value="">— Seleccionar —</option>
+            <option value="EXPORTACION">EXPORTACIÓN</option>
+            <option value="NACIONAL">NACIONAL</option>
+          </select>
+        </div>
+        <div class="fm"><label>Tipo Destino</label>
+          <select id="evTipoDestino" onchange="toggleEditVenta()">
+            <option value="">— Seleccionar —</option>
+            <option value="FRIGORIFICO">FRIGORÍFICO</option>
+            <option value="PRIVADO">PRIVADO</option>
+          </select>
+        </div>
+        <div class="fm" id="evFrigWrap" style="display:none;"><label>Frigorífico</label>
+          <select id="evFrigorifico">
+            <option value="">— Seleccionar —</option>
+            <option value="BFC S.A.">BFC S.A.</option>
+            <option value="FRIGOR S.A.">FRIGOR S.A.</option>
+            <option value="FRIGOSI S.A.">FRIGOSI S.A.</option>
+            <option value="FRIDOSA">FRIDOSA</option>
+            <option value="OTRO">OTRO</option>
+          </select>
+        </div>
+        <div class="fm" id="evPrivWrap" style="display:none;"><label>Comprador</label>
+          <input id="evDestino" type="text" placeholder="Nombre del comprador">
+        </div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn bs" onclick="cerrar('moEditV')">Cancelar</button>
+      <button class="btn bp" onclick="guardarEditVenta()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
 </body></html>`);
   w.document.close();
 }
@@ -2625,6 +2703,59 @@ async function guardarCompletarVenta(){
   finally{btn.disabled=false;btn.textContent='✅ Agregar y Cerrar Venta';}
 }
 
+
+// ═══════════ EDITAR VENTA ═══════════
+function toggleEditVenta(){
+  const td=document.getElementById('evTipoDestino')?.value||'';
+  const fw=document.getElementById('evFrigWrap');
+  const pw=document.getElementById('evPrivWrap');
+  if(fw) fw.style.display=td==='FRIGORIFICO'?'':'none';
+  if(pw) pw.style.display=td==='PRIVADO'?'':'none';
+}
+
+function editarVenta(vId){
+  const v=ventas.find(x=>x.id===vId);
+  if(!v){ntf('Venta no encontrada',true);return;}
+  document.getElementById('evCodigo').value=v.codigo||'';
+  document.getElementById('evFecha').value=fechaParaInput(v.fecha)||'';
+  document.getElementById('evTipo').value=v.tipo||'';
+  document.getElementById('evMun').value=v.municipio||'';
+  document.getElementById('evMercado').value=v.mercado||'';
+  document.getElementById('evTipoDestino').value=v.tipoDestino||'';
+  document.getElementById('evFrigorifico').value=v.frigorifico||'';
+  document.getElementById('evDestino').value=v.destino||'';
+  document.getElementById('moEditV').dataset.vid=vId;
+  toggleEditVenta();
+  document.getElementById('moEditV').classList.add('open');
+}
+
+async function guardarEditVenta(){
+  const vId=document.getElementById('moEditV').dataset.vid;
+  const v=ventas.find(x=>x.id===vId);
+  if(!v){ntf('Error: venta no encontrada',true);return;}
+  const fecha=document.getElementById('evFecha').value;
+  const tipo=document.getElementById('evTipo').value;
+  const mun=document.getElementById('evMun').value.trim();
+  const mercado=document.getElementById('evMercado').value;
+  const td=document.getElementById('evTipoDestino').value;
+  let frigorifico='', destino='';
+  if(td==='FRIGORIFICO'){
+    frigorifico=document.getElementById('evFrigorifico').value||'';
+    destino=frigorifico;
+  } else {
+    destino=document.getElementById('evDestino').value.trim();
+  }
+  const upd={};
+  const fields={fecha,tipo,municipio:mun,mercado,tipoDestino:td,frigorifico,destino};
+  Object.entries(fields).forEach(([k,val])=>{ upd['ventas/'+vId+'/'+k]=val; });
+  try{
+    await fbPatch('',upd);
+    Object.assign(v,fields);
+    cerrar('moEditV'); renderV();
+    ntf('✅ Venta actualizada');
+  }catch(e){ntf('Error: '+e.message,true);}
+}
+
 function renderV(){
   const tb=document.getElementById('vBody');
   if(!tb)return;
@@ -2650,6 +2781,7 @@ function renderV(){
     <td><span style="font-size:10px;padding:2px 8px;border-radius:4px;background:${estBg};color:${estColor};font-weight:700;">${est}</span></td>
     <td style="white-space:nowrap;">
       <button class="btn bs btn-sm" onclick="verReciboVenta('${v.id}')" title="Ver recibo">🧾</button>
+      <button class="btn bs btn-sm" style="border-color:var(--gold);color:var(--gold);" onclick="editarVenta('${v.id}')" title="Editar">✏️</button>
       ${est==='ABIERTA'?`<button class="btn bs btn-sm" style="border-color:#f90;color:#f90;" onclick="completarVenta('${v.id}')" title="Agregar animal faltante">➕</button>`:''}
       <button class="btn bd btn-sm" onclick="eliminarVenta('${v.id}')" title="Eliminar">✕</button>
     </td>
@@ -2665,30 +2797,90 @@ function renderV(){
   renderVAnimales();
 }
 
-let pVAnim=1;
+let pVAnim=1, vaSortField='fechaVenta', vaSortDir=-1;
+
+function sortVA(field){
+  if(vaSortField===field){ vaSortDir*=-1; } else { vaSortField=field; vaSortDir=-1; }
+  renderVAnimales();
+}
+
+function descargarPlantillaVenta(){
+  const cols=['IDE','FECHA_VENTA','FECHA_INGRESO','TIPO_ANIMAL','CATEGORIA','GRUPO',
+    'ORIGEN','MERCADO','TIPO_DESTINO','FRIGORIFICO_O_COMPRADOR',
+    'PESO_VENTA_KG','PRECIO_VENTA_BS','PESO_INGRESO_KG','PRECIO_COMPRA_BS',
+    'RAZA','MUNICIPIO'];
+  const ejemplo=[['68000000123456','31/01/2026','25/01/2024','INVERNADA','VAQUILLA',
+    'VAQ. COLA 1','AGUA DULCE','EXPORTACION','FRIGORIFICO','FRIGOR S.A.',
+    '380','8500','180','2400','Nelore','San Ignacio de Velazco']];
+  const ws=XLSX.utils.aoa_to_sheet([cols,...ejemplo]);
+  // Ancho de columnas
+  ws['!cols']=cols.map(()=>({wch:20}));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'VENTAS');
+  XLSX.writeFile(wb,'PLANTILLA_VENTAS_HISTORICAS.xlsx');
+  ntf('✅ Plantilla descargada — completá y subí con "Importar Ventas Históricas"');
+}
+
 function renderVAnimales(){
   const ventaFilt=document.getElementById('vfVenta')?.value||'';
   const tipo=document.getElementById('vfTipo')?.value||'';
   const cat=document.getElementById('vfCat')?.value||'';
   const grupo=document.getElementById('vfGrupo')?.value||'';
   const origen=document.getElementById('vfOrigen')?.value||'';
+  const mercFilt=document.getElementById('vfMercado')?.value||'';
+  const frigFilt=document.getElementById('vfFrigorifico')?.value||'';
   const bus=document.getElementById('vfBus')?.value.trim().toLowerCase()||'';
 
-  // Animales vendidos = bajas tipo VENTA cruzado con animales
   const vendidos=bajas.filter(b=>{
     if(b.tipo!=='VENTA') return false;
     if(ventaFilt && b.ventaId!==ventaFilt) return false;
     const a=animales[b.ide]||{};
+    const venta=ventas.find(v=>v.id===b.ventaId)||{};
     if(tipo && (a.tipo||b.tipoAnimal||'')!==tipo) return false;
     if(cat && (a.categoria||b.categoriaAnimal||'')!==cat) return false;
     if(grupo && (b.grupoAnimal||a.grupo||'')!==grupo) return false;
     if(origen && (a.origen||b.origenAnimal||'')!==origen) return false;
+    if(mercFilt && (venta.mercado||'')!==mercFilt) return false;
+    if(frigFilt && (venta.frigorifico||b.destino||venta.destino||'')!==frigFilt) return false;
     if(bus && !String(b.ide).toLowerCase().includes(bus)) return false;
     return true;
   });
 
   const counter=document.getElementById('vAnimCounter');
   if(counter) counter.textContent=vendidos.length+' animales';
+
+  // Sort
+  vendidos.sort((ba,bb)=>{
+    const aa=animales[ba.ide]||{}, ab=animales[bb.ide]||{};
+    const va=ventas.find(v=>v.id===ba.ventaId)||{};
+    const vb=ventas.find(v=>v.id===bb.ventaId)||{};
+    let A,B;
+    switch(vaSortField){
+      case 'tipo':       A=aa.tipo||'';        B=ab.tipo||''; break;
+      case 'cat':        A=aa.categoria||'';   B=ab.categoria||''; break;
+      case 'grupo':      A=ba.grupoAnimal||aa.grupo||''; B=bb.grupoAnimal||ab.grupo||''; break;
+      case 'origen':     A=aa.origen||'';      B=ab.origen||''; break;
+      case 'fechaIngreso': A=parseFecha(aa.fechaIngreso||''); B=parseFecha(ab.fechaIngreso||''); break;
+      case 'fechaVenta': A=parseFecha(ba.fecha||'');  B=parseFecha(bb.fecha||''); break;
+      case 'pesoVenta':  A=ba.pesoVenta||0;    B=bb.pesoVenta||0; break;
+      case 'precioVenta':A=ba.precioVenta||0;  B=bb.precioVenta||0; break;
+      case 'dias':{
+        const dA=parseFecha(aa.fechaIngreso)&&parseFecha(ba.fecha)?Math.round((new Date(parseFecha(ba.fecha))-new Date(parseFecha(aa.fechaIngreso)+'T12:00:00'))/86400000):0;
+        const dB=parseFecha(ab.fechaIngreso)&&parseFecha(bb.fecha)?Math.round((new Date(parseFecha(bb.fecha))-new Date(parseFecha(ab.fechaIngreso)+'T12:00:00'))/86400000):0;
+        A=dA; B=dB; break;
+      }
+      case 'ganancia':   A=(ba.precioVenta||0)-(aa.precioCompra||0); B=(bb.precioVenta||0)-(ab.precioCompra||0); break;
+      case 'bsDia':{
+        const dA2=parseFecha(aa.fechaIngreso)&&parseFecha(ba.fecha)?Math.round((new Date(parseFecha(ba.fecha))-new Date(parseFecha(aa.fechaIngreso)+'T12:00:00'))/86400000):0;
+        const dB2=parseFecha(ab.fechaIngreso)&&parseFecha(bb.fecha)?Math.round((new Date(parseFecha(bb.fecha))-new Date(parseFecha(ab.fechaIngreso)+'T12:00:00'))/86400000):0;
+        A=dA2>0?((ba.precioVenta||0)-(aa.precioCompra||0))/dA2:0;
+        B=dB2>0?((bb.precioVenta||0)-(ab.precioCompra||0))/dB2:0; break;
+      }
+      default: A=ba.ide||''; B=bb.ide||'';
+    }
+    if(typeof A==='number') return (A-B)*vaSortDir;
+    return String(A).localeCompare(String(B))*vaSortDir;
+  });
 
   const tb=document.getElementById('vAnimBody');
   if(!tb) return;
@@ -2861,6 +3053,58 @@ function verReciboVenta(vId){
     <div class="mf">
       <button class="btn bs" onclick="cerrar('moCompletarV')">Cancelar</button>
       <button class="btn bp" id="btnCompletarV" onclick="guardarCompletarVenta()">✅ Agregar y Cerrar Venta</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Editar Venta -->
+<div class="mo" id="moEditV">
+  <div class="md" style="max-width:560px;">
+    <div class="mh"><div class="mt">✏️ Editar Venta</div><button class="mc" onclick="cerrar('moEditV')">✕</button></div>
+    <div class="mb">
+      <div class="fg">
+        <div class="fm"><label>Código</label><input id="evCodigo" readonly style="opacity:.6;"></div>
+        <div class="fm"><label>Fecha</label><input id="evFecha" type="date"></div>
+        <div class="fm"><label>Tipo Animal</label>
+          <select id="evTipo">
+            <option value="">— Seleccionar —</option>
+            <option value="INVERNADA">INVERNADA</option>
+            <option value="CRIA-REPRODUCTORES">CRIA-REPRODUCTORES</option>
+          </select>
+        </div>
+        <div class="fm"><label>Municipio</label><input id="evMun" type="text"></div>
+        <div class="fm"><label>Mercado</label>
+          <select id="evMercado">
+            <option value="">— Seleccionar —</option>
+            <option value="EXPORTACION">EXPORTACIÓN</option>
+            <option value="NACIONAL">NACIONAL</option>
+          </select>
+        </div>
+        <div class="fm"><label>Tipo Destino</label>
+          <select id="evTipoDestino" onchange="toggleEditVenta()">
+            <option value="">— Seleccionar —</option>
+            <option value="FRIGORIFICO">FRIGORÍFICO</option>
+            <option value="PRIVADO">PRIVADO</option>
+          </select>
+        </div>
+        <div class="fm" id="evFrigWrap" style="display:none;"><label>Frigorífico</label>
+          <select id="evFrigorifico">
+            <option value="">— Seleccionar —</option>
+            <option value="BFC S.A.">BFC S.A.</option>
+            <option value="FRIGOR S.A.">FRIGOR S.A.</option>
+            <option value="FRIGOSI S.A.">FRIGOSI S.A.</option>
+            <option value="FRIDOSA">FRIDOSA</option>
+            <option value="OTRO">OTRO</option>
+          </select>
+        </div>
+        <div class="fm" id="evPrivWrap" style="display:none;"><label>Comprador</label>
+          <input id="evDestino" type="text" placeholder="Nombre del comprador">
+        </div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn bs" onclick="cerrar('moEditV')">Cancelar</button>
+      <button class="btn bp" onclick="guardarEditVenta()">💾 Guardar</button>
     </div>
   </div>
 </div>
@@ -3225,5 +3469,61 @@ function ntf(msg,err=false,dur=3500){
     </div>
   </div>
 </div>
+
+<!-- Modal: Editar Venta -->
+<div class="mo" id="moEditV">
+  <div class="md" style="max-width:560px;">
+    <div class="mh"><div class="mt">✏️ Editar Venta</div><button class="mc" onclick="cerrar('moEditV')">✕</button></div>
+    <div class="mb">
+      <div class="fg">
+        <div class="fm"><label>Código</label><input id="evCodigo" readonly style="opacity:.6;"></div>
+        <div class="fm"><label>Fecha</label><input id="evFecha" type="date"></div>
+        <div class="fm"><label>Tipo Animal</label>
+          <select id="evTipo">
+            <option value="">— Seleccionar —</option>
+            <option value="INVERNADA">INVERNADA</option>
+            <option value="CRIA-REPRODUCTORES">CRIA-REPRODUCTORES</option>
+          </select>
+        </div>
+        <div class="fm"><label>Municipio</label><input id="evMun" type="text"></div>
+        <div class="fm"><label>Mercado</label>
+          <select id="evMercado">
+            <option value="">— Seleccionar —</option>
+            <option value="EXPORTACION">EXPORTACIÓN</option>
+            <option value="NACIONAL">NACIONAL</option>
+          </select>
+        </div>
+        <div class="fm"><label>Tipo Destino</label>
+          <select id="evTipoDestino" onchange="toggleEditVenta()">
+            <option value="">— Seleccionar —</option>
+            <option value="FRIGORIFICO">FRIGORÍFICO</option>
+            <option value="PRIVADO">PRIVADO</option>
+          </select>
+        </div>
+        <div class="fm" id="evFrigWrap" style="display:none;"><label>Frigorífico</label>
+          <select id="evFrigorifico">
+            <option value="">— Seleccionar —</option>
+            <option value="BFC S.A.">BFC S.A.</option>
+            <option value="FRIGOR S.A.">FRIGOR S.A.</option>
+            <option value="FRIGOSI S.A.">FRIGOSI S.A.</option>
+            <option value="FRIDOSA">FRIDOSA</option>
+            <option value="OTRO">OTRO</option>
+          </select>
+        </div>
+        <div class="fm" id="evPrivWrap" style="display:none;"><label>Comprador</label>
+          <input id="evDestino" type="text" placeholder="Nombre del comprador">
+        </div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn bs" onclick="cerrar('moEditV')">Cancelar</button>
+      <button class="btn bp" onclick="guardarEditVenta()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
+
+function openImportVentasHist(){
+  ntf('Próximamente — Importar Ventas Históricas desde Excel');
+}
