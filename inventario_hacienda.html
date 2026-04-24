@@ -262,18 +262,18 @@ tr:hover td{background:rgba(109,186,58,.04);}
     <span id="aCount" style="font-size:11px;color:var(--t3);">Cargando...</span>
   </div>
   <div class="fr">
-    <select id="fTipo" onchange="filtA()">
+    <select id="fTipo" onchange="renderA()">
       <option value="">Todos los tipos</option>
       <option value="INVERNADA">INVERNADA</option>
       <option value="CRIA-REPRODUCTORES">CRIA-REPRODUCTORES</option>
     </select>
-    <select id="fCat" onchange="filtA()">
+    <select id="fCat" onchange="renderA()">
       <option value="">Todas las categorías</option>
       <option value="VAQUILLA">Vaquilla</option>
       <option value="TORILLO">Torillo</option>
       <option value="VACA">Vaca</option>
     </select>
-    <select id="fGrupo" onchange="filtA()">
+    <select id="fGrupo" onchange="renderA()">
       <option value="">Todos los grupos</option>
       <option value="VAQ. VENTA">VAQ. VENTA</option>
       <option value="VAQ. CABEZA">VAQ. CABEZA</option>
@@ -294,13 +294,13 @@ tr:hover td{background:rgba(109,186,58,.04);}
       <option value="TOR. CRIA CABEZA">TOR. CRIA CABEZA</option>
       <option value="TOR. CRIA CUERPO">TOR. CRIA CUERPO</option>
     </select>
-    <select id="fEst" onchange="filtA()">
+    <select id="fEst" onchange="renderA()">
       <option value="ACTIVO">Activos</option>
       <option value="">Todos</option>
       <option value="VENDIDO">Vendidos</option>
       <option value="MUERTO">Muertos</option>
     </select>
-    <input class="si" type="text" id="fBus" placeholder="🔍 IDE, caravana u origen..." oninput="filtA()">
+    <input class="si" type="text" id="fBus" placeholder="🔍 IDE, caravana u origen..." oninput="renderA()">
   </div>
   <div class="card">
     <div class="tw"><table>
@@ -314,6 +314,7 @@ tr:hover td{background:rgba(109,186,58,.04);}
         <th style="cursor:pointer;" onclick="sortA('fechaIngreso')">F. Ingreso ↕</th>
         <th style="cursor:pointer;" onclick="sortA('pesoIngreso')">Peso Ing. ↕</th>
         <th style="cursor:pointer;" onclick="sortA('precioCompra')">Precio ↕</th>
+        <th style="cursor:pointer;" onclick="sortA('_ultPesaje')">Últ. Pesaje ↕</th>
         <th>Raza</th><th>Estado</th><th></th>
       </tr></thead>
       <tbody id="aBody"><tr><td colspan="13"><div class="ldr"><div class="ls"></div></div></td></tr></tbody>
@@ -858,6 +859,8 @@ window.onload = async () => {
   ntf('');
   renderDash();
   renderA();
+  // Limpiar notificación después de cargar
+  setTimeout(()=>{ const n=document.getElementById('ntf'); if(n&&n.textContent.includes('ando')) n.style.display='none'; }, 3000);
 };
 
 async function loadAll(){
