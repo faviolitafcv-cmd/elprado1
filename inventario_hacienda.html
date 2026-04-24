@@ -773,7 +773,7 @@ async function loadAll(){
 function toArr(v){ return v ? (Array.isArray(v) ? v : Object.values(v)) : []; }
 
 // ═══════════ NAVIGATION ═══════════
-const TABS = ['dash','animales','pesajes','compras','bajas','informes'];
+const TABS = ['dash','animales','pesajes','compras','ventas','bajas','informes'];
 function showPg(id){
   document.querySelectorAll('.pg').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -784,6 +784,7 @@ function showPg(id){
   if(id==='pesajes')   renderP();
   if(id==='bajas')     renderB();
   if(id==='informes')  renderInf();
+  if(id==='ventas')    renderV();
   if(id==='compras')   renderCo();
 }
 function filtQuick(tipo, cat){
