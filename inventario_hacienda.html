@@ -204,14 +204,43 @@ tr:hover td{background:rgba(109,186,58,.04);}
     <div class="sc" onclick="filtQuick('CRIA-REPRODUCTORES','TORILLO')"><div class="sc-v" id="dCT">—</div><div class="sc-l">Cría Torillo</div></div>
   </div>
 
+  <!-- RESUMEN POR GRUPO -->
   <div class="card">
-    <div class="ch"><div class="ct">📊 Inventario por Grupo</div></div>
+    <div class="ch">
+      <div class="ct">🐄 Resumen por Grupo — Proyectado al <span id="dFechaHoy"></span></div>
+      <button class="btn bs btn-sm" onclick="verNoVinieron()">⚠️ Ver quién no vino al pesaje</button>
+    </div>
     <div class="tw"><table>
-      <thead><tr><th>Tipo</th><th>Categoría</th><th>Grupo</th><th>Cabezas</th><th>Peso Ing. Prom.</th><th>Ult. GMD Prom.</th><th>Orígenes</th></tr></thead>
-      <tbody id="dGrupos"><tr><td colspan="6"><div class="ldr"><div class="ls"></div></div></td></tr></tbody>
+      <thead><tr>
+        <th>Grupo</th>
+        <th>Cabezas</th>
+        <th>Peso Prom. Proyectado</th>
+        <th>GMD Prom.</th>
+        <th>GMD desde ingreso</th>
+        <th>Estado</th>
+        <th></th>
+      </tr></thead>
+      <tbody id="dGrupos"><tr><td colspan="7"><div class="ldr"><div class="ls"></div></div></td></tr></tbody>
     </table></div>
   </div>
 
+  <!-- DETALLE DE GRUPO (se muestra al hacer clic) -->
+  <div class="card" id="dGrupoDetalle" style="display:none;">
+    <div class="ch">
+      <div class="ct" id="dGrupoDetalleTit">— Detalle del Grupo —</div>
+      <button class="btn bs btn-sm" onclick="document.getElementById('dGrupoDetalle').style.display='none'">✕ Cerrar</button>
+    </div>
+    <div id="dGrupoDetalleCats" style="padding:8px 14px;font-size:12px;color:var(--t2);border-bottom:1px solid var(--brd);"></div>
+    <div class="tw"><table>
+      <thead><tr>
+        <th>IDE</th><th>Tipo</th><th>Categoría</th><th>Origen</th>
+        <th>Peso Ing.</th><th>Último Pesaje</th><th>GMD</th><th>Peso Hoy (proj.)</th>
+      </tr></thead>
+      <tbody id="dGrupoDetalleBody"></tbody>
+    </table></div>
+  </div>
+
+  <!-- ÚLTIMOS PESAJES -->
   <div class="card">
     <div class="ch"><div class="ct">⚖️ Últimos Pesajes</div></div>
     <div class="tw"><table>
@@ -895,387 +924,191 @@ function filtQuick(tipo, cat){
 
 // ═══════════ DASHBOARD ═══════════
 function renderDash(){
+  const hoy = new Date();
+  const hoyStr = hoy.toISOString().split('T')[0];
+  document.getElementById('dFechaHoy').textContent = hoy.toLocaleDateString('es-BO',{day:'2-digit',month:'long',year:'numeric'});
+
+  const GRUPOS_OFICIALES = new Set(['VAQ. VENTA','VAQ. CABEZA','VAQ. CUERPO','VAQ. COLA 1','VAQ. COLA 2','VAQ. COLA 3',
+    'TOR. VENTA','TOR. CABEZA','TOR. CUERPO','TOR. COLA 1','TOR. COLA 2','TOR. COLA 3',
+    'VAQ. CRIA CABEZA','VAQ. CRIA CUERPO','VAQ. CRIA COLA 1','VAQ. CRIA COLA 2',
+    'TOR. CRIA CABEZA','TOR. CRIA CUERPO']);
+
   const act = Object.values(animales).filter(a=>a.estado==='ACTIVO');
   document.getElementById('dTot').textContent = act.length;
-  // Función helper que normaliza categorías viejas y nuevas
+
   function esInvVaq(a){ return (a.tipo==='INVERNADA'&&a.categoria==='VAQUILLA')||a.categoria==='VQ_INV'; }
   function esInvTor(a){ return (a.tipo==='INVERNADA'&&a.categoria==='TORILLO')||a.categoria==='TR_INV'; }
   function esInvVac(a){ return (a.tipo==='INVERNADA'&&a.categoria==='VACA')||a.categoria==='VC_INV'; }
   function esCriaVaq(a){ return (a.tipo==='CRIA-REPRODUCTORES'&&a.categoria==='VAQUILLA')||a.categoria==='VQ_PDC'; }
   function esCriaTor(a){ return (a.tipo==='CRIA-REPRODUCTORES'&&a.categoria==='TORILLO')||a.categoria==='TR_REP'; }
-  document.getElementById('dVI').textContent  = act.filter(esInvVaq).length;
-  document.getElementById('dTI').textContent  = act.filter(esInvTor).length;
-  document.getElementById('dVC').textContent  = act.filter(esInvVac).length;
-  document.getElementById('dCV').textContent  = act.filter(esCriaVaq).length;
-  document.getElementById('dCT').textContent  = act.filter(esCriaTor).length;
+  document.getElementById('dVI').textContent = act.filter(esInvVaq).length;
+  document.getElementById('dTI').textContent = act.filter(esInvTor).length;
+  document.getElementById('dVC').textContent = act.filter(esInvVac).length;
+  document.getElementById('dCV').textContent = act.filter(esCriaVaq).length;
+  document.getElementById('dCT').textContent = act.filter(esCriaTor).length;
 
-  // Build groups summary
+  // Último pesaje por animal
+  const lastPes = {};
+  pesajes.forEach(p=>{
+    if(!lastPes[p.ide] || p.fecha > lastPes[p.ide].fecha) lastPes[p.ide]=p;
+  });
+
+  // Función: proyectar peso a hoy
+  function pesoHoy(a){
+    const lp = lastPes[a.ide];
+    if(lp && lp.gmd!=null && lp.fecha){
+      const dias = Math.max(0, Math.round((hoy - new Date(lp.fecha+'T12:00:00'))/86400000));
+      return Math.round((lp.peso + lp.gmd*dias)*10)/10;
+    }
+    // Sin pesaje: usar peso ingreso
+    return a.pesoIngreso||0;
+  }
+
+  // Función: GMD histórica desde ingreso hasta último pesaje
+  function gmdHistorico(a){
+    const lp = lastPes[a.ide];
+    if(!lp || !a.pesoIngreso || !a.fechaIngreso) return null;
+    const dias = Math.max(1, Math.round((new Date(lp.fecha) - new Date(a.fechaIngreso))/86400000));
+    return Math.round((lp.peso - a.pesoIngreso)/dias*1000)/1000;
+  }
+
+  // Agrupar por GRUPO (no por tipo+categoría)
   const gmap = {};
   act.forEach(a=>{
-    const k = a.tipo+'|'+a.categoria+'|'+a.grupo;
-    if(!gmap[k]) gmap[k]={tipo:a.tipo,cat:a.categoria,grupo:a.grupo,n:0,ps:0,orig:new Set()};
-    gmap[k].n++; gmap[k].ps+=a.pesoIngreso||0;
-    if(a.origen) gmap[k].orig.add(a.origen);
-  });
-
-  // Last GMD per animal
-  const lastGmd = {};
-  pesajes.forEach(p=>{
-    if(lastGmd[p.ide]===undefined && p.gmd!=null) lastGmd[p.ide]=p.gmd;
-  });
-  const gmdG = {};
-  act.forEach(a=>{
-    const k = a.tipo+'|'+a.categoria+'|'+a.grupo;
-    const g = lastGmd[a.ide];
-    if(g!=null){ if(!gmdG[k]){gmdG[k]={s:0,n:0};} gmdG[k].s+=g; gmdG[k].n++; }
+    const g = a.grupo||'SIN GRUPO';
+    if(!gmap[g]) gmap[g]={grupo:g, n:0, pesoHoySum:0, gmdSum:0, gmdN:0, gmdHistSum:0, gmdHistN:0, oficial:GRUPOS_OFICIALES.has(g)};
+    gmap[g].n++;
+    gmap[g].pesoHoySum += pesoHoy(a);
+    const lp = lastPes[a.ide];
+    if(lp && lp.gmd!=null){ gmap[g].gmdSum+=lp.gmd; gmap[g].gmdN++; }
+    const gh = gmdHistorico(a);
+    if(gh!=null){ gmap[g].gmdHistSum+=gh; gmap[g].gmdHistN++; }
   });
 
   const rows = Object.values(gmap).sort((a,b)=>{
-    const co=CAT_ORD.indexOf(a.cat)-CAT_ORD.indexOf(b.cat);
-    return co||GRU_ORD.indexOf(a.grupo)-GRU_ORD.indexOf(b.grupo);
+    // Primero los oficiales, después el resto
+    if(a.oficial && !b.oficial) return -1;
+    if(!a.oficial && b.oficial) return 1;
+    return a.grupo.localeCompare(b.grupo);
   });
 
   const tbody = document.getElementById('dGrupos');
-  if(!rows.length){tbody.innerHTML='<tr><td colspan="6"><div class="emp"><div class="emp-ic">🐄</div>Sin animales</div></td></tr>';return;}
+  if(!rows.length){tbody.innerHTML='<tr><td colspan="7"><div class="emp"><div class="emp-ic">🐄</div>Sin animales</div></td></tr>';return;}
+
   tbody.innerHTML = rows.map(g=>{
-    const k=g.cat+'|'+g.grupo, gd=gmdG[k];
-    const gdStr = gd&&gd.n>0 ? (gd.s/gd.n).toFixed(3)+' kg/d' : '—';
-    const origStr = [...g.orig].slice(0,4).join(', ')+(g.orig.size>4?'...':'');
-    return`<tr>
-      <td style="font-size:11px;font-weight:600;color:var(--t2);">${g.tipo||'—'}</td>
-      <td><span class="bg ${CBADGE[g.cat]||''}">${g.cat||'—'}</span></td>
-      <td><strong>${GRUS[g.grupo]||g.grupo}</strong></td>
+    const pesoPromHoy = g.n>0 ? (g.pesoHoySum/g.n).toFixed(1) : '—';
+    const gmdProm = g.gmdN>0 ? (g.gmdSum/g.gmdN).toFixed(3) : '—';
+    const gmdHist = g.gmdHistN>0 ? (g.gmdHistSum/g.gmdHistN).toFixed(3) : '—';
+    const badge = g.oficial
+      ? '<span style="font-size:10px;background:rgba(109,186,58,.2);color:var(--gr);padding:2px 6px;border-radius:4px;">✅ Oficial</span>'
+      : '<span style="font-size:10px;background:rgba(255,100,100,.2);color:var(--red);padding:2px 6px;border-radius:4px;">⚠️ Fuera</span>';
+    return `<tr style="cursor:pointer;" onclick="verDetalleGrupo('${g.grupo.replace(/'/g,"\'")}')">
+      <td><strong>${g.grupo}</strong></td>
       <td class="mn tg">${g.n}</td>
-      <td class="mn">${g.n>0?(g.ps/g.n).toFixed(0)+' kg':'—'}</td>
-      <td class="mn tgo">${gdStr}</td>
-      <td style="font-size:11px;color:var(--t3);">${origStr||'—'}</td>
+      <td class="mn">${pesoPromHoy} kg</td>
+      <td class="mn tgo">${gmdProm!=='—'?(parseFloat(gmdProm)>=0?'+':'')+gmdProm+' kg/d':'—'}</td>
+      <td class="mn" style="color:var(--t2);">${gmdHist!=='—'?(parseFloat(gmdHist)>=0?'+':'')+gmdHist+' kg/d':'—'}</td>
+      <td>${badge}</td>
+      <td style="font-size:11px;color:var(--t3);">👁 Ver</td>
     </tr>`;
   }).join('');
 
-  // Recent pesajes
+  // Últimos pesajes
   const tb2=document.getElementById('dPesajes');
   const rec=pesajes.slice(0,10);
   if(!rec.length){tb2.innerHTML='<tr><td colspan="8" class="emp">Sin pesajes</td></tr>';return;}
   tb2.innerHTML=rec.map(p=>{
     const a=animales[String(p.ide)]||{};
-    const mig=p.grupoAnterior&&p.grupoNuevo&&p.grupoAnterior!==p.grupoNuevo;
     return`<tr>
       <td class="mn" style="font-size:11px;">${p.fecha}</td>
       <td class="mn tg" style="font-size:11px;cursor:pointer;" onclick="verDet('${p.ide}')">${p.ide}</td>
-      <td style="font-size:11px;">${a.origen||p.origen||'—'}</td>
-      <td class="mn">${p.pesoAnterior||'—'} kg</td>
-      <td class="mn tg"><b>${p.peso}</b> kg</td>
-      <td class="mn tgo">${p.gmd!=null?(p.gmd>0?'+':'')+Number(p.gmd).toFixed(3):'—'}</td>
-      <td style="font-size:11px;"><b>${GRUS[p.grupoNuevo]||p.grupoNuevo||'—'}</b></td>
-      <td>${mig?'<span class="bg bg-mig">✓ Migró</span>':''}</td>
+      <td style="font-size:11px;">${a.origen||'—'}</td>
+      <td class="mn">${p.pesoAnterior||'—'}</td>
+      <td class="mn tg"><b>${p.peso}</b></td>
+      <td class="mn tgo">${p.gmd!=null?(p.gmd>=0?'+':'')+Number(p.gmd).toFixed(3):'—'}</td>
+      <td style="font-size:11px;">${p.grupoNuevo||'—'}</td>
+      <td>${p.migro?'<span class="bg bg-mig" style="font-size:10px;">Sí</span>':'—'}</td>
     </tr>`;
   }).join('');
 }
 
-// ═══════════ ANIMALES ═══════════
-let aSortField='grupo', aSortDir=1;
+function verDetalleGrupo(grupo){
+  const hoy = new Date();
+  const GRUPOS_OFICIALES = new Set(['VAQ. VENTA','VAQ. CABEZA','VAQ. CUERPO','VAQ. COLA 1','VAQ. COLA 2','VAQ. COLA 3',
+    'TOR. VENTA','TOR. CABEZA','TOR. CUERPO','TOR. COLA 1','TOR. COLA 2','TOR. COLA 3',
+    'VAQ. CRIA CABEZA','VAQ. CRIA CUERPO','VAQ. CRIA COLA 1','VAQ. CRIA COLA 2',
+    'TOR. CRIA CABEZA','TOR. CRIA CUERPO']);
 
-function sortA(field){
-  if(aSortField===field){ aSortDir*=-1; } else { aSortField=field; aSortDir=1; }
-  filtA();
+  const lastPes = {};
+  pesajes.forEach(p=>{ if(!lastPes[p.ide]||p.fecha>lastPes[p.ide].fecha) lastPes[p.ide]=p; });
+
+  const animGrupo = Object.values(animales).filter(a=>a.estado==='ACTIVO'&&a.grupo===grupo);
+  document.getElementById('dGrupoDetalleTit').textContent = '🐄 Grupo: '+grupo+' ('+animGrupo.length+' animales)';
+
+  // Resumen de categorías dentro del grupo
+  const cats={};
+  animGrupo.forEach(a=>{ const k=(a.tipo||'?')+' · '+(a.categoria||'?'); cats[k]=(cats[k]||0)+1; });
+  document.getElementById('dGrupoDetalleCats').innerHTML =
+    '<strong>Composición:</strong> '+Object.entries(cats).map(([k,n])=>`${k}: <b>${n}</b>`).join(' &nbsp;|&nbsp; ');
+
+  const tb = document.getElementById('dGrupoDetalleBody');
+  if(!animGrupo.length){tb.innerHTML='<tr><td colspan="8" class="emp">Sin animales</td></tr>';
+    document.getElementById('dGrupoDetalle').style.display='';return;}
+
+  tb.innerHTML = animGrupo.sort((a,b)=>String(a.ide).localeCompare(String(b.ide))).map(a=>{
+    const lp = lastPes[a.ide];
+    const gmd = lp?.gmd;
+    let pesoProj = a.pesoIngreso||0;
+    if(lp && gmd!=null){
+      const dias = Math.max(0,Math.round((hoy-new Date(lp.fecha+'T12:00:00'))/86400000));
+      pesoProj = Math.round((lp.peso+gmd*dias)*10)/10;
+    }
+    return`<tr>
+      <td class="mn tg" style="font-size:11px;cursor:pointer;" onclick="verDet('${a.ide}')">${a.ide}</td>
+      <td style="font-size:11px;">${a.tipo||'—'}</td>
+      <td><span class="bg ${CBADGE[a.categoria]||''}" style="font-size:10px;">${a.categoria||'—'}</span></td>
+      <td style="font-size:11px;">${a.origen||'—'}</td>
+      <td class="mn">${a.pesoIngreso||'—'} kg</td>
+      <td class="mn" style="font-size:11px;">${lp?lp.fecha+' ('+lp.peso+' kg)':'Sin pesaje'}</td>
+      <td class="mn tgo">${gmd!=null?(gmd>=0?'+':'')+Number(gmd).toFixed(3):'—'}</td>
+      <td class="mn tg"><b>${pesoProj} kg</b></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('dGrupoDetalle').style.display='';
+  document.getElementById('dGrupoDetalle').scrollIntoView({behavior:'smooth'});
 }
 
-function filtA(){
-  const tipo=document.getElementById('fTipo')?.value||'';
-  const cat=document.getElementById('fCat').value;
-  const gru=document.getElementById('fGrupo').value;
-  const est=document.getElementById('fEst').value;
-  const bus=document.getElementById('fBus').value.trim().toLowerCase();
-  aFilt=Object.values(animales).filter(a=>{
-    if(tipo&&(a.tipo||'')!==tipo)return false;
-    if(cat&&(a.categoria||'')!==cat)return false;
-    if(gru&&(a.grupo||'')!==gru)return false;
-    if(est&&a.estado!==est)return false;
-    if(bus){
-      const s=String(a.ide).toLowerCase()+(a.ida||'').toLowerCase()+(a.origen||'').toLowerCase()+(a.grupo||'').toLowerCase();
-      if(!s.includes(bus))return false;
-    }
-    return true;
-  }).sort((a,b)=>{
-    const vA=String(a[aSortField]||'').toLowerCase();
-    const vB=String(b[aSortField]||'').toLowerCase();
-    const numA=parseFloat(a[aSortField]);
-    const numB=parseFloat(b[aSortField]);
-    if(!isNaN(numA)&&!isNaN(numB)) return (numA-numB)*aSortDir;
-    return vA.localeCompare(vB)*aSortDir;
+function verNoVinieron(){
+  // Animales activos que NO tienen pesaje en el último mes
+  const hoy = new Date();
+  const hace30 = new Date(hoy - 30*86400000).toISOString().split('T')[0];
+  const lastPes = {};
+  pesajes.forEach(p=>{ if(!lastPes[p.ide]||p.fecha>lastPes[p.ide].fecha) lastPes[p.ide]=p; });
+
+  const noVinieron = Object.values(animales).filter(a=>{
+    if(a.estado!=='ACTIVO') return false;
+    const lp = lastPes[a.ide];
+    return !lp || lp.fecha < hace30; // sin pesaje o último pesaje hace más de 30 días
   });
-  pA=1; renderAT();
-}
-function renderA(){ filtA(); }
 
-function renderAT(){
-  const tot=aFilt.length;
-  document.getElementById('aCount').textContent=tot+' animal'+(tot!==1?'es':'');
-  const st=(pA-1)*PXP, sl=aFilt.slice(st,st+PXP);
-  const tb=document.getElementById('aBody');
-  if(!sl.length){tb.innerHTML='<tr><td colspan="11"><div class="emp"><div class="emp-ic">🐄</div>Sin animales encontrados</div></td></tr>';document.getElementById('aPag').innerHTML='';return;}
-  tb.innerHTML=sl.map(a=>`<tr>
-    <td class="mn tg" style="font-size:11px;cursor:pointer;" onclick="verDet('${a.ide}')">${a.ide}</td>
-    <td class="mn" style="font-size:11px;">${a.ida||'—'}</td>
-    <td style="font-size:11px;color:var(--t2);">${a.tipo||'—'}</td>
-    <td><span class="bg ${CBADGE[a.categoria]||''}">${a.categoria||'—'}</span></td>
-    <td><b>${GRUS[a.grupo]||a.grupo||'—'}</b></td>
-    <td style="font-size:11px;">${a.origen||'—'}</td>
-    <td class="mn" style="font-size:11px;">${a.fechaIngreso||'—'}</td>
-    <td class="mn">${a.pesoIngreso||'—'} kg</td>
-    <td class="mn tgo" style="font-size:11px;">Bs ${fmt(a.precioCompra)}</td>
-    <td style="font-size:11px;color:var(--t3);">${a.raza||'—'}</td>
-    <td><span class="bg bg-${(a.estado||'activo').toLowerCase()}">${a.estado||'ACTIVO'}</span></td>
-    <td style="white-space:nowrap;">
-      <button class="btn bs btn-sm" onclick="verDet('${a.ide}')" title="Ver detalle">📋</button>
-      <button class="btn bs btn-sm" style="border-color:var(--gold);color:var(--gold);" onclick="editarAnimal('${a.ide}')" title="Editar">✏️</button>
-      <button class="btn bd btn-sm" onclick="eliminarAnimal('${a.ide}')" title="Eliminar">✕</button>
-    </td>
-  </tr>`).join('');
-  renderPag('aPag',tot,pA,n=>{pA=n;renderAT();});
-}
+  if(!noVinieron.length){ ntf('✅ Todos los animales tienen pesaje reciente'); return; }
 
-
-// ═══════════ EDITAR / ELIMINAR ANIMAL ═══════════
-function editarAnimal(ide){
-  const a=animales[ide];
-  if(!a){ntf('Animal no encontrado',true);return;}
-  document.getElementById('eaIde').value    = ide;
-  document.getElementById('eaTipo').value   = a.tipo||'';
-  document.getElementById('eaCat').value    = a.categoria||'';
-  document.getElementById('eaGrupo').value  = a.grupo||'';
-  document.getElementById('eaIda').value    = a.ida||'';
-  document.getElementById('eaOrigen').value = a.origen||'';
-  document.getElementById('eaFecha').value  = a.fechaIngreso||'';
-  document.getElementById('eaPeso').value   = a.pesoIngreso||'';
-  document.getElementById('eaPrecio').value = a.precioCompra||'';
-  document.getElementById('eaRaza').value   = a.raza||'';
-  document.getElementById('eaEstado').value = a.estado||'ACTIVO';
-  document.getElementById('moEditA').classList.add('open');
-}
-
-async function guardarEditAnimal(){
-  const ide   = document.getElementById('eaIde').value;
-  const tipo  = document.getElementById('eaTipo').value;
-  const cat   = document.getElementById('eaCat').value;
-  const gru   = document.getElementById('eaGrupo').value;
-  const ida   = document.getElementById('eaIda').value.trim()||null;
-  const ori   = document.getElementById('eaOrigen').value.trim();
-  const fecha = document.getElementById('eaFecha').value;
-  const peso  = parseFloat(document.getElementById('eaPeso').value)||0;
-  const prec  = parseFloat(document.getElementById('eaPrecio').value)||0;
-  const raza  = document.getElementById('eaRaza').value.trim()||null;
-  const est   = document.getElementById('eaEstado').value;
-  if(!ide){ntf('Error: sin IDE',true);return;}
-  const upd={tipo,categoria:cat,grupo:gru,ida,origen:ori,fechaIngreso:fecha,
-    pesoIngreso:peso,precioCompra:prec,raza,estado:est};
-  try{
-    const updObj={}; updObj['animales/'+ide]={...animales[ide],...upd}; await fbPatch('',updObj);
-    animales[ide]={...animales[ide],...upd};
-    cerrar('moEditA'); renderDash(); renderA();
-    ntf('✅ Animal actualizado');
-  }catch(e){ntf('Error: '+e.message,true);}
-}
-
-async function eliminarAnimal(ide){
-  const a=animales[ide];
-  if(!a){ntf('Animal no encontrado',true);return;}
-  if(!confirm('¿Eliminar animal IDE '+ide+'?\nEsta acción no se puede deshacer.')) return;
-  try{
-    await fetch(FB+'/animales/'+ide+'.json',{method:'DELETE'});
-    delete animales[ide];
-    renderDash(); renderA();
-    ntf('✅ Animal eliminado');
-  }catch(e){ntf('Error: '+e.message,true);}
-}
-
-// ═══════════ ANIMAL MODAL ═══════════
-function openMA(){
-  ['aIde','aIda','aPI','aPR','aOri'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('aCat').value='';
-  document.getElementById('aGru').innerHTML='<option value="">— Primero categoría —</option>';
-  document.getElementById('aRaz').value='Nelore';
-  document.getElementById('aMun').value='San Ignacio de Velazco';
-  document.getElementById('moAT').textContent='➕ Registrar Animal';
-  document.getElementById('moA').classList.add('open');
-}
-function updGrupos(){ updGruposSel('aCat','aGru'); }
-function updGruposC(){ updGruposSel('cCat','cGru'); }
-function updGruposSel(catId, gruId){
-  const cat=document.getElementById(catId).value;
-  const sel=document.getElementById(gruId);
-  if(!cat){sel.innerHTML='<option value="">— Primero categoría —</option>';return;}
-  const gs=GRUS_CAT[cat]||[];
-  sel.innerHTML='<option value="">— Seleccionar —</option>'+gs.map(g=>`<option value="${g}">${GRUS[g]||g}</option>`).join('');
-}
-async function saveA(){
-  const ide=document.getElementById('aIde').value.trim();
-  const ida=document.getElementById('aIda').value.trim();
-  const cat=document.getElementById('aCat').value;
-  const gru=document.getElementById('aGru').value;
-  const fi=document.getElementById('aFI').value;
-  const pi=parseFloat(document.getElementById('aPI').value);
-  const pr=parseFloat(document.getElementById('aPR').value);
-  const raz=document.getElementById('aRaz').value.trim();
-  const ori=document.getElementById('aOri').value.trim();
-  const mun=document.getElementById('aMun').value.trim();
-
-  if(!ide||!cat||!gru||!fi||isNaN(pi)||pi<=0||isNaN(pr)||pr<=0||!ori){
-    ntf('Completá todos los campos obligatorios (*)', true); return;
-  }
-  if(animales[ide]&&!confirm(`Ya existe IDE ${ide}. ¿Actualizar sus datos?`)) return;
-
-  const tipo=document.getElementById('aTipo')?.value||null;
-  const a={ide,ida:ida||null,tipo:tipo||null,categoria:cat,grupo:gru,fechaIngreso:fi,pesoIngreso:pi,
-    precioCompra:pr,raza:raz||null,origen:ori,municipio:mun||null,estado:'ACTIVO',usuario};
-  try{
-    await fbSet('animales/'+ide, a);
-    animales[ide]=a;
-    cerrar('moA'); renderDash(); renderA();
-    ntf('✅ Animal guardado correctamente');
-  }catch(e){ntf('Error: '+e.message,true);}
-}
-
-
-// ═══════════════════════════════════════════════════════════
-// IMPORTAR INVENTARIO INICIAL DESDE EXCEL
-// ═══════════════════════════════════════════════════════════
-function openImportInv(){
-  document.getElementById('moImportInv').classList.add('open');
-  document.getElementById('invImportPrev').innerHTML='';
-  document.getElementById('btnConfInv').style.display='none';
-  document.getElementById('fInvXls').value='';
-}
-window._invData = null;
-
-function readInvExcel(file){
-  const reader = new FileReader();
-  reader.onload = function(e){
-    try{
-      const wb = XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws,{header:1,raw:false,dateNF:'yyyy-mm-dd'});
-      if(rows.length<2){ntf('Archivo vacío',true);return;}
-      const hdr = rows[0].map(h=>String(h||'').trim().toUpperCase());
-      const ci  = hdr.findIndex(h=>h==='IDE');
-      const civ = hdr.findIndex(h=>h==='IDV'||h==='IDA');
-      const cfi = hdr.findIndex(h=>h.includes('FECHA'));
-      const cpi = hdr.findIndex(h=>h.includes('PESO'));
-      const cpr = hdr.findIndex(h=>h.includes('PRECIO'));
-      const crz = hdr.findIndex(h=>h==='RAZA');
-      const cor = hdr.findIndex(h=>h==='ORIGEN');
-      const ctp = hdr.findIndex(h=>h==='TIPO');
-      const cca = hdr.findIndex(h=>h==='CATEGORIA');
-      const cgr = hdr.findIndex(h=>h==='GRUPO');
-      if(ci<0||cfi<0||cpi<0){ntf('No se encontraron columnas IDE/Fecha/Peso',true);return;}
-
-      const data=[];
-      for(let i=1;i<rows.length;i++){
-        const r=rows[i];
-        const ide=String(r[ci]||'').trim();
-        if(!ide||ide==='undefined') continue;
-        const fecha=r[cfi]?String(r[cfi]).trim().substring(0,10):'';
-        const peso=parseFloat(String(r[cpi]||0).replace(',','.'));
-        const precio=cpr>=0?parseFloat(String(r[cpr]||0).replace(',','.')):0;
-        data.push({
-          ide,
-          ida: civ>=0&&r[civ]?String(r[civ]).trim():null,
-          fechaIngreso: fecha,
-          pesoIngreso: isNaN(peso)?0:peso,
-          precioCompra: isNaN(precio)?0:precio,
-          raza: crz>=0&&r[crz]?String(r[crz]).trim():null,
-          origen: cor>=0&&r[cor]?String(r[cor]).trim():null,
-          tipo: ctp>=0&&r[ctp]?String(r[ctp]).trim():null,
-          categoria: cca>=0&&r[cca]?String(r[cca]).trim():null,
-          grupo: cgr>=0&&r[cgr]?String(r[cgr]).trim():null,
-          estado:'ACTIVO'
-        });
-      }
-      window._invData=data;
-
-      // Preview por grupo
-      const byGrupo={};
-      data.forEach(d=>{const g=d.grupo||'SIN GRUPO';byGrupo[g]=(byGrupo[g]||0)+1;});
-      const rows2=Object.entries(byGrupo).sort((a,b)=>a[0].localeCompare(b[0]));
-      document.getElementById('invImportPrev').innerHTML=`
-        <div style="margin-bottom:10px;font-size:12px;color:var(--t2);">
-          <strong style="color:var(--gr)">${data.length}</strong> animales listos para importar
-        </div>
-        <table style="width:100%;font-size:11px;">
-          <thead><tr><th style="text-align:left;">Grupo</th><th>Animales</th></tr></thead>
-          <tbody>${rows2.map(([g,n])=>`<tr><td>${g}</td><td style="text-align:center;font-weight:700;">${n}</td></tr>`).join('')}</tbody>
-        </table>`;
-      document.getElementById('btnConfInv').style.display='';
-    }catch(err){ntf('Error leyendo Excel: '+err.message,true);}
-  };
-  reader.readAsArrayBuffer(file);
-}
-
-
-function limpiarInventario(){
-  const conf = prompt('Esta acción elimina TODOS los animales del sistema.\n\nPara confirmar escribí exactamente:\nELIMINAR TODO');
-  if(conf !== 'ELIMINAR TODO'){ ntf('Operación cancelada'); return; }
-  const conf2 = confirm('¿Estás SEGURA? Se borrarán los ' + Object.keys(animales).length + ' animales de Firebase.');
-  if(!conf2) return;
-  fetch(FB+'/animales.json', {method:'DELETE'})
-    .then(()=>{
-      animales={};
-      renderDash(); renderA();
-      ntf('✅ Inventario eliminado correctamente');
+  // Descargar Excel
+  const rows = [['IDE','IDA','Tipo','Categoría','Grupo','Origen','Último Pesaje','Peso Ing.'],
+    ...noVinieron.map(a=>{
+      const lp=lastPes[a.ide];
+      return [a.ide,a.ida||'',a.tipo||'',a.categoria||'',a.grupo||'',a.origen||'',lp?lp.fecha:'Sin pesaje',a.pesoIngreso||''];
     })
-    .catch(e=>ntf('Error: '+e.message, true));
+  ];
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'No vinieron');
+  XLSX.writeFile(wb,'animales_sin_pesaje_reciente.xlsx');
+  ntf('⬇️ Descargado: '+noVinieron.length+' animales sin pesaje reciente');
 }
 
-async function confirmarImportInv(){
-  if(!window._invData){return;}
-  const data=window._invData;
-  const btn=document.getElementById('btnConfInv');
-  btn.disabled=true; btn.textContent='⏳ Importando...';
 
-  const usuario = sessionStorage.getItem('ep_usuario')||'IMPORT';
-  const BATCH=20; // lotes chicos para evitar timeout
-  const MAX_REINTENTOS=3;
-  let ok=0, err=0, reintentos=0;
-
-  for(let i=0;i<data.length;i+=BATCH){
-    const batch=data.slice(i,i+BATCH);
-    const updates={};
-    batch.forEach(d=>{
-      const key=d.ide;
-      updates['animales/'+key]={...d, usuario};
-      animales[key]={...d, usuario};
-    });
-
-    let exito=false;
-    for(let intento=0;intento<MAX_REINTENTOS;intento++){
-      try{
-        await fbPatch('', updates);
-        exito=true;
-        break;
-      }catch(e){
-        reintentos++;
-        await new Promise(r=>setTimeout(r,500*(intento+1))); // espera creciente
-      }
-    }
-
-    if(exito){ ok+=batch.length; }
-    else { err+=batch.length; }
-
-    btn.textContent=`⏳ ${ok}/${data.length}...${err>0?' ⚠️'+err+' err':''}`;
-    await new Promise(r=>setTimeout(r,200));
-  }
-
-  btn.disabled=false;
-  window._invData=null;
-
-  if(err>0){
-    ntf(`⚠️ ${ok} importados, ${err} fallaron. Volvé a importar para completar.`, true);
-  } else {
-    cerrar('moImportInv');
-    ntf(`✅ ${ok} animales importados correctamente`);
-  }
-  renderDash(); renderA();
-}
 
 // ═══════════ ANIMAL DETAIL ═══════════
 function verDet(ide){
