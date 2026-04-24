@@ -1301,6 +1301,14 @@ function readBalanza(file){
   rd.readAsArrayBuffer(file);
 }
 
+function fmtFecha(v){
+  const iso=parseFecha(v);
+  if(!iso) return '—';
+  const [y,m,d]=iso.split('-');
+  return d+'/'+m+'/'+y;
+}
+function fechaParaInput(v){ return parseFecha(v)||''; }
+
 function parseFecha(v){
   try{
     if(v instanceof Date) return v.toISOString().split('T')[0];
@@ -2690,6 +2698,170 @@ function readVentaXls(file){
     }catch(err){ntf('Error: '+err.message,true);}
   };
   rd.readAsArrayBuffer(file);
+}
+
+// ═══════════ EDITAR / ELIMINAR ANIMAL ═══════════
+function calcPermanencia(fechaIngreso){
+  if(!fechaIngreso) return '—';
+  const iso=parseFecha(fechaIngreso);
+  if(!iso) return '—';
+  const hoy=new Date(), ing=new Date(iso+'T12:00:00');
+  if(isNaN(ing)) return '—';
+  let y=hoy.getFullYear()-ing.getFullYear(), m=hoy.getMonth()-ing.getMonth(), d=hoy.getDate()-ing.getDate();
+  if(d<0){m--;d+=new Date(hoy.getFullYear(),hoy.getMonth(),0).getDate();}
+  if(m<0){y--;m+=12;}
+  const parts=[];
+  if(y>0)parts.push(y+' año'+(y>1?'s':''));
+  if(m>0)parts.push(m+' mes'+(m>1?'es':''));
+  if(d>0)parts.push(d+' día'+(d>1?'s':''));
+  return parts.length?parts.join(', '):'Hoy';
+}
+
+function toggleCambioIDE(){
+  const wrap=document.getElementById('eaCambioIDEWrap');
+  const arrow=document.getElementById('eaCambioIDEArrow');
+  if(!wrap)return;
+  if(wrap.style.display==='none'){wrap.style.display='block';if(arrow)arrow.textContent='▲';}
+  else{wrap.style.display='none';if(arrow)arrow.textContent='▼';const n=document.getElementById('eaIdeNuevo');if(n)n.value='';}
+}
+
+function editarAnimal(ide){
+  const a=animales[ide];
+  if(!a){ntf('Animal no encontrado',true);return;}
+  document.getElementById('eaIde').value=ide;
+  const ni=document.getElementById('eaIdeNuevo');if(ni)ni.value='';
+  const cw=document.getElementById('eaCambioIDEWrap');if(cw)cw.style.display='none';
+  const ca=document.getElementById('eaCambioIDEArrow');if(ca)ca.textContent='▼';
+  document.getElementById('eaTipo').value=a.tipo||'';
+  document.getElementById('eaCat').value=a.categoria||'';
+  document.getElementById('eaGrupo').value=a.grupo||'';
+  document.getElementById('eaIda').value=a.ida||'';
+  document.getElementById('eaOrigen').value=a.origen||'';
+  const fi=fechaParaInput(a.fechaIngreso);
+  document.getElementById('eaFecha').value=fi;
+  document.getElementById('eaPeso').value=a.pesoIngreso||'';
+  document.getElementById('eaPrecio').value=a.precioCompra?Number(a.precioCompra).toFixed(2):'';
+  document.getElementById('eaRaza').value=a.raza||'';
+  document.getElementById('eaEstado').value=a.estado||'ACTIVO';
+  const ep=document.getElementById('eaPermanencia');if(ep)ep.value=calcPermanencia(fi||a.fechaIngreso);
+  document.getElementById('moEditA').classList.add('open');
+}
+
+async function guardarEditAnimal(){
+  const ideViejo=document.getElementById('eaIde').value;
+  const ideNuevoEl=document.getElementById('eaIdeNuevo');
+  const ideNuevo=ideNuevoEl?ideNuevoEl.value.trim():'';
+  const tipo=document.getElementById('eaTipo').value;
+  const cat=document.getElementById('eaCat').value;
+  const gru=document.getElementById('eaGrupo').value;
+  const ida=document.getElementById('eaIda').value.trim()||null;
+  const ori=document.getElementById('eaOrigen').value.trim();
+  const fecha=document.getElementById('eaFecha').value;
+  const peso=parseFloat(document.getElementById('eaPeso').value)||0;
+  const prec=parseFloat(document.getElementById('eaPrecio').value)||0;
+  const raza=document.getElementById('eaRaza').value.trim()||null;
+  const est=document.getElementById('eaEstado').value;
+  if(!ideViejo){ntf('Error: sin IDE',true);return;}
+  const btn=document.querySelector('#moEditA .btn.bp');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Guardando...';}
+  try{
+    if(ideNuevo && ideNuevo!==ideViejo){
+      if(animales[ideNuevo]){ntf('⚠️ El IDE '+ideNuevo+' ya existe',true);return;}
+      if(!confirm('Cambiar IDE?  Viejo: '+ideViejo+' Nuevo: '+ideNuevo)) return;
+      const upd={};
+      upd['animales/'+ideNuevo]={...animales[ideViejo],ide:ideNuevo,tipo,categoria:cat,grupo:gru,ida:ideViejo,origen:ori,fechaIngreso:fecha,pesoIngreso:peso,precioCompra:prec,raza,estado:est};
+      upd['animales/'+ideViejo]=null;
+      pesajes.filter(p=>String(p.ide)===String(ideViejo)).forEach(p=>{
+        const np={...p,ide:ideNuevo};const nid=p.id?p.id.replace(ideViejo,ideNuevo):'p_'+ideNuevo+'_'+(p.fecha||'').replace(/-/g,'');
+        np.id=nid;upd['pesajes/'+nid]=np;upd['pesajes/'+p.id]=null;
+      });
+      await fbPatch('',upd);
+      animales[ideNuevo]={...animales[ideViejo],...upd['animales/'+ideNuevo]};
+      delete animales[ideViejo];
+      pesajes.forEach(p=>{if(String(p.ide)===String(ideViejo))p.ide=ideNuevo;});
+      window._lastPes={};pesajes.forEach(p=>{if(!window._lastPes[p.ide]||p.fecha>window._lastPes[p.ide].fecha)window._lastPes[p.ide]=p;});
+      cerrar('moEditA');renderDash();renderA();
+      ntf('✅ IDE cambiado: '+ideViejo+' → '+ideNuevo);
+    } else {
+      const upd={tipo,categoria:cat,grupo:gru,ida,origen:ori,fechaIngreso:fecha,pesoIngreso:peso,precioCompra:prec,raza,estado:est};
+      const updObj={};updObj['animales/'+ideViejo]={...animales[ideViejo],...upd};
+      await fbPatch('',updObj);
+      animales[ideViejo]={...animales[ideViejo],...upd};
+      cerrar('moEditA');renderDash();renderA();ntf('✅ Animal actualizado');
+    }
+  }catch(e){ntf('Error: '+e.message,true);}
+  finally{if(btn){btn.disabled=false;btn.textContent='💾 Guardar Cambios';}}
+}
+
+async function eliminarAnimal(ide){
+  const a=animales[ide];
+  if(!a){ntf('Animal no encontrado',true);return;}
+  if(!confirm('Eliminar animal IDE '+ide+'?')) return;
+  try{
+    await fetch(FB+'/animales/'+ide+'.json',{method:'DELETE'});
+    delete animales[ide];renderDash();renderA();ntf('✅ Animal eliminado');
+  }catch(e){ntf('Error: '+e.message,true);}
+}
+
+async function corregirCategoriasMasivo(){
+  const act=Object.values(animales).filter(a=>a.estado==='ACTIVO');
+  const cambios=[];
+  act.forEach(a=>{
+    const map=MAPA_GRUPO_CAT[a.grupo];
+    if(!map)return;
+    if(a.tipo!==map.tipo||a.categoria!==map.categoria)
+      cambios.push({ide:a.ide,grupo:a.grupo,tipoNuevo:map.tipo,catNueva:map.categoria});
+  });
+  if(!cambios.length){ntf('✅ Todos ya tienen tipo/categoría correctos');return;}
+  if(!confirm('Se van a corregir '+cambios.length+' animales. Confirmar?'))return;
+  const btn=document.getElementById('btnCorregirCats');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Corrigiendo...';}
+  const BATCH=50;let ok=0;
+  for(let i=0;i<cambios.length;i+=BATCH){
+    const batch=cambios.slice(i,i+BATCH);const upd={};
+    batch.forEach(ch=>{upd['animales/'+ch.ide+'/tipo']=ch.tipoNuevo;upd['animales/'+ch.ide+'/categoria']=ch.catNueva;if(animales[ch.ide]){animales[ch.ide].tipo=ch.tipoNuevo;animales[ch.ide].categoria=ch.catNueva;}});
+    try{await fbPatch('',upd);ok+=batch.length;}catch(e){console.error(e);}
+    await new Promise(r=>setTimeout(r,200));
+  }
+  if(btn){btn.disabled=false;btn.textContent='✅ Listo';}
+  renderDash();renderA();ntf('✅ '+ok+' animales corregidos');
+}
+
+function verDetalleGrupo(grupo){
+  const hoy=new Date();
+  const lp=window._lastPes||{};
+  const animGrupo=Object.values(animales).filter(a=>a.estado==='ACTIVO'&&a.grupo===grupo);
+  document.getElementById('dGrupoDetalleTit').textContent='🐄 Grupo: '+grupo+' ('+animGrupo.length+' animales)';
+  const cats={};animGrupo.forEach(a=>{const k=(a.tipo||'?')+' · '+(a.categoria||'?');cats[k]=(cats[k]||0)+1;});
+  document.getElementById('dGrupoDetalleCats').innerHTML='<strong>Composición:</strong> '+Object.entries(cats).map(([k,n])=>k+': <b>'+n+'</b>').join(' | ');
+  const tb=document.getElementById('dGrupoDetalleBody');
+  if(!animGrupo.length){tb.innerHTML='<tr><td colspan="8" class="emp">Sin animales</td></tr>';document.getElementById('dGrupoDetalle').style.display='';return;}
+  tb.innerHTML=animGrupo.sort((a,b)=>String(a.ide).localeCompare(String(b.ide))).map(a=>{
+    const lpa=lp[a.ide];const gmd=lpa?.gmd;
+    let pp=a.pesoIngreso||0;
+    if(lpa&&gmd!=null){const dias=Math.max(0,Math.round((hoy-new Date(lpa.fecha+'T12:00:00'))/86400000));pp=Math.round((lpa.peso+gmd*dias)*10)/10;}
+    return`<tr><td class="mn tg" style="font-size:11px;cursor:pointer;" onclick="editarAnimal('${a.ide}')">${a.ide}</td><td style="font-size:11px;">${a.tipo||'—'}</td><td style="font-size:11px;">${a.categoria||'—'}</td><td style="font-size:11px;">${a.origen||'—'}</td><td class="mn">${a.pesoIngreso||'—'} kg</td><td class="mn" style="font-size:11px;">${lpa?lpa.fecha+' ('+lpa.peso+' kg)':'Sin pesaje'}</td><td class="mn">${gmd!=null?(gmd>=0?'+':'')+Number(gmd).toFixed(3):'—'}</td><td class="mn tg"><b>${pp} kg</b></td></tr>`;
+  }).join('');
+  document.getElementById('dGrupoDetalle').style.display='';
+  document.getElementById('dGrupoDetalle').scrollIntoView({behavior:'smooth'});
+}
+
+function verNoVinieron(){
+  const hoy=new Date();
+  const hace30=new Date(hoy-30*86400000).toISOString().split('T')[0];
+  const lp=window._lastPes||{};
+  const noV=Object.values(animales).filter(a=>{
+    if(a.estado!=='ACTIVO')return false;
+    const lpa=lp[a.ide];
+    return !lpa||lpa.fecha<hace30;
+  });
+  if(!noV.length){ntf('✅ Todos tienen pesaje reciente');return;}
+  const rows=[['IDE','IDA','Tipo','Categoría','Grupo','Origen','Último Pesaje','Peso Ing.'],
+    ...noV.map(a=>{const lpa=lp[a.ide];return[a.ide,a.ida||'',a.tipo||'',a.categoria||'',a.grupo||'',a.origen||'',lpa?lpa.fecha:'Sin pesaje',a.pesoIngreso||''];})];
+  const ws=XLSX.utils.aoa_to_sheet(rows);const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Sin pesaje');
+  XLSX.writeFile(wb,'animales_sin_pesaje.xlsx');
+  ntf('⬇️ '+noV.length+' animales sin pesaje reciente');
 }
 </script>
 
