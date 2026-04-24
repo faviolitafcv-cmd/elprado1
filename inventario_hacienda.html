@@ -1180,6 +1180,62 @@ function calcEst(a){
 
 // ═══════════ IMPORT FROM BALANZA ═══════════
 
+// ═══════════ EDITAR / ELIMINAR ANIMAL ═══════════
+function editarAnimal(ide){
+  const a = animales[ide];
+  if(!a){ ntf('Animal no encontrado',true); return; }
+  document.getElementById('eaIde').value     = ide;
+  document.getElementById('eaTipo').value    = a.tipo||'';
+  document.getElementById('eaCat').value     = a.categoria||'';
+  document.getElementById('eaGrupo').value   = a.grupo||'';
+  document.getElementById('eaIda').value     = a.ida||'';
+  document.getElementById('eaOrigen').value  = a.origen||'';
+  document.getElementById('eaFecha').value   = a.fechaIngreso||'';
+  document.getElementById('eaPeso').value    = a.pesoIngreso||'';
+  document.getElementById('eaPrecio').value  = a.precioCompra||'';
+  document.getElementById('eaRaza').value    = a.raza||'';
+  document.getElementById('eaEstado').value  = a.estado||'ACTIVO';
+  document.getElementById('moEditA').classList.add('open');
+}
+
+async function guardarEditAnimal(){
+  const ide   = document.getElementById('eaIde').value;
+  const tipo  = document.getElementById('eaTipo').value;
+  const cat   = document.getElementById('eaCat').value;
+  const gru   = document.getElementById('eaGrupo').value;
+  const ida   = document.getElementById('eaIda').value.trim()||null;
+  const ori   = document.getElementById('eaOrigen').value.trim();
+  const fecha = document.getElementById('eaFecha').value;
+  const peso  = parseFloat(document.getElementById('eaPeso').value)||0;
+  const prec  = parseFloat(document.getElementById('eaPrecio').value)||0;
+  const raza  = document.getElementById('eaRaza').value.trim()||null;
+  const est   = document.getElementById('eaEstado').value;
+  if(!ide){ ntf('Error: sin IDE',true); return; }
+  const upd = {tipo,categoria:cat,grupo:gru,ida,origen:ori,
+    fechaIngreso:fecha,pesoIngreso:peso,precioCompra:prec,raza,estado:est};
+  try{
+    const updObj = {};
+    updObj['animales/'+ide] = {...animales[ide],...upd};
+    await fbPatch('', updObj);
+    animales[ide] = {...animales[ide],...upd};
+    cerrar('moEditA');
+    renderDash(); renderA();
+    ntf('✅ Animal actualizado');
+  }catch(e){ ntf('Error: '+e.message, true); }
+}
+
+async function eliminarAnimal(ide){
+  const a = animales[ide];
+  if(!a){ ntf('Animal no encontrado',true); return; }
+  if(!confirm('¿Eliminar animal IDE '+ide+'?\nEsta acción no se puede deshacer.')) return;
+  try{
+    await fetch(FB+'/animales/'+ide+'.json',{method:'DELETE'});
+    delete animales[ide];
+    renderDash(); renderA();
+    ntf('✅ Animal eliminado');
+  }catch(e){ ntf('Error: '+e.message, true); }
+}
+
 // ═══════════ TABLA ANIMALES ═══════════
 let aSortField = 'grupo', aSortDir = 1;
 
