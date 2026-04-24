@@ -1860,7 +1860,11 @@ function readVentaXls(file){
         <div style="margin-top:8px;padding:10px;background:rgba(109,186,58,.07);border-radius:6px;border:1px solid var(--brd2);">
           <div style="font-weight:700;color:var(--gr);margin-bottom:4px;">✅ ${_ventaAnimales.length} animales leídos</div>
           <div style="font-size:11px;color:var(--t3);">Kg total: <strong>${kgTot.toFixed(1)} kg</strong> — Peso promedio: <strong>${(_ventaAnimales.length>0?kgTot/_ventaAnimales.length:0).toFixed(1)} kg</strong></div>
-          ${noEnc.length>0?`<div style="font-size:11px;color:var(--red);margin-top:4px;">⚠️ ${noEnc.length} IDEs no encontrados en el sistema</div>`:''}
+          ${noEnc.length>0?`
+            <div style="margin-top:8px;padding:8px;background:rgba(220,50,50,.08);border:1px solid rgba(220,50,50,.3);border-radius:4px;">
+              <div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:4px;">⚠️ ${noEnc.length} IDE${noEnc.length>1?'s':''} NO encontrado${noEnc.length>1?'s':''} en el sistema — NO se incluyen en la venta:</div>
+              <div style="font-size:11px;color:var(--red);font-family:monospace;line-height:1.8;">${noEnc.join('<br>')}</div>
+            </div>`:''}
         </div>`;
     }catch(err){ntf('Error: '+err.message,true);}
   };
