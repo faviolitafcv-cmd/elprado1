@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Stock de Hacienda — El Prado 1</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js">
 var _charts={};
 function destroyChart(id){if(_charts[id]){_charts[id].destroy();delete _charts[id];}}
@@ -30,31 +29,27 @@ function calcStat(b){
   var fv=parseFecha(b.fecha||'');
   var dias=0;
   if(fi&&fv){dias=Math.round((new Date(fv)-new Date(fi+'T12:00:00'))/86400000);if(dias<0)dias=0;}
-  var gmd=null;
+  var gmd=null,gan=null,bd=null,mk=null;
   if(dias>0&&a.pesoIngreso&&b.pesoVenta)gmd=Math.round((b.pesoVenta-a.pesoIngreso)/dias*1000)/1000;
-  var gan=null;
   if(a.precioCompra!=null&&b.precioVenta!=null)gan=Math.round((b.precioVenta-a.precioCompra)*100)/100;
-  var bd=null;
   if(gan!=null&&dias>0)bd=Math.round(gan/dias*100)/100;
-  var mk=null;
   if(gan!=null&&a.pesoIngreso&&b.pesoVenta&&b.pesoVenta>a.pesoIngreso)mk=Math.round(gan/(b.pesoVenta-a.pesoIngreso)*100)/100;
   return {a:a,v:v,dias:dias,gmd:gmd,gan:gan,bd:bd,mk:mk};
 }
 function renderInformes(){
   var data=getVentasData();
-  // Poblar selector meses
   var sel=document.getElementById('ifPeriodo');
   if(sel&&sel.options.length<=1){
     var ms=[...new Set(bajas.filter(function(b){return b.tipo==='VENTA';}).map(function(b){return b.fecha.substring(0,7);}))].sort().reverse();
     ms.forEach(function(m){var o=document.createElement('option');o.value=m;o.textContent=m;sel.appendChild(o);});
   }
   if(!data.length) return;
-  var totC=data.length,totKg=0,totBsV=0,totBsC=0,sGmd=0,nGmd=0,sD=0,nD=0,sBd=0,nBd=0,sMk=0,nMk=0;
+  var totC=data.length,totKg=0,totBsV=0,totBsC=0,sG=0,nG=0,sD=0,nD=0,sBd=0,nBd=0,sMk=0,nMk=0;
   var byD={},byO={},byTC={};
   data.forEach(function(b){
     var s=calcStat(b);var a=s.a,v=s.v;
     totKg+=b.pesoVenta||0;totBsV+=b.precioVenta||0;totBsC+=a.precioCompra||0;
-    if(s.gmd!=null){sGmd+=s.gmd;nGmd++;}
+    if(s.gmd!=null){sG+=s.gmd;nG++;}
     if(s.dias>0){sD+=s.dias;nD++;}
     if(s.bd!=null){sBd+=s.bd;nBd++;}
     if(s.mk!=null){sMk+=s.mk;nMk++;}
@@ -74,31 +69,27 @@ function renderInformes(){
     if(s.gan!=null){byTC[tc].sgan+=s.gan;byTC[tc].ngan++;}
     if(s.bd!=null){byTC[tc].sbd+=s.bd;byTC[tc].nbd++;}
   });
-  // Resumen cabecera
   function sv(id,val,col){var el=document.getElementById(id);if(el){el.textContent=val;if(col)el.style.color=col;}}
   sv('vrCab',totC.toLocaleString('es-BO'));
   sv('vrKg',(totKg/1000).toFixed(1)+' t');
   sv('vrBs','Bs '+fmt(totBsV));
   var gan=totBsV-totBsC;
   sv('vrGan',(gan>=0?'+':'')+'Bs '+fmt(gan),gan>=0?'var(--gr)':'var(--red)');
-  sv('vrGmd',nGmd>0?(sGmd/nGmd).toFixed(3)+' kg/d':'—');
+  sv('vrGmd',nG>0?(sG/nG).toFixed(3)+' kg/d':'—');
   sv('vrDias',nD>0?Math.round(sD/nD)+' días':'—');
   sv('vrBsDia',nBd>0?'Bs '+fmt(sBd/nBd):'—');
   sv('vrMargKg',nMk>0?'Bs '+fmt(sMk/nMk)+'/kg':'—');
-  // Tabla destino
   var td=document.getElementById('itDestino');
   if(td)td.innerHTML=Object.values(byD).sort(function(a,b){return b.bsV-a.bsV;}).map(function(d){
     var g=d.bsV-d.bsC,p=d.bsC>0?(g/d.bsC*100).toFixed(1):'—',bk=d.kg>0?fmt(d.bsV/d.kg):'—';
-    return '<tr><td><b>'+d.dest+'</b></td><td style="font-size:11px;color:var(--t2);">'+d.merc+'</td><td class="mn tg">'+d.n+'</td><td class="mn">'+Math.round(d.kg)+' kg</td><td class="mn tgo">Bs '+fmt(d.bsV)+'</td><td class="mn">Bs '+bk+'/kg</td><td class="mn" style="color:'+(g>=0?'var(--gr)':'var(--red)')+';">'+(g>=0?'+':'')+'Bs '+fmt(g)+'</td><td class="mn">'+p+'%</td></tr>';
+    return '<tr><td><b>'+d.dest+'</b></td><td style="font-size:11px;color:var(--t2);">'+d.merc+'</td><td class="mn tg">'+d.n+'</td><td class="mn">'+Math.round(d.kg)+' kg</td><td class="mn tgo">Bs '+fmt(d.bsV)+'</td><td class="mn">Bs '+bk+'</td><td class="mn" style="color:'+(g>=0?'var(--gr)':'var(--red)')+';">'+(g>=0?'+':'')+'Bs '+fmt(g)+'</td><td class="mn">'+p+'%</td></tr>';
   }).join('');
-  // Tabla origen
   var to=document.getElementById('itOrigen');
   if(to)to.innerHTML=Object.values(byO).sort(function(a,b){return (b.bsV-b.bsC)-(a.bsV-a.bsC);}).map(function(o){
     var g=o.bsV-o.bsC,p=o.bsC>0?(g/o.bsC*100).toFixed(1):'—';
     var gp=o.ng>0?(o.sg/o.ng).toFixed(3):'—',dp=o.nd>0?Math.round(o.sd/o.nd)+'d':'—';
     return '<tr><td><b>'+o.orig+'</b></td><td class="mn tg">'+o.n+'</td><td class="mn">'+Math.round(o.kg)+' kg</td><td class="mn tgo">Bs '+fmt(o.bsC)+'</td><td class="mn tgo">Bs '+fmt(o.bsV)+'</td><td class="mn" style="color:'+(g>=0?'var(--gr)':'var(--red)')+';">'+(g>=0?'+':'')+'Bs '+fmt(g)+'</td><td class="mn">'+p+'%</td><td class="mn">'+gp+'</td><td class="mn">'+dp+'</td></tr>';
   }).join('');
-  // Tabla tipo+cat
   var tt=document.getElementById('itTipoCat');
   if(tt)tt.innerHTML=Object.values(byTC).sort(function(a,b){return a.tipo.localeCompare(b.tipo)||a.cat.localeCompare(b.cat);}).map(function(t){
     var pv=t.n>0?fmt(t.spv/t.n):'—',pi=t.n>0?fmt(t.spi/t.n):'—';
@@ -106,50 +97,40 @@ function renderInformes(){
     var ganp=t.ngan>0?fmt(t.sgan/t.ngan):'—',bdp=t.nbd>0?fmt(t.sbd/t.nbd):'—';
     return '<tr><td>'+t.tipo.replace('CRIA-REPRODUCTORES','CRÍA')+'</td><td><b>'+t.cat+'</b></td><td class="mn tg">'+t.n+'</td><td class="mn">'+pv+' kg</td><td class="mn">'+pi+' kg</td><td class="mn tgo">'+gp+'</td><td class="mn">'+dp+'</td><td class="mn tgo">Bs '+ganp+'</td><td class="mn">Bs '+bdp+'/d</td></tr>';
   }).join('');
-  // Gráficos
   var COL=['#4CAF50','#2196F3','#FF9800','#E91E63','#9C27B0','#00BCD4','#8BC34A','#FF5722'];
   var dKeys=Object.keys(byD);
   destroyChart('chartDestino');
-  var cD=document.getElementById('chartDestino')?.getContext('2d');
-  if(cD)_charts['chartDestino']=new Chart(cD,{type:'doughnut',data:{labels:dKeys,datasets:[{data:dKeys.map(function(k){return byD[k].n;}),backgroundColor:COL,borderWidth:2,borderColor:'#0d1f0d'}]},options:{plugins:{legend:{labels:{color:'#e8ffe8',font:{size:11}}}}}});
-  var mMap={};
-  data.forEach(function(b){var v=ventas.find(function(x){return x.id===b.ventaId;})||{};var m=v.mercado||'SIN DATO';mMap[m]=(mMap[m]||0)+1;});
+  var cD=document.getElementById('chartDestino');
+  if(cD&&window.Chart)_charts['chartDestino']=new Chart(cD.getContext('2d'),{type:'doughnut',data:{labels:dKeys,datasets:[{data:dKeys.map(function(k){return byD[k].n;}),backgroundColor:COL,borderWidth:2,borderColor:'#0d1f0d'}]},options:{plugins:{legend:{labels:{color:'#e8ffe8',font:{size:11}}}}}});
+  var mMap={};data.forEach(function(b){var v=ventas.find(function(x){return x.id===b.ventaId;})||{};var m=v.mercado||'SIN DATO';mMap[m]=(mMap[m]||0)+1;});
   destroyChart('chartMercado');
-  var cM=document.getElementById('chartMercado')?.getContext('2d');
-  if(cM)_charts['chartMercado']=new Chart(cM,{type:'doughnut',data:{labels:Object.keys(mMap),datasets:[{data:Object.values(mMap),backgroundColor:['#4CAF50','#FF9800','#9E9E9E'],borderWidth:2,borderColor:'#0d1f0d'}]},options:{plugins:{legend:{labels:{color:'#e8ffe8',font:{size:11}}}}}});
+  var cM=document.getElementById('chartMercado');
+  if(cM&&window.Chart)_charts['chartMercado']=new Chart(cM.getContext('2d'),{type:'doughnut',data:{labels:Object.keys(mMap),datasets:[{data:Object.values(mMap),backgroundColor:['#4CAF50','#FF9800','#9E9E9E'],borderWidth:2,borderColor:'#0d1f0d'}]},options:{plugins:{legend:{labels:{color:'#e8ffe8',font:{size:11}}}}}});
   var oS=Object.values(byO).sort(function(a,b){return (b.bsV-b.bsC)-(a.bsV-a.bsC);}).slice(0,10);
   destroyChart('chartOrigen');
-  var cO=document.getElementById('chartOrigen')?.getContext('2d');
-  if(cO)_charts['chartOrigen']=new Chart(cO,{type:'bar',data:{labels:oS.map(function(o){return o.orig;}),datasets:[{label:'Ganancia Bs',data:oS.map(function(o){return Math.round(o.bsV-o.bsC);}),backgroundColor:oS.map(function(o){return o.bsV-o.bsC>=0?'rgba(76,175,80,.8)':'rgba(233,30,99,.8)';})}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#7a9a7a'},grid:{color:'#1a3a1a'}},y:{ticks:{color:'#e8ffe8',font:{size:10}},grid:{color:'#1a3a1a'}}}}});
-  var dS=Object.values(byD).sort(function(a,b){return b.bsV/b.kg-a.bsV/a.kg;});
+  var cO=document.getElementById('chartOrigen');
+  if(cO&&window.Chart)_charts['chartOrigen']=new Chart(cO.getContext('2d'),{type:'bar',data:{labels:oS.map(function(o){return o.orig;}),datasets:[{label:'Ganancia',data:oS.map(function(o){return Math.round(o.bsV-o.bsC);}),backgroundColor:oS.map(function(o){return o.bsV-o.bsC>=0?'rgba(76,175,80,.8)':'rgba(233,30,99,.8)';})}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#7a9a7a'},grid:{color:'#1a3a1a'}},y:{ticks:{color:'#e8ffe8',font:{size:10}},grid:{color:'#1a3a1a'}}}}});
+  var dS=Object.values(byD).sort(function(a,b){return b.bsV/Math.max(b.kg,1)-a.bsV/Math.max(a.kg,1);});
   destroyChart('chartBsKg');
-  var cBK=document.getElementById('chartBsKg')?.getContext('2d');
-  if(cBK)_charts['chartBsKg']=new Chart(cBK,{type:'bar',data:{labels:dS.map(function(d){return d.dest;}),datasets:[{label:'Bs/kg',data:dS.map(function(d){return d.kg>0?Math.round(d.bsV/d.kg*100)/100:0;}),backgroundColor:'rgba(33,150,243,.8)'}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#e8ffe8',font:{size:10}},grid:{color:'#1a3a1a'}},y:{ticks:{color:'#7a9a7a'},grid:{color:'#1a3a1a'}}}}});
+  var cBK=document.getElementById('chartBsKg');
+  if(cBK&&window.Chart)_charts['chartBsKg']=new Chart(cBK.getContext('2d'),{type:'bar',data:{labels:dS.map(function(d){return d.dest;}),datasets:[{label:'Bs/kg',data:dS.map(function(d){return d.kg>0?Math.round(d.bsV/d.kg*100)/100:0;}),backgroundColor:'rgba(33,150,243,.8)'}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#e8ffe8',font:{size:10}},grid:{color:'#1a3a1a'}},y:{ticks:{color:'#7a9a7a'},grid:{color:'#1a3a1a'}}}}});
   var tcS=Object.values(byTC).filter(function(t){return t.ng>0;}).sort(function(a,b){return b.sg/b.ng-a.sg/a.ng;});
   destroyChart('chartGmd');
-  var cG=document.getElementById('chartGmd')?.getContext('2d');
-  if(cG)_charts['chartGmd']=new Chart(cG,{type:'bar',data:{labels:tcS.map(function(t){return t.tipo.replace('CRIA-REPRODUCTORES','CRÍA')+' '+t.cat;}),datasets:[{label:'GMD',data:tcS.map(function(t){return Math.round(t.sg/t.ng*1000)/1000;}),backgroundColor:'rgba(255,152,0,.8)'}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#e8ffe8',font:{size:10}},grid:{color:'#1a3a1a'}},y:{ticks:{color:'#7a9a7a'},grid:{color:'#1a3a1a'}}}}});
-  var byMes={};
-  data.forEach(function(b){var mes=b.fecha.substring(0,7);if(!byMes[mes])byMes[mes]={bsV:0,kg:0};byMes[mes].bsV+=b.precioVenta||0;byMes[mes].kg+=b.pesoVenta||0;});
+  var cG=document.getElementById('chartGmd');
+  if(cG&&window.Chart)_charts['chartGmd']=new Chart(cG.getContext('2d'),{type:'bar',data:{labels:tcS.map(function(t){return t.tipo.replace('CRIA-REPRODUCTORES','CRÍA')+' '+t.cat;}),datasets:[{label:'GMD',data:tcS.map(function(t){return Math.round(t.sg/t.ng*1000)/1000;}),backgroundColor:'rgba(255,152,0,.8)'}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#e8ffe8',font:{size:10}},grid:{color:'#1a3a1a'}},y:{ticks:{color:'#7a9a7a'},grid:{color:'#1a3a1a'}}}}});
+  var byMes={};data.forEach(function(b){var mes=b.fecha.substring(0,7);if(!byMes[mes])byMes[mes]={bsV:0,kg:0};byMes[mes].bsV+=b.precioVenta||0;byMes[mes].kg+=b.pesoVenta||0;});
   var ms=Object.keys(byMes).sort();
   destroyChart('chartEvol');
-  var cEv=document.getElementById('chartEvol')?.getContext('2d');
-  if(cEv)_charts['chartEvol']=new Chart(cEv,{type:'line',data:{labels:ms,datasets:[{label:'Bs/kg prom',data:ms.map(function(m){return byMes[m].kg>0?Math.round(byMes[m].bsV/byMes[m].kg*100)/100:0;}),borderColor:'#4CAF50',backgroundColor:'rgba(76,175,80,.1)',tension:0.3,pointBackgroundColor:'#4CAF50'}]},options:{plugins:{legend:{labels:{color:'#e8ffe8'}}},scales:{x:{ticks:{color:'#e8ffe8',font:{size:10}},grid:{color:'#1a3a1a'}},y:{ticks:{color:'#7a9a7a'},grid:{color:'#1a3a1a'}}}}});
+  var cEv=document.getElementById('chartEvol');
+  if(cEv&&window.Chart)_charts['chartEvol']=new Chart(cEv.getContext('2d'),{type:'line',data:{labels:ms,datasets:[{label:'Bs/kg prom',data:ms.map(function(m){return byMes[m].kg>0?Math.round(byMes[m].bsV/byMes[m].kg*100)/100:0;}),borderColor:'#4CAF50',backgroundColor:'rgba(76,175,80,.1)',tension:0.3,pointBackgroundColor:'#4CAF50'}]},options:{plugins:{legend:{labels:{color:'#e8ffe8'}}},scales:{x:{ticks:{color:'#e8ffe8',font:{size:10}},grid:{color:'#1a3a1a'}},y:{ticks:{color:'#7a9a7a'},grid:{color:'#1a3a1a'}}}}});
 }
 function renderInf(){renderInformes();}
 function exportarInformeExcel(){
   var data=getVentasData();
-  if(!data.length){ntf('Sin datos para exportar',true);return;}
+  if(!data.length){ntf('Sin datos',true);return;}
   var rows=[['IDE','Tipo','Cat','Origen','F.Ingreso','F.Venta','Mercado','Destino','Peso Venta','Precio Venta','Peso Ing','Precio Compra','GMD','Días','Ganancia','Bs/día']];
-  data.forEach(function(b){
-    var s=calcStat(b);var a=s.a,v=s.v;
-    rows.push([b.ide,a.tipo||'',a.categoria||'',a.origen||'',a.fechaIngreso||'',b.fecha,v.mercado||'',v.frigorifico||b.destino||'',b.pesoVenta||'',b.precioVenta||'',a.pesoIngreso||'',a.precioCompra||'',s.gmd||'',s.dias||'',s.gan||'',s.bd||'']);
-  });
-  var ws=XLSX.utils.aoa_to_sheet(rows);
-  var wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'Ventas');
-  XLSX.writeFile(wb,'Informe_Ventas.xlsx');
-  ntf('OK exportado');
+  data.forEach(function(b){var s=calcStat(b);var a=s.a,v=s.v;rows.push([b.ide,a.tipo||'',a.categoria||'',a.origen||'',a.fechaIngreso||'',b.fecha,v.mercado||'',v.frigorifico||b.destino||'',b.pesoVenta||'',b.precioVenta||'',a.pesoIngreso||'',a.precioCompra||'',s.gmd||'',s.dias||'',s.gan||'',s.bd||'']);});
+  var ws=XLSX.utils.aoa_to_sheet(rows);var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Ventas');XLSX.writeFile(wb,'Informe_Ventas.xlsx');ntf('OK exportado');
 }
 </script>
 <style>
@@ -335,7 +316,6 @@ tr:hover td{background:rgba(109,186,58,.04);}
   <div class="tab" onclick="showPg('animales')">🐄 Animales</div>
   <div class="tab" onclick="showPg('pesajes')">⚖️ Pesajes</div>
   <div class="tab" onclick="showPg('compras')">📥 Compras</div>
-  <div class="tab" onclick="showPg('ventas')">💰 Ventas</div>
   <div class="tab" onclick="showPg('bajas')">📤 Bajas</div>
   <div class="tab" onclick="showPg('informes')">📋 Informes</div>
 </div>
@@ -351,43 +331,14 @@ tr:hover td{background:rgba(109,186,58,.04);}
     <div class="sc" onclick="filtQuick('CRIA-REPRODUCTORES','TORILLO')"><div class="sc-v" id="dCT">—</div><div class="sc-l">Cría Torillo</div></div>
   </div>
 
-  <!-- RESUMEN POR GRUPO -->
   <div class="card">
-    <div class="ch">
-      <div class="ct">🐄 Resumen por Grupo — Proyectado al <span id="dFechaHoy"></span></div>
-      <button class="btn bs btn-sm" onclick="verNoVinieron()">⚠️ Ver quién no vino al pesaje</button>
-    </div>
+    <div class="ch"><div class="ct">📊 Inventario por Grupo</div></div>
     <div class="tw"><table>
-      <thead><tr>
-        <th>Grupo</th>
-        <th>Cabezas</th>
-        <th>Peso Prom. Proyectado</th>
-        <th>GMD Prom.</th>
-        <th>GMD desde ingreso</th>
-        <th>Estado</th>
-        <th></th>
-      </tr></thead>
-      <tbody id="dGrupos"><tr><td colspan="7"><div class="ldr"><div class="ls"></div></div></td></tr></tbody>
+      <thead><tr><th>Tipo</th><th>Categoría</th><th>Grupo</th><th>Cabezas</th><th>Peso Ing. Prom.</th><th>Ult. GMD Prom.</th><th>Orígenes</th></tr></thead>
+      <tbody id="dGrupos"><tr><td colspan="6"><div class="ldr"><div class="ls"></div></div></td></tr></tbody>
     </table></div>
   </div>
 
-  <!-- DETALLE DE GRUPO (se muestra al hacer clic) -->
-  <div class="card" id="dGrupoDetalle" style="display:none;">
-    <div class="ch">
-      <div class="ct" id="dGrupoDetalleTit">— Detalle del Grupo —</div>
-      <button class="btn bs btn-sm" onclick="document.getElementById('dGrupoDetalle').style.display='none'">✕ Cerrar</button>
-    </div>
-    <div id="dGrupoDetalleCats" style="padding:8px 14px;font-size:12px;color:var(--t2);border-bottom:1px solid var(--brd);"></div>
-    <div class="tw"><table>
-      <thead><tr>
-        <th>IDE</th><th>Tipo</th><th>Categoría</th><th>Origen</th>
-        <th>Peso Ing.</th><th>Último Pesaje</th><th>GMD</th><th>Peso Hoy (proj.)</th>
-      </tr></thead>
-      <tbody id="dGrupoDetalleBody"></tbody>
-    </table></div>
-  </div>
-
-  <!-- ÚLTIMOS PESAJES -->
   <div class="card">
     <div class="ch"><div class="ct">⚖️ Últimos Pesajes</div></div>
     <div class="tw"><table>
@@ -402,70 +353,45 @@ tr:hover td{background:rgba(109,186,58,.04);}
   <div class="ar">
     <button class="btn bp" onclick="openMA()">+ Agregar Animal</button>
     <button class="btn bs" onclick="openImport()">📥 Importar Pesaje</button>
-    <span id="aCounter" style="font-size:12px;color:var(--t2);margin-left:auto;align-self:center;"></span>
     <button class="btn bs" id="btnImportInv" style="border-color:var(--gr);color:var(--gr);display:none;" onclick="openImportInv()">📋 Importar Inventario Inicial</button>
     <button class="btn bs" style="border-color:var(--red);color:var(--red);" onclick="limpiarInventario()">🗑 Limpiar Inventario</button>
     <div class="sp"></div>
-
+    <span id="aCount" style="font-size:11px;color:var(--t3);">Cargando...</span>
   </div>
   <div class="fr">
-    <select id="fTipo" onchange="renderA()">
-      <option value="">Todos los tipos</option>
-      <option value="INVERNADA">INVERNADA</option>
-      <option value="CRIA-REPRODUCTORES">CRIA-REPRODUCTORES</option>
-    </select>
-    <select id="fCat" onchange="renderA()">
+    <select id="fCat" onchange="filtA()">
       <option value="">Todas las categorías</option>
-      <option value="VAQUILLA">Vaquilla</option>
-      <option value="TORILLO">Torillo</option>
-      <option value="VACA">Vaca</option>
+      <option value="VQ_INV">Vaquilla Invernada</option>
+      <option value="VQ_PDC">Vaquilla Pie de Cría</option>
+      <option value="TR_INV">Torillo Invernada</option>
+      <option value="TR_REP">Torillo Reproductor</option>
+      <option value="VC_INV">Vaca Invernada</option>
     </select>
-    <select id="fGrupo" onchange="renderA()">
+    <select id="fGrupo" onchange="filtA()">
       <option value="">Todos los grupos</option>
-      <option value="VAQ. VENTA">VAQ. VENTA</option>
-      <option value="VAQ. CABEZA">VAQ. CABEZA</option>
-      <option value="VAQ. CUERPO">VAQ. CUERPO</option>
-      <option value="VAQ. COLA 1">VAQ. COLA 1</option>
-      <option value="VAQ. COLA 2">VAQ. COLA 2</option>
-      <option value="VAQ. COLA 3">VAQ. COLA 3</option>
-      <option value="TOR. VENTA">TOR. VENTA</option>
-      <option value="TOR. CABEZA">TOR. CABEZA</option>
-      <option value="TOR. CUERPO">TOR. CUERPO</option>
-      <option value="TOR. COLA 1">TOR. COLA 1</option>
-      <option value="TOR. COLA 2">TOR. COLA 2</option>
-      <option value="TOR. COLA 3">TOR. COLA 3</option>
-      <option value="VAQ. CRIA CABEZA">VAQ. CRIA CABEZA</option>
-      <option value="VAQ. CRIA CUERPO">VAQ. CRIA CUERPO</option>
-      <option value="VAQ. CRIA COLA 1">VAQ. CRIA COLA 1</option>
-      <option value="VAQ. CRIA COLA 2">VAQ. CRIA COLA 2</option>
-      <option value="TOR. CRIA CABEZA">TOR. CRIA CABEZA</option>
-      <option value="TOR. CRIA CUERPO">TOR. CRIA CUERPO</option>
+      <option value="CABEZA">Cabeza</option>
+      <option value="CUERPO">Cuerpo</option>
+      <option value="COLA1">Cola 1</option>
+      <option value="COLA2">Cola 2</option>
+      <option value="COLA3">Cola 3</option>
+      <option value="VENTA">Venta</option>
+      <option value="REPRODUCTOR">Reproductor</option>
     </select>
-    <select id="fEst" onchange="renderA()">
+    <select id="fEst" onchange="filtA()">
       <option value="ACTIVO">Activos</option>
       <option value="">Todos</option>
-      <option value="EN VENTA">En Venta</option>
       <option value="VENDIDO">Vendidos</option>
       <option value="MUERTO">Muertos</option>
     </select>
-    <input class="si" type="text" id="fBus" placeholder="🔍 IDE, caravana u origen..." oninput="renderA()">
+    <input class="si" type="text" id="fBus" placeholder="🔍 IDE, caravana u origen..." oninput="filtA()">
   </div>
   <div class="card">
     <div class="tw"><table>
       <thead><tr>
-        <th style="cursor:pointer;" onclick="sortA('ide')">IDE (Chip) ↕</th>
-        <th>Caravana</th>
-        <th style="cursor:pointer;" onclick="sortA('tipo')">Tipo ↕</th>
-        <th style="cursor:pointer;" onclick="sortA('categoria')">Categoría ↕</th>
-        <th style="cursor:pointer;" onclick="sortA('grupo')">Grupo ↕</th>
-        <th style="cursor:pointer;" onclick="sortA('origen')">Origen ↕</th>
-        <th style="cursor:pointer;" onclick="sortA('fechaIngreso')">F. Ingreso ↕</th>
-        <th style="cursor:pointer;" onclick="sortA('pesoIngreso')">Peso Ing. ↕</th>
-        <th style="cursor:pointer;" onclick="sortA('precioCompra')">Precio ↕</th>
-        <th style="cursor:pointer;" onclick="sortA('_ultPesaje')">Últ. Pesaje ↕</th>
-        <th>Raza</th><th>Estado</th><th></th>
+        <th>IDE (Chip)</th><th>Caravana</th><th>Tipo</th><th>Categoría</th><th>Grupo</th><th>Origen</th>
+        <th>F. Ingreso</th><th>Peso Ing.</th><th>Precio</th><th>Raza</th><th>Estado</th><th></th>
       </tr></thead>
-      <tbody id="aBody"><tr><td colspan="13"><div class="ldr"><div class="ls"></div></div></td></tr></tbody>
+      <tbody id="aBody"><tr><td colspan="11"><div class="ldr"><div class="ls"></div></div></td></tr></tbody>
     </table></div>
     <div style="padding:10px 14px;border-top:1px solid var(--brd);">
       <div class="pag" id="aPag"></div>
@@ -527,117 +453,9 @@ tr:hover td{background:rgba(109,186,58,.04);}
   <div class="card">
     <div class="ch"><div class="ct">📥 Historial de Compras</div></div>
     <div class="tw"><table>
-      <thead><tr><th>Código</th><th>Fecha</th><th>Origen/Predio</th><th>Municipio</th><th>Tipo</th><th>Cabezas</th><th>Kg Total</th><th>Total Bs</th><th>Bs/kg</th><th></th></tr></thead>
-      <tbody id="cBody"><tr><td colspan="10"><div class="emp"><div class="emp-ic">📥</div>Sin compras registradas</div></td></tr></tbody>
+      <thead><tr><th>Fecha</th><th>Origen/Predio</th><th>Municipio</th><th>Categoría</th><th>Cabezas</th><th>Peso Prom.</th><th>Precio Prom.</th><th>Total Bs</th><th>Raza</th></tr></thead>
+      <tbody id="cBody"><tr><td colspan="9"><div class="emp"><div class="emp-ic">📥</div>Sin compras registradas</div></td></tr></tbody>
     </table></div>
-  </div>
-</div>
-
-<!-- ═══════ VENTAS ═══════ -->
-<div class="pg" id="pg-ventas">
-  <div class="ar">
-    <button class="btn bp" onclick="openV()">💰 Registrar Venta</button>
-  </div>
-
-  <!-- RESUMEN EJECUTIVO VENTAS -->
-  <div class="stats" id="vResumen" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:12px;">
-    <div class="sc"><div class="sc-v" id="vrCab">—</div><div class="sc-l">🐄 Animales Vendidos</div></div>
-    <div class="sc"><div class="sc-v" id="vrKg" style="font-size:16px;">—</div><div class="sc-l">📦 Kg Vendidos</div></div>
-    <div class="sc"><div class="sc-v" id="vrBs" style="font-size:14px;">—</div><div class="sc-l">💰 Total Bs Vendido</div></div>
-    <div class="sc"><div class="sc-v" id="vrGan" style="font-size:14px;">—</div><div class="sc-l">📈 Ganancia Total Bs</div></div>
-    <div class="sc"><div class="sc-v" id="vrGmd">—</div><div class="sc-l">⚡ GMD Promedio</div></div>
-    <div class="sc"><div class="sc-v" id="vrDias">—</div><div class="sc-l">📅 Días Prom. Campo</div></div>
-    <div class="sc"><div class="sc-v" id="vrBsDia" style="font-size:14px;">—</div><div class="sc-l">💵 Bs/Animal/Día</div></div>
-    <div class="sc"><div class="sc-v" id="vrMargKg" style="font-size:14px;">—</div><div class="sc-l">🎯 Margen Bs/Kg prod.</div></div>
-  </div>
-
-  <!-- HISTORIAL DE VENTAS -->
-  <div class="card">
-    <div class="ch"><div class="ct">💰 Historial de Ventas</div></div>
-    <div class="tw"><table>
-      <thead><tr>
-        <th>Código</th><th>Fecha</th><th>Destino</th><th>Tipo</th>
-        <th>Cabezas</th><th>Kg Total</th><th>Total Bs</th><th>Bs/kg</th>
-        <th>Estado</th><th></th>
-      </tr></thead>
-      <tbody id="vBody"><tr><td colspan="10"><div class="emp"><div class="emp-ic">💰</div>Sin ventas registradas</div></td></tr></tbody>
-    </table></div>
-  </div>
-
-  <!-- ANIMALES VENDIDOS -->
-  <div class="card">
-    <div class="ch">
-      <div class="ct">🐄 Animales Vendidos</div>
-      <span id="vAnimCounter" style="font-size:12px;color:var(--t2);margin-right:auto;"></span>
-      <button class="btn bs btn-sm" onclick="descargarPlantillaVenta()" style="border-color:var(--gold);color:var(--gold);">📥 Descargar Plantilla Ventas</button>
-      <button class="btn bs btn-sm" onclick="openImportVentasHist()" style="border-color:var(--gr);color:var(--gr);">📤 Importar Ventas Históricas</button>
-    </div>
-    <div class="fr" style="padding:8px 14px;gap:8px;flex-wrap:wrap;">
-      <select id="vfVenta" onchange="renderVAnimales()" style="font-size:12px;">
-        <option value="">Todas las ventas</option>
-      </select>
-      <select id="vfTipo" onchange="renderVAnimales()" style="font-size:12px;">
-        <option value="">Todos los tipos</option>
-        <option value="INVERNADA">INVERNADA</option>
-        <option value="CRIA-REPRODUCTORES">CRIA-REPRODUCTORES</option>
-      </select>
-      <select id="vfCat" onchange="renderVAnimales()" style="font-size:12px;">
-        <option value="">Todas las categorías</option>
-        <option value="VAQUILLA">VAQUILLA</option>
-        <option value="TORILLO">TORILLO</option>
-        <option value="VACA">VACA</option>
-      </select>
-      <select id="vfGrupo" onchange="renderVAnimales()" style="font-size:12px;">
-        <option value="">Todos los grupos</option>
-        <option>VAQ. VENTA</option><option>VAQ. CABEZA</option><option>VAQ. CUERPO</option>
-        <option>VAQ. COLA 1</option><option>VAQ. COLA 2</option><option>VAQ. COLA 3</option>
-        <option>TOR. VENTA</option><option>TOR. CABEZA</option><option>TOR. CUERPO</option>
-        <option>TOR. COLA 1</option><option>TOR. COLA 2</option><option>TOR. COLA 3</option>
-        <option>VAQ. CRIA CABEZA</option><option>VAQ. CRIA CUERPO</option>
-        <option>VAQ. CRIA COLA 1</option><option>VAQ. CRIA COLA 2</option>
-        <option>TOR. CRIA CABEZA</option><option>TOR. CRIA CUERPO</option>
-      </select>
-      <select id="vfOrigen" onchange="renderVAnimales()" style="font-size:12px;">
-        <option value="">Todos los orígenes</option>
-      </select>
-      <select id="vfMercado" onchange="renderVAnimales()" style="font-size:12px;">
-        <option value="">Todos los mercados</option>
-        <option value="EXPORTACION">EXPORTACIÓN</option>
-        <option value="NACIONAL">NACIONAL</option>
-      </select>
-      <select id="vfFrigorifico" onchange="renderVAnimales()" style="font-size:12px;">
-        <option value="">Todos los destinos</option>
-        <option value="BFC S.A.">BFC S.A.</option>
-        <option value="FRIGOR S.A.">FRIGOR S.A.</option>
-        <option value="FRIGOSI S.A.">FRIGOSI S.A.</option>
-        <option value="FRIDOSA">FRIDOSA</option>
-      </select>
-      <input id="vfBus" type="text" placeholder="🔍 Buscar IDE..." oninput="renderVAnimales()" style="font-size:12px;padding:5px 10px;background:var(--card2);border:1px solid var(--brd);color:var(--text);border-radius:6px;">
-    </div>
-    <div class="tw"><table>
-      <thead><tr>
-        <th>IDE</th>
-        <th style="cursor:pointer;" onclick="sortVA('tipo')">Tipo ↕</th>
-        <th style="cursor:pointer;" onclick="sortVA('cat')">Categoría ↕</th>
-        <th style="cursor:pointer;" onclick="sortVA('grupo')">Grupo ↕</th>
-        <th style="cursor:pointer;" onclick="sortVA('origen')">Origen ↕</th>
-        <th style="cursor:pointer;" onclick="sortVA('fechaIngreso')">F. Ingreso ↕</th>
-        <th style="cursor:pointer;" onclick="sortVA('fechaVenta')">F. Venta ↕</th>
-        <th>Mercado</th><th>Destino</th>
-        <th style="cursor:pointer;" onclick="sortVA('pesoVenta')">Peso Venta ↕</th>
-        <th style="cursor:pointer;" onclick="sortVA('precioVenta')">Precio Venta ↕</th>
-        <th>Peso Ing.</th>
-        <th>Precio Compra</th>
-        <th style="cursor:pointer;" onclick="sortVA('gmd')">GMD ↕</th>
-        <th style="cursor:pointer;" onclick="sortVA('dias')">Días campo ↕</th>
-        <th style="cursor:pointer;" onclick="sortVA('ganancia')">Ganancia ↕</th>
-        <th style="cursor:pointer;" onclick="sortVA('bsDia')">Bs/día ↕</th>
-      </tr></thead>
-      <tbody id="vAnimBody"><tr><td colspan="14" class="emp">—</td></tr></tbody>
-    </table></div>
-    <div style="padding:8px 14px;border-top:1px solid var(--brd);">
-      <div class="pag" id="vAnimPag"></div>
-    </div>
   </div>
 </div>
 
