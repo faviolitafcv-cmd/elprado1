@@ -698,6 +698,8 @@ const GRU_ORD = ['CABEZA','CUERPO','COLA1','COLA2','COLA3','VENTA','REPRODUCTOR'
 
 // ═══════════ STATE ═══════════
 let animales = {};   // keyed by IDE
+let ventas   = [];
+let _ventaAnimales=[], _cuentasVenta=[];
 let pesajes  = [];   // sorted desc by fecha
 let bajas    = [];   // sorted desc by fecha
 let compras  = [];
@@ -2174,7 +2176,6 @@ function exportarInformeExcel(){
 }
 
 // ═══════════ VENTAS ═══════════
-let ventas=[], _ventaAnimales=[], _cuentasVenta=[];
 let pVAnim=1, vaSortField='fechaVenta', vaSortDir=-1;
 
 function genCodigoVenta(){
