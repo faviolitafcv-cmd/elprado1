@@ -446,9 +446,9 @@ tr:hover td{background:rgba(109,186,58,.04);}
     <div class="tw"><table>
       <thead><tr>
         <th>IDE</th><th>Tipo</th><th>Categoría</th><th>Grupo (vendido)</th>
-        <th>Origen</th><th>F. Venta</th><th>Destino</th>
+        <th>Origen</th><th>F. Ingreso</th><th>F. Venta</th><th>Mercado</th><th>Destino</th>
         <th>Peso Venta</th><th>Precio Venta</th><th>Peso Ing.</th><th>Precio Compra</th>
-        <th>GMD Total</th><th>Días en campo</th><th>Ganancia (Bs)</th>
+        <th>GMD Total</th><th>Días campo</th><th>Ganancia (Bs)</th><th>Bs/día</th>
       </tr></thead>
       <tbody id="vAnimBody"><tr><td colspan="14" class="emp">—</td></tr></tbody>
     </table></div>
@@ -757,14 +757,49 @@ tr:hover td{background:rgba(109,186,58,.04);}
       <div class="fg">
         <div class="sep">Datos Generales del Lote</div>
         <div class="fm"><label>Fecha de Venta *</label><input id="vF2" type="date"></div>
-        <div class="fm"><label>Destino / Comprador *</label><input id="vDest" type="text" placeholder="Nombre del comprador"></div>
         <div class="fm"><label>Municipio</label><input id="vMun" type="text" placeholder="San Ignacio..."></div>
-        <div class="fm"><label>Tipo *</label>
+        <div class="fm"><label>Tipo de Animal *</label>
           <select id="vTipo">
             <option value="">— Seleccionar —</option>
             <option value="INVERNADA">INVERNADA</option>
             <option value="CRIA-REPRODUCTORES">CRIA-REPRODUCTORES</option>
           </select>
+        </div>
+        <div class="fm"><label>Mercado *</label>
+          <select id="vMercado" onchange="toggleDestinoVenta()">
+            <option value="">— Seleccionar —</option>
+            <option value="EXPORTACION">EXPORTACIÓN</option>
+            <option value="NACIONAL">NACIONAL</option>
+          </select>
+        </div>
+        <div class="fm"><label>Tipo de Destino *</label>
+          <select id="vTipoDestino" onchange="toggleDestinoVenta()">
+            <option value="">— Seleccionar —</option>
+            <option value="FRIGORIFICO">FRIGORÍFICO</option>
+            <option value="PRIVADO">PRIVADO</option>
+          </select>
+        </div>
+        <div class="fm" id="vFrigorificoWrap" style="display:none;">
+          <label>Frigorífico *</label>
+          <select id="vFrigorifico">
+            <option value="">— Seleccionar —</option>
+            <option value="BFC S.A.">BFC S.A.</option>
+            <option value="FRIGOR S.A.">FRIGOR S.A.</option>
+            <option value="FRIGOSI S.A.">FRIGOSI S.A.</option>
+            <option value="FRIDOSA">FRIDOSA</option>
+            <option value="OTRO">OTRO (especificar)</option>
+          </select>
+        </div>
+        <div class="fm" id="vFrigorificoOtroWrap" style="display:none;">
+          <label>Especificar frigorífico</label>
+          <input id="vFrigorificoOtro" type="text" placeholder="Nombre del frigorífico">
+        </div>
+        <div class="fm" id="vPrivadoWrap" style="display:none;">
+          <label>Comprador / Destino *</label>
+          <input id="vDest" type="text" placeholder="Nombre del comprador">
+        </div>
+        <div class="fm" id="vDestinoHidden" style="display:none;">
+          <input id="vDestHidden" type="hidden">
         </div>
 
         <div class="sep">Kilogramos</div>
@@ -2353,9 +2388,27 @@ function readVentaXls(file){
   rd.readAsArrayBuffer(file);
 }
 
+
+function toggleDestinoVenta(){
+  const td = document.getElementById('vTipoDestino')?.value||'';
+  const frig = document.getElementById('vFrigorificoWrap');
+  const frigOtro = document.getElementById('vFrigorificoOtroWrap');
+  const priv = document.getElementById('vPrivadoWrap');
+  const frigSel = document.getElementById('vFrigorifico');
+  if(frig) frig.style.display = td==='FRIGORIFICO' ? '' : 'none';
+  if(priv) priv.style.display = td==='PRIVADO' ? '' : 'none';
+  if(frigOtro) frigOtro.style.display = (td==='FRIGORIFICO' && frigSel?.value==='OTRO') ? '' : 'none';
+}
+// Listener para cuando cambia el frigorífico seleccionado
+document.addEventListener('change', e=>{
+  if(e.target.id==='vFrigorifico') toggleDestinoVenta();
+});
+
 function openV(){
   _ventaAnimales=[];_cuentasVenta=[];window._ventaNoEnc=[];
-  ['vF2','vDest','vMun','vComNombre'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['vF2','vDest','vMun','vComNombre','vFrigorifico','vFrigorificoOtro'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';})
+  ;['vMercado','vTipoDestino'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  if(typeof toggleDestinoVenta==='function') toggleDestinoVenta();;
   ['vKgBruto','vPrecBruto','vComPrecio','vTransporte','vDesbaste','vPrecKgInput'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.value=id==='vDesbaste'?'0':'';
   });
@@ -2379,9 +2432,19 @@ function openV(){
 
 async function saveVenta(){
   const fecha=document.getElementById('vF2').value;
-  const dest=document.getElementById('vDest').value.trim();
   const mun=document.getElementById('vMun').value.trim();
   const tipo=document.getElementById('vTipo').value;
+  const mercado=document.getElementById('vMercado')?.value||'';
+  const tipoDestino=document.getElementById('vTipoDestino')?.value||'';
+  let frigorifico='', dest='';
+  if(tipoDestino==='FRIGORIFICO'){
+    frigorifico=document.getElementById('vFrigorifico')?.value||'';
+    if(frigorifico==='OTRO') frigorifico=document.getElementById('vFrigorificoOtro')?.value.trim()||'';
+    dest=frigorifico;
+  } else {
+    dest=document.getElementById('vDest')?.value.trim()||'';
+  }
+  if(!mercado||!tipoDestino||!dest){ntf('Completá mercado, tipo de destino y destino',true);return;}
   const com=parseFloat(document.getElementById('vComPrecio').value)||0;
   const trans=parseFloat(document.getElementById('vTransporte').value)||0;
   const comNom=document.getElementById('vComNombre').value.trim();
@@ -2396,7 +2459,7 @@ async function saveVenta(){
   } else {
     bruto=parseFloat(document.getElementById('vPrecBruto')?.value)||0;
   }
-  if(!fecha||!dest||!tipo||bruto<=0){ntf('Completá fecha, destino, tipo y precio',true);return;}
+  if(!fecha||!tipo||bruto<=0){ntf('Completá fecha, tipo de animal y precio',true);return;}
   if(!_ventaAnimales.length){ntf('Subí el Excel de la balanza con los animales',true);return;}
 
   const totalCobrar=Math.round((bruto-com-trans)*100)/100;
@@ -2416,6 +2479,7 @@ async function saveVenta(){
   const vId='v_'+Date.now();
   const ventaObj={
     id:vId,codigo,fecha,destino:dest,municipio:mun,tipo,
+    mercado,tipoDestino,frigorifico:frigorifico||null,
     cabezasRegistradas:_ventaAnimales.length,
     cabezasTotales:cabezasTotalesExcel,
     kgBruto,kgNeto,desbastePct:desbPct,
@@ -2644,10 +2708,13 @@ function renderVAnimales(){
     const a=animales[b.ide]||{};
     const venta=ventas.find(v=>v.id===b.ventaId)||{};
     // GMD total y días en campo
-    let diasCampo='—', gmdTotal='—', ganancia='—';
-    if(a.fechaIngreso && b.fecha){
-      const dias=Math.round((new Date(b.fecha)-new Date(a.fechaIngreso+'T12:00:00'))/86400000);
+    let diasCampo='—', diasCampoNum=null, gmdTotal='—', ganancia='—';
+    const fIng=parseFecha(a.fechaIngreso);
+    const fVent=parseFecha(b.fecha);
+    if(fIng && fVent){
+      const dias=Math.round((new Date(fVent)-new Date(fIng+'T12:00:00'))/86400000);
       if(dias>0){
+        diasCampoNum=dias;
         diasCampo=dias+' días';
         if(a.pesoIngreso && b.pesoVenta){
           gmdTotal=((b.pesoVenta-a.pesoIngreso)/dias).toFixed(3)+' kg/d';
@@ -2658,14 +2725,22 @@ function renderVAnimales(){
       const gan=b.precioVenta-a.precioCompra;
       ganancia='<span style="color:'+(gan>=0?'var(--gr)':'var(--red)')+';">Bs '+fmt(gan)+'</span>';
     }
+    // Bs/día
+    let bsDia='—';
+    if(a.precioCompra&&b.precioVenta&&diasCampoNum>0){
+      const bsDiaVal=(b.precioVenta-a.precioCompra)/diasCampoNum;
+      bsDia='<span style="color:'+(bsDiaVal>=0?'var(--gr)':'var(--red)')+';">Bs '+fmt(bsDiaVal)+'</span>';
+    }
     return`<tr>
       <td class="mn tg" style="font-size:11px;">${b.ide}</td>
       <td style="font-size:11px;">${a.tipo||'—'}</td>
       <td style="font-size:11px;">${a.categoria||b.categoriaAnimal||'—'}</td>
       <td style="font-size:11px;">${b.grupoAnimal||a.grupo||'—'}</td>
       <td style="font-size:11px;">${a.origen||b.origenAnimal||'—'}</td>
+      <td class="mn" style="font-size:11px;">${fmtFecha(a.fechaIngreso)}</td>
       <td class="mn" style="font-size:11px;">${fmtFecha(b.fecha)}</td>
-      <td style="font-size:11px;">${b.destino||venta.destino||'—'}</td>
+      <td style="font-size:10px;color:var(--t2);">${venta.mercado||'—'}</td>
+      <td style="font-size:11px;">${venta.frigorifico||b.destino||venta.destino||'—'}</td>
       <td class="mn">${b.pesoVenta?b.pesoVenta+' kg':'—'}</td>
       <td class="mn tgo">${b.precioVenta?'Bs '+fmt(b.precioVenta):'—'}</td>
       <td class="mn">${a.pesoIngreso?a.pesoIngreso+' kg':'—'}</td>
@@ -2673,6 +2748,7 @@ function renderVAnimales(){
       <td class="mn" style="font-size:11px;">${gmdTotal}</td>
       <td class="mn" style="font-size:11px;">${diasCampo}</td>
       <td class="mn">${ganancia}</td>
+      <td class="mn">${bsDia}</td>
     </tr>`;
   }).join('');
 
