@@ -1404,8 +1404,11 @@ function readBalanza(file){
       for(let i=1;i<rows.length;i++){
         const r=rows[i];
         if(!r||!r[cIde])continue;
-        const ideOrig=String(r[cIde]).trim();
-        if(!ideOrig||ideOrig==='undefined')continue;
+        // IDE puede venir como float (68000000704871.0) → convertir a entero
+        let ideRaw=r[cIde];
+        if(typeof ideRaw==='number') ideRaw=Math.round(ideRaw);
+        const ideOrig=String(ideRaw).trim().replace(/\.0$/,'');
+        if(!ideOrig||ideOrig==='undefined'||ideOrig==='0')continue;
 
         const pNuevo=parseFloat(String(r[cPeso]||0).replace(',','.'));
         if(isNaN(pNuevo)||pNuevo<=0)continue;
@@ -1472,14 +1475,22 @@ function readBalanza(file){
 
 function parseFecha(v){
   try{
+    if(!v) return new Date().toISOString().split('T')[0];
     if(v instanceof Date) return v.toISOString().split('T')[0];
     if(typeof v==='string'){
+      v=v.trim();
+      // DD/MM/YYYY
       const p=v.split('/');
-      if(p.length===3) return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+      if(p.length===3 && p[2].length===4)
+        return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+      // YYYY-MM-DD
+      if(/^\d{4}-\d{2}-\d{2}/.test(v)) return v.split('T')[0];
       return v.split('T')[0];
     }
-    if(typeof v==='number'){
-      return new Date((v-25569)*86400000).toISOString().split('T')[0];
+    if(typeof v==='number' && v>1000){
+      // Serial Excel → fecha
+      const d=new Date(Math.round((v-25569)*86400000));
+      return d.toISOString().split('T')[0];
     }
   }catch(e){}
   return new Date().toISOString().split('T')[0];
@@ -1490,7 +1501,11 @@ function showImportPrev(data, noEnc=[]){
   document.getElementById('iSum').innerHTML=`
     <div class="ist"><span>📊</span><b>${tot}</b> pesajes listos para importar</div>
     <div class="ist"><span>🔄</span><b>${mig}</b> animales cambian de grupo</div>
-    ${noEnc.length>0?`<div class="ist" style="color:var(--red);"><span>⚠️</span><b>${noEnc.length}</b> IDEs NO encontrados en el sistema</div>`:''}`;
+    ${noEnc.length>0?`
+      <div class="ist" style="color:var(--red);font-weight:700;">
+        <span>⚠️</span><b>${noEnc.length}</b> IDEs NO encontrados — se excluyen de la importación
+        <span style="font-size:11px;font-weight:400;margin-left:6px;">(usá el botón rojo para descargarlos)</span>
+      </div>`:''}`;
   document.getElementById('iPB').innerHTML=data.slice(0,20).map(d=>`
     <tr class="${d.migro?'row-mig':d.existente?'':'row-new'}">
       <td class="mn tg" style="font-size:11px;cursor:pointer" onclick="verDet('${d.ide}')">${d.ide}</td>
@@ -1517,11 +1532,19 @@ function showImportPrev(data, noEnc=[]){
 function descargarNoEncontrados(){
   const ne=importD?._noEncontrados||[];
   if(!ne.length){ntf('No hay IDEs sin encontrar');return;}
-  const rows=[['IDE','Peso','Clasificación','Fecha'],...ne.map(x=>[x.ide,x.peso,x.clasf,x.fecha])];
+  // Devuelve exactamente las mismas columnas que la planilla original
+  const rows=[
+    ['Peso','GDM','Notas sobre el animal','Raza','Clasf. Pesaj','Fecha Ingreso','Categoria',
+     'GDM total','Total de días','Peso ant.','GDM ant.','IDE','Origen','Fecha','Hora'],
+    ...ne.map(x=>[
+      x.peso,'','','',x.clasf||'','','','','','','',x.ide,'',x.fecha,''
+    ])
+  ];
   const ws=XLSX.utils.aoa_to_sheet(rows);
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'No Encontrados');
-  XLSX.writeFile(wb,'IDEs_no_encontrados.xlsx');
+  XLSX.writeFile(wb,'PESAJE_no_encontrados.xlsx');
+  ntf('✅ Descargado: '+ne.length+' animales no encontrados');
 }
 
 async function confirmarI(){
