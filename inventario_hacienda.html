@@ -259,7 +259,7 @@ tr:hover td{background:rgba(109,186,58,.04);}
     <button class="btn bs" id="btnImportInv" style="border-color:var(--gr);color:var(--gr);display:none;" onclick="openImportInv()">📋 Importar Inventario Inicial</button>
     <button class="btn bs" style="border-color:var(--red);color:var(--red);" onclick="limpiarInventario()">🗑 Limpiar Inventario</button>
     <div class="sp"></div>
-    <span id="aCount" style="font-size:11px;color:var(--t3);">Cargando...</span>
+
   </div>
   <div class="fr">
     <select id="fTipo" onchange="renderA()">
@@ -1189,11 +1189,17 @@ function sortA(field){
 }
 
 function renderA(){
+  try{
   const tipo = document.getElementById('fTipo')?.value||'';
   const cat  = document.getElementById('fCat')?.value||'';
   const gru  = document.getElementById('fGrupo')?.value||'';
-  const est  = document.getElementById('fEst')?.value||'';
+  const est  = document.getElementById('fEst')?.value||'ACTIVO';
   const bus  = document.getElementById('fBus')?.value.trim().toLowerCase()||'';
+  // Recalcular _lastPes si no existe (por si loadAll corrió sin pesajes)
+  if(!window._lastPes || Object.keys(window._lastPes).length===0){
+    window._lastPes = {};
+    pesajes.forEach(p=>{ if(!window._lastPes[p.ide]||p.fecha>window._lastPes[p.ide].fecha) window._lastPes[p.ide]=p; });
+  }
   const _lp  = window._lastPes||{};
 
   aFilt = Object.values(animales).filter(a=>{
@@ -1270,11 +1276,12 @@ function renderA(){
     let html = '';
     if(totalPages>1){
       if(pA>1) html+=`<button class="btn bs btn-sm" onclick="pA--;renderA()">‹ Ant</button> `;
-      html+=`<span style="font-size:12px;color:var(--t2);">Pág ${pA} de ${totalPages}</span>`;
+      html+=`<span style="font-size:12px;color:var(--t2);">Pág ${pA} de ${totalPages} (${total} animales)</span>`;
       if(pA<totalPages) html+=` <button class="btn bs btn-sm" onclick="pA++;renderA()">Sig ›</button>`;
     }
     pag.innerHTML=html;
   }
+  }catch(e){ console.error('renderA error:',e); ntf('Error al renderizar: '+e.message, true); }
 }
 
 function openImport(){
