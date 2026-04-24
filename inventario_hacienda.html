@@ -3150,7 +3150,7 @@ function verReciboVenta(vId){
     </div>
   </div>
 </div>
-</body></html>`);
+`);
   w.document.close();
 }
 
@@ -3464,128 +3464,7 @@ function ntf(msg,err=false,dur=3500){
   clearTimeout(ntfT);
   if(dur>0) ntfT=setTimeout(()=>el.style.display='none',dur);
 }
-</script>
 
-<!-- Modal: Importar Inventario Inicial -->
-<div class="modal-bg" id="moImportInv">
-  <div class="modal" style="max-width:520px;">
-    <div class="mh"><div class="mt">📥 Importar Inventario Inicial desde Excel</div>
-      <button class="mc" onclick="cerrar('moImportInv')">✕</button></div>
-    <div style="font-size:12px;color:var(--t2);margin-bottom:12px;line-height:1.6;">
-      Seleccioná tu planilla Excel con las columnas:<br>
-      <strong>IDE · IDV · Fecha Ingreso · Peso Ingreso · Precio · Raza · Origen · TIPO · CATEGORIA · GRUPO</strong>
-    </div>
-    <input type="file" id="fInvXls" accept=".xls,.xlsx" style="margin-bottom:12px;font-size:12px;" onchange="readInvExcel(this.files[0])">
-    <div id="invImportPrev" style="max-height:300px;overflow-y:auto;margin-bottom:12px;"></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;">
-      <button class="btn bs" onclick="cerrar('moImportInv')">Cancelar</button>
-      <button class="btn bp" id="btnConfInv" style="display:none;" onclick="confirmarImportInv()">✅ Confirmar e Importar</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal: Completar Venta Abierta -->
-<div class="mo" id="moCompletarV">
-  <div class="md" style="max-width:520px;">
-    <div class="mh">
-      <div class="mt">➕ Completar Venta Abierta</div>
-      <button class="mc" onclick="cerrar('moCompletarV')">✕</button>
-    </div>
-    <div class="mb">
-      <div id="moCompletarVInfo" style="padding:10px;background:rgba(255,150,0,.1);border:1px solid rgba(255,150,0,.3);border-radius:6px;margin-bottom:12px;font-size:12px;"></div>
-      <div class="fg">
-        <div class="fm full"><label>IDE del animal faltante *</label>
-          <input id="cvIde" type="text" placeholder="Número de chip">
-        </div>
-        <div class="fm"><label>Peso (kg) — máximo permitido: <span id="cvMaxKg" style="color:#f90;"></span></label>
-          <input id="cvPeso" type="number" step="0.1" oninput="calcCompletarVenta()">
-        </div>
-        <div class="fm"><label>Precio calculado (Bs)</label>
-          <input id="cvPrecio" type="text" readonly style="background:rgba(109,186,58,.07);color:var(--gr);">
-        </div>
-      </div>
-    </div>
-    <div class="mf">
-      <button class="btn bs" onclick="cerrar('moCompletarV')">Cancelar</button>
-      <button class="btn bp" id="btnCompletarV" onclick="guardarCompletarVenta()">✅ Agregar y Cerrar Venta</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal: Editar Venta -->
-<div class="mo" id="moEditV">
-  <div class="md" style="max-width:560px;">
-    <div class="mh"><div class="mt">✏️ Editar Venta</div><button class="mc" onclick="cerrar('moEditV')">✕</button></div>
-    <div class="mb">
-      <div class="fg">
-        <div class="fm"><label>Código</label><input id="evCodigo" readonly style="opacity:.6;"></div>
-        <div class="fm"><label>Fecha</label><input id="evFecha" type="date"></div>
-        <div class="fm"><label>Tipo Animal</label>
-          <select id="evTipo">
-            <option value="">— Seleccionar —</option>
-            <option value="INVERNADA">INVERNADA</option>
-            <option value="CRIA-REPRODUCTORES">CRIA-REPRODUCTORES</option>
-          </select>
-        </div>
-        <div class="fm"><label>Municipio</label><input id="evMun" type="text"></div>
-        <div class="fm"><label>Mercado</label>
-          <select id="evMercado">
-            <option value="">— Seleccionar —</option>
-            <option value="EXPORTACION">EXPORTACIÓN</option>
-            <option value="NACIONAL">NACIONAL</option>
-          </select>
-        </div>
-        <div class="fm"><label>Tipo Destino</label>
-          <select id="evTipoDestino" onchange="toggleEditVenta()">
-            <option value="">— Seleccionar —</option>
-            <option value="FRIGORIFICO">FRIGORÍFICO</option>
-            <option value="PRIVADO">PRIVADO</option>
-          </select>
-        </div>
-        <div class="fm" id="evFrigWrap" style="display:none;"><label>Frigorífico</label>
-          <select id="evFrigorifico">
-            <option value="">— Seleccionar —</option>
-            <option value="BFC S.A.">BFC S.A.</option>
-            <option value="FRIGOR S.A.">FRIGOR S.A.</option>
-            <option value="FRIGOSI S.A.">FRIGOSI S.A.</option>
-            <option value="FRIDOSA">FRIDOSA</option>
-            <option value="OTRO">OTRO</option>
-          </select>
-        </div>
-        <div class="fm" id="evPrivWrap" style="display:none;"><label>Comprador</label>
-          <input id="evDestino" type="text" placeholder="Nombre del comprador">
-        </div>
-      </div>
-    </div>
-    <div class="mf">
-      <button class="btn bs" onclick="cerrar('moEditV')">Cancelar</button>
-      <button class="btn bp" onclick="guardarEditVenta()">💾 Guardar</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal: Importar Ventas Históricas -->
-<div class="mo" id="moImportVH">
-  <div class="md" style="max-width:560px;">
-    <div class="mh">
-      <div class="mt">📤 Importar Ventas Históricas</div>
-      <button class="mc" onclick="cerrar('moImportVH')">✕</button>
-    </div>
-    <div style="font-size:12px;color:var(--t2);padding:10px 14px 0;">
-      Columnas esperadas: <strong>IDE · FECHA_VENTA · FECHA_INGRESO · TIPO_ANIMAL · CATEGORIA · GRUPO · ORIGEN · MERCADO · TIPO_DESTINO · FRIGORIFICO_O_COMPRADOR · PESO_VENTA_KG · PRECIO_VENTA_BS · PESO_INGRESO_KG · PRECIO_COMPRA_BS · RAZA</strong>
-    </div>
-    <div class="mb">
-      <input type="file" id="fVH" accept=".xls,.xlsx" style="font-size:12px;margin-bottom:12px;" onchange="readVentasHist(this.files[0])">
-      <div id="vhPrev" style="max-height:300px;overflow-y:auto;"></div>
-    </div>
-    <div class="mf">
-      <button class="btn bs" onclick="cerrar('moImportVH')">Cancelar</button>
-      <button class="btn bp" id="btnConfVH" style="display:none;" onclick="confirmarImportVH()">✅ Confirmar e Importar</button>
-    </div>
-  </div>
-</div>
-</body>
-</html>
 
 function openImportVentasHist(){
   document.getElementById('moImportVH').classList.add('open');
@@ -3772,3 +3651,127 @@ async function confirmarImportVH(){
   renderV();renderDash();renderA();
   ntf(err?`⚠️ Completado con ${err} errores`:`✅ ${Object.keys(data).length} ventas históricas importadas — inventario activo intacto`);
 }
+
+</script>
+
+<!-- Modal: Importar Inventario Inicial -->
+<div class="modal-bg" id="moImportInv">
+  <div class="modal" style="max-width:520px;">
+    <div class="mh"><div class="mt">📥 Importar Inventario Inicial desde Excel</div>
+      <button class="mc" onclick="cerrar('moImportInv')">✕</button></div>
+    <div style="font-size:12px;color:var(--t2);margin-bottom:12px;line-height:1.6;">
+      Seleccioná tu planilla Excel con las columnas:<br>
+      <strong>IDE · IDV · Fecha Ingreso · Peso Ingreso · Precio · Raza · Origen · TIPO · CATEGORIA · GRUPO</strong>
+    </div>
+    <input type="file" id="fInvXls" accept=".xls,.xlsx" style="margin-bottom:12px;font-size:12px;" onchange="readInvExcel(this.files[0])">
+    <div id="invImportPrev" style="max-height:300px;overflow-y:auto;margin-bottom:12px;"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn bs" onclick="cerrar('moImportInv')">Cancelar</button>
+      <button class="btn bp" id="btnConfInv" style="display:none;" onclick="confirmarImportInv()">✅ Confirmar e Importar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Completar Venta Abierta -->
+<div class="mo" id="moCompletarV">
+  <div class="md" style="max-width:520px;">
+    <div class="mh">
+      <div class="mt">➕ Completar Venta Abierta</div>
+      <button class="mc" onclick="cerrar('moCompletarV')">✕</button>
+    </div>
+    <div class="mb">
+      <div id="moCompletarVInfo" style="padding:10px;background:rgba(255,150,0,.1);border:1px solid rgba(255,150,0,.3);border-radius:6px;margin-bottom:12px;font-size:12px;"></div>
+      <div class="fg">
+        <div class="fm full"><label>IDE del animal faltante *</label>
+          <input id="cvIde" type="text" placeholder="Número de chip">
+        </div>
+        <div class="fm"><label>Peso (kg) — máximo permitido: <span id="cvMaxKg" style="color:#f90;"></span></label>
+          <input id="cvPeso" type="number" step="0.1" oninput="calcCompletarVenta()">
+        </div>
+        <div class="fm"><label>Precio calculado (Bs)</label>
+          <input id="cvPrecio" type="text" readonly style="background:rgba(109,186,58,.07);color:var(--gr);">
+        </div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn bs" onclick="cerrar('moCompletarV')">Cancelar</button>
+      <button class="btn bp" id="btnCompletarV" onclick="guardarCompletarVenta()">✅ Agregar y Cerrar Venta</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Editar Venta -->
+<div class="mo" id="moEditV">
+  <div class="md" style="max-width:560px;">
+    <div class="mh"><div class="mt">✏️ Editar Venta</div><button class="mc" onclick="cerrar('moEditV')">✕</button></div>
+    <div class="mb">
+      <div class="fg">
+        <div class="fm"><label>Código</label><input id="evCodigo" readonly style="opacity:.6;"></div>
+        <div class="fm"><label>Fecha</label><input id="evFecha" type="date"></div>
+        <div class="fm"><label>Tipo Animal</label>
+          <select id="evTipo">
+            <option value="">— Seleccionar —</option>
+            <option value="INVERNADA">INVERNADA</option>
+            <option value="CRIA-REPRODUCTORES">CRIA-REPRODUCTORES</option>
+          </select>
+        </div>
+        <div class="fm"><label>Municipio</label><input id="evMun" type="text"></div>
+        <div class="fm"><label>Mercado</label>
+          <select id="evMercado">
+            <option value="">— Seleccionar —</option>
+            <option value="EXPORTACION">EXPORTACIÓN</option>
+            <option value="NACIONAL">NACIONAL</option>
+          </select>
+        </div>
+        <div class="fm"><label>Tipo Destino</label>
+          <select id="evTipoDestino" onchange="toggleEditVenta()">
+            <option value="">— Seleccionar —</option>
+            <option value="FRIGORIFICO">FRIGORÍFICO</option>
+            <option value="PRIVADO">PRIVADO</option>
+          </select>
+        </div>
+        <div class="fm" id="evFrigWrap" style="display:none;"><label>Frigorífico</label>
+          <select id="evFrigorifico">
+            <option value="">— Seleccionar —</option>
+            <option value="BFC S.A.">BFC S.A.</option>
+            <option value="FRIGOR S.A.">FRIGOR S.A.</option>
+            <option value="FRIGOSI S.A.">FRIGOSI S.A.</option>
+            <option value="FRIDOSA">FRIDOSA</option>
+            <option value="OTRO">OTRO</option>
+          </select>
+        </div>
+        <div class="fm" id="evPrivWrap" style="display:none;"><label>Comprador</label>
+          <input id="evDestino" type="text" placeholder="Nombre del comprador">
+        </div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn bs" onclick="cerrar('moEditV')">Cancelar</button>
+      <button class="btn bp" onclick="guardarEditVenta()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Importar Ventas Históricas -->
+<div class="mo" id="moImportVH">
+  <div class="md" style="max-width:560px;">
+    <div class="mh">
+      <div class="mt">📤 Importar Ventas Históricas</div>
+      <button class="mc" onclick="cerrar('moImportVH')">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--t2);padding:10px 14px 0;">
+      Columnas esperadas: <strong>IDE · FECHA_VENTA · FECHA_INGRESO · TIPO_ANIMAL · CATEGORIA · GRUPO · ORIGEN · MERCADO · TIPO_DESTINO · FRIGORIFICO_O_COMPRADOR · PESO_VENTA_KG · PRECIO_VENTA_BS · PESO_INGRESO_KG · PRECIO_COMPRA_BS · RAZA</strong>
+    </div>
+    <div class="mb">
+      <input type="file" id="fVH" accept=".xls,.xlsx" style="font-size:12px;margin-bottom:12px;" onchange="readVentasHist(this.files[0])">
+      <div id="vhPrev" style="max-height:300px;overflow-y:auto;"></div>
+    </div>
+    <div class="mf">
+      <button class="btn bs" onclick="cerrar('moImportVH')">Cancelar</button>
+      <button class="btn bp" id="btnConfVH" style="display:none;" onclick="confirmarImportVH()">✅ Confirmar e Importar</button>
+    </div>
+  </div>
+</div>
+
+
+
