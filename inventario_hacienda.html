@@ -2301,17 +2301,12 @@ function verReciboCompra(cId){
 
 <!-- Modal: Importar Ventas Históricas -->
 <div class="mo" id="moImportVH">
-  <div class="md" style="max-width:560px;">
-    <div class="mh">
-      <div class="mt">📤 Importar Ventas Históricas</div>
-      <button class="mc" onclick="cerrar('moImportVH')">✕</button>
-    </div>
-    <div style="font-size:12px;color:var(--t2);padding:10px 14px 0;">
-      Columnas esperadas: <strong>IDE · FECHA_VENTA · FECHA_INGRESO · TIPO_ANIMAL · CATEGORIA · GRUPO · ORIGEN · MERCADO · TIPO_DESTINO · FRIGORIFICO_O_COMPRADOR · PESO_VENTA_KG · PRECIO_VENTA_BS · PESO_INGRESO_KG · PRECIO_COMPRA_BS · RAZA</strong>
-    </div>
+  <div class="md" style="max-width:540px;">
+    <div class="mh"><div class="mt">📤 Importar Ventas Históricas</div><button class="mc" onclick="cerrar('moImportVH')">✕</button></div>
+    <div style="font-size:11px;color:var(--t2);padding:8px 14px 0;">Columnas: IDE · FECHA_VENTA · FECHA_INGRESO · TIPO_ANIMAL · CATEGORIA · GRUPO · ORIGEN · MERCADO · TIPO_DESTINO · FRIGORIFICO_O_COMPRADOR · PESO_VENTA_KG · PRECIO_VENTA_BS · PESO_INGRESO_KG · PRECIO_COMPRA_BS · RAZA</div>
     <div class="mb">
       <input type="file" id="fVH" accept=".xls,.xlsx" style="font-size:12px;margin-bottom:12px;" onchange="readVentasHist(this.files[0])">
-      <div id="vhPrev" style="max-height:300px;overflow-y:auto;"></div>
+      <div id="vhPrev" style="max-height:280px;overflow-y:auto;"></div>
     </div>
     <div class="mf">
       <button class="btn bs" onclick="cerrar('moImportVH')">Cancelar</button>
@@ -3132,17 +3127,12 @@ function verReciboVenta(vId){
 
 <!-- Modal: Importar Ventas Históricas -->
 <div class="mo" id="moImportVH">
-  <div class="md" style="max-width:560px;">
-    <div class="mh">
-      <div class="mt">📤 Importar Ventas Históricas</div>
-      <button class="mc" onclick="cerrar('moImportVH')">✕</button>
-    </div>
-    <div style="font-size:12px;color:var(--t2);padding:10px 14px 0;">
-      Columnas esperadas: <strong>IDE · FECHA_VENTA · FECHA_INGRESO · TIPO_ANIMAL · CATEGORIA · GRUPO · ORIGEN · MERCADO · TIPO_DESTINO · FRIGORIFICO_O_COMPRADOR · PESO_VENTA_KG · PRECIO_VENTA_BS · PESO_INGRESO_KG · PRECIO_COMPRA_BS · RAZA</strong>
-    </div>
+  <div class="md" style="max-width:540px;">
+    <div class="mh"><div class="mt">📤 Importar Ventas Históricas</div><button class="mc" onclick="cerrar('moImportVH')">✕</button></div>
+    <div style="font-size:11px;color:var(--t2);padding:8px 14px 0;">Columnas: IDE · FECHA_VENTA · FECHA_INGRESO · TIPO_ANIMAL · CATEGORIA · GRUPO · ORIGEN · MERCADO · TIPO_DESTINO · FRIGORIFICO_O_COMPRADOR · PESO_VENTA_KG · PRECIO_VENTA_BS · PESO_INGRESO_KG · PRECIO_COMPRA_BS · RAZA</div>
     <div class="mb">
       <input type="file" id="fVH" accept=".xls,.xlsx" style="font-size:12px;margin-bottom:12px;" onchange="readVentasHist(this.files[0])">
-      <div id="vhPrev" style="max-height:300px;overflow-y:auto;"></div>
+      <div id="vhPrev" style="max-height:280px;overflow-y:auto;"></div>
     </div>
     <div class="mf">
       <button class="btn bs" onclick="cerrar('moImportVH')">Cancelar</button>
@@ -3150,7 +3140,7 @@ function verReciboVenta(vId){
     </div>
   </div>
 </div>
-`);
+</body></html>`);
   w.document.close();
 }
 
@@ -3464,194 +3454,6 @@ function ntf(msg,err=false,dur=3500){
   clearTimeout(ntfT);
   if(dur>0) ntfT=setTimeout(()=>el.style.display='none',dur);
 }
-
-
-function openImportVentasHist(){
-  document.getElementById('moImportVH').classList.add('open');
-  document.getElementById('vhPrev').innerHTML='';
-  document.getElementById('btnConfVH').style.display='none';
-  document.getElementById('fVH').value='';
-  window._vhData=null;
-}
-
-function readVentasHist(file){
-  if(!file) return;
-  const rd=new FileReader();
-  rd.onload=e=>{
-    try{
-      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});
-      const ws=wb.Sheets[wb.SheetNames[0]];
-      const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,dateNF:'yyyy-mm-dd'});
-      if(rows.length<2){ntf('Archivo vacío',true);return;}
-      const hdr=rows[0].map(h=>String(h||'').trim().toUpperCase());
-      const ci  =hdr.findIndex(h=>h==='IDE');
-      const cfv =hdr.findIndex(h=>h.includes('FECHA_V')||h==='FECHA VENTA');
-      const cfi =hdr.findIndex(h=>h.includes('FECHA_I')||h==='FECHA INGRESO');
-      const ctp =hdr.findIndex(h=>h.includes('TIPO_A')||h==='TIPO');
-      const ccat=hdr.findIndex(h=>h==='CATEGORIA');
-      const cgr =hdr.findIndex(h=>h==='GRUPO');
-      const cor =hdr.findIndex(h=>h==='ORIGEN');
-      const cmer=hdr.findIndex(h=>h==='MERCADO');
-      const ctd =hdr.findIndex(h=>h.includes('TIPO_D'));
-      const cfrig=hdr.findIndex(h=>h.includes('FRIGORIFICO'));
-      const cpv =hdr.findIndex(h=>h.includes('PESO_V'));
-      const cprv=hdr.findIndex(h=>h.includes('PRECIO_V'));
-      const cpig=hdr.findIndex(h=>h.includes('PESO_I'));
-      const cprc=hdr.findIndex(h=>h.includes('PRECIO_C'));
-      const crz =hdr.findIndex(h=>h==='RAZA');
-      const cmun=hdr.findIndex(h=>h==='MUNICIPIO');
-      if(ci<0||cfv<0){ntf('No se encontró columna IDE o FECHA_VENTA',true);return;}
-
-      const byVenta={};
-      let total=0;
-      for(let i=1;i<rows.length;i++){
-        const r=rows[i];
-        if(!r||!r[ci]) continue;
-        let ide=String(r[ci]).trim().replace(/\.0$/,'');
-        if(parseFloat(ide)>0) ide=String(Math.round(parseFloat(ide)));
-        if(!ide||ide==='0') continue;
-        const fv=parseFecha(r[cfv]);
-        if(!fv) continue;
-        const dest=cfrig>=0&&r[cfrig]?String(r[cfrig]).trim():'';
-        const td  =ctd>=0&&r[ctd]?String(r[ctd]).trim():'';
-        const mer =cmer>=0&&r[cmer]?String(r[cmer]).trim():'';
-        const frig=td==='FRIGORIFICO'?dest:'';
-        const comp=td==='PRIVADO'?dest:'';
-        // Agrupar por fecha+destino como una venta
-        const vKey=fv+'|'+(frig||comp||'?');
-        if(!byVenta[vKey]) byVenta[vKey]={
-          fecha:fv, destino:dest, frigorifico:frig||null,
-          mercado:mer, tipoDestino:td, municipio:'',
-          animales:[], tipo:''
-        };
-        const pv=parseFloat(String(r[cpv]||0).replace(',','.'));
-        const prv=parseFloat(String(r[cprv]||0).replace(',','.'));
-        const pig=cpig>=0?parseFloat(String(r[cpig]||0).replace(',','.')):0;
-        const prc=cprc>=0?parseFloat(String(r[cprc]||0).replace(',','.')):0;
-        byVenta[vKey].tipo = ctp>=0&&r[ctp]?String(r[ctp]).trim():byVenta[vKey].tipo;
-        byVenta[vKey].animales.push({
-          ide, fechaVenta:fv,
-          fechaIngreso:cfi>=0?parseFecha(r[cfi]):'',
-          tipo:ctp>=0&&r[ctp]?String(r[ctp]).trim():'',
-          categoria:ccat>=0&&r[ccat]?String(r[ccat]).trim():'',
-          grupo:cgr>=0&&r[cgr]?String(r[cgr]).trim():'',
-          origen:cor>=0&&r[cor]?String(r[cor]).trim():'',
-          pesoVenta:isNaN(pv)?0:pv,
-          precioVenta:isNaN(prv)?0:prv,
-          pesoIngreso:isNaN(pig)?0:pig,
-          precioCompra:isNaN(prc)?0:prc,
-          raza:crz>=0&&r[crz]?String(r[crz]).trim():'',
-          municipio:cmun>=0&&r[cmun]?String(r[cmun]).trim():''
-        });
-        total++;
-      }
-
-      window._vhData=byVenta;
-      const nVentas=Object.keys(byVenta).length;
-      document.getElementById('vhPrev').innerHTML=`
-        <div style="padding:10px;background:rgba(109,186,58,.07);border-radius:6px;border:1px solid var(--brd2);">
-          <div style="font-weight:700;color:var(--gr);margin-bottom:8px;">✅ ${total} animales en ${nVentas} ventas</div>
-          ${Object.entries(byVenta).map(([k,v])=>
-            `<div style="font-size:12px;color:var(--t2);margin-bottom:3px;">
-              📅 ${v.fecha} — ${v.destino||'?'} — <strong>${v.animales.length} animales</strong>
-            </div>`
-          ).join('')}
-        </div>`;
-      document.getElementById('btnConfVH').style.display='';
-    }catch(err){ntf('Error: '+err.message,true);}
-  };
-  rd.readAsArrayBuffer(file);
-}
-
-async function confirmarImportVH(){
-  const data=window._vhData;
-  if(!data){return;}
-  const btn=document.getElementById('btnConfVH');
-  btn.disabled=true; btn.textContent='⏳ Importando...';
-  const g=calcGestion();
-  let codigoN=ventas.filter(v=>v.codigo&&v.codigo.startsWith(String(g)+'-V')).length;
-  let ok=0,err=0;
-
-  for(const [,vObj] of Object.entries(data)){
-    codigoN++;
-    const vId='vh_'+vObj.fecha.replace(/-/g,'')+'_'+codigoN;
-    const codigo=g+'-V'+String(codigoN).padStart(3,'0');
-    const kgTot=Math.round(vObj.animales.reduce((s,a)=>s+a.pesoVenta,0)*10)/10;
-    const totalBs=Math.round(vObj.animales.reduce((s,a)=>s+a.precioVenta,0)*100)/100;
-    const precKg=kgTot>0?totalBs/kgTot:0;
-    const ventaObj={
-      id:vId,codigo,fecha:vObj.fecha,
-      destino:vObj.destino,frigorifico:vObj.frigorifico||null,
-      mercado:vObj.mercado,tipoDestino:vObj.tipoDestino,
-      municipio:'',tipo:vObj.tipo,
-      cabezasRegistradas:vObj.animales.length,
-      cabezasTotales:vObj.animales.length,
-      kgTotal:kgTot,kgNeto:kgTot,
-      totalCobrar:totalBs,precioKg:precKg,
-      estado:'CERRADA',usuario,importado:true
-    };
-
-    const BATCH=30;
-    const updates={};
-    updates['ventas/'+vId]=ventaObj;
-
-    for(const a of vObj.animales){
-      // ══════════════════════════════════════════════════════
-      // REGLA CRÍTICA: NUNCA tocar animales ACTIVOS del inventario
-      // Si el IDE existe como ACTIVO → usar IDE+"R" para el histórico
-      // ══════════════════════════════════════════════════════
-      let ideReg = a.ide;
-      const animalActual = animales[a.ide];
-      if(animalActual && animalActual.estado==='ACTIVO'){
-        ideReg = a.ide + 'R'; // R = registro histórico, no toca el activo
-      }
-
-      const bid='b_'+ideReg+'_'+a.fechaVenta.replace(/-/g,'');
-      updates['bajas/'+bid]={
-        id:bid,ide:ideReg,tipo:'VENTA',fecha:a.fechaVenta,
-        pesoVenta:a.pesoVenta,precioVenta:a.precioVenta,
-        destino:vObj.destino,ventaId:vId,
-        categoriaAnimal:a.categoria,grupoAnimal:a.grupo||null,
-        origenAnimal:a.origen,usuario,historico:true
-      };
-
-      // Solo crear/actualizar en animales si NO está ACTIVO en inventario
-      if(!animalActual || animalActual.estado!=='ACTIVO'){
-        updates['animales/'+ideReg]={
-          ide:ideReg,tipo:a.tipo,categoria:a.categoria,
-          grupo:a.grupo||null,origen:a.origen,
-          fechaIngreso:a.fechaIngreso,pesoIngreso:a.pesoIngreso,
-          precioCompra:a.precioCompra||null,
-          raza:a.raza||null,estado:'VENDIDO',
-          usuario,historico:true
-        };
-      }
-    }
-
-    // Guardar en lotes
-    const allKeys=Object.keys(updates);
-    for(let i=0;i<allKeys.length;i+=BATCH){
-      const batch={};
-      allKeys.slice(i,i+BATCH).forEach(k=>batch[k]=updates[k]);
-      try{ await fbPatch('',batch); ok++; }
-      catch(e){ err++; console.error(e); }
-      await new Promise(r=>setTimeout(r,150));
-    }
-    btn.textContent=`⏳ Procesando ventas...`;
-    await new Promise(r=>setTimeout(r,200));
-  }
-
-  // Recargar datos
-  const [rV,rB]=await Promise.all([fbGet('ventas'),fbGet('bajas')]);
-  if(rV) ventas=Object.values(rV).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
-  if(rB) bajas=Object.values(rB).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
-
-  btn.disabled=false;
-  cerrar('moImportVH');
-  renderV();renderDash();renderA();
-  ntf(err?`⚠️ Completado con ${err} errores`:`✅ ${Object.keys(data).length} ventas históricas importadas — inventario activo intacto`);
-}
-
 </script>
 
 <!-- Modal: Importar Inventario Inicial -->
@@ -3754,17 +3556,12 @@ async function confirmarImportVH(){
 
 <!-- Modal: Importar Ventas Históricas -->
 <div class="mo" id="moImportVH">
-  <div class="md" style="max-width:560px;">
-    <div class="mh">
-      <div class="mt">📤 Importar Ventas Históricas</div>
-      <button class="mc" onclick="cerrar('moImportVH')">✕</button>
-    </div>
-    <div style="font-size:12px;color:var(--t2);padding:10px 14px 0;">
-      Columnas esperadas: <strong>IDE · FECHA_VENTA · FECHA_INGRESO · TIPO_ANIMAL · CATEGORIA · GRUPO · ORIGEN · MERCADO · TIPO_DESTINO · FRIGORIFICO_O_COMPRADOR · PESO_VENTA_KG · PRECIO_VENTA_BS · PESO_INGRESO_KG · PRECIO_COMPRA_BS · RAZA</strong>
-    </div>
+  <div class="md" style="max-width:540px;">
+    <div class="mh"><div class="mt">📤 Importar Ventas Históricas</div><button class="mc" onclick="cerrar('moImportVH')">✕</button></div>
+    <div style="font-size:11px;color:var(--t2);padding:8px 14px 0;">Columnas: IDE · FECHA_VENTA · FECHA_INGRESO · TIPO_ANIMAL · CATEGORIA · GRUPO · ORIGEN · MERCADO · TIPO_DESTINO · FRIGORIFICO_O_COMPRADOR · PESO_VENTA_KG · PRECIO_VENTA_BS · PESO_INGRESO_KG · PRECIO_COMPRA_BS · RAZA</div>
     <div class="mb">
       <input type="file" id="fVH" accept=".xls,.xlsx" style="font-size:12px;margin-bottom:12px;" onchange="readVentasHist(this.files[0])">
-      <div id="vhPrev" style="max-height:300px;overflow-y:auto;"></div>
+      <div id="vhPrev" style="max-height:280px;overflow-y:auto;"></div>
     </div>
     <div class="mf">
       <button class="btn bs" onclick="cerrar('moImportVH')">Cancelar</button>
@@ -3772,6 +3569,148 @@ async function confirmarImportVH(){
     </div>
   </div>
 </div>
+</body>
+</html>
 
+function openImportVentasHist(){
+  document.getElementById('moImportVH').classList.add('open');
+  document.getElementById('vhPrev').innerHTML='';
+  document.getElementById('btnConfVH').style.display='none';
+  document.getElementById('fVH').value='';
+  window._vhData=null;
+}
 
+function readVentasHist(file){
+  if(!file) return;
+  const rd=new FileReader();
+  rd.onload=e=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,dateNF:'yyyy-mm-dd'});
+      if(rows.length<2){ntf('Archivo vacío',true);return;}
+      const hdr=rows[0].map(h=>String(h||'').trim().toUpperCase());
+      const ci=hdr.findIndex(h=>h==='IDE');
+      const cfv=hdr.findIndex(h=>h.includes('FECHA_V'));
+      const cfi=hdr.findIndex(h=>h.includes('FECHA_I'));
+      const ctp=hdr.findIndex(h=>h.includes('TIPO_A'));
+      const ccat=hdr.findIndex(h=>h==='CATEGORIA');
+      const cgr=hdr.findIndex(h=>h==='GRUPO');
+      const cor=hdr.findIndex(h=>h==='ORIGEN');
+      const cmer=hdr.findIndex(h=>h==='MERCADO');
+      const ctd=hdr.findIndex(h=>h.includes('TIPO_D'));
+      const cfrig=hdr.findIndex(h=>h.includes('FRIGORIFICO'));
+      const cpv=hdr.findIndex(h=>h.includes('PESO_V'));
+      const cprv=hdr.findIndex(h=>h.includes('PRECIO_V'));
+      const cpig=hdr.findIndex(h=>h.includes('PESO_I'));
+      const cprc=hdr.findIndex(h=>h.includes('PRECIO_C'));
+      const crz=hdr.findIndex(h=>h==='RAZA');
+      if(ci<0||cfv<0){ntf('No se encontró columna IDE o FECHA_VENTA',true);return;}
+      const byVenta={};
+      let total=0;
+      for(let i=1;i<rows.length;i++){
+        const r=rows[i];
+        if(!r||!r[ci]) continue;
+        let ide=String(r[ci]).trim().replace(/\.0$/,'');
+        if(parseFloat(ide)>0) ide=String(Math.round(parseFloat(ide)));
+        if(!ide||ide==='0') continue;
+        const fv=parseFecha(r[cfv]);
+        if(!fv) continue;
+        const dest=cfrig>=0&&r[cfrig]?String(r[cfrig]).trim():'';
+        const td=ctd>=0&&r[ctd]?String(r[ctd]).trim():'';
+        const mer=cmer>=0&&r[cmer]?String(r[cmer]).trim():'';
+        const frig=td==='FRIGORIFICO'?dest:'';
+        const vKey=fv+'|'+(dest||'?');
+        if(!byVenta[vKey]) byVenta[vKey]={fecha:fv,destino:dest,frigorifico:frig||null,mercado:mer,tipoDestino:td,tipo:'',animales:[]};
+        const pv=parseFloat(String(r[cpv]||0).replace(',','.'));
+        const prv=parseFloat(String(r[cprv]||0).replace(',','.'));
+        const pig=cpig>=0?parseFloat(String(r[cpig]||0).replace(',','.')):0;
+        const prc=cprc>=0?parseFloat(String(r[cprc]||0).replace(',','.')):0;
+        if(ctp>=0&&r[ctp]) byVenta[vKey].tipo=String(r[ctp]).trim();
+        byVenta[vKey].animales.push({
+          ide,fechaVenta:fv,
+          fechaIngreso:cfi>=0?parseFecha(r[cfi]):'',
+          tipo:ctp>=0&&r[ctp]?String(r[ctp]).trim():'',
+          categoria:ccat>=0&&r[ccat]?String(r[ccat]).trim():'',
+          grupo:cgr>=0&&r[cgr]?String(r[cgr]).trim():'',
+          origen:cor>=0&&r[cor]?String(r[cor]).trim():'',
+          pesoVenta:isNaN(pv)?0:pv,
+          precioVenta:isNaN(prv)?0:prv,
+          pesoIngreso:isNaN(pig)?0:pig,
+          precioCompra:isNaN(prc)?0:prc,
+          raza:crz>=0&&r[crz]?String(r[crz]).trim():''
+        });
+        total++;
+      }
+      window._vhData=byVenta;
+      const nV=Object.keys(byVenta).length;
+      let prev='<div style="padding:10px;background:rgba(109,186,58,.07);border-radius:6px;">';
+      prev+='<div style="font-weight:700;color:var(--gr);margin-bottom:8px;">✅ '+total+' animales en '+nV+' ventas</div>';
+      Object.values(byVenta).forEach(v=>{
+        prev+='<div style="font-size:12px;color:var(--t2);margin-bottom:3px;">📅 '+v.fecha+' — '+(v.destino||'?')+' — <strong>'+v.animales.length+' animales</strong></div>';
+      });
+      prev+='</div>';
+      document.getElementById('vhPrev').innerHTML=prev;
+      document.getElementById('btnConfVH').style.display='';
+    }catch(err){ntf('Error: '+err.message,true);}
+  };
+  rd.readAsArrayBuffer(file);
+}
 
+async function confirmarImportVH(){
+  const data=window._vhData;
+  if(!data) return;
+  const btn=document.getElementById('btnConfVH');
+  btn.disabled=true; btn.textContent='⏳ Importando...';
+  const g=calcGestion();
+  let codigoN=ventas.filter(v=>v.codigo&&v.codigo.startsWith(String(g)+'-V')).length;
+
+  for(const [,vObj] of Object.entries(data)){
+    codigoN++;
+    const vId='vh_'+vObj.fecha.replace(/-/g,'')+'_'+codigoN;
+    const codigo=g+'-V'+String(codigoN).padStart(3,'0');
+    const kgTot=Math.round(vObj.animales.reduce((s,a)=>s+a.pesoVenta,0)*10)/10;
+    const totalBs=Math.round(vObj.animales.reduce((s,a)=>s+a.precioVenta,0)*100)/100;
+    const precKg=kgTot>0?totalBs/kgTot:0;
+    const ventaObj={id:vId,codigo,fecha:vObj.fecha,destino:vObj.destino,
+      frigorifico:vObj.frigorifico||null,mercado:vObj.mercado,
+      tipoDestino:vObj.tipoDestino,tipo:vObj.tipo,municipio:'',
+      cabezasRegistradas:vObj.animales.length,cabezasTotales:vObj.animales.length,
+      kgTotal:kgTot,kgNeto:kgTot,totalCobrar:totalBs,precioKg:precKg,
+      estado:'CERRADA',usuario,importado:true};
+    const updates={};
+    updates['ventas/'+vId]=ventaObj;
+    for(const a of vObj.animales){
+      // NUNCA tocar animales ACTIVOS
+      let ideReg=a.ide;
+      const animalActual=animales[a.ide];
+      if(animalActual&&animalActual.estado==='ACTIVO') ideReg=a.ide+'R';
+      const bid='b_'+ideReg+'_'+a.fechaVenta.replace(/-/g,'');
+      updates['bajas/'+bid]={id:bid,ide:ideReg,tipo:'VENTA',fecha:a.fechaVenta,
+        pesoVenta:a.pesoVenta,precioVenta:a.precioVenta,
+        destino:vObj.destino,ventaId:vId,
+        categoriaAnimal:a.categoria,grupoAnimal:a.grupo||null,
+        origenAnimal:a.origen,usuario,historico:true};
+      if(!animalActual||animalActual.estado!=='ACTIVO'){
+        updates['animales/'+ideReg]={ide:ideReg,tipo:a.tipo,categoria:a.categoria,
+          grupo:a.grupo||null,origen:a.origen,fechaIngreso:a.fechaIngreso,
+          pesoIngreso:a.pesoIngreso,precioCompra:a.precioCompra||null,
+          raza:a.raza||null,estado:'VENDIDO',usuario,historico:true};
+      }
+    }
+    const allKeys=Object.keys(updates);
+    for(let i=0;i<allKeys.length;i+=30){
+      const batch={};
+      allKeys.slice(i,i+30).forEach(k=>batch[k]=updates[k]);
+      try{ await fbPatch('',batch); }catch(e){ console.error(e); }
+      await new Promise(r=>setTimeout(r,150));
+    }
+  }
+  const [rV,rB]=await Promise.all([fbGet('ventas'),fbGet('bajas')]);
+  if(rV) ventas=Object.values(rV).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  if(rB) bajas=Object.values(rB).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  btn.disabled=false;
+  cerrar('moImportVH');
+  renderV();renderDash();renderA();
+  ntf('✅ '+Object.keys(data).length+' ventas históricas importadas — inventario activo intacto');
+}
