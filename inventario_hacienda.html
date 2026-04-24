@@ -2289,7 +2289,7 @@ function readVentaXls(file){
           grupo:ccl>=0&&r[ccl]?String(r[ccl]).trim():null});
       }
       const kgTot=_ventaAnimales.reduce((s,a)=>s+a.peso,0);
-      document.getElementById('vKgTot').value=kgTot.toFixed(1);
+      document.getElementById('vKgBruto').value=kgTot.toFixed(1);
       calcVenta();
       document.getElementById('vXlsPrev').innerHTML=`
         <div style="margin-top:8px;padding:10px;background:rgba(109,186,58,.07);border-radius:6px;border:1px solid var(--brd2);">
