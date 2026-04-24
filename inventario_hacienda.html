@@ -389,13 +389,71 @@ tr:hover td{background:rgba(109,186,58,.04);}
 <div class="pg" id="pg-ventas">
   <div class="ar">
     <button class="btn bp" onclick="openV()">💰 Registrar Venta</button>
+    <div class="sp"></div>
+    <span id="vCounter" style="font-size:12px;color:var(--t2);align-self:center;"></span>
   </div>
+
+  <!-- HISTORIAL DE VENTAS -->
   <div class="card">
     <div class="ch"><div class="ct">💰 Historial de Ventas</div></div>
     <div class="tw"><table>
-      <thead><tr><th>Código</th><th>Fecha</th><th>Destino</th><th>Tipo</th><th>Cabezas</th><th>Kg Total</th><th>Total Bs</th><th>Bs/kg</th><th></th></tr></thead>
-      <tbody id="vBody"><tr><td colspan="9"><div class="emp"><div class="emp-ic">💰</div>Sin ventas registradas</div></td></tr></tbody>
+      <thead><tr>
+        <th>Código</th><th>Fecha</th><th>Destino</th><th>Tipo</th>
+        <th>Cabezas</th><th>Kg Total</th><th>Total Bs</th><th>Bs/kg</th>
+        <th>Estado</th><th></th>
+      </tr></thead>
+      <tbody id="vBody"><tr><td colspan="10"><div class="emp"><div class="emp-ic">💰</div>Sin ventas registradas</div></td></tr></tbody>
     </table></div>
+  </div>
+
+  <!-- ANIMALES VENDIDOS -->
+  <div class="card">
+    <div class="ch">
+      <div class="ct">🐄 Animales Vendidos</div>
+      <span id="vAnimCounter" style="font-size:12px;color:var(--t2);"></span>
+    </div>
+    <div class="fr" style="padding:8px 14px;gap:8px;flex-wrap:wrap;">
+      <select id="vfVenta" onchange="renderVAnimales()" style="font-size:12px;">
+        <option value="">Todas las ventas</option>
+      </select>
+      <select id="vfTipo" onchange="renderVAnimales()" style="font-size:12px;">
+        <option value="">Todos los tipos</option>
+        <option value="INVERNADA">INVERNADA</option>
+        <option value="CRIA-REPRODUCTORES">CRIA-REPRODUCTORES</option>
+      </select>
+      <select id="vfCat" onchange="renderVAnimales()" style="font-size:12px;">
+        <option value="">Todas las categorías</option>
+        <option value="VAQUILLA">VAQUILLA</option>
+        <option value="TORILLO">TORILLO</option>
+        <option value="VACA">VACA</option>
+      </select>
+      <select id="vfGrupo" onchange="renderVAnimales()" style="font-size:12px;">
+        <option value="">Todos los grupos</option>
+        <option>VAQ. VENTA</option><option>VAQ. CABEZA</option><option>VAQ. CUERPO</option>
+        <option>VAQ. COLA 1</option><option>VAQ. COLA 2</option><option>VAQ. COLA 3</option>
+        <option>TOR. VENTA</option><option>TOR. CABEZA</option><option>TOR. CUERPO</option>
+        <option>TOR. COLA 1</option><option>TOR. COLA 2</option><option>TOR. COLA 3</option>
+        <option>VAQ. CRIA CABEZA</option><option>VAQ. CRIA CUERPO</option>
+        <option>VAQ. CRIA COLA 1</option><option>VAQ. CRIA COLA 2</option>
+        <option>TOR. CRIA CABEZA</option><option>TOR. CRIA CUERPO</option>
+      </select>
+      <select id="vfOrigen" onchange="renderVAnimales()" style="font-size:12px;">
+        <option value="">Todos los orígenes</option>
+      </select>
+      <input id="vfBus" type="text" placeholder="🔍 Buscar IDE..." oninput="renderVAnimales()" style="font-size:12px;padding:5px 10px;background:var(--card2);border:1px solid var(--brd);color:var(--text);border-radius:6px;">
+    </div>
+    <div class="tw"><table>
+      <thead><tr>
+        <th>IDE</th><th>Tipo</th><th>Categoría</th><th>Grupo (vendido)</th>
+        <th>Origen</th><th>F. Venta</th><th>Destino</th>
+        <th>Peso Venta</th><th>Precio Venta</th><th>Peso Ing.</th><th>Precio Compra</th>
+        <th>GMD Total</th><th>Días en campo</th><th>Ganancia (Bs)</th>
+      </tr></thead>
+      <tbody id="vAnimBody"><tr><td colspan="14" class="emp">—</td></tr></tbody>
+    </table></div>
+    <div style="padding:8px 14px;border-top:1px solid var(--brd);">
+      <div class="pag" id="vAnimPag"></div>
+    </div>
   </div>
 </div>
 
@@ -2019,7 +2077,35 @@ function verReciboCompra(cId){
     Documento generado por Sistema de Gestión El Prado 1 &nbsp;|&nbsp; ${c.codigo} &nbsp;|&nbsp; ${new Date().toLocaleDateString('es-BO')}
     <br>Usuario: ${c.usuario||'—'}
   </div>
-  </body></html>`);
+  
+<!-- Modal: Completar Venta Abierta -->
+<div class="mo" id="moCompletarV">
+  <div class="md" style="max-width:520px;">
+    <div class="mh">
+      <div class="mt">➕ Completar Venta Abierta</div>
+      <button class="mc" onclick="cerrar('moCompletarV')">✕</button>
+    </div>
+    <div class="mb">
+      <div id="moCompletarVInfo" style="padding:10px;background:rgba(255,150,0,.1);border:1px solid rgba(255,150,0,.3);border-radius:6px;margin-bottom:12px;font-size:12px;"></div>
+      <div class="fg">
+        <div class="fm full"><label>IDE del animal faltante *</label>
+          <input id="cvIde" type="text" placeholder="Número de chip">
+        </div>
+        <div class="fm"><label>Peso (kg) — máximo permitido: <span id="cvMaxKg" style="color:#f90;"></span></label>
+          <input id="cvPeso" type="number" step="0.1" oninput="calcCompletarVenta()">
+        </div>
+        <div class="fm"><label>Precio calculado (Bs)</label>
+          <input id="cvPrecio" type="text" readonly style="background:rgba(109,186,58,.07);color:var(--gr);">
+        </div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn bs" onclick="cerrar('moCompletarV')">Cancelar</button>
+      <button class="btn bp" id="btnCompletarV" onclick="guardarCompletarVenta()">✅ Agregar y Cerrar Venta</button>
+    </div>
+  </div>
+</div>
+</body></html>`);
   w.document.close();
 }
 
@@ -2182,17 +2268,36 @@ async function saveVenta(){
   const comNom=document.getElementById('vComNombre').value.trim();
   if(!fecha||!dest||!tipo||bruto<=0){ntf('Completá fecha, destino, tipo y precio bruto',true);return;}
   if(!_ventaAnimales.length){ntf('Subí el Excel de la balanza con los animales',true);return;}
+
   const totalCobrar=bruto-com-trans;
-  const precKg=kgTot>0?totalCobrar/kgTot:totalCobrar/_ventaAnimales.length;
+  const precKg=kgTot>0?totalCobrar/kgTot:0;
+  const noEnc=window._ventaNoEnc||[];
+  const pesoProm=_ventaAnimales.length>0?kgTot/_ventaAnimales.length:0;
+
+  // Calcular faltantes si hay IDEs no encontrados
+  const cabezasTotalesExcel=_ventaAnimales.length+noEnc.length;
+  const kgFaltantes=noEnc.length>0?Math.round(noEnc.length*pesoProm*10)/10:0;
+  const bsFaltantes=noEnc.length>0?Math.round(noEnc.length*pesoProm*precKg*100)/100:0;
+  const estado=noEnc.length>0?'ABIERTA':'CERRADA';
+
   const codigo=genCodigoVenta();
   const btn=document.getElementById('btnSaveV');
   btn.disabled=true;btn.textContent='⏳ Guardando...';
   const vId='v_'+Date.now();
-  const ventaObj={id:vId,codigo,fecha,destino:dest,municipio:mun,tipo,
-    cabezas:_ventaAnimales.length,kgTotal:kgTot,
+  const ventaObj={
+    id:vId,codigo,fecha,destino:dest,municipio:mun,tipo,
+    cabezasRegistradas:_ventaAnimales.length,
+    cabezasTotales:cabezasTotalesExcel,
+    kgTotal:kgTot,
+    kgFaltantes,bsFaltantes,
+    animalesFaltantes:noEnc.length,
+    idesFaltantes:noEnc.length>0?noEnc:[],
+    pesoProm:Math.round(pesoProm*10)/10,
     precioBruto:bruto,comisionista:comNom||null,precioComision:com,
     transporte:trans,totalCobrar,precioKg:precKg,
-    cuentas:_cuentasVenta.length?_cuentasVenta:null,usuario};
+    estado,
+    cuentas:_cuentasVenta.length?_cuentasVenta:null,usuario
+  };
   const updates={}; updates['ventas/'+vId]=ventaObj;
   for(const a of _ventaAnimales){
     const precAnimal=Math.round(a.peso*precKg*100)/100;
@@ -2204,36 +2309,251 @@ async function saveVenta(){
       categoriaAnimal:animales[a.ide]?.categoria||null,
       grupoAnimal:animales[a.ide]?.grupo||null,
       origenAnimal:animales[a.ide]?.origen||null,usuario};
-    if(animales[a.ide]){animales[a.ide].estado='VENDIDO';}
+    if(animales[a.ide]) animales[a.ide].estado='VENDIDO';
   }
   try{
     await fbPatch('',updates);
     ventas.unshift(ventaObj);
     cerrar('moV2');renderDash();renderA();renderV();renderB();
-    ntf('✅ Venta '+codigo+' registrada — '+_ventaAnimales.length+' animales');
-    setTimeout(()=>verReciboVenta(vId),500);
+    if(estado==='ABIERTA'){
+      ntf('⚠️ Venta '+codigo+' ABIERTA — faltan '+noEnc.length+' animales ('+kgFaltantes+' kg / Bs '+fmt(bsFaltantes)+')',true);
+    } else {
+      ntf('✅ Venta '+codigo+' CERRADA — '+_ventaAnimales.length+' animales');
+      setTimeout(()=>verReciboVenta(vId),500);
+    }
   }catch(e){ntf('Error: '+e.message,true);}
   finally{btn.disabled=false;btn.textContent='💰 Registrar Venta';}
+}
+
+
+// ═══════════ COMPLETAR VENTA ABIERTA ═══════════
+let _ventaAbiertaId = null;
+
+function completarVenta(vId){
+  const v=ventas.find(x=>x.id===vId);
+  if(!v||v.estado!=='ABIERTA'){ntf('Venta no encontrada o ya cerrada',true);return;}
+  _ventaAbiertaId=vId;
+  document.getElementById('cvIde').value='';
+  document.getElementById('cvPeso').value='';
+  document.getElementById('cvPrecio').value='';
+  document.getElementById('cvMaxKg').textContent=v.kgFaltantes+' kg';
+  document.getElementById('moCompletarVInfo').innerHTML=`
+    <div style="font-weight:700;color:#f90;margin-bottom:6px;">Venta ${v.codigo} — ABIERTA</div>
+    <div>Animales faltantes: <strong>${v.animalesFaltantes}</strong></div>
+    <div>Kg faltantes: <strong>${v.kgFaltantes} kg</strong></div>
+    <div>Monto faltante: <strong>Bs ${fmt(v.bsFaltantes)}</strong></div>
+    <div>Peso promedio esperado: <strong>${v.pesoProm} kg/animal</strong></div>
+    ${v.idesFaltantes&&v.idesFaltantes.length?'<div style="margin-top:6px;">IDEs faltantes: <span style="font-family:monospace;color:#f90;">'+v.idesFaltantes.join(', ')+'</span></div>':''}
+  `;
+  document.getElementById('moCompletarV').classList.add('open');
+}
+
+function calcCompletarVenta(){
+  const vId=_ventaAbiertaId;
+  const v=ventas.find(x=>x.id===vId);
+  if(!v) return;
+  const peso=parseFloat(document.getElementById('cvPeso').value)||0;
+  // Validar que no supere los kg faltantes
+  if(peso > v.kgFaltantes+0.5){
+    document.getElementById('cvPeso').style.borderColor='var(--red)';
+    document.getElementById('cvPrecio').value='⚠️ Supera los kg faltantes ('+v.kgFaltantes+' kg)';
+    return;
+  }
+  document.getElementById('cvPeso').style.borderColor='';
+  const precio=Math.round(peso*(v.precioKg||0)*100)/100;
+  document.getElementById('cvPrecio').value=precio>0?'Bs '+fmt(precio):'—';
+}
+
+async function guardarCompletarVenta(){
+  const vId=_ventaAbiertaId;
+  const v=ventas.find(x=>x.id===vId);
+  if(!v){ntf('Error: venta no encontrada',true);return;}
+  const ide=document.getElementById('cvIde').value.trim();
+  const peso=parseFloat(document.getElementById('cvPeso').value)||0;
+  if(!ide){ntf('Ingresá el IDE del animal',true);return;}
+  if(peso<=0){ntf('Ingresá el peso',true);return;}
+  if(peso>v.kgFaltantes+0.5){ntf('⚠️ El peso supera los kg faltantes ('+v.kgFaltantes+' kg)',true);return;}
+  if(animales[ide]&&animales[ide].estado==='VENDIDO'){ntf('⚠️ Este animal ya fue vendido',true);return;}
+  if(!animales[ide]){ntf('⚠️ IDE no encontrado en el inventario',true);return;}
+
+  const btn=document.getElementById('btnCompletarV');
+  btn.disabled=true; btn.textContent='⏳ Guardando...';
+
+  const precAnimal=Math.round(peso*(v.precioKg||0)*100)/100;
+  const bid='b_'+ide+'_'+v.fecha.replace(/-/g,'');
+  const nuevasFaltantes=v.animalesFaltantes-1;
+  const nuevosKgFalt=Math.round((v.kgFaltantes-peso)*10)/10;
+  const nuevosBsFalt=Math.round((v.bsFaltantes-precAnimal)*100)/100;
+  const nuevoEstado=nuevasFaltantes<=0?'CERRADA':'ABIERTA';
+
+  const updates={};
+  updates['bajas/'+bid]={id:bid,ide,tipo:'VENTA',fecha:v.fecha,
+    pesoVenta:peso,precioVenta:precAnimal,
+    destino:v.destino,ventaId:vId,
+    categoriaAnimal:animales[ide]?.categoria||null,
+    grupoAnimal:animales[ide]?.grupo||null,
+    origenAnimal:animales[ide]?.origen||null,usuario};
+  updates['animales/'+ide+'/estado']='VENDIDO';
+  updates['ventas/'+vId+'/animalesFaltantes']=nuevasFaltantes;
+  updates['ventas/'+vId+'/kgFaltantes']=nuevosKgFalt;
+  updates['ventas/'+vId+'/bsFaltantes']=nuevosBsFalt;
+  updates['ventas/'+vId+'/cabezasRegistradas']=(v.cabezasRegistradas||0)+1;
+  updates['ventas/'+vId+'/estado']=nuevoEstado;
+
+  try{
+    await fbPatch('',updates);
+    // Actualizar local
+    animales[ide].estado='VENDIDO';
+    v.animalesFaltantes=nuevasFaltantes;
+    v.kgFaltantes=nuevosKgFalt;
+    v.bsFaltantes=nuevosBsFalt;
+    v.cabezasRegistradas=(v.cabezasRegistradas||0)+1;
+    v.estado=nuevoEstado;
+    bajas.unshift(updates['bajas/'+bid]);
+    cerrar('moCompletarV');
+    renderV(); renderDash(); renderA();
+    if(nuevoEstado==='CERRADA'){
+      ntf('✅ Venta '+v.codigo+' CERRADA — todos los animales registrados');
+    } else {
+      ntf('✅ Animal agregado — faltan '+nuevasFaltantes+' animales ('+nuevosKgFalt+' kg)');
+    }
+  }catch(e){ntf('Error: '+e.message,true);}
+  finally{btn.disabled=false;btn.textContent='✅ Agregar y Cerrar Venta';}
 }
 
 function renderV(){
   const tb=document.getElementById('vBody');
   if(!tb)return;
-  if(!ventas.length){tb.innerHTML='<tr><td colspan="9"><div class="emp"><div class="emp-ic">💰</div>Sin ventas registradas</div></td></tr>';return;}
-  tb.innerHTML=ventas.slice(0,100).map(v=>`<tr>
+  if(!ventas.length){
+    tb.innerHTML='<tr><td colspan="10"><div class="emp"><div class="emp-ic">💰</div>Sin ventas registradas</div></td></tr>';
+    return;
+  }
+  tb.innerHTML=ventas.slice(0,100).map(v=>{
+    const est=v.estado||'CERRADA';
+    const estColor=est==='ABIERTA'?'#f90':'var(--gr)';
+    const estBg=est==='ABIERTA'?'rgba(255,150,0,.15)':'rgba(109,186,58,.15)';
+    const cabezas=v.cabezasRegistradas||v.cabezas||'—';
+    const cabTotal=v.cabezasTotales||v.cabezas||'—';
+    return`<tr>
     <td class="mn" style="font-size:11px;font-weight:700;color:var(--gold);">${v.codigo||'—'}</td>
     <td class="mn" style="font-size:11px;">${v.fecha}</td>
     <td style="font-size:11px;"><b>${v.destino||'—'}</b></td>
     <td style="font-size:11px;">${v.tipo||'—'}</td>
-    <td class="mn tg">${v.cabezas||'—'}</td>
-    <td class="mn">${v.kgTotal?v.kgTotal.toFixed(0)+' kg':'—'}</td>
-    <td class="mn tgo">Bs ${fmt(v.totalCobrar||0)}</td>
+    <td class="mn tg">${cabezas}${cabTotal!==cabezas?'<span style="font-size:9px;color:var(--t3);">/'+cabTotal+'</span>':''}</td>
+    <td class="mn">${v.kgTotal?v.kgTotal.toFixed(0)+' kg':'—'}${v.kgFaltantes?'<span style="font-size:9px;color:#f90;"> -'+v.kgFaltantes+'</span>':''}</td>
+    <td class="mn tgo">Bs ${fmt(v.totalCobrar||0)}${v.bsFaltantes?'<span style="font-size:9px;color:#f90;"> -Bs '+fmt(v.bsFaltantes)+'</span>':''}</td>
     <td class="mn">${v.precioKg?'Bs '+Number(v.precioKg).toFixed(2):'—'}</td>
+    <td><span style="font-size:10px;padding:2px 8px;border-radius:4px;background:${estBg};color:${estColor};font-weight:700;">${est}</span></td>
     <td style="white-space:nowrap;">
       <button class="btn bs btn-sm" onclick="verReciboVenta('${v.id}')" title="Ver recibo">🧾</button>
+      ${est==='ABIERTA'?`<button class="btn bs btn-sm" style="border-color:#f90;color:#f90;" onclick="completarVenta('${v.id}')" title="Agregar animal faltante">➕</button>`:''}
       <button class="btn bd btn-sm" onclick="eliminarVenta('${v.id}')" title="Eliminar">✕</button>
     </td>
-  </tr>`).join('');
+  </tr>`;
+  }).join('');
+
+  // Poblar select de ventas en filtro animales vendidos
+  const selV=document.getElementById('vfVenta');
+  if(selV){
+    selV.innerHTML='<option value="">Todas las ventas</option>'+
+      ventas.map(v=>`<option value="${v.id}">${v.codigo} — ${v.destino||''} (${v.fecha})</option>`).join('');
+  }
+  renderVAnimales();
+}
+
+let pVAnim=1;
+function renderVAnimales(){
+  const ventaFilt=document.getElementById('vfVenta')?.value||'';
+  const tipo=document.getElementById('vfTipo')?.value||'';
+  const cat=document.getElementById('vfCat')?.value||'';
+  const grupo=document.getElementById('vfGrupo')?.value||'';
+  const origen=document.getElementById('vfOrigen')?.value||'';
+  const bus=document.getElementById('vfBus')?.value.trim().toLowerCase()||'';
+
+  // Animales vendidos = bajas tipo VENTA cruzado con animales
+  const vendidos=bajas.filter(b=>{
+    if(b.tipo!=='VENTA') return false;
+    if(ventaFilt && b.ventaId!==ventaFilt) return false;
+    const a=animales[b.ide]||{};
+    if(tipo && (a.tipo||b.tipoAnimal||'')!==tipo) return false;
+    if(cat && (a.categoria||b.categoriaAnimal||'')!==cat) return false;
+    if(grupo && (b.grupoAnimal||a.grupo||'')!==grupo) return false;
+    if(origen && (a.origen||b.origenAnimal||'')!==origen) return false;
+    if(bus && !String(b.ide).toLowerCase().includes(bus)) return false;
+    return true;
+  });
+
+  const counter=document.getElementById('vAnimCounter');
+  if(counter) counter.textContent=vendidos.length+' animales';
+
+  const tb=document.getElementById('vAnimBody');
+  if(!tb) return;
+
+  const PXP=50;
+  const total=vendidos.length;
+  const totalPages=Math.ceil(total/PXP)||1;
+  if(pVAnim>totalPages) pVAnim=1;
+  const slice=vendidos.slice((pVAnim-1)*PXP,pVAnim*PXP);
+
+  if(!slice.length){
+    tb.innerHTML='<tr><td colspan="14"><div class="emp">Sin animales vendidos con ese filtro</div></td></tr>';
+    document.getElementById('vAnimPag').innerHTML=''; return;
+  }
+
+  tb.innerHTML=slice.map(b=>{
+    const a=animales[b.ide]||{};
+    const venta=ventas.find(v=>v.id===b.ventaId)||{};
+    // GMD total y días en campo
+    let diasCampo='—', gmdTotal='—', ganancia='—';
+    if(a.fechaIngreso && b.fecha){
+      const dias=Math.round((new Date(b.fecha)-new Date(a.fechaIngreso+'T12:00:00'))/86400000);
+      if(dias>0){
+        diasCampo=dias+' días';
+        if(a.pesoIngreso && b.pesoVenta){
+          gmdTotal=((b.pesoVenta-a.pesoIngreso)/dias).toFixed(3)+' kg/d';
+        }
+      }
+    }
+    if(a.precioCompra && b.precioVenta){
+      const gan=b.precioVenta-a.precioCompra;
+      ganancia='<span style="color:'+(gan>=0?'var(--gr)':'var(--red)')+';">Bs '+fmt(gan)+'</span>';
+    }
+    return`<tr>
+      <td class="mn tg" style="font-size:11px;">${b.ide}</td>
+      <td style="font-size:11px;">${a.tipo||'—'}</td>
+      <td style="font-size:11px;">${a.categoria||b.categoriaAnimal||'—'}</td>
+      <td style="font-size:11px;">${b.grupoAnimal||a.grupo||'—'}</td>
+      <td style="font-size:11px;">${a.origen||b.origenAnimal||'—'}</td>
+      <td class="mn" style="font-size:11px;">${b.fecha}</td>
+      <td style="font-size:11px;">${b.destino||venta.destino||'—'}</td>
+      <td class="mn">${b.pesoVenta?b.pesoVenta+' kg':'—'}</td>
+      <td class="mn tgo">${b.precioVenta?'Bs '+fmt(b.precioVenta):'—'}</td>
+      <td class="mn">${a.pesoIngreso?a.pesoIngreso+' kg':'—'}</td>
+      <td class="mn tgo">${a.precioCompra?'Bs '+fmt(a.precioCompra):'—'}</td>
+      <td class="mn" style="font-size:11px;">${gmdTotal}</td>
+      <td class="mn" style="font-size:11px;">${diasCampo}</td>
+      <td class="mn">${ganancia}</td>
+    </tr>`;
+  }).join('');
+
+  // Paginación
+  const pag=document.getElementById('vAnimPag');
+  if(pag){
+    let html='';
+    if(totalPages>1){
+      if(pVAnim>1) html+=`<button class="btn bs btn-sm" onclick="pVAnim--;renderVAnimales()">‹ Ant</button> `;
+      html+=`<span style="font-size:12px;color:var(--t2);">Pág ${pVAnim} de ${totalPages}</span>`;
+      if(pVAnim<totalPages) html+=` <button class="btn bs btn-sm" onclick="pVAnim++;renderVAnimales()">Sig ›</button>`;
+    }
+    pag.innerHTML=html;
+  }
+
+  // Poblar select orígenes
+  const selO=document.getElementById('vfOrigen');
+  if(selO && selO.options.length<=1){
+    const origs=[...new Set(bajas.filter(b=>b.tipo==='VENTA').map(b=>animales[b.ide]?.origen||b.origenAnimal).filter(Boolean))].sort();
+    selO.innerHTML='<option value="">Todos los orígenes</option>'+origs.map(o=>`<option value="${o}">${o}</option>`).join('');
+  }
 }
 
 async function eliminarVenta(vId){
@@ -2291,7 +2611,35 @@ function verReciboVenta(vId){
     ${v.cuentas.map(cu=>`<tr><td>${cu.titular||'—'}</td><td>${cu.ci||'—'}</td><td>${cu.banco||'—'}</td><td>${cu.nroCuenta||'—'}</td><td>Bs ${(cu.monto||0).toLocaleString('es-BO',{minimumFractionDigits:2})}</td></tr>`).join('')}
   </table>`:''}
   <div class="footer">Documento generado por Sistema de Gestión El Prado 1 &nbsp;|&nbsp; ${v.codigo} &nbsp;|&nbsp; ${new Date().toLocaleDateString('es-BO')}<br>Usuario: ${v.usuario||'—'}</div>
-  </body></html>`);
+  
+<!-- Modal: Completar Venta Abierta -->
+<div class="mo" id="moCompletarV">
+  <div class="md" style="max-width:520px;">
+    <div class="mh">
+      <div class="mt">➕ Completar Venta Abierta</div>
+      <button class="mc" onclick="cerrar('moCompletarV')">✕</button>
+    </div>
+    <div class="mb">
+      <div id="moCompletarVInfo" style="padding:10px;background:rgba(255,150,0,.1);border:1px solid rgba(255,150,0,.3);border-radius:6px;margin-bottom:12px;font-size:12px;"></div>
+      <div class="fg">
+        <div class="fm full"><label>IDE del animal faltante *</label>
+          <input id="cvIde" type="text" placeholder="Número de chip">
+        </div>
+        <div class="fm"><label>Peso (kg) — máximo permitido: <span id="cvMaxKg" style="color:#f90;"></span></label>
+          <input id="cvPeso" type="number" step="0.1" oninput="calcCompletarVenta()">
+        </div>
+        <div class="fm"><label>Precio calculado (Bs)</label>
+          <input id="cvPrecio" type="text" readonly style="background:rgba(109,186,58,.07);color:var(--gr);">
+        </div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn bs" onclick="cerrar('moCompletarV')">Cancelar</button>
+      <button class="btn bp" id="btnCompletarV" onclick="guardarCompletarVenta()">✅ Agregar y Cerrar Venta</button>
+    </div>
+  </div>
+</div>
+</body></html>`);
   w.document.close();
 }
 
@@ -2621,6 +2969,34 @@ function ntf(msg,err=false,dur=3500){
     <div style="display:flex;gap:8px;justify-content:flex-end;">
       <button class="btn bs" onclick="cerrar('moImportInv')">Cancelar</button>
       <button class="btn bp" id="btnConfInv" style="display:none;" onclick="confirmarImportInv()">✅ Confirmar e Importar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Completar Venta Abierta -->
+<div class="mo" id="moCompletarV">
+  <div class="md" style="max-width:520px;">
+    <div class="mh">
+      <div class="mt">➕ Completar Venta Abierta</div>
+      <button class="mc" onclick="cerrar('moCompletarV')">✕</button>
+    </div>
+    <div class="mb">
+      <div id="moCompletarVInfo" style="padding:10px;background:rgba(255,150,0,.1);border:1px solid rgba(255,150,0,.3);border-radius:6px;margin-bottom:12px;font-size:12px;"></div>
+      <div class="fg">
+        <div class="fm full"><label>IDE del animal faltante *</label>
+          <input id="cvIde" type="text" placeholder="Número de chip">
+        </div>
+        <div class="fm"><label>Peso (kg) — máximo permitido: <span id="cvMaxKg" style="color:#f90;"></span></label>
+          <input id="cvPeso" type="number" step="0.1" oninput="calcCompletarVenta()">
+        </div>
+        <div class="fm"><label>Precio calculado (Bs)</label>
+          <input id="cvPrecio" type="text" readonly style="background:rgba(109,186,58,.07);color:var(--gr);">
+        </div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn bs" onclick="cerrar('moCompletarV')">Cancelar</button>
+      <button class="btn bp" id="btnCompletarV" onclick="guardarCompletarVenta()">✅ Agregar y Cerrar Venta</button>
     </div>
   </div>
 </div>
