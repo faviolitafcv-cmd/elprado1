@@ -1305,8 +1305,10 @@ function calcEst(a){
 // ═══════════ EDITAR / ELIMINAR ANIMAL ═══════════
 function calcPermanencia(fechaIngreso){
   if(!fechaIngreso) return '—';
+  const iso = parseFecha(fechaIngreso);
+  if(!iso) return '—';
   const hoy = new Date();
-  const ing = new Date(fechaIngreso+'T12:00:00');
+  const ing = new Date(iso+'T12:00:00');
   if(isNaN(ing)) return '—';
   let y = hoy.getFullYear()-ing.getFullYear();
   let m = hoy.getMonth()-ing.getMonth();
@@ -1346,19 +1348,7 @@ function editarAnimal(ide){
   document.getElementById('eaIda').value       = a.ida||'';
   document.getElementById('eaOrigen').value    = a.origen||'';
   // Fecha: normalizar TODOS los formatos posibles a YYYY-MM-DD
-  let fi = String(a.fechaIngreso||'').trim();
-  if(fi){
-    // M/D/YY o M/D/YYYY o DD/MM/YYYY
-    const p = fi.split('/');
-    if(p.length===3){
-      const y = p[2].length===2 ? '20'+p[2] : p[2];
-      // Si primer componente <= 12 podría ser mes (M/D/YYYY) o dia (DD/MM/YYYY)
-      // En el sistema usamos DD/MM/YYYY
-      fi = y+'-'+p[1].padStart(2,'0')+'-'+p[0].padStart(2,'0');
-    }
-    // Si ya es YYYY-MM-DD, dejarlo
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(fi)) fi = '';
-  }
+  const fi = fechaParaInput(a.fechaIngreso);
   document.getElementById('eaFecha').value     = fi;
   document.getElementById('eaPeso').value      = a.pesoIngreso||'';
   // Precio: mostrar como número normal (el input type=number lo formatea)
@@ -1502,8 +1492,11 @@ function renderA(){
   }).sort((a,b)=>{
     let vA, vB;
     if(aSortField==='_ultPesaje'){
-      vA = (_lp[a.ide]?.fecha)||'';
-      vB = (_lp[b.ide]?.fecha)||'';
+      vA = parseFecha((_lp[a.ide]?.fecha)||'');
+      vB = parseFecha((_lp[b.ide]?.fecha)||'');
+    } else if(aSortField==='fechaIngreso'){
+      vA = parseFecha(a.fechaIngreso||'');
+      vB = parseFecha(b.fechaIngreso||'');
     } else {
       vA = String(a[aSortField]||'').toLowerCase();
       vB = String(b[aSortField]||'').toLowerCase();
@@ -1541,7 +1534,7 @@ function renderA(){
       <td><span class="bg ${CBADGE[a.categoria]||''}" style="font-size:10px;">${a.categoria||'—'}</span></td>
       <td style="font-size:11px;font-weight:600;">${a.grupo||'—'}</td>
       <td style="font-size:11px;">${a.origen||'—'}</td>
-      <td class="mn" style="font-size:11px;">${a.fechaIngreso||'—'}</td>
+      <td class="mn" style="font-size:11px;">${fmtFecha(a.fechaIngreso)}</td>
       <td class="mn">${a.pesoIngreso?a.pesoIngreso+' kg':'—'}</td>
       <td class="mn tgo">${a.precioCompra?'Bs '+fmt(a.precioCompra):'—'}</td>
       <td class="mn" style="font-size:11px;${!ultPes?'color:var(--red);':'color:var(--t2);'}">${ultPes||'⚠️ Sin pesaje'}</td>
@@ -1680,26 +1673,78 @@ function readBalanza(file){
 }
 
 function parseFecha(v){
+  // Convierte CUALQUIER formato de fecha a YYYY-MM-DD
+  // NO modifica datos en Firebase — solo normaliza para mostrar y calcular
   try{
-    if(!v) return new Date().toISOString().split('T')[0];
-    if(v instanceof Date) return v.toISOString().split('T')[0];
-    if(typeof v==='string'){
-      v=v.trim();
-      // DD/MM/YYYY
-      const p=v.split('/');
-      if(p.length===3 && p[2].length===4)
-        return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
-      // YYYY-MM-DD
-      if(/^\d{4}-\d{2}-\d{2}/.test(v)) return v.split('T')[0];
-      return v.split('T')[0];
+    if(!v && v!==0) return '';
+    // Ya es Date object
+    if(v instanceof Date){
+      if(isNaN(v)) return '';
+      return v.toISOString().split('T')[0];
     }
+    // Número = serial Excel (ej: 45678)
     if(typeof v==='number' && v>1000){
-      // Serial Excel → fecha
       const d=new Date(Math.round((v-25569)*86400000));
       return d.toISOString().split('T')[0];
     }
+    if(typeof v==='string'){
+      v=v.trim();
+      if(!v) return '';
+      // Ya es YYYY-MM-DD
+      if(/^\d{4}-\d{2}-\d{2}/.test(v)) return v.substring(0,10);
+      // Formatos con /
+      if(v.includes('/')){
+        const p=v.split('/');
+        if(p.length===3){
+          let d=parseInt(p[0]), m=parseInt(p[1]), y=parseInt(p[2]);
+          // Año corto (24 → 2024)
+          if(y<100) y+=2000;
+          // Detectar si es M/D/YYYY o DD/MM/YYYY
+          // Si el primer número es > 12, es DD/MM/YYYY (el día no puede ser mes)
+          // Si el segundo número es > 12, es M/D/YYYY (el día está en posición 2)
+          if(d>12 && m<=12){
+            // DD/MM/YYYY — d es día, m es mes
+            return `${y}-${m.toString().padStart(2,'0')}-${d.toString().padStart(2,'0')}`;
+          } else if(m>12 && d<=12){
+            // M/D/YYYY — d es mes, m es día
+            return `${y}-${d.toString().padStart(2,'0')}-${m.toString().padStart(2,'0')}`;
+          } else {
+            // Ambiguos — asumir M/D/YYYY (formato más común en Excel de Bolivia/LATAM con 2 dígitos)
+            // Pero si año de 4 dígitos está al final → DD/MM/YYYY
+            if(p[2].length===4){
+              return `${y}-${m.toString().padStart(2,'0')}-${d.toString().padStart(2,'0')}`;
+            } else {
+              // M/D/YY → asumir mes primero
+              return `${y}-${d.toString().padStart(2,'0')}-${m.toString().padStart(2,'0')}`;
+            }
+          }
+        }
+      }
+      // Formato con guiones pero no YYYY-MM-DD
+      if(v.includes('-')){
+        const p=v.split('-');
+        if(p.length===3){
+          if(p[0].length===4) return v.substring(0,10); // YYYY-MM-DD
+          // DD-MM-YYYY
+          return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+        }
+      }
+    }
   }catch(e){}
-  return new Date().toISOString().split('T')[0];
+  return '';
+}
+
+// Normaliza fecha de Firebase para mostrar en pantalla como DD/MM/YYYY
+function fmtFecha(v){
+  const iso = parseFecha(v);
+  if(!iso) return '—';
+  const [y,m,d] = iso.split('-');
+  return d+'/'+m+'/'+y;
+}
+
+// Normaliza fecha para input type=date (YYYY-MM-DD)
+function fechaParaInput(v){
+  return parseFecha(v)||'';
 }
 
 function showImportPrev(data, noEnc=[]){
@@ -2531,7 +2576,7 @@ function renderV(){
     const cabTotal=v.cabezasTotales||v.cabezas||'—';
     return`<tr>
     <td class="mn" style="font-size:11px;font-weight:700;color:var(--gold);">${v.codigo||'—'}</td>
-    <td class="mn" style="font-size:11px;">${v.fecha}</td>
+    <td class="mn" style="font-size:11px;">${fmtFecha(v.fecha)}</td>
     <td style="font-size:11px;"><b>${v.destino||'—'}</b></td>
     <td style="font-size:11px;">${v.tipo||'—'}</td>
     <td class="mn tg">${cabezas}${cabTotal!==cabezas?'<span style="font-size:9px;color:var(--t3);">/'+cabTotal+'</span>':''}</td>
@@ -2619,7 +2664,7 @@ function renderVAnimales(){
       <td style="font-size:11px;">${a.categoria||b.categoriaAnimal||'—'}</td>
       <td style="font-size:11px;">${b.grupoAnimal||a.grupo||'—'}</td>
       <td style="font-size:11px;">${a.origen||b.origenAnimal||'—'}</td>
-      <td class="mn" style="font-size:11px;">${b.fecha}</td>
+      <td class="mn" style="font-size:11px;">${fmtFecha(b.fecha)}</td>
       <td style="font-size:11px;">${b.destino||venta.destino||'—'}</td>
       <td class="mn">${b.pesoVenta?b.pesoVenta+' kg':'—'}</td>
       <td class="mn tgo">${b.precioVenta?'Bs '+fmt(b.precioVenta):'—'}</td>
@@ -2802,7 +2847,7 @@ function renderCo(){
   }
   tb.innerHTML=compras.slice(0,100).map(c=>`<tr>
     <td class="mn" style="font-size:11px;font-weight:700;color:var(--gr);">${c.codigo||'—'}</td>
-    <td class="mn" style="font-size:11px;">${c.fecha}</td>
+    <td class="mn" style="font-size:11px;">${fmtFecha(c.fecha)}</td>
     <td style="font-size:11px;"><b>${c.origen||'—'}</b></td>
     <td style="font-size:11px;">${c.municipio||'—'}</td>
     <td style="font-size:11px;">${c.tipo||'—'}</td>
@@ -2899,7 +2944,7 @@ function renderB(){
     const esV=b.tipo==='VENTA';
     const det=esV?`${b.destino||'—'} (${b.mercado||'—'})`:b.causaMuerte||'—';
     return`<tr>
-      <td class="mn" style="font-size:11px;">${b.fecha}</td>
+      <td class="mn" style="font-size:11px;">${fmtFecha(b.fecha)}</td>
       <td><span class="bg" style="background:rgba(${esV?'74,154,186':'224,90,74'},.14);color:var(--${esV?'blue':'red'});">${b.tipo}</span></td>
       <td class="mn tg" style="font-size:11px;cursor:pointer" onclick="verDet('${b.ide}')">${b.ide}</td>
       <td><span class="bg ${CBADGE[b.categoriaAnimal]||''}" style="font-size:8px;">${CATS[b.categoriaAnimal]||b.categoriaAnimal||'—'}</span></td>
