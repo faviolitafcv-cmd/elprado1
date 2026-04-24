@@ -6,6 +6,152 @@
 <title>Stock de Hacienda — El Prado 1</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js">
+var _charts={};
+function destroyChart(id){if(_charts[id]){_charts[id].destroy();delete _charts[id];}}
+function getVentasData(){
+  var p=document.getElementById('ifPeriodo')?.value||'';
+  var tp=document.getElementById('ifTipo')?.value||'';
+  var mc=document.getElementById('ifMercado')?.value||'';
+  return bajas.filter(function(b){
+    if(b.tipo!=='VENTA') return false;
+    var v=ventas.find(function(x){return x.id===b.ventaId;})||{};
+    var a=animales[b.ide]||{};
+    if(p&&b.fecha.substring(0,7)!==p) return false;
+    if(tp&&(a.tipo||v.tipo||'')!==tp) return false;
+    if(mc&&(v.mercado||'')!==mc) return false;
+    return true;
+  });
+}
+function calcStat(b){
+  var a=animales[b.ide]||{};
+  var v=ventas.find(function(x){return x.id===b.ventaId;})||{};
+  var fi=parseFecha(a.fechaIngreso||'');
+  var fv=parseFecha(b.fecha||'');
+  var dias=0;
+  if(fi&&fv){dias=Math.round((new Date(fv)-new Date(fi+'T12:00:00'))/86400000);if(dias<0)dias=0;}
+  var gmd=null;
+  if(dias>0&&a.pesoIngreso&&b.pesoVenta)gmd=Math.round((b.pesoVenta-a.pesoIngreso)/dias*1000)/1000;
+  var gan=null;
+  if(a.precioCompra!=null&&b.precioVenta!=null)gan=Math.round((b.precioVenta-a.precioCompra)*100)/100;
+  var bd=null;
+  if(gan!=null&&dias>0)bd=Math.round(gan/dias*100)/100;
+  var mk=null;
+  if(gan!=null&&a.pesoIngreso&&b.pesoVenta&&b.pesoVenta>a.pesoIngreso)mk=Math.round(gan/(b.pesoVenta-a.pesoIngreso)*100)/100;
+  return {a:a,v:v,dias:dias,gmd:gmd,gan:gan,bd:bd,mk:mk};
+}
+function renderInformes(){
+  var data=getVentasData();
+  // Poblar selector meses
+  var sel=document.getElementById('ifPeriodo');
+  if(sel&&sel.options.length<=1){
+    var ms=[...new Set(bajas.filter(function(b){return b.tipo==='VENTA';}).map(function(b){return b.fecha.substring(0,7);}))].sort().reverse();
+    ms.forEach(function(m){var o=document.createElement('option');o.value=m;o.textContent=m;sel.appendChild(o);});
+  }
+  if(!data.length) return;
+  var totC=data.length,totKg=0,totBsV=0,totBsC=0,sGmd=0,nGmd=0,sD=0,nD=0,sBd=0,nBd=0,sMk=0,nMk=0;
+  var byD={},byO={},byTC={};
+  data.forEach(function(b){
+    var s=calcStat(b);var a=s.a,v=s.v;
+    totKg+=b.pesoVenta||0;totBsV+=b.precioVenta||0;totBsC+=a.precioCompra||0;
+    if(s.gmd!=null){sGmd+=s.gmd;nGmd++;}
+    if(s.dias>0){sD+=s.dias;nD++;}
+    if(s.bd!=null){sBd+=s.bd;nBd++;}
+    if(s.mk!=null){sMk+=s.mk;nMk++;}
+    var dest=v.frigorifico||b.destino||v.destino||'?';
+    if(!byD[dest])byD[dest]={dest:dest,merc:v.mercado||'',n:0,kg:0,bsV:0,bsC:0};
+    byD[dest].n++;byD[dest].kg+=b.pesoVenta||0;byD[dest].bsV+=b.precioVenta||0;byD[dest].bsC+=a.precioCompra||0;
+    var orig=a.origen||b.origenAnimal||'?';
+    if(!byO[orig])byO[orig]={orig:orig,n:0,kg:0,bsV:0,bsC:0,sg:0,ng:0,sd:0,nd:0};
+    byO[orig].n++;byO[orig].kg+=b.pesoVenta||0;byO[orig].bsV+=b.precioVenta||0;byO[orig].bsC+=a.precioCompra||0;
+    if(s.gmd!=null){byO[orig].sg+=s.gmd;byO[orig].ng++;}
+    if(s.dias>0){byO[orig].sd+=s.dias;byO[orig].nd++;}
+    var tc=(a.tipo||'?')+'|'+(a.categoria||'?');
+    if(!byTC[tc])byTC[tc]={tipo:a.tipo||'?',cat:a.categoria||'?',n:0,spv:0,spi:0,sg:0,ng:0,sd:0,nd:0,sgan:0,ngan:0,sbd:0,nbd:0};
+    byTC[tc].n++;byTC[tc].spv+=b.pesoVenta||0;byTC[tc].spi+=a.pesoIngreso||0;
+    if(s.gmd!=null){byTC[tc].sg+=s.gmd;byTC[tc].ng++;}
+    if(s.dias>0){byTC[tc].sd+=s.dias;byTC[tc].nd++;}
+    if(s.gan!=null){byTC[tc].sgan+=s.gan;byTC[tc].ngan++;}
+    if(s.bd!=null){byTC[tc].sbd+=s.bd;byTC[tc].nbd++;}
+  });
+  // Resumen cabecera
+  function sv(id,val,col){var el=document.getElementById(id);if(el){el.textContent=val;if(col)el.style.color=col;}}
+  sv('vrCab',totC.toLocaleString('es-BO'));
+  sv('vrKg',(totKg/1000).toFixed(1)+' t');
+  sv('vrBs','Bs '+fmt(totBsV));
+  var gan=totBsV-totBsC;
+  sv('vrGan',(gan>=0?'+':'')+'Bs '+fmt(gan),gan>=0?'var(--gr)':'var(--red)');
+  sv('vrGmd',nGmd>0?(sGmd/nGmd).toFixed(3)+' kg/d':'—');
+  sv('vrDias',nD>0?Math.round(sD/nD)+' días':'—');
+  sv('vrBsDia',nBd>0?'Bs '+fmt(sBd/nBd):'—');
+  sv('vrMargKg',nMk>0?'Bs '+fmt(sMk/nMk)+'/kg':'—');
+  // Tabla destino
+  var td=document.getElementById('itDestino');
+  if(td)td.innerHTML=Object.values(byD).sort(function(a,b){return b.bsV-a.bsV;}).map(function(d){
+    var g=d.bsV-d.bsC,p=d.bsC>0?(g/d.bsC*100).toFixed(1):'—',bk=d.kg>0?fmt(d.bsV/d.kg):'—';
+    return '<tr><td><b>'+d.dest+'</b></td><td style="font-size:11px;color:var(--t2);">'+d.merc+'</td><td class="mn tg">'+d.n+'</td><td class="mn">'+Math.round(d.kg)+' kg</td><td class="mn tgo">Bs '+fmt(d.bsV)+'</td><td class="mn">Bs '+bk+'/kg</td><td class="mn" style="color:'+(g>=0?'var(--gr)':'var(--red)')+';">'+(g>=0?'+':'')+'Bs '+fmt(g)+'</td><td class="mn">'+p+'%</td></tr>';
+  }).join('');
+  // Tabla origen
+  var to=document.getElementById('itOrigen');
+  if(to)to.innerHTML=Object.values(byO).sort(function(a,b){return (b.bsV-b.bsC)-(a.bsV-a.bsC);}).map(function(o){
+    var g=o.bsV-o.bsC,p=o.bsC>0?(g/o.bsC*100).toFixed(1):'—';
+    var gp=o.ng>0?(o.sg/o.ng).toFixed(3):'—',dp=o.nd>0?Math.round(o.sd/o.nd)+'d':'—';
+    return '<tr><td><b>'+o.orig+'</b></td><td class="mn tg">'+o.n+'</td><td class="mn">'+Math.round(o.kg)+' kg</td><td class="mn tgo">Bs '+fmt(o.bsC)+'</td><td class="mn tgo">Bs '+fmt(o.bsV)+'</td><td class="mn" style="color:'+(g>=0?'var(--gr)':'var(--red)')+';">'+(g>=0?'+':'')+'Bs '+fmt(g)+'</td><td class="mn">'+p+'%</td><td class="mn">'+gp+'</td><td class="mn">'+dp+'</td></tr>';
+  }).join('');
+  // Tabla tipo+cat
+  var tt=document.getElementById('itTipoCat');
+  if(tt)tt.innerHTML=Object.values(byTC).sort(function(a,b){return a.tipo.localeCompare(b.tipo)||a.cat.localeCompare(b.cat);}).map(function(t){
+    var pv=t.n>0?fmt(t.spv/t.n):'—',pi=t.n>0?fmt(t.spi/t.n):'—';
+    var gp=t.ng>0?(t.sg/t.ng).toFixed(3):'—',dp=t.nd>0?Math.round(t.sd/t.nd)+'d':'—';
+    var ganp=t.ngan>0?fmt(t.sgan/t.ngan):'—',bdp=t.nbd>0?fmt(t.sbd/t.nbd):'—';
+    return '<tr><td>'+t.tipo.replace('CRIA-REPRODUCTORES','CRÍA')+'</td><td><b>'+t.cat+'</b></td><td class="mn tg">'+t.n+'</td><td class="mn">'+pv+' kg</td><td class="mn">'+pi+' kg</td><td class="mn tgo">'+gp+'</td><td class="mn">'+dp+'</td><td class="mn tgo">Bs '+ganp+'</td><td class="mn">Bs '+bdp+'/d</td></tr>';
+  }).join('');
+  // Gráficos
+  var COL=['#4CAF50','#2196F3','#FF9800','#E91E63','#9C27B0','#00BCD4','#8BC34A','#FF5722'];
+  var dKeys=Object.keys(byD);
+  destroyChart('chartDestino');
+  var cD=document.getElementById('chartDestino')?.getContext('2d');
+  if(cD)_charts['chartDestino']=new Chart(cD,{type:'doughnut',data:{labels:dKeys,datasets:[{data:dKeys.map(function(k){return byD[k].n;}),backgroundColor:COL,borderWidth:2,borderColor:'#0d1f0d'}]},options:{plugins:{legend:{labels:{color:'#e8ffe8',font:{size:11}}}}}});
+  var mMap={};
+  data.forEach(function(b){var v=ventas.find(function(x){return x.id===b.ventaId;})||{};var m=v.mercado||'SIN DATO';mMap[m]=(mMap[m]||0)+1;});
+  destroyChart('chartMercado');
+  var cM=document.getElementById('chartMercado')?.getContext('2d');
+  if(cM)_charts['chartMercado']=new Chart(cM,{type:'doughnut',data:{labels:Object.keys(mMap),datasets:[{data:Object.values(mMap),backgroundColor:['#4CAF50','#FF9800','#9E9E9E'],borderWidth:2,borderColor:'#0d1f0d'}]},options:{plugins:{legend:{labels:{color:'#e8ffe8',font:{size:11}}}}}});
+  var oS=Object.values(byO).sort(function(a,b){return (b.bsV-b.bsC)-(a.bsV-a.bsC);}).slice(0,10);
+  destroyChart('chartOrigen');
+  var cO=document.getElementById('chartOrigen')?.getContext('2d');
+  if(cO)_charts['chartOrigen']=new Chart(cO,{type:'bar',data:{labels:oS.map(function(o){return o.orig;}),datasets:[{label:'Ganancia Bs',data:oS.map(function(o){return Math.round(o.bsV-o.bsC);}),backgroundColor:oS.map(function(o){return o.bsV-o.bsC>=0?'rgba(76,175,80,.8)':'rgba(233,30,99,.8)';})}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#7a9a7a'},grid:{color:'#1a3a1a'}},y:{ticks:{color:'#e8ffe8',font:{size:10}},grid:{color:'#1a3a1a'}}}}});
+  var dS=Object.values(byD).sort(function(a,b){return b.bsV/b.kg-a.bsV/a.kg;});
+  destroyChart('chartBsKg');
+  var cBK=document.getElementById('chartBsKg')?.getContext('2d');
+  if(cBK)_charts['chartBsKg']=new Chart(cBK,{type:'bar',data:{labels:dS.map(function(d){return d.dest;}),datasets:[{label:'Bs/kg',data:dS.map(function(d){return d.kg>0?Math.round(d.bsV/d.kg*100)/100:0;}),backgroundColor:'rgba(33,150,243,.8)'}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#e8ffe8',font:{size:10}},grid:{color:'#1a3a1a'}},y:{ticks:{color:'#7a9a7a'},grid:{color:'#1a3a1a'}}}}});
+  var tcS=Object.values(byTC).filter(function(t){return t.ng>0;}).sort(function(a,b){return b.sg/b.ng-a.sg/a.ng;});
+  destroyChart('chartGmd');
+  var cG=document.getElementById('chartGmd')?.getContext('2d');
+  if(cG)_charts['chartGmd']=new Chart(cG,{type:'bar',data:{labels:tcS.map(function(t){return t.tipo.replace('CRIA-REPRODUCTORES','CRÍA')+' '+t.cat;}),datasets:[{label:'GMD',data:tcS.map(function(t){return Math.round(t.sg/t.ng*1000)/1000;}),backgroundColor:'rgba(255,152,0,.8)'}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#e8ffe8',font:{size:10}},grid:{color:'#1a3a1a'}},y:{ticks:{color:'#7a9a7a'},grid:{color:'#1a3a1a'}}}}});
+  var byMes={};
+  data.forEach(function(b){var mes=b.fecha.substring(0,7);if(!byMes[mes])byMes[mes]={bsV:0,kg:0};byMes[mes].bsV+=b.precioVenta||0;byMes[mes].kg+=b.pesoVenta||0;});
+  var ms=Object.keys(byMes).sort();
+  destroyChart('chartEvol');
+  var cEv=document.getElementById('chartEvol')?.getContext('2d');
+  if(cEv)_charts['chartEvol']=new Chart(cEv,{type:'line',data:{labels:ms,datasets:[{label:'Bs/kg prom',data:ms.map(function(m){return byMes[m].kg>0?Math.round(byMes[m].bsV/byMes[m].kg*100)/100:0;}),borderColor:'#4CAF50',backgroundColor:'rgba(76,175,80,.1)',tension:0.3,pointBackgroundColor:'#4CAF50'}]},options:{plugins:{legend:{labels:{color:'#e8ffe8'}}},scales:{x:{ticks:{color:'#e8ffe8',font:{size:10}},grid:{color:'#1a3a1a'}},y:{ticks:{color:'#7a9a7a'},grid:{color:'#1a3a1a'}}}}});
+}
+function renderInf(){renderInformes();}
+function exportarInformeExcel(){
+  var data=getVentasData();
+  if(!data.length){ntf('Sin datos para exportar',true);return;}
+  var rows=[['IDE','Tipo','Cat','Origen','F.Ingreso','F.Venta','Mercado','Destino','Peso Venta','Precio Venta','Peso Ing','Precio Compra','GMD','Días','Ganancia','Bs/día']];
+  data.forEach(function(b){
+    var s=calcStat(b);var a=s.a,v=s.v;
+    rows.push([b.ide,a.tipo||'',a.categoria||'',a.origen||'',a.fechaIngreso||'',b.fecha,v.mercado||'',v.frigorifico||b.destino||'',b.pesoVenta||'',b.precioVenta||'',a.pesoIngreso||'',a.precioCompra||'',s.gmd||'',s.dias||'',s.gan||'',s.bd||'']);
+  });
+  var ws=XLSX.utils.aoa_to_sheet(rows);
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Ventas');
+  XLSX.writeFile(wb,'Informe_Ventas.xlsx');
+  ntf('OK exportado');
+}
+</script>
 <style>
 :root{
   --bg:#0d1f0d;--card:#152015;--card2:#1a2a1a;--card3:#1e2e1e;
@@ -524,373 +670,38 @@ tr:hover td{background:rgba(109,186,58,.04);}
 
 <!-- ═══════ INFORMES ═══════ -->
 <div class="pg" id="pg-informes">
-
-  <!-- FILTRO PERÍODO -->
   <div class="card" style="margin-bottom:12px;">
     <div style="display:flex;gap:12px;align-items:center;padding:10px 14px;flex-wrap:wrap;">
-      <span style="font-size:12px;color:var(--t2);font-weight:700;">📅 Período:</span>
-      <select id="ifPeriodo" onchange="renderInformes()" style="font-size:12px;background:var(--card2);border:1px solid var(--brd);color:var(--text);padding:5px 10px;border-radius:6px;">
-        <option value="">Toda la gestión</option>
-      </select>
-      <select id="ifTipo" onchange="renderInformes()" style="font-size:12px;background:var(--card2);border:1px solid var(--brd);color:var(--text);padding:5px 10px;border-radius:6px;">
-        <option value="">Todos los tipos</option>
-        <option value="INVERNADA">INVERNADA</option>
-        <option value="CRIA-REPRODUCTORES">CRIA-REPRODUCTORES</option>
-      </select>
-      <select id="ifMercado" onchange="renderInformes()" style="font-size:12px;background:var(--card2);border:1px solid var(--brd);color:var(--text);padding:5px 10px;border-radius:6px;">
-        <option value="">Todos los mercados</option>
-        <option value="EXPORTACION">EXPORTACIÓN</option>
-        <option value="NACIONAL">NACIONAL</option>
-      </select>
+      <span style="font-size:12px;color:var(--t2);font-weight:700;">📅 Filtrar:</span>
+      <select id="ifPeriodo" onchange="renderInformes()" style="font-size:12px;background:var(--card2);border:1px solid var(--brd);color:var(--text);padding:5px 10px;border-radius:6px;"><option value="">Toda la gestión</option></select>
+      <select id="ifTipo" onchange="renderInformes()" style="font-size:12px;background:var(--card2);border:1px solid var(--brd);color:var(--text);padding:5px 10px;border-radius:6px;"><option value="">Todos los tipos</option><option value="INVERNADA">INVERNADA</option><option value="CRIA-REPRODUCTORES">CRIA-REPRODUCTORES</option></select>
+      <select id="ifMercado" onchange="renderInformes()" style="font-size:12px;background:var(--card2);border:1px solid var(--brd);color:var(--text);padding:5px 10px;border-radius:6px;"><option value="">Todos los mercados</option><option value="EXPORTACION">EXPORTACIÓN</option><option value="NACIONAL">NACIONAL</option></select>
       <button class="btn bs btn-sm" onclick="exportarInformeExcel()" style="margin-left:auto;border-color:var(--gold);color:var(--gold);">📥 Exportar Excel</button>
     </div>
   </div>
-
-  <!-- GRÁFICOS -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
-    <div class="card"><div class="ch"><div class="ct">🍕 Ventas por Destino</div></div>
-      <canvas id="chartDestino" height="220"></canvas></div>
-    <div class="card"><div class="ch"><div class="ct">🍕 Exportación vs Nacional</div></div>
-      <canvas id="chartMercado" height="220"></canvas></div>
+    <div class="card"><div class="ch"><div class="ct">🍕 Ventas por Destino</div></div><canvas id="chartDestino" height="220"></canvas></div>
+    <div class="card"><div class="ch"><div class="ct">🍕 Exportación vs Nacional</div></div><canvas id="chartMercado" height="220"></canvas></div>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
-    <div class="card"><div class="ch"><div class="ct">📊 Ganancia por Origen (Bs)</div></div>
-      <canvas id="chartOrigen" height="260"></canvas></div>
-    <div class="card"><div class="ch"><div class="ct">📊 Bs/kg por Destino</div></div>
-      <canvas id="chartBsKg" height="260"></canvas></div>
+    <div class="card"><div class="ch"><div class="ct">📊 Ganancia por Origen (Bs)</div></div><canvas id="chartOrigen" height="260"></canvas></div>
+    <div class="card"><div class="ch"><div class="ct">📊 Bs/kg por Destino</div></div><canvas id="chartBsKg" height="260"></canvas></div>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
-    <div class="card"><div class="ch"><div class="ct">⚡ GMD por Tipo y Categoría</div></div>
-      <canvas id="chartGmd" height="260"></canvas></div>
-    <div class="card"><div class="ch"><div class="ct">📈 Evolución Bs/kg por Mes</div></div>
-      <canvas id="chartEvol" height="260"></canvas></div>
+    <div class="card"><div class="ch"><div class="ct">⚡ GMD por Tipo y Categoría</div></div><canvas id="chartGmd" height="260"></canvas></div>
+    <div class="card"><div class="ch"><div class="ct">📈 Evolución Bs/kg por Mes</div></div><canvas id="chartEvol" height="260"></canvas></div>
   </div>
-
-  <!-- TABLAS RESUMEN -->
   <div class="card" style="margin-bottom:12px;">
-    <div class="ch"><div class="ct">📋 Resumen por Destino / Frigorífico</div></div>
-    <div class="tw"><table>
-      <thead><tr><th>Destino</th><th>Mercado</th><th>Cabezas</th><th>Kg Total</th><th>Total Bs</th><th>Bs/kg prom</th><th>Ganancia Bs</th><th>Ganancia %</th></tr></thead>
-      <tbody id="itDestino"></tbody>
-    </table></div>
+    <div class="ch"><div class="ct">📋 Resumen por Destino</div></div>
+    <div class="tw"><table><thead><tr><th>Destino</th><th>Mercado</th><th>Cabezas</th><th>Kg Total</th><th>Total Bs</th><th>Bs/kg</th><th>Ganancia Bs</th><th>Ganancia %</th></tr></thead><tbody id="itDestino"></tbody></table></div>
   </div>
-
   <div class="card" style="margin-bottom:12px;">
-    <div class="ch"><div class="ct">🏡 Resumen por Origen / Predio</div></div>
-    <div class="tw"><table>
-      <thead><tr><th>Origen</th><th>Cabezas</th><th>Kg venta</th><th>Bs compra</th><th>Bs venta</th><th>Ganancia Bs</th><th>Margen %</th><th>GMD prom</th><th>Días prom</th></tr></thead>
-      <tbody id="itOrigen"></tbody>
-    </table></div>
+    <div class="ch"><div class="ct">🏡 Resumen por Origen</div></div>
+    <div class="tw"><table><thead><tr><th>Origen</th><th>Cabezas</th><th>Kg venta</th><th>Bs compra</th><th>Bs venta</th><th>Ganancia</th><th>Margen %</th><th>GMD prom</th><th>Días prom</th></tr></thead><tbody id="itOrigen"></tbody></table></div>
   </div>
-
-  <div class="card" style="margin-bottom:12px;">
+  <div class="card">
     <div class="ch"><div class="ct">🐄 Resumen por Tipo y Categoría</div></div>
-    <div class="tw"><table>
-      <thead><tr><th>Tipo</th><th>Categoría</th><th>Cabezas</th><th>Peso venta prom</th><th>Peso ing. prom</th><th>GMD prom</th><th>Días prom</th><th>Ganancia prom</th><th>Bs/día prom</th></tr></thead>
-      <tbody id="itTipoCat"></tbody>
-    </table></div>
+    <div class="tw"><table><thead><tr><th>Tipo</th><th>Categoría</th><th>Cabezas</th><th>Peso venta prom</th><th>Peso ing. prom</th><th>GMD prom</th><th>Días prom</th><th>Ganancia prom</th><th>Bs/día prom</th></tr></thead><tbody id="itTipoCat"></tbody></table></div>
   </div>
-
 </div>
-
-// ═══════════ INFORMES GERENCIALES ═══════════
-let _charts = {};
-
-function destroyChart(id){
-  if(_charts[id]){ _charts[id].destroy(); delete _charts[id]; }
-}
-
-function getVentasData(){
-  const perfil = document.getElementById('ifPeriodo')?.value||'';
-  const tipo   = document.getElementById('ifTipo')?.value||'';
-  const merc   = document.getElementById('ifMercado')?.value||'';
-  return bajas.filter(function(b){
-    if(b.tipo!=='VENTA') return false;
-    var v=ventas.find(function(x){return x.id===b.ventaId;})||{};
-    if(perfil && b.fecha.substring(0,7)!==perfil) return false;
-    var a=animales[b.ide]||{};
-    if(tipo && (a.tipo||v.tipo||'')!==tipo) return false;
-    if(merc && (v.mercado||'')!==merc) return false;
-    return true;
-  });
-}
-
-function calcVentaStat(b){
-  var a=animales[b.ide]||{};
-  var v=ventas.find(function(x){return x.id===b.ventaId;})||{};
-  var fIng=parseFecha(a.fechaIngreso||'');
-  var fVent=parseFecha(b.fecha||'');
-  var dias=0;
-  if(fIng&&fVent){
-    dias=Math.round((new Date(fVent)-new Date(fIng+'T12:00:00'))/86400000);
-    if(dias<0) dias=0;
-  }
-  var gmd=null;
-  if(dias>0&&a.pesoIngreso&&b.pesoVenta){
-    gmd=Math.round((b.pesoVenta-a.pesoIngreso)/dias*1000)/1000;
-  }
-  var ganancia=null;
-  if(a.precioCompra!=null&&b.precioVenta!=null){
-    ganancia=Math.round((b.precioVenta-a.precioCompra)*100)/100;
-  }
-  var bsDia=null;
-  if(ganancia!=null&&dias>0) bsDia=Math.round(ganancia/dias*100)/100;
-  var margenKg=null;
-  if(ganancia!=null&&a.pesoIngreso&&b.pesoVenta&&b.pesoVenta>a.pesoIngreso){
-    margenKg=Math.round(ganancia/(b.pesoVenta-a.pesoIngreso)*100)/100;
-  }
-  return {a:a,v:v,dias:dias,gmd:gmd,ganancia:ganancia,bsDia:bsDia,margenKg:margenKg};
-}
-
-function renderInformes(){
-  var data=getVentasData();
-  if(!data.length){
-    ['itDestino','itOrigen','itTipoCat'].forEach(function(id){
-      var el=document.getElementById(id);
-      if(el) el.innerHTML='<tr><td colspan="9" class="emp">Sin datos</td></tr>';
-    });
-    return;
-  }
-
-  // Poblar selector de meses
-  var selP=document.getElementById('ifPeriodo');
-  if(selP&&selP.options.length<=1){
-    var meses=[...new Set(bajas.filter(function(b){return b.tipo==='VENTA';}).map(function(b){return b.fecha.substring(0,7);}))].sort().reverse();
-    meses.forEach(function(m){
-      var opt=document.createElement('option');
-      opt.value=m; opt.textContent=m;
-      selP.appendChild(opt);
-    });
-  }
-
-  // ── Calcular stats ────────────────────────────────────────────────────────
-  var totCab=data.length, totKg=0, totBsV=0, totBsC=0, sumGmd=0, nGmd=0;
-  var sumDias=0, nDias=0, sumBsDia=0, nBsDia=0, sumMargKg=0, nMargKg=0;
-
-  // Agrupaciones
-  var byDest={}, byOrig={}, byTC={};
-
-  data.forEach(function(b){
-    var st=calcVentaStat(b);
-    var a=st.a, v=st.v;
-    totKg+=b.pesoVenta||0;
-    totBsV+=b.precioVenta||0;
-    totBsC+=a.precioCompra||0;
-    if(st.gmd!=null){sumGmd+=st.gmd;nGmd++;}
-    if(st.dias>0){sumDias+=st.dias;nDias++;}
-    if(st.bsDia!=null){sumBsDia+=st.bsDia;nBsDia++;}
-    if(st.margenKg!=null){sumMargKg+=st.margenKg;nMargKg++;}
-
-    // Por destino
-    var dest=v.frigorifico||b.destino||v.destino||'?';
-    if(!byDest[dest]) byDest[dest]={dest:dest,merc:v.mercado||'',n:0,kg:0,bsV:0,bsC:0};
-    byDest[dest].n++;byDest[dest].kg+=b.pesoVenta||0;
-    byDest[dest].bsV+=b.precioVenta||0;byDest[dest].bsC+=a.precioCompra||0;
-
-    // Por origen
-    var orig=a.origen||b.origenAnimal||'?';
-    if(!byOrig[orig]) byOrig[orig]={orig:orig,n:0,kg:0,bsV:0,bsC:0,sumGmd:0,nGmd:0,sumDias:0,nDias:0};
-    byOrig[orig].n++;byOrig[orig].kg+=b.pesoVenta||0;
-    byOrig[orig].bsV+=b.precioVenta||0;byOrig[orig].bsC+=a.precioCompra||0;
-    if(st.gmd!=null){byOrig[orig].sumGmd+=st.gmd;byOrig[orig].nGmd++;}
-    if(st.dias>0){byOrig[orig].sumDias+=st.dias;byOrig[orig].nDias++;}
-
-    // Por tipo+categoria
-    var tc=(a.tipo||'?')+'|'+(a.categoria||'?');
-    if(!byTC[tc]) byTC[tc]={tipo:a.tipo||'?',cat:a.categoria||'?',n:0,sumPV:0,sumPI:0,sumGmd:0,nGmd:0,sumDias:0,nDias:0,sumGan:0,nGan:0,sumBsDia:0,nBsDia:0};
-    byTC[tc].n++;byTC[tc].sumPV+=b.pesoVenta||0;byTC[tc].sumPI+=a.pesoIngreso||0;
-    if(st.gmd!=null){byTC[tc].sumGmd+=st.gmd;byTC[tc].nGmd++;}
-    if(st.dias>0){byTC[tc].sumDias+=st.dias;byTC[tc].nDias++;}
-    if(st.ganancia!=null){byTC[tc].sumGan+=st.ganancia;byTC[tc].nGan++;}
-    if(st.bsDia!=null){byTC[tc].sumBsDia+=st.bsDia;byTC[tc].nBsDia++;}
-  });
-
-  // ── Actualizar resumen cabecera ventas ────────────────────────────────────
-  function sv(id,val){var el=document.getElementById(id);if(el)el.textContent=val;}
-  sv('vrCab', totCab.toLocaleString('es-BO'));
-  sv('vrKg',  (totKg/1000).toFixed(1)+' t');
-  sv('vrBs',  'Bs '+fmt(totBsV));
-  var ganTot=totBsV-totBsC;
-  sv('vrGan',  (ganTot>=0?'+':'')+'Bs '+fmt(ganTot));
-  document.getElementById('vrGan').style.color=ganTot>=0?'var(--gr)':'var(--red)';
-  sv('vrGmd',  nGmd>0?(sumGmd/nGmd).toFixed(3)+' kg/d':'—');
-  sv('vrDias', nDias>0?Math.round(sumDias/nDias)+' días':'—');
-  sv('vrBsDia',nBsDia>0?'Bs '+fmt(sumBsDia/nBsDia):' —');
-  sv('vrMargKg',nMargKg>0?'Bs '+fmt(sumMargKg/nMargKg)+'/kg':'—');
-
-  // ── TABLA DESTINO ─────────────────────────────────────────────────────────
-  var tdEl=document.getElementById('itDestino');
-  var tdRows=Object.values(byDest).sort(function(a,b){return b.bsV-a.bsV;});
-  tdEl.innerHTML=tdRows.map(function(d){
-    var gan=d.bsV-d.bsC;
-    var pct=d.bsC>0?(gan/d.bsC*100).toFixed(1):'—';
-    var bskg=d.kg>0?fmt(d.bsV/d.kg):'—';
-    return '<tr><td><strong>'+d.dest+'</strong></td><td style="font-size:11px;color:var(--t2);">'+d.merc+'</td>'
-      +'<td class="mn tg">'+d.n+'</td>'
-      +'<td class="mn">'+Math.round(d.kg)+' kg</td>'
-      +'<td class="mn tgo">Bs '+fmt(d.bsV)+'</td>'
-      +'<td class="mn">Bs '+bskg+'/kg</td>'
-      +'<td class="mn" style="color:'+(gan>=0?'var(--gr)':'var(--red)')+';">'+(gan>=0?'+':'')+'Bs '+fmt(gan)+'</td>'
-      +'<td class="mn" style="color:'+(parseFloat(pct)>=0?'var(--gr)':'var(--red)')+';">'+pct+'%</td></tr>';
-  }).join('');
-
-  // ── TABLA ORIGEN ─────────────────────────────────────────────────────────
-  var toEl=document.getElementById('itOrigen');
-  var toRows=Object.values(byOrig).sort(function(a,b){return (b.bsV-b.bsC)-(a.bsV-a.bsC);});
-  toEl.innerHTML=toRows.map(function(o){
-    var gan=o.bsV-o.bsC;
-    var pct=o.bsC>0?(gan/o.bsC*100).toFixed(1):'—';
-    var gmdP=o.nGmd>0?(o.sumGmd/o.nGmd).toFixed(3):'—';
-    var diasP=o.nDias>0?Math.round(o.sumDias/o.nDias)+'d':'—';
-    return '<tr><td><strong>'+o.orig+'</strong></td>'
-      +'<td class="mn tg">'+o.n+'</td>'
-      +'<td class="mn">'+Math.round(o.kg)+' kg</td>'
-      +'<td class="mn tgo">Bs '+fmt(o.bsC)+'</td>'
-      +'<td class="mn tgo">Bs '+fmt(o.bsV)+'</td>'
-      +'<td class="mn" style="color:'+(gan>=0?'var(--gr)':'var(--red)')+';">'+(gan>=0?'+':'')+'Bs '+fmt(gan)+'</td>'
-      +'<td class="mn" style="color:'+(parseFloat(pct)>=0?'var(--gr)':'var(--red)')+';">'+pct+'%</td>'
-      +'<td class="mn">'+gmdP+'</td>'
-      +'<td class="mn">'+diasP+'</td></tr>';
-  }).join('');
-
-  // ── TABLA TIPO+CATEGORIA ─────────────────────────────────────────────────
-  var ttEl=document.getElementById('itTipoCat');
-  var ttRows=Object.values(byTC).sort(function(a,b){return a.tipo.localeCompare(b.tipo)||a.cat.localeCompare(b.cat);});
-  ttEl.innerHTML=ttRows.map(function(t){
-    var pvP=t.n>0?fmt(t.sumPV/t.n):'—';
-    var piP=t.n>0?fmt(t.sumPI/t.n):'—';
-    var gmdP=t.nGmd>0?(t.sumGmd/t.nGmd).toFixed(3):'—';
-    var dP=t.nDias>0?Math.round(t.sumDias/t.nDias)+'d':'—';
-    var ganP=t.nGan>0?fmt(t.sumGan/t.nGan):'—';
-    var bdP=t.nBsDia>0?fmt(t.sumBsDia/t.nBsDia):'—';
-    return '<tr><td>'+t.tipo+'</td><td><strong>'+t.cat+'</strong></td>'
-      +'<td class="mn tg">'+t.n+'</td>'
-      +'<td class="mn">'+pvP+' kg</td>'
-      +'<td class="mn">'+piP+' kg</td>'
-      +'<td class="mn tgo">'+gmdP+'</td>'
-      +'<td class="mn">'+dP+'</td>'
-      +'<td class="mn tgo">Bs '+ganP+'</td>'
-      +'<td class="mn">Bs '+bdP+'/d</td></tr>';
-  }).join('');
-
-  // ── GRÁFICOS ──────────────────────────────────────────────────────────────
-  var COLORS=['#4CAF50','#2196F3','#FF9800','#E91E63','#9C27B0','#00BCD4','#8BC34A','#FF5722'];
-
-  // Torta destino
-  destroyChart('chartDestino');
-  var ctxD=document.getElementById('chartDestino')?.getContext('2d');
-  if(ctxD){
-    var dLabels=Object.keys(byDest);
-    var dData=dLabels.map(function(k){return byDest[k].n;});
-    _charts['chartDestino']=new Chart(ctxD,{type:'doughnut',data:{
-      labels:dLabels,
-      datasets:[{data:dData,backgroundColor:COLORS,borderWidth:2,borderColor:'#0d1f0d'}]
-    },options:{plugins:{legend:{labels:{color:'#e8ffe8',font:{size:11}}}}}});
-  }
-
-  // Torta mercado
-  destroyChart('chartMercado');
-  var ctxM=document.getElementById('chartMercado')?.getContext('2d');
-  if(ctxM){
-    var mMap={};
-    data.forEach(function(b){
-      var v=ventas.find(function(x){return x.id===b.ventaId;})||{};
-      var m=v.mercado||'SIN DATO';
-      mMap[m]=(mMap[m]||0)+1;
-    });
-    _charts['chartMercado']=new Chart(ctxM,{type:'doughnut',data:{
-      labels:Object.keys(mMap),
-      datasets:[{data:Object.values(mMap),backgroundColor:['#4CAF50','#FF9800','#9E9E9E'],borderWidth:2,borderColor:'#0d1f0d'}]
-    },options:{plugins:{legend:{labels:{color:'#e8ffe8',font:{size:11}}}}}});
-  }
-
-  // Barras ganancia por origen (top 10)
-  destroyChart('chartOrigen');
-  var ctxO=document.getElementById('chartOrigen')?.getContext('2d');
-  if(ctxO){
-    var origS=Object.values(byOrig).sort(function(a,b){return (b.bsV-b.bsC)-(a.bsV-a.bsC);}).slice(0,10);
-    var oColors=origS.map(function(o){return (o.bsV-o.bsC)>=0?'rgba(76,175,80,.8)':'rgba(233,30,99,.8)';});
-    _charts['chartOrigen']=new Chart(ctxO,{type:'bar',data:{
-      labels:origS.map(function(o){return o.orig;}),
-      datasets:[{label:'Ganancia Bs',data:origS.map(function(o){return Math.round(o.bsV-o.bsC);}),backgroundColor:oColors}]
-    },options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{
-      x:{ticks:{color:'#7a9a7a'},grid:{color:'#1a3a1a'}},
-      y:{ticks:{color:'#e8ffe8',font:{size:10}},grid:{color:'#1a3a1a'}}
-    }}});
-  }
-
-  // Barras Bs/kg por destino
-  destroyChart('chartBsKg');
-  var ctxBK=document.getElementById('chartBsKg')?.getContext('2d');
-  if(ctxBK){
-    var dS=Object.values(byDest).sort(function(a,b){return b.bsV/b.kg-a.bsV/a.kg;});
-    _charts['chartBsKg']=new Chart(ctxBK,{type:'bar',data:{
-      labels:dS.map(function(d){return d.dest;}),
-      datasets:[{label:'Bs/kg',data:dS.map(function(d){return d.kg>0?Math.round(d.bsV/d.kg*100)/100:0;}),backgroundColor:'rgba(33,150,243,.8)'}]
-    },options:{plugins:{legend:{display:false}},scales:{
-      x:{ticks:{color:'#e8ffe8',font:{size:10}},grid:{color:'#1a3a1a'}},
-      y:{ticks:{color:'#7a9a7a'},grid:{color:'#1a3a1a'}}
-    }}});
-  }
-
-  // Barras GMD por tipo+categoría
-  destroyChart('chartGmd');
-  var ctxG=document.getElementById('chartGmd')?.getContext('2d');
-  if(ctxG){
-    var tcS=Object.values(byTC).filter(function(t){return t.nGmd>0;}).sort(function(a,b){return b.sumGmd/b.nGmd-a.sumGmd/a.nGmd;});
-    _charts['chartGmd']=new Chart(ctxG,{type:'bar',data:{
-      labels:tcS.map(function(t){return t.tipo.replace('CRIA-REPRODUCTORES','CRÍA')+' '+t.cat;}),
-      datasets:[{label:'GMD kg/día',data:tcS.map(function(t){return Math.round(t.sumGmd/t.nGmd*1000)/1000;}),backgroundColor:'rgba(255,152,0,.8)'}]
-    },options:{plugins:{legend:{display:false}},scales:{
-      x:{ticks:{color:'#e8ffe8',font:{size:10}},grid:{color:'#1a3a1a'}},
-      y:{ticks:{color:'#7a9a7a'},grid:{color:'#1a3a1a'}}
-    }}});
-  }
-
-  // Línea evolución Bs/kg por mes
-  destroyChart('chartEvol');
-  var ctxEv=document.getElementById('chartEvol')?.getContext('2d');
-  if(ctxEv){
-    var byMes={};
-    data.forEach(function(b){
-      var v=ventas.find(function(x){return x.id===b.ventaId;})||{};
-      var mes=b.fecha.substring(0,7);
-      if(!byMes[mes]) byMes[mes]={bsV:0,kg:0};
-      byMes[mes].bsV+=b.precioVenta||0;
-      byMes[mes].kg+=b.pesoVenta||0;
-    });
-    var meses=Object.keys(byMes).sort();
-    _charts['chartEvol']=new Chart(ctxEv,{type:'line',data:{
-      labels:meses,
-      datasets:[{label:'Bs/kg prom',data:meses.map(function(m){return byMes[m].kg>0?Math.round(byMes[m].bsV/byMes[m].kg*100)/100:0;}),
-        borderColor:'#4CAF50',backgroundColor:'rgba(76,175,80,.1)',tension:0.3,pointBackgroundColor:'#4CAF50'}]
-    },options:{plugins:{legend:{labels:{color:'#e8ffe8'}}},scales:{
-      x:{ticks:{color:'#e8ffe8',font:{size:10}},grid:{color:'#1a3a1a'}},
-      y:{ticks:{color:'#7a9a7a'},grid:{color:'#1a3a1a'}}
-    }}});
-  }
-}
-
-function renderInf(){ renderInformes(); }
-
-function exportarInformeExcel(){
-  var data=getVentasData();
-  if(!data.length){ntf('Sin datos para exportar',true);return;}
-  var rows=[['IDE','Tipo','Categoría','Grupo','Origen','F.Ingreso','F.Venta','Mercado','Destino',
-    'Peso Venta','Precio Venta','Peso Ing.','Precio Compra','GMD','Días campo','Ganancia','Bs/día']];
-  data.forEach(function(b){
-    var st=calcVentaStat(b);
-    var a=st.a,v=st.v;
-    rows.push([b.ide,a.tipo||'',a.categoria||'',b.grupoAnimal||'',a.origen||'',
-      a.fechaIngreso||'',b.fecha,v.mercado||'',v.frigorifico||b.destino||'',
-      b.pesoVenta||'',b.precioVenta||'',a.pesoIngreso||'',a.precioCompra||'',
-      st.gmd||'',st.dias||'',st.ganancia||'',st.bsDia||'']);
-  });
-  var ws=XLSX.utils.aoa_to_sheet(rows);
-  var wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'Informe Ventas');
-  XLSX.writeFile(wb,'Informe_Ventas_ElPrado1.xlsx');
-  ntf('✅ Informe exportado');
-}
-
 
