@@ -981,16 +981,24 @@ window.onload = async () => {
 
 async function loadAll(){
   try {
-    const [rA, rP, rB, rC, rV] = await Promise.all([
+    // Carga prioritaria: animales activos, pesajes, ventas, compras
+    const [rA, rP, rC, rV] = await Promise.all([
       fbGet('animales'), fbGet('pesajes'),
-      fbGet('bajas'),    fbGet('compras'),
-      fbGet('ventas')
+      fbGet('compras'),  fbGet('ventas')
     ]);
     animales = rA || {};
     pesajes  = toArr(rP).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
-    bajas    = toArr(rB).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
     compras  = toArr(rC).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
     ventas   = toArr(rV).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+    // Carga de bajas en segundo plano (son muchos registros)
+    bajas = [];
+    fbGet('bajas').then(rB=>{
+      bajas = toArr(rB).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+      // Actualizar vistas que dependen de bajas
+      if(document.getElementById('pg-ventas')?.classList.contains('active')) renderV();
+      if(document.getElementById('pg-informes')?.classList.contains('active')){renderInf();renderIG();}
+      if(document.getElementById('pg-bajas')?.classList.contains('active')) renderB();
+    }).catch(e=>console.warn('bajas load error',e));
     // Índice de último pesaje por animal
     window._lastPes = {};
     pesajes.forEach(p=>{ if(!window._lastPes[p.ide]||p.fecha>window._lastPes[p.ide].fecha) window._lastPes[p.ide]=p; });
