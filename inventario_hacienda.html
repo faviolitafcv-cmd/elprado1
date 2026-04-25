@@ -262,8 +262,19 @@ tr:hover td{background:rgba(109,186,58,.04);}
   <div class="card">
     <div class="tw"><table>
       <thead><tr>
-        <th>IDE (Chip)</th><th>Caravana</th><th>Tipo</th><th>Categoría</th><th>Grupo</th><th>Origen</th>
-        <th>F. Ingreso</th><th>Peso Ing.</th><th>Precio</th><th>Raza</th><th>Estado</th><th></th>
+        <th data-col="ide" style="cursor:pointer;" onclick="sortA('ide')">IDE (Chip) <span class="sort-ic">↕</span></th>
+        <th data-col="ida" style="cursor:pointer;" onclick="sortA('ida')">Caravana <span class="sort-ic">↕</span></th>
+        <th data-col="tipo" style="cursor:pointer;" onclick="sortA('tipo')">Tipo <span class="sort-ic">↕</span></th>
+        <th data-col="cat" style="cursor:pointer;" onclick="sortA('cat')">Categoría <span class="sort-ic">↕</span></th>
+        <th data-col="grupo" style="cursor:pointer;" onclick="sortA('grupo')">Grupo <span class="sort-ic">↕</span></th>
+        <th data-col="origen" style="cursor:pointer;" onclick="sortA('origen')">Origen <span class="sort-ic">↕</span></th>
+        <th data-col="fecha" style="cursor:pointer;" onclick="sortA('fecha')">F. Ingreso <span class="sort-ic">↕</span></th>
+        <th data-col="peso" style="cursor:pointer;" onclick="sortA('peso')">Peso Ing. <span class="sort-ic">↕</span></th>
+        <th data-col="precio" style="cursor:pointer;" onclick="sortA('precio')">Precio <span class="sort-ic">↕</span></th>
+        <th>Raza</th>
+        <th data-col="ultpes" style="cursor:pointer;" onclick="sortA('ultpes')">Últ. Pesaje <span class="sort-ic">↕</span></th>
+        <th data-col="estado" style="cursor:pointer;" onclick="sortA('estado')">Estado <span class="sort-ic">↕</span></th>
+        <th></th>
       </tr></thead>
       <tbody id="aBody"><tr><td colspan="11"><div class="ldr"><div class="ls"></div></div></td></tr></tbody>
     </table></div>
@@ -430,8 +441,12 @@ tr:hover td{background:rgba(109,186,58,.04);}
     <p style="padding:10px 14px 0;font-size:11px;color:var(--t3);">Base para la PAC. Mostrá cabezas activas por categoría, grupo y predio de origen.</p>
     <div class="tw"><table>
       <thead><tr>
-        <th>Categoría</th><th>Grupo</th><th>Origen</th>
-        <th>Cabezas</th><th>Peso Ing. Prom.</th><th>GMD Prom.</th><th>Estadía Prom.</th>
+        <th style="min-width:140px;">Grupo</th>
+        <th>Cabezas</th>
+        <th>Peso Últ. Pesaje</th>
+        <th>GMD Prom.</th>
+        <th style="color:var(--green);">⚖️ Peso Hoy (proj.)</th>
+        <th>Orígenes</th>
       </tr></thead>
       <tbody id="iInv"><tr><td colspan="7"><div class="ldr"><div class="ls"></div></div></td></tr></tbody>
     </table></div>
@@ -445,6 +460,27 @@ tr:hover td{background:rgba(109,186,58,.04);}
       </tr></thead>
       <tbody id="iOrig"><tr><td colspan="7" class="emp">—</td></tr></tbody>
     </table></div>
+  </div>
+
+  <!-- Panel detalle de grupo (O4-O5) -->
+  <div class="card" id="dGrupoDetalle" style="display:none;">
+    <div class="ch">
+      <div class="ct" id="dGrupoDetalleTit">🐄 Grupo</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn bp btn-sm" onclick="filtQuickGrupo()">🔍 Ver en Animales</button>
+        <button class="btn bs btn-sm" onclick="document.getElementById('dGrupoDetalle').style.display='none'">✕ Cerrar</button>
+      </div>
+    </div>
+    <div id="dGrupoDetalleCats" style="padding:8px 14px;"></div>
+    <div class="tw">
+      <table>
+        <thead><tr>
+          <th>IDE (Chip)</th><th>Tipo</th><th>Cat.</th><th>Origen</th>
+          <th>Peso Ing.</th><th>Últ. Pesaje</th><th>GMD</th><th>⚖️ Peso Hoy</th>
+        </tr></thead>
+        <tbody id="dGrupoDetalleBody"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -704,6 +740,7 @@ let pesajes  = [];   // sorted desc by fecha
 let bajas    = [];   // sorted desc by fecha
 let compras  = [];
 let aFilt    = [];
+let _aSort   = {col:null, dir:1}; // columna y dirección de orden en tabla animales
 let pA = 1, pP = 1, pB = 1;
 const PXP = 50;
 let importD  = null;
@@ -729,6 +766,16 @@ window.onload = async () => {
   ntf('');
   renderDash();
   renderA();
+  // Re-renderizar la pestaña activa si el usuario navegó antes de que cargaran los datos
+  const _pgActiva = document.querySelector('.pg.active');
+  if(_pgActiva && _pgActiva.id !== 'pg-dash' && _pgActiva.id !== 'pg-animales'){
+    const _pgId = _pgActiva.id.replace('pg-','');
+    if(_pgId==='informes') renderInf();
+    else if(_pgId==='ventas') renderV();
+    else if(_pgId==='bajas') renderB();
+    else if(_pgId==='pesajes') renderP();
+    else if(_pgId==='compras') renderCo();
+  }
 };
 
 async function loadAll(){
@@ -853,6 +900,15 @@ function renderDash(){
 }
 
 // ═══════════ ANIMALES ═══════════
+function sortA(col){
+  if(_aSort.col===col){ _aSort.dir*=-1; } else { _aSort.col=col; _aSort.dir=1; }
+  // Actualizar indicadores visuales en headers
+  document.querySelectorAll('#pg-animales thead th[data-col]').forEach(th=>{
+    const ic=th.querySelector('.sort-ic');
+    if(ic) ic.textContent= th.dataset.col===_aSort.col ? (_aSort.dir===1?'↑':'↓') : '↕';
+  });
+  pA=1; renderAT();
+}
 function filtA(){
   const cat=document.getElementById('fCat').value;
   const gru=document.getElementById('fGrupo').value;
@@ -868,6 +924,30 @@ function filtA(){
     }
     return true;
   }).sort((a,b)=>{
+    if(_aSort.col){
+      const col=_aSort.col, dir=_aSort.dir;
+      let A,B;
+      switch(col){
+        case 'ide':    A=String(a.ide||'');   B=String(b.ide||'');   break;
+        case 'ida':    A=a.ida||'';           B=b.ida||'';           break;
+        case 'tipo':   A=a.tipo||'';          B=b.tipo||'';          break;
+        case 'cat':    A=a.categoria||'';     B=b.categoria||'';     break;
+        case 'grupo':  A=a.grupo||'';         B=b.grupo||'';         break;
+        case 'origen': A=a.origen||'';        B=b.origen||'';        break;
+        case 'fecha':  A=parseFecha(a.fechaIngreso)||''; B=parseFecha(b.fechaIngreso)||''; break;
+        case 'peso':   A=a.pesoIngreso||0;    B=b.pesoIngreso||0;    break;
+        case 'precio': A=a.precioCompra||0;   B=b.precioCompra||0;   break;
+        case 'ultpes': {
+          const la=window._lastPes&&window._lastPes[a.ide]?window._lastPes[a.ide].fecha:'';
+          const lb=window._lastPes&&window._lastPes[b.ide]?window._lastPes[b.ide].fecha:'';
+          A=la; B=lb; break;
+        }
+        case 'estado': A=a.estado||'';        B=b.estado||'';        break;
+        default:       A=a.tipo||'';          B=b.tipo||'';
+      }
+      if(typeof A==='number') return (A-B)*dir;
+      return String(A).localeCompare(String(B))*dir;
+    }
     const to=(a.tipo||'').localeCompare(b.tipo||'');
     const co=(a.categoria||'').localeCompare(b.categoria||'');
     return to||co||String(a.grupo).localeCompare(String(b.grupo))||String(a.origen).localeCompare(String(b.origen));
@@ -881,7 +961,7 @@ function renderAT(){
   document.getElementById('aCount').textContent=tot+' animal'+(tot!==1?'es':'');
   const st=(pA-1)*PXP, sl=aFilt.slice(st,st+PXP);
   const tb=document.getElementById('aBody');
-  if(!sl.length){tb.innerHTML='<tr><td colspan="11"><div class="emp"><div class="emp-ic">🐄</div>Sin animales encontrados</div></td></tr>';document.getElementById('aPag').innerHTML='';return;}
+  if(!sl.length){tb.innerHTML='<tr><td colspan="13"><div class="emp"><div class="emp-ic">🐄</div>Sin animales encontrados</div></td></tr>';document.getElementById('aPag').innerHTML='';return;}
   tb.innerHTML=sl.map(a=>`<tr>
     <td class="mn tg" style="font-size:11px;cursor:pointer;" onclick="verDet('${a.ide}')">${a.ide}</td>
     <td class="mn" style="font-size:11px;">${a.ida||'—'}</td>
@@ -889,12 +969,16 @@ function renderAT(){
     <td><span class="bg ${CBADGE[a.categoria]||''}">${a.categoria||'—'}</span></td>
     <td><b>${GRUS[a.grupo]||a.grupo||'—'}</b></td>
     <td style="font-size:11px;">${a.origen||'—'}</td>
-    <td class="mn" style="font-size:11px;">${a.fechaIngreso||'—'}</td>
+    <td class="mn" style="font-size:11px;">${fmtFecha(a.fechaIngreso)}</td>
     <td class="mn">${a.pesoIngreso||'—'} kg</td>
     <td class="mn tgo" style="font-size:11px;">Bs ${fmt(a.precioCompra)}</td>
     <td style="font-size:11px;color:var(--t3);">${a.raza||'—'}</td>
+    <td class="mn" style="font-size:11px;">${(()=>{const lpa=window._lastPes&&window._lastPes[a.ide];return lpa?fmtFecha(lpa.fecha):'—';})()}</td>
     <td><span class="bg bg-${(a.estado||'activo').toLowerCase()}">${a.estado||'ACTIVO'}</span></td>
-    <td><button class="btn bs btn-sm" onclick="verDet('${a.ide}')">📋</button></td>
+    <td style="white-space:nowrap;">
+      <button class="btn bs btn-sm" onclick="verDet('${a.ide}')" title="Ver detalle">📋</button>
+      <button class="btn bp btn-sm" style="margin-left:3px;" onclick="editarAnimal('${a.ide}')" title="Editar">✏️</button>
+    </td>
   </tr>`).join('');
   renderPag('aPag',tot,pA,n=>{pA=n;renderAT();});
 }
@@ -1292,15 +1376,25 @@ function parseFecha(v){
   try{
     if(v instanceof Date) return v.toISOString().split('T')[0];
     if(typeof v==='string'){
+      v=v.trim();
+      if(/^\d{4}-\d{2}-\d{2}/.test(v)) return v.split('T')[0];
       const p=v.split('/');
-      if(p.length===3) return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+      if(p.length===3){
+        const n0=parseInt(p[0],10),n1=parseInt(p[1],10),n2=parseInt(p[2],10);
+        let d,m,y;
+        if(p[0].length===4){d=n2;m=n1;y=n0;}
+        else if(n1>12){d=n1;m=n0;y=n2;}
+        else{d=n0;m=n1;y=n2;}
+        if(y<100) y+=2000;
+        return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      }
       return v.split('T')[0];
     }
     if(typeof v==='number'){
       return new Date((v-25569)*86400000).toISOString().split('T')[0];
     }
   }catch(e){}
-  return new Date().toISOString().split('T')[0];
+  return null;
 }
 
 function showImportPrev(data, noEnc=[]){
@@ -1912,49 +2006,52 @@ function renderB(){
 
 // ═══════════ INFORMES ═══════════
 function renderInf(){
+  const hoy=new Date();
+  const lp=window._lastPes||{};
   const act=Object.values(animales).filter(a=>a.estado==='ACTIVO');
-  // Inventario por grupo + origen
+
+  // ─── TABLA GRUPOS (O1-O5) ───────────────────────────
   const gmap={};
   act.forEach(a=>{
-    const k=a.categoria+'|'+a.grupo+'|'+(a.origen||'SIN ORIGEN');
-    if(!gmap[k]) gmap[k]={cat:a.categoria,grupo:a.grupo,origen:a.origen||'—',n:0,ps:0,es:0};
-    gmap[k].n++; gmap[k].ps+=a.pesoIngreso||0; gmap[k].es+=calcEst(a);
+    const g=a.grupo||'SIN GRUPO';
+    if(!gmap[g]) gmap[g]={grupo:g,n:0,origenes:{},sumGmd:0,nGmd:0,sumPeso:0,nPeso:0,sumPesoProy:0};
+    gmap[g].n++;
+    gmap[g].origenes[a.origen||'SIN ORIGEN']=(gmap[g].origenes[a.origen||'SIN ORIGEN']||0)+1;
+    const lpa=lp[a.ide];
+    if(lpa&&lpa.gmd!=null){
+      gmap[g].sumGmd+=lpa.gmd; gmap[g].nGmd++;
+      gmap[g].sumPeso+=(lpa.peso||0); gmap[g].nPeso++;
+      const dsd=Math.max(0,Math.round((hoy-new Date(lpa.fecha+'T12:00:00'))/86400000));
+      gmap[g].sumPesoProy+=Math.round((lpa.peso+lpa.gmd*dsd)*10)/10;
+    }
   });
-  const lastGmd={};
-  pesajes.forEach(p=>{if(lastGmd[p.ide]===undefined&&p.gmd!=null)lastGmd[p.ide]=p.gmd;});
-  const gmdMap={};
-  act.forEach(a=>{
-    const k=a.categoria+'|'+a.grupo+'|'+(a.origen||'SIN ORIGEN');
-    const g=lastGmd[a.ide];
-    if(g!=null){if(!gmdMap[k]){gmdMap[k]={s:0,n:0};} gmdMap[k].s+=g; gmdMap[k].n++;}
-  });
-  const rows=Object.values(gmap).sort((a,b)=>{
-    const co=CAT_ORD.indexOf(a.cat)-CAT_ORD.indexOf(b.cat);
-    return co||GRU_ORD.indexOf(a.grupo)-GRU_ORD.indexOf(b.grupo)||a.origen.localeCompare(b.origen);
-  });
+  const rows=Object.values(gmap).sort((a,b)=>
+    (GRU_ORD.indexOf(a.grupo)-GRU_ORD.indexOf(b.grupo))||a.grupo.localeCompare(b.grupo));
   const tb=document.getElementById('iInv');
   tb.innerHTML=rows.length?rows.map(g=>{
-    const k=g.cat+'|'+g.grupo+'|'+(g.origen==='—'?'SIN ORIGEN':g.origen);
-    const gd=gmdMap[k];
-    return`<tr>
-      <td><span class="bg ${CBADGE[g.cat]||''}">${CATS[g.cat]||g.cat}</span></td>
-      <td><b>${GRUS[g.grupo]||g.grupo}</b></td>
-      <td style="font-size:11px;">${g.origen}</td>
-      <td class="mn tg">${g.n}</td>
-      <td class="mn">${g.n>0?(g.ps/g.n).toFixed(0)+' kg':'—'}</td>
-      <td class="mn tgo">${gd&&gd.n>0?(gd.s/gd.n).toFixed(3)+' kg/d':'—'}</td>
-      <td class="mn" style="font-size:11px;">${g.n>0?Math.round(g.es/g.n)+' días':'—'}</td>
+    const gmdProm=g.nGmd>0?(g.sumGmd/g.nGmd).toFixed(3):null;
+    const pesoProm=g.nPeso>0?Math.round(g.sumPeso/g.nPeso):null;
+    const pesoHoy=g.nGmd>0?Math.round(g.sumPesoProy/g.nGmd):null;
+    const origs=Object.entries(g.origenes).sort((a,b)=>b[1]-a[1]).map(([k,v])=>k+(g.origenes[k]>1?' ('+g.origenes[k]+')':'')).join(', ');
+    const gmdCol=gmdProm!=null?(parseFloat(gmdProm)>=0.8?'var(--green)':parseFloat(gmdProm)>=0.5?'var(--gold)':'var(--red)'):'var(--t2)';
+    return`<tr style="cursor:pointer;" onclick="verDetalleGrupo('${g.grupo}')" title="Click para ver animales del grupo">
+      <td><b style="color:var(--green);">${GRUS[g.grupo]||g.grupo}</b></td>
+      <td class="mn tg" style="font-size:15px;">${g.n}</td>
+      <td class="mn">${pesoProm?pesoProm+' kg':'—'}</td>
+      <td class="mn" style="color:${gmdCol};font-weight:bold;">${gmdProm?gmdProm+' kg/d':'—'}</td>
+      <td class="mn tg"><b>${pesoHoy?pesoHoy+' kg':'—'}</b></td>
+      <td style="font-size:10px;color:var(--t2);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${origs}</td>
     </tr>`;
-  }).join(''):'<tr><td colspan="7" class="emp">Sin animales</td></tr>';
+  }).join(''):'<tr><td colspan="6" class="emp">Sin animales activos</td></tr>';
 
-  // Por origen
+  // ─── TABLA POR ORIGEN (se mantiene) ───────────────
   const omap={};
   act.forEach(a=>{
     const k=(a.origen||'SIN ORIGEN')+'|'+a.categoria;
     if(!omap[k]) omap[k]={ori:a.origen||'—',cat:a.categoria,n:0,es:0};
     omap[k].n++; omap[k].es+=calcEst(a);
   });
-  const gmdO={}, seenO={};
+  const gmdO={},seenO={};
   pesajes.forEach(p=>{
     if(seenO[p.ide])return; seenO[p.ide]=true;
     const a=animales[String(p.ide)];
@@ -1962,7 +2059,7 @@ function renderInf(){
     const k=(a.origen||'SIN ORIGEN')+'|'+a.categoria;
     if(p.gmd!=null){if(!gmdO[k]){gmdO[k]={s:0,n:0};} gmdO[k].s+=p.gmd; gmdO[k].n++;}
   });
-  const vCnt={}, mCnt={};
+  const vCnt={},mCnt={};
   bajas.forEach(b=>{
     const k=(b.origenAnimal||'SIN ORIGEN')+'|'+b.categoriaAnimal;
     if(b.tipo==='VENTA') vCnt[k]=(vCnt[k]||0)+1;
@@ -1970,7 +2067,7 @@ function renderInf(){
   });
   const oRows=Object.entries(omap).sort((a,b)=>a[0].localeCompare(b[0]));
   const tb2=document.getElementById('iOrig');
-  tb2.innerHTML=oRows.length?oRows.map(([k,o])=>{
+  if(tb2) tb2.innerHTML=oRows.length?oRows.map(([k,o])=>{
     const gd=gmdO[k];
     return`<tr>
       <td style="font-size:12px;"><b>${o.ori}</b></td>
@@ -1979,9 +2076,11 @@ function renderInf(){
       <td class="mn tgo">${gd&&gd.n>0?(gd.s/gd.n).toFixed(3)+' kg/d':'—'}</td>
       <td class="mn">${o.n>0?Math.round(o.es/o.n)+' días':'—'}</td>
       <td class="mn tb">${vCnt[k]||0}</td>
-      <td class="mn tr">${mCnt[k]||0}</td>
+      <td class="mn" style="color:var(--red);">${mCnt[k]||0}</td>
     </tr>`;
-  }).join(''):'<tr><td colspan="7" class="emp">—</td></tr>';
+  }).join(''):'<tr><td colspan="7" class="emp">Sin datos</td></tr>';
+
+  renderInformes();
 }
 
 function exportInforme(){
@@ -2093,13 +2192,27 @@ function renderInformes(){
     ms.forEach(function(m){var o=document.createElement('option');o.value=m;o.textContent=m;sel.appendChild(o);});
   }
   if(!data.length){document.getElementById('itDestino').innerHTML='<tr><td colspan="8" class="emp">Sin datos de venta</td></tr>';return;}
-  var totC=data.length,totKg=0,totBsV=0,totBsC=0,sG=0,nG=0,sD=0,nD=0,sBd=0,nBd=0,sMk=0,nMk=0;
+  // Totales de cabezas/kg/Bs desde ventas[] para exactitud (bajas puede no tener todos los animales individuales)
+  var _p=document.getElementById('ifPeriodo')?document.getElementById('ifPeriodo').value:'';
+  var _mc=document.getElementById('ifMercado')?document.getElementById('ifMercado').value:'';
+  var totC=0,totKg=0,totBsV=0;
+  ventas.filter(function(v){
+    if(_p&&v.fecha.substring(0,7)!==_p)return false;
+    if(_mc&&(v.mercado||'')!==_mc)return false;
+    return true;
+  }).forEach(function(v){
+    totC+=(v.cabezasRegistradas||v.cabezas||0);
+    totKg+=(v.kgTotal||v.kgNeto||0);
+    totBsV+=(v.totalCobrar||v.precioBruto||0);
+  });
+  var totBsC=0,sG=0,nG=0,sD=0,nD=0,sBd=0,nBd=0,sMk=0,nMk=0;
   var byD={},byO={},byTC={};
   data.forEach(function(b){
     var s=calcStat(b);var a=s.a,v=s.v;
-    totKg+=b.pesoVenta||0;totBsV+=b.precioVenta||0;totBsC+=a.precioCompra||0;
+    totBsC+=a.precioCompra||0;
     if(s.gmd!=null){sG+=s.gmd;nG++;}
-    if(s.dias>0){sD+=s.dias;nD++;}
+    // Solo incluir días en el promedio si están en rango razonable (30-550 días)
+    if(s.dias>=30&&s.dias<=550){sD+=s.dias;nD++;}
     if(s.bd!=null){sBd+=s.bd;nBd++;}
     if(s.mk!=null){sMk+=s.mk;nMk++;}
     var dest=v.frigorifico||b.destino||v.destino||'?';
@@ -2120,7 +2233,7 @@ function renderInformes(){
   });
   function sv(id,val,col){var el=document.getElementById(id);if(el){el.textContent=val;if(col)el.style.color=col;}}
   sv('vrCab',totC.toLocaleString('es-BO'));
-  sv('vrKg',(totKg/1000).toFixed(1)+' t');
+  sv('vrKg',fmt(totKg)+' kg');
   sv('vrBs','Bs '+fmt(totBsV));
   var gan=totBsV-totBsC;
   sv('vrGan',(gan>=0?'+':'')+'Bs '+fmt(gan),gan>=0?'var(--gr)':'var(--red)');
@@ -2812,20 +2925,86 @@ function verDetalleGrupo(grupo){
   const hoy=new Date();
   const lp=window._lastPes||{};
   const animGrupo=Object.values(animales).filter(a=>a.estado==='ACTIVO'&&a.grupo===grupo);
-  document.getElementById('dGrupoDetalleTit').textContent='🐄 Grupo: '+grupo+' ('+animGrupo.length+' animales)';
-  const cats={};animGrupo.forEach(a=>{const k=(a.tipo||'?')+' · '+(a.categoria||'?');cats[k]=(cats[k]||0)+1;});
-  document.getElementById('dGrupoDetalleCats').innerHTML='<strong>Composición:</strong> '+Object.entries(cats).map(([k,n])=>k+': <b>'+n+'</b>').join(' | ');
+  document.getElementById('dGrupoDetalleTit').textContent='🐄 Grupo: '+(GRUS[grupo]||grupo)+' — '+animGrupo.length+' animales activos';
+
+  // Sub-resumen por origen (O5)
+  const porOrigen={};
+  animGrupo.forEach(a=>{
+    const o=a.origen||'SIN ORIGEN';
+    if(!porOrigen[o]) porOrigen[o]={n:0,sumGmd:0,nGmd:0,sumPeso:0,nPeso:0,sumPesoProy:0};
+    porOrigen[o].n++;
+    const lpa=lp[a.ide];
+    if(lpa&&lpa.gmd!=null){
+      porOrigen[o].sumGmd+=lpa.gmd; porOrigen[o].nGmd++;
+      porOrigen[o].sumPeso+=(lpa.peso||0); porOrigen[o].nPeso++;
+      const dsd=Math.max(0,Math.round((hoy-new Date(lpa.fecha+'T12:00:00'))/86400000));
+      porOrigen[o].sumPesoProy+=Math.round((lpa.peso+lpa.gmd*dsd)*10)/10;
+    }
+  });
+
+  const oriResumen=Object.entries(porOrigen).sort((a,b)=>b[1].n-a[1].n).map(([ori,d])=>{
+    const gmd=d.nGmd>0?(d.sumGmd/d.nGmd).toFixed(3):null;
+    const peso=d.nPeso>0?Math.round(d.sumPeso/d.nPeso):null;
+    const pHoy=d.nGmd>0?Math.round(d.sumPesoProy/d.nGmd):null;
+    const gCol=gmd!=null?(parseFloat(gmd)>=0.8?'var(--green)':parseFloat(gmd)>=0.5?'var(--gold)':'var(--red)'):'var(--t2)';
+    return`<tr>
+      <td style="font-size:12px;"><b>${ori}</b></td>
+      <td class="mn tg">${d.n}</td>
+      <td class="mn">${peso?peso+' kg':'—'}</td>
+      <td class="mn" style="color:${gCol};font-weight:bold;">${gmd?gmd+' kg/d':'—'}</td>
+      <td class="mn tg"><b>${pHoy?pHoy+' kg':'—'}</b></td>
+      <td><button class="btn bs btn-sm" style="font-size:11px;" onclick="filtQuickGrupoOrigen('${grupo}','${ori}')">Ver</button></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('dGrupoDetalleCats').innerHTML=
+    '<table style="width:100%;border-collapse:collapse;margin-bottom:8px;">'
+    +'<thead><tr style="font-size:11px;color:var(--t2);">'
+    +'<th style="text-align:left;padding:4px;">Origen</th><th>Cabezas</th><th>Peso Últ.Pes.</th><th>GMD Prom.</th><th>Peso Hoy (proy.)</th><th></th>'
+    +'</tr></thead><tbody>'+oriResumen+'</tbody></table>';
+
+  // Tabla detalle de animales
   const tb=document.getElementById('dGrupoDetalleBody');
   if(!animGrupo.length){tb.innerHTML='<tr><td colspan="8" class="emp">Sin animales</td></tr>';document.getElementById('dGrupoDetalle').style.display='';return;}
-  tb.innerHTML=animGrupo.sort((a,b)=>String(a.ide).localeCompare(String(b.ide))).map(a=>{
+  tb.innerHTML=animGrupo.sort((a,b)=>(a.origen||'').localeCompare(b.origen||'')||String(a.ide).localeCompare(String(b.ide))).map(a=>{
     const lpa=lp[a.ide];const gmd=lpa?.gmd;
     let pp=a.pesoIngreso||0;
     if(lpa&&gmd!=null){const dias=Math.max(0,Math.round((hoy-new Date(lpa.fecha+'T12:00:00'))/86400000));pp=Math.round((lpa.peso+gmd*dias)*10)/10;}
-    return`<tr><td class="mn tg" style="font-size:11px;cursor:pointer;" onclick="editarAnimal('${a.ide}')">${a.ide}</td><td style="font-size:11px;">${a.tipo||'—'}</td><td style="font-size:11px;">${a.categoria||'—'}</td><td style="font-size:11px;">${a.origen||'—'}</td><td class="mn">${a.pesoIngreso||'—'} kg</td><td class="mn" style="font-size:11px;">${lpa?lpa.fecha+' ('+lpa.peso+' kg)':'Sin pesaje'}</td><td class="mn">${gmd!=null?(gmd>=0?'+':'')+Number(gmd).toFixed(3):'—'}</td><td class="mn tg"><b>${pp} kg</b></td></tr>`;
+    const gCol=gmd!=null?(gmd>=0.8?'var(--green)':gmd>=0.5?'var(--gold)':'var(--red)'):'var(--t2)';
+    return`<tr>
+      <td class="mn tg" style="font-size:11px;cursor:pointer;" onclick="editarAnimal('${a.ide}')">${a.ide}</td>
+      <td style="font-size:11px;">${a.tipo||'—'}</td>
+      <td style="font-size:11px;">${a.categoria||'—'}</td>
+      <td style="font-size:11px;">${a.origen||'—'}</td>
+      <td class="mn">${a.pesoIngreso||'—'} kg</td>
+      <td class="mn" style="font-size:11px;">${lpa?fmtFecha(lpa.fecha)+' ('+lpa.peso+' kg)':'Sin pesaje'}</td>
+      <td class="mn" style="color:${gCol};font-weight:bold;">${gmd!=null?(gmd>=0?'+':'')+Number(gmd).toFixed(3)+' kg/d':'—'}</td>
+      <td class="mn tg"><b>${pp} kg</b></td>
+    </tr>`;
   }).join('');
   document.getElementById('dGrupoDetalle').style.display='';
   document.getElementById('dGrupoDetalle').scrollIntoView({behavior:'smooth'});
 }
+
+function filtQuickGrupo(){
+  const tit=document.getElementById('dGrupoDetalleTit').textContent;
+  const grupo=tit.replace('🐄 Grupo: ','').split(' — ')[0].trim();
+  // Encontrar la key real del grupo
+  const gKey=Object.keys(GRUS).find(k=>GRUS[k]===grupo)||grupo;
+  document.getElementById('dGrupoDetalle').style.display='none';
+  showPg('animales');
+  document.getElementById('fGrupo').value=gKey;
+  filtA();
+}
+function filtQuickGrupoOrigen(grupo, origen){
+  document.getElementById('dGrupoDetalle').style.display='none';
+  showPg('animales');
+  document.getElementById('fGrupo').value=grupo;
+  const fBus=document.getElementById('fBus');
+  if(fBus) fBus.value=origen==='SIN ORIGEN'?'':origen;
+  filtA();
+}
+
 
 function verNoVinieron(){
   const hoy=new Date();
