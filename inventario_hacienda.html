@@ -857,6 +857,7 @@ window.onload = async () => {
   ntf('Cargando datos...', false, 0);
   await loadAll();
   ntf('');
+  window._dataLoaded = true;
   poblarFOrigen();
   renderDash();
   renderA();
@@ -2164,7 +2165,7 @@ function renderB(){
 
 // ═══════════ INFORMES ═══════════
 function renderInf(){
-  if(!window._lastPes){setTimeout(renderInf,300);return;} // Esperar que carguen los datos
+  if(!window._dataLoaded){setTimeout(renderInf,400);return;} // Esperar que carguen todos los datos
   const hoy=new Date();
   const lp=window._lastPes||{};
   const act=Object.values(animales).filter(a=>a.estado==='ACTIVO');
@@ -2239,7 +2240,7 @@ function renderInf(){
     </tr>`;
   }).join(''):'<tr><td colspan="7" class="emp">Sin datos</td></tr>';
 
-  renderInformes();
+  // renderInformes() se llama solo desde la pestaña Ventas
 }
 
 function exportInforme(){
@@ -2999,6 +3000,7 @@ function editarAnimal(ide){
   const ca=document.getElementById('eaCambioIDEArrow');if(ca)ca.textContent='▼';
   document.getElementById('eaTipo').value=a.tipo||'';
   document.getElementById('eaCat').value=a.categoria||'';
+  updGruposSel('eaCat','eaGrupo'); // Poblar opciones de grupo según categoría
   document.getElementById('eaGrupo').value=a.grupo||'';
   document.getElementById('eaIda').value=a.ida||'';
   document.getElementById('eaOrigen').value=a.origen||'';
