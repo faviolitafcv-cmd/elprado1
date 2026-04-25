@@ -2336,6 +2336,8 @@ function renderV(){
   const selV=document.getElementById('vfVenta');
   if(selV){selV.innerHTML='<option value="">Todas las ventas</option>'+ventas.map(v=>`<option value="${v.id}">${v.codigo} — ${v.frigorifico||v.destino||''} (${v.fecha})</option>`).join('');}
   renderVAnimales();
+  // Actualizar tarjetas resumen
+  if(typeof renderInformes==='function') renderInformes();
 }
 
 function renderVAnimales(){
