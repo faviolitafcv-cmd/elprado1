@@ -208,7 +208,7 @@ tr:hover td{background:rgba(109,186,58,.04);}
   <div class="card">
     <div class="ch"><div class="ct">📊 Inventario por Grupo</div></div>
     <div class="tw"><table>
-      <thead><tr><th>Tipo</th><th>Categoría</th><th>Grupo</th><th>Cabezas</th><th>Peso Ing. Prom.</th><th>Ult. GMD Prom.</th><th>Orígenes</th></tr></thead>
+      <thead><tr><th>Grupo</th><th>Cabezas</th><th>Peso Últ. Pesaje</th><th>GMD Prom.</th><th style="color:var(--green);">⚖️ Peso Hoy</th><th>Orígenes</th></tr></thead>
       <tbody id="dGrupos"><tr><td colspan="6"><div class="ldr"><div class="ls"></div></div></td></tr></tbody>
     </table></div>
   </div>
@@ -896,49 +896,51 @@ function renderDash(){
   document.getElementById('dCV').textContent  = act.filter(esCriaVaq).length;
   document.getElementById('dCT').textContent  = act.filter(esCriaTor).length;
 
-  // Build groups summary
-  const gmap = {};
+  // TABLA GRUPOS: solo grupo sin repetir, con GMD real y peso proyectado
+  const hoy_d=new Date();
+  const lp_d=window._lastPes||{};
+  const gmap={};
   act.forEach(a=>{
-    const k = a.tipo+'|'+a.categoria+'|'+a.grupo;
-    if(!gmap[k]) gmap[k]={tipo:a.tipo,cat:a.categoria,grupo:a.grupo,n:0,ps:0,orig:new Set()};
-    gmap[k].n++; gmap[k].ps+=a.pesoIngreso||0;
-    if(a.origen) gmap[k].orig.add(a.origen);
+    const g=a.grupo||'SIN GRUPO';
+    if(!gmap[g])gmap[g]={grupo:g,n:0,origenes:new Set(),sumGmd:0,nGmd:0,sumPeso:0,nPeso:0,sumPesoProy:0};
+    gmap[g].n++;
+    if(a.origen)gmap[g].origenes.add(a.origen);
+    const lpa=lp_d[a.ide];
+    if(lpa&&a.pesoIngreso&&a.fechaIngreso&&lpa.peso&&lpa.fecha){
+      let fi=parseFecha(a.fechaIngreso);
+      if(fi){
+        if(new Date(fi+'T12:00:00')>=new Date(lpa.fecha+'T12:00:00')){
+          const p=fi.split('-');if(p.length===3){const sw=p[0]+'-'+p[2]+'-'+p[1];if(new Date(sw+'T12:00:00')<new Date(lpa.fecha+'T12:00:00'))fi=sw;}
+        }
+        const dias=Math.round((new Date(lpa.fecha+'T12:00:00')-new Date(fi+'T12:00:00'))/86400000);
+        if(dias>0){
+          const gmdR=Math.round((lpa.peso-a.pesoIngreso)/dias*1000)/1000;
+          gmap[g].sumGmd+=gmdR;gmap[g].nGmd++;
+          gmap[g].sumPeso+=lpa.peso;gmap[g].nPeso++;
+          const dsd=Math.max(0,Math.round((hoy_d-new Date(lpa.fecha+'T12:00:00'))/86400000));
+          gmap[g].sumPesoProy+=(lpa.peso+gmdR*dsd);
+        }
+      }
+    }
   });
-
-  // Last GMD per animal
-  const lastGmd = {};
-  pesajes.forEach(p=>{
-    if(lastGmd[p.ide]===undefined && p.gmd!=null) lastGmd[p.ide]=p.gmd;
-  });
-  const gmdG = {};
-  act.forEach(a=>{
-    const k = a.tipo+'|'+a.categoria+'|'+a.grupo;
-    const g = lastGmd[a.ide];
-    if(g!=null){ if(!gmdG[k]){gmdG[k]={s:0,n:0};} gmdG[k].s+=g; gmdG[k].n++; }
-  });
-
-  const rows = Object.values(gmap).sort((a,b)=>{
-    const co=CAT_ORD.indexOf(a.cat)-CAT_ORD.indexOf(b.cat);
-    return co||GRU_ORD.indexOf(a.grupo)-GRU_ORD.indexOf(b.grupo);
-  });
-
-  const tbody = document.getElementById('dGrupos');
-  if(!rows.length){tbody.innerHTML='<tr><td colspan="6"><div class="emp"><div class="emp-ic">🐄</div>Sin animales</div></td></tr>';return;}
-  tbody.innerHTML = rows.map(g=>{
-    const k=g.cat+'|'+g.grupo, gd=gmdG[k];
-    const gdStr = gd&&gd.n>0 ? (gd.s/gd.n).toFixed(3)+' kg/d' : '—';
-    const origStr = [...g.orig].slice(0,4).join(', ')+(g.orig.size>4?'...':'');
-    return`<tr>
-      <td style="font-size:11px;font-weight:600;color:var(--t2);">${g.tipo||'—'}</td>
-      <td><span class="bg ${CBADGE[g.cat]||''}">${g.cat||'—'}</span></td>
-      <td><strong>${GRUS[g.grupo]||g.grupo}</strong></td>
+  const rows_d=Object.values(gmap).sort((a,b)=>(GRU_ORD.indexOf(a.grupo)-GRU_ORD.indexOf(b.grupo))||a.grupo.localeCompare(b.grupo));
+  const tbody_d=document.getElementById('dGrupos');
+  if(!rows_d.length){tbody_d.innerHTML='<tr><td colspan="6"><div class="emp">Sin animales</div></td></tr>';}
+  else{tbody_d.innerHTML=rows_d.map(g=>{
+    const gmd=g.nGmd>0?(g.sumGmd/g.nGmd).toFixed(3):null;
+    const pesoU=g.nPeso>0?Math.round(g.sumPeso/g.nPeso):null;
+    const pesoH=g.nGmd>0?Math.round(g.sumPesoProy/g.nGmd):null;
+    const origStr=[...g.origenes].slice(0,4).join(', ')+(g.origenes.size>4?'...':'');
+    const gCol=gmd!=null?(parseFloat(gmd)>=0.8?'var(--green)':parseFloat(gmd)>=0.5?'var(--gold)':'var(--red)'):'var(--t2)';
+    return`<tr style="cursor:pointer;" onclick="verDetalleGrupo('${g.grupo}');showPg('informes');">
+      <td><b>${GRUS[g.grupo]||g.grupo}</b></td>
       <td class="mn tg">${g.n}</td>
-      <td class="mn">${g.n>0?(g.ps/g.n).toFixed(0)+' kg':'—'}</td>
-      <td class="mn tgo">${gdStr}</td>
-      <td style="font-size:11px;color:var(--t3);">${origStr||'—'}</td>
+      <td class="mn">${pesoU?pesoU+' kg':'—'}</td>
+      <td class="mn" style="color:${gCol};font-weight:bold;">${gmd?gmd+' kg/d':'—'}</td>
+      <td class="mn tg"><b>${pesoH?pesoH+' kg':'—'}</b></td>
+      <td style="font-size:10px;color:var(--t2);">${origStr||'—'}</td>
     </tr>`;
-  }).join('');
-
+  }).join('');}
   // Recent pesajes
   const tb2=document.getElementById('dPesajes');
   const rec=pesajes.slice(0,10);
@@ -2247,6 +2249,188 @@ function calcStat(b){
   if(gan!=null&&pesoIng&&b.pesoVenta&&b.pesoVenta>pesoIng)mk=Math.round(gan/(b.pesoVenta-pesoIng)*100)/100;
   return {a:a,v:v,dias:dias,gmd:gmd,gan:gan,bd:bd,mk:mk};
 }
+function renderIG(){
+  if(!window._dataLoaded)return;
+  const per=document.getElementById('igPeriodo')?.value||'';
+  const sel=document.getElementById('igPeriodo');
+  if(sel&&sel.options.length<=1){
+    const ms=[...new Set(bajas.filter(b=>b.tipo==='VENTA').map(b=>(b.fecha||'').substring(0,7)).filter(Boolean))].sort().reverse();
+    ms.forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=m;sel.appendChild(o);});
+  }
+  const data=bajas.filter(b=>b.tipo==='VENTA'&&(!per||(b.fecha||'').substring(0,7)===per));
+  if(!data.length){
+    ['igTablaBody','igOrigen','igDestino'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<tr><td colspan="12" class="emp">Sin datos</td></tr>';});
+    return;
+  }
+  function cig(b){
+    const a=animales[String(b.ide)]||{};
+    const pi=b.pesoIngreso||a.pesoIngreso||0;
+    const pc=b.precioCompra!=null?b.precioCompra:(a.precioCompra!=null?a.precioCompra:null);
+    const fi_raw=b.fechaIngreso||a.fechaIngreso||'';
+    let dias=0,fi=parseFecha(fi_raw);
+    if(fi&&b.fecha){
+      let d=Math.round((new Date(b.fecha+'T12:00:00')-new Date(fi+'T12:00:00'))/86400000);
+      if(d<0){const p=fi.split('-');if(p.length===3){const sw=p[0]+'-'+p[2]+'-'+p[1];const d2=Math.round((new Date(b.fecha+'T12:00:00')-new Date(sw+'T12:00:00'))/86400000);if(d2>0)d=d2;}}
+      dias=Math.max(0,d);
+    }
+    const pv=b.pesoVenta||0;
+    const kgG=dias>0&&pi>0?pv-pi:null;
+    const gmd=kgG!=null&&dias>0?Math.round(kgG/dias*1000)/1000:null;
+    const bkc=pi>0&&pc!=null?Math.round(pc/pi*100)/100:null;
+    const bkv=pv>0&&b.precioVenta?Math.round(b.precioVenta/pv*100)/100:null;
+    const gan=pc!=null&&b.precioVenta!=null?Math.round((b.precioVenta-pc)*100)/100:null;
+    const mar=gan!=null&&kgG!=null&&kgG>0?Math.round(gan/kgG*100)/100:null;
+    return{dias,gmd,bkc,bkv,gan,mar,pi,pv,
+      tipo:b.tipoAnimal||a.tipo||'',cat:b.categoriaAnimal||a.categoria||'',
+      origen:b.origenAnimal||a.origen||'—',
+      merc:(b.mercado||'—').toUpperCase(),
+      frig:b.frigorifico||(b.destino==='PRIVADO'?'PRIVADO':b.destino)||'—'};
+  }
+  // Agrupar
+  const byTC={},byTipo={},byOrig={},byMerc={},byFrig={};
+  data.forEach(b=>{
+    const m=cig(b);
+    // Por TIPO+CAT
+    const k=(m.tipo||'?')+'|'+(m.cat||'?');
+    if(!byTC[k])byTC[k]={tipo:m.tipo,cat:m.cat,n:0,sGmd:0,nGmd:0,sDias:0,nDias:0,sBkc:0,nBkc:0,sBkv:0,nBkv:0,totGan:0,nGan:0,sMar:0,nMar:0,totKgG:0};
+    const g=byTC[k]; g.n++;
+    if(m.gmd!=null){g.sGmd+=m.gmd;g.nGmd++;}
+    if(m.dias>20&&m.dias<700){g.sDias+=m.dias;g.nDias++;}
+    if(m.bkc!=null){g.sBkc+=m.bkc;g.nBkc++;}
+    if(m.bkv!=null){g.sBkv+=m.bkv;g.nBkv++;}
+    if(m.gan!=null){g.totGan+=m.gan;g.nGan++;}
+    if(m.mar!=null){g.sMar+=m.mar;g.nMar++;}
+    // Por TIPO
+    const t=m.tipo||'?';
+    if(!byTipo[t])byTipo[t]={tipo:t,n:0,totGan:0,nGan:0,sBkc:0,nBkc:0,sBkv:0,nBkv:0,sMar:0,nMar:0,sDias:0,nDias:0,sGmd:0,nGmd:0};
+    const gt=byTipo[t]; gt.n++;
+    if(m.gan!=null){gt.totGan+=m.gan;gt.nGan++;}
+    if(m.bkc!=null){gt.sBkc+=m.bkc;gt.nBkc++;}
+    if(m.bkv!=null){gt.sBkv+=m.bkv;gt.nBkv++;}
+    if(m.mar!=null){gt.sMar+=m.mar;gt.nMar++;}
+    if(m.dias>20&&m.dias<700){gt.sDias+=m.dias;gt.nDias++;}
+    if(m.gmd!=null){gt.sGmd+=m.gmd;gt.nGmd++;}
+    // Por ORIGEN
+    const o=m.origen;
+    if(!byOrig[o])byOrig[o]={o,n:0,sGmd:0,nGmd:0,sDias:0,nDias:0,sBkc:0,nBkc:0,sBkv:0,nBkv:0,totGan:0,nGan:0,sMar:0,nMar:0};
+    const go=byOrig[o]; go.n++;
+    if(m.gmd!=null){go.sGmd+=m.gmd;go.nGmd++;}
+    if(m.dias>20&&m.dias<700){go.sDias+=m.dias;go.nDias++;}
+    if(m.bkc!=null){go.sBkc+=m.bkc;go.nBkc++;}
+    if(m.bkv!=null){go.sBkv+=m.bkv;go.nBkv++;}
+    if(m.gan!=null){go.totGan+=m.gan;go.nGan++;}
+    if(m.mar!=null){go.sMar+=m.mar;go.nMar++;}
+    // Por MERCADO
+    const me=m.merc;
+    if(!byMerc[me])byMerc[me]={me,n:0,totKg:0,totBsV:0,totGan:0,nGan:0,sMar:0,nMar:0};
+    const gm=byMerc[me]; gm.n++; gm.totKg+=m.pv; gm.totBsV+=(b.precioVenta||0);
+    if(m.gan!=null){gm.totGan+=m.gan;gm.nGan++;}
+    if(m.mar!=null){gm.sMar+=m.mar;gm.nMar++;}
+    // Por FRIGORIFICO
+    const fr=m.frig+'|'+m.merc;
+    if(!byFrig[fr])byFrig[fr]={frig:m.frig,merc:m.merc,n:0,totKg:0,totBsV:0,totGan:0,nGan:0,sMar:0,nMar:0};
+    const gf=byFrig[fr]; gf.n++; gf.totKg+=m.pv; gf.totBsV+=(b.precioVenta||0);
+    if(m.gan!=null){gf.totGan+=m.gan;gf.nGan++;}
+    if(m.mar!=null){gf.sMar+=m.mar;gf.nMar++;}
+  });
+
+  // NIVEL 1
+  const cols={'INVERNADA':'var(--green)','CRIA-REPRODUCTORES':'var(--gold)'};
+  document.getElementById('igResumenTipo').innerHTML=Object.values(byTipo).map(t=>{
+    const col=cols[t.tipo]||'var(--blue)';
+    const mar=t.nMar>0?(t.sMar/t.nMar).toFixed(2):null;
+    const bkc=t.nBkc>0?(t.sBkc/t.nBkc).toFixed(2):null;
+    const bkv=t.nBkv>0?(t.sBkv/t.nBkv).toFixed(2):null;
+    const dias=t.nDias>0?Math.round(t.sDias/t.nDias):null;
+    const gmd=t.nGmd>0?(t.sGmd/t.nGmd).toFixed(3):null;
+    return`<div style="background:var(--card2);border-radius:10px;padding:14px;border-left:4px solid ${col};">
+      <div style="font-weight:800;color:${col};font-size:13px;margin-bottom:10px;">🐄 ${t.tipo} — ${t.n} cabezas</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">
+        <div><span style="color:var(--t2);">Ganancia total</span><br><b style="color:${col};">Bs ${fmt(t.totGan)}</b></div>
+        <div><span style="color:var(--t2);">Ganancia/cabeza</span><br><b>Bs ${t.nGan>0?fmt(t.totGan/t.nGan):'—'}</b></div>
+        <div><span style="color:var(--t2);">Margen Bs/kg</span><br><b style="color:${col};">${mar?'Bs '+mar:'—'}</b></div>
+        <div><span style="color:var(--t2);">GMD promedio</span><br><b>${gmd?gmd+' kg/d':'—'}</b></div>
+        <div><span style="color:var(--t2);">Bs/kg compra prom</span><br><b>${bkc?'Bs '+bkc:'—'}</b></div>
+        <div><span style="color:var(--t2);">Bs/kg venta prom</span><br><b>${bkv?'Bs '+bkv:'—'}</b></div>
+        <div><span style="color:var(--t2);">Días estadía prom</span><br><b>${dias?dias+' días':'—'}</b></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // NIVEL 2
+  const rows=Object.values(byTC).sort((a,b)=>b.totGan-a.totGan);
+  const totG=rows.reduce((s,r)=>s+r.totGan,0);
+  const medals=['🥇','🥈','🥉'];
+  document.getElementById('igTablaHead').innerHTML='<th>Tipo</th><th>Categoría</th><th>Cab.</th><th>%</th><th>GMD</th><th>Días</th><th>Bs/kg compra</th><th>Bs/kg venta</th><th style="color:var(--gold);">Margen Bs/kg</th><th>Gan./cab.</th><th style="color:var(--green);">Ganancia total</th><th>#</th>';
+  document.getElementById('igTablaBody').innerHTML=rows.map((g,i)=>{
+    const mar=g.nMar>0?(g.sMar/g.nMar).toFixed(2):null;
+    const bkc=g.nBkc>0?(g.sBkc/g.nBkc).toFixed(2):null;
+    const bkv=g.nBkv>0?(g.sBkv/g.nBkv).toFixed(2):null;
+    const dias=g.nDias>0?Math.round(g.sDias/g.nDias):null;
+    const gmd=g.nGmd>0?(g.sGmd/g.nGmd).toFixed(3):null;
+    const gc=g.nGan>0?Math.round(g.totGan/g.nGan):null;
+    const pct=totG>0?((g.totGan/totG)*100).toFixed(1):'0';
+    const mc=mar!=null?(parseFloat(mar)>30?'var(--green)':parseFloat(mar)>15?'var(--gold)':'var(--red)'):'var(--t2)';
+    return`<tr><td><b>${g.tipo}</b></td><td>${g.cat}</td><td class="mn tg">${g.n}</td>
+      <td class="mn" style="font-size:11px;color:var(--t2);">${pct}%</td>
+      <td class="mn">${gmd?gmd+' kg/d':'—'}</td><td class="mn">${dias?dias+' d':'—'}</td>
+      <td class="mn">${bkc?'Bs '+bkc:'—'}</td><td class="mn">${bkv?'Bs '+bkv:'—'}</td>
+      <td class="mn" style="color:${mc};font-weight:800;">${mar?'Bs '+mar:'—'}</td>
+      <td class="mn">${gc?'Bs '+fmt(gc):'—'}</td>
+      <td class="mn tg"><b>Bs ${fmt(g.totGan)}</b></td>
+      <td class="mn">${medals[i]||('#'+(i+1))}</td></tr>`;
+  }).join('');
+
+  // NIVEL 3
+  document.getElementById('igOrigen').innerHTML=Object.values(byOrig).sort((a,b)=>b.totGan-a.totGan).map(o=>{
+    const mar=o.nMar>0?(o.sMar/o.nMar).toFixed(2):null;
+    const bkc=o.nBkc>0?(o.sBkc/o.nBkc).toFixed(2):null;
+    const bkv=o.nBkv>0?(o.sBkv/o.nBkv).toFixed(2):null;
+    const dias=o.nDias>0?Math.round(o.sDias/o.nDias):null;
+    const gmd=o.nGmd>0?(o.sGmd/o.nGmd).toFixed(3):null;
+    const gc=o.nGan>0?Math.round(o.totGan/o.nGan):null;
+    const mc=mar!=null?(parseFloat(mar)>30?'var(--green)':parseFloat(mar)>15?'var(--gold)':'var(--red)'):'var(--t2)';
+    return`<tr><td><b>${o.o}</b></td><td class="mn tg">${o.n}</td>
+      <td class="mn">${gmd?gmd+' kg/d':'—'}</td><td class="mn">${dias?dias+' d':'—'}</td>
+      <td class="mn">${bkc?'Bs '+bkc:'—'}</td><td class="mn">${bkv?'Bs '+bkv:'—'}</td>
+      <td class="mn" style="color:${mc};font-weight:700;">${mar?'Bs '+mar:'—'}</td>
+      <td class="mn">${gc?'Bs '+fmt(gc):'—'}</td>
+      <td class="mn tg"><b>Bs ${fmt(o.totGan)}</b></td></tr>`;
+  }).join('');
+
+  // NIVEL 4
+  const totN=data.length;
+  const mcols={'EXPORTACION':'var(--green)','NACIONAL':'var(--blue)'};
+  document.getElementById('igMercado').innerHTML=Object.values(byMerc).map(m=>{
+    const bkv=m.totKg>0?Math.round(m.totBsV/m.totKg*100)/100:null;
+    const mar=m.nMar>0?(m.sMar/m.nMar).toFixed(2):null;
+    const col=mcols[m.me]||'var(--t2)';
+    const pct=totN>0?((m.n/totN)*100).toFixed(1):'0';
+    return`<div style="background:var(--card2);border-radius:10px;padding:14px;border-left:4px solid ${col};">
+      <div style="font-weight:800;color:${col};margin-bottom:8px;">${m.me==='EXPORTACION'?'🌍':'🏠'} ${m.me} — ${m.n} cab. (${pct}%)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;">
+        <div><span style="color:var(--t2);">Bs/kg venta prom</span><br><b style="color:${col};">${bkv?'Bs '+bkv:'—'}</b></div>
+        <div><span style="color:var(--t2);">Margen Bs/kg</span><br><b>${mar?'Bs '+mar:'—'}</b></div>
+        <div><span style="color:var(--t2);">Ganancia total</span><br><b>Bs ${fmt(m.totGan)}</b></div>
+        <div><span style="color:var(--t2);">Gan./cabeza</span><br><b>Bs ${m.nGan>0?fmt(m.totGan/m.nGan):'—'}</b></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // NIVEL 5
+  document.getElementById('igDestino').innerHTML=Object.values(byFrig).sort((a,b)=>b.totGan-a.totGan).map(d=>{
+    const bkv=d.totKg>0?Math.round(d.totBsV/d.totKg*100)/100:null;
+    const mar=d.nMar>0?(d.sMar/d.nMar).toFixed(2):null;
+    const mc=mar!=null?(parseFloat(mar)>30?'var(--green)':parseFloat(mar)>15?'var(--gold)':'var(--red)'):'var(--t2)';
+    return`<tr><td><b>${d.frig}</b></td><td style="font-size:11px;color:var(--t2);">${d.merc}</td>
+      <td class="mn tg">${d.n}</td>
+      <td class="mn">${bkv?'Bs '+bkv:'—'}</td>
+      <td class="mn" style="color:${mc};font-weight:700;">${mar?'Bs '+mar:'—'}</td>
+      <td class="mn tg"><b>Bs ${fmt(d.totGan)}</b></td></tr>`;
+  }).join('');
+}
+
+
 function renderInformes(){
   var data=getVentasData();
   var sel=document.getElementById('ifPeriodo');
