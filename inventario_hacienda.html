@@ -500,6 +500,66 @@ tr:hover td{background:rgba(109,186,58,.04);}
       </table>
     </div>
   </div>
+
+  <!-- ═══════════ INFORMES GERENCIALES ═══════════ -->
+  <div class="card" style="margin-top:16px;">
+    <div class="ch">
+      <div class="ct">📊 Análisis de Rentabilidad — Ventas</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select id="igPeriodo" onchange="renderIG()" style="font-size:11px;">
+          <option value="">Todos los períodos</option>
+        </select>
+        <button class="btn bs btn-sm" onclick="renderIG()">🔄 Actualizar</button>
+      </div>
+    </div>
+
+    <!-- NIVEL 1: Resumen Ejecutivo INVERNADA vs CRÍA -->
+    <div style="padding:12px 14px 0;">
+      <div style="font-size:12px;font-weight:700;color:var(--gold);margin-bottom:8px;">NIVEL 1 — RESUMEN EJECUTIVO POR TIPO</div>
+      <div id="igResumenTipo" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-bottom:16px;"></div>
+    </div>
+
+    <!-- NIVEL 2: Tabla Maestra de Rentabilidad -->
+    <div style="padding:0 14px 12px;">
+      <div style="font-size:12px;font-weight:700;color:var(--gold);margin-bottom:8px;">NIVEL 2 — TABLA MAESTRA DE RENTABILIDAD</div>
+      <p style="font-size:11px;color:var(--t2);margin-bottom:8px;">Click en cualquier columna para ordenar. Click en una fila para ver el detalle.</p>
+      <div class="tw"><table id="igTabla">
+        <thead><tr id="igTablaHead"></tr></thead>
+        <tbody id="igTablaBody"></tbody>
+      </table></div>
+    </div>
+
+    <!-- NIVEL 3: Análisis por Origen -->
+    <div style="padding:0 14px 12px;">
+      <div style="font-size:12px;font-weight:700;color:var(--gold);margin-bottom:8px;">NIVEL 3 — RENTABILIDAD POR ORIGEN (¿Dónde conviene comprar?)</div>
+      <div class="tw"><table>
+        <thead><tr>
+          <th>Origen</th><th>Cab.</th><th>GMD prom</th><th>Días prom</th>
+          <th>Bs/kg compra</th><th>Bs/kg venta</th><th>Margen Bs/kg</th>
+          <th>Ganancia/cab</th><th>Ganancia total</th>
+        </tr></thead>
+        <tbody id="igOrigen"></tbody>
+      </table></div>
+    </div>
+
+    <!-- NIVEL 4: Exportación vs Nacional -->
+    <div style="padding:0 14px 12px;">
+      <div style="font-size:12px;font-weight:700;color:var(--gold);margin-bottom:8px;">NIVEL 4 — MERCADO: EXPORTACIÓN vs NACIONAL</div>
+      <div id="igMercado" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-bottom:8px;"></div>
+    </div>
+
+    <!-- NIVEL 5: Por Destino/Frigorífico -->
+    <div style="padding:0 14px 16px;">
+      <div style="font-size:12px;font-weight:700;color:var(--gold);margin-bottom:8px;">NIVEL 5 — RENTABILIDAD POR DESTINO (¿Quién paga mejor?)</div>
+      <div class="tw"><table>
+        <thead><tr>
+          <th>Destino</th><th>Mercado</th><th>Cab.</th>
+          <th>Bs/kg venta</th><th>Margen Bs/kg</th><th>Ganancia total</th>
+        </tr></thead>
+        <tbody id="igDestino"></tbody>
+      </table></div>
+    </div>
+  </div>
 </div>
 
 <!-- ══════════════════════════ MODALES ══════════════════════════ -->
@@ -930,7 +990,7 @@ function showPg(id){
   if(id==='animales')  renderA();
   if(id==='pesajes')   renderP();
   if(id==='bajas')     renderB();
-  if(id==='informes')  renderInf();
+  if(id==='informes'){renderInf();renderIG();}
   if(id==='ventas')    renderV();
   if(id==='compras')   renderCo();
 }
@@ -2356,6 +2416,256 @@ function calcStat(b){
   if(gan!=null&&pesoIng&&b.pesoVenta&&b.pesoVenta>pesoIng)mk=Math.round(gan/(b.pesoVenta-pesoIng)*100)/100;
   return {a:a,v:v,dias:dias,gmd:gmd,gan:gan,bd:bd,mk:mk};
 }
+// ═══════════════════════════════════════════════════════
+// INFORMES GERENCIALES — renderIG()
+// Analiza bajas[] con todos los datos para 5 niveles
+// ═══════════════════════════════════════════════════════
+function renderIG(){
+  const per=document.getElementById('igPeriodo')?.value||'';
+  // Poblar selector de período
+  const sel=document.getElementById('igPeriodo');
+  if(sel&&sel.options.length<=1){
+    const meses=[...new Set(bajas.filter(b=>b.tipo==='VENTA').map(b=>(b.fecha||'').substring(0,7)).filter(Boolean))].sort().reverse();
+    meses.forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=m;sel.appendChild(o);});
+  }
+
+  // Filtrar bajas de venta
+  const data=bajas.filter(b=>{
+    if(b.tipo!=='VENTA')return false;
+    if(per&&(b.fecha||'').substring(0,7)!==per)return false;
+    return true;
+  });
+  if(!data.length){
+    document.getElementById('igTablaBody').innerHTML='<tr><td colspan="12" class="emp">Sin datos de venta</td></tr>';
+    return;
+  }
+
+  // Calcular métricas por animal
+  function calcIG(b){
+    const a=animales[String(b.ide)]||{};
+    const pesoIng=b.pesoIngreso||a.pesoIngreso||0;
+    const precComp=b.precioCompra!=null?b.precioCompra:(a.precioCompra!=null?a.precioCompra:null);
+    const fechaIng=b.fechaIngreso||a.fechaIngreso||'';
+    let dias=0;
+    if(fechaIng&&b.fecha){
+      let fi=parseFecha(fechaIng);
+      if(fi){
+        const dTest=Math.round((new Date(b.fecha+'T12:00:00')-new Date(fi+'T12:00:00'))/86400000);
+        if(dTest<0){const p=fi.split('-');if(p.length===3){const sw=p[0]+'-'+p[2]+'-'+p[1];const d2=Math.round((new Date(b.fecha+'T12:00:00')-new Date(sw+'T12:00:00'))/86400000);if(d2>0)fi=sw;}}
+        dias=Math.max(0,Math.round((new Date(b.fecha+'T12:00:00')-new Date(fi+'T12:00:00'))/86400000));
+      }
+    }
+    const kgGanado=dias>0&&pesoIng?(b.pesoVenta||0)-pesoIng:null;
+    const gmd=kgGanado!=null&&dias>0?Math.round(kgGanado/dias*1000)/1000:null;
+    const bsKgComp=pesoIng>0&&precComp!=null?Math.round(precComp/pesoIng*100)/100:null;
+    const bsKgVent=(b.pesoVenta||0)>0&&b.precioVenta?Math.round(b.precioVenta/(b.pesoVenta)*100)/100:null;
+    const ganancia=precComp!=null&&b.precioVenta!=null?Math.round((b.precioVenta-precComp)*100)/100:null;
+    const margen=ganancia!=null&&kgGanado>0?Math.round(ganancia/kgGanado*100)/100:null;
+    return{dias,gmd,bsKgComp,bsKgVent,ganancia,margen,
+      tipo:b.tipoAnimal||a.tipo||'',
+      cat:b.categoriaAnimal||a.categoria||'',
+      origen:b.origenAnimal||a.origen||'—',
+      mercado:b.mercado||'—',
+      frigorifico:b.frigorifico||b.destino||'—',
+      pesoIng,pesoVenta:b.pesoVenta||0,precComp};
+  }
+
+  // Agrupar por TIPO+CATEGORÍA para tabla maestra
+  const byTC={};
+  data.forEach(b=>{
+    const m=calcIG(b);
+    const tipo=m.tipo||'SIN TIPO';
+    const cat=m.cat||'SIN CAT';
+    const k=tipo+'|'+cat;
+    if(!byTC[k])byTC[k]={tipo,cat,n:0,
+      sGmd:0,nGmd:0,sDias:0,nDias:0,
+      sBsKgC:0,nBsKgC:0,sBsKgV:0,nBsKgV:0,
+      sGan:0,nGan:0,sMar:0,nMar:0,
+      totGan:0,totKgGan:0};
+    byTC[k].n++;
+    if(m.gmd!=null){byTC[k].sGmd+=m.gmd;byTC[k].nGmd++;}
+    if(m.dias>30&&m.dias<600){byTC[k].sDias+=m.dias;byTC[k].nDias++;}
+    if(m.bsKgComp!=null){byTC[k].sBsKgC+=m.bsKgComp;byTC[k].nBsKgC++;}
+    if(m.bsKgVent!=null){byTC[k].sBsKgV+=m.bsKgVent;byTC[k].nBsKgV++;}
+    if(m.ganancia!=null){byTC[k].totGan+=m.ganancia;byTC[k].sGan+=m.ganancia;byTC[k].nGan++;}
+    if(m.margen!=null){byTC[k].sMar+=m.margen;byTC[k].nMar++;}
+    if(m.gmd!=null&&m.dias>0)byTC[k].totKgGan+=(m.gmd*m.dias);
+  });
+
+  // Nivel 1: Resumen por TIPO
+  const byTipo={};
+  Object.values(byTC).forEach(g=>{
+    const t=g.tipo;
+    if(!byTipo[t])byTipo[t]={tipo:t,n:0,totGan:0,nGan:0,totKgGan:0,
+      sMar:0,nMar:0,sBsKgC:0,nBsKgC:0,sBsKgV:0,nBsKgV:0,sDias:0,nDias:0,sGmd:0,nGmd:0};
+    byTipo[t].n+=g.n;
+    byTipo[t].totGan+=g.totGan;
+    byTipo[t].totKgGan+=g.totKgGan;
+    byTipo[t].nGan+=g.nGan;
+    byTipo[t].sMar+=g.sMar;byTipo[t].nMar+=g.nMar;
+    byTipo[t].sBsKgC+=g.sBsKgC;byTipo[t].nBsKgC+=g.nBsKgC;
+    byTipo[t].sBsKgV+=g.sBsKgV;byTipo[t].nBsKgV+=g.nBsKgV;
+    byTipo[t].sDias+=g.sDias;byTipo[t].nDias+=g.nDias;
+    byTipo[t].sGmd+=g.sGmd;byTipo[t].nGmd+=g.nGmd;
+  });
+  const colores={'INVERNADA':'var(--green)','CRIA-REPRODUCTORES':'var(--gold)'};
+  document.getElementById('igResumenTipo').innerHTML=Object.values(byTipo).map(t=>{
+    const mar=t.nMar>0?(t.sMar/t.nMar).toFixed(2):null;
+    const bsKgC=t.nBsKgC>0?(t.sBsKgC/t.nBsKgC).toFixed(2):null;
+    const bsKgV=t.nBsKgV>0?(t.sBsKgV/t.nBsKgV).toFixed(2):null;
+    const dias=t.nDias>0?Math.round(t.sDias/t.nDias):null;
+    const gmd=t.nGmd>0?(t.sGmd/t.nGmd).toFixed(3):null;
+    const col=colores[t.tipo]||'var(--blue)';
+    return`<div style="background:var(--card2);border-radius:10px;padding:16px;border-left:4px solid ${col};">
+      <div style="font-size:14px;font-weight:800;color:${col};margin-bottom:12px;">🐄 ${t.tipo}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">
+        <div><span style="color:var(--t2);">Cabezas vendidas</span><br><b style="font-size:16px;">${t.n}</b></div>
+        <div><span style="color:var(--t2);">Ganancia total</span><br><b style="color:${col};font-size:15px;">Bs ${fmt(t.totGan)}</b></div>
+        <div><span style="color:var(--t2);">Ganancia/cabeza</span><br><b>Bs ${t.nGan>0?fmt(t.totGan/t.nGan):'—'}</b></div>
+        <div><span style="color:var(--t2);">Margen Bs/kg</span><br><b style="color:${col};">${mar?'Bs '+mar:'—'}</b></div>
+        <div><span style="color:var(--t2);">Bs/kg compra prom</span><br><b>${bsKgC?'Bs '+bsKgC:'—'}</b></div>
+        <div><span style="color:var(--t2);">Bs/kg venta prom</span><br><b>${bsKgV?'Bs '+bsKgV:'—'}</b></div>
+        <div><span style="color:var(--t2);">GMD promedio</span><br><b>${gmd?gmd+' kg/d':'—'}</b></div>
+        <div><span style="color:var(--t2);">Estadía promedio</span><br><b>${dias?dias+' días':'—'}</b></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Nivel 2: Tabla maestra por TIPO+CATEGORÍA
+  const rows=Object.values(byTC).sort((a,b)=>b.totGan-a.totGan);
+  const totGanTotal=rows.reduce((s,r)=>s+r.totGan,0);
+  document.getElementById('igTablaHead').innerHTML=`
+    <th>Tipo</th><th>Categoría</th><th>Cab.</th><th>%</th>
+    <th>GMD prom</th><th>Días prom</th>
+    <th>Bs/kg compra</th><th>Bs/kg venta</th>
+    <th style="color:var(--gold);">Margen Bs/kg</th>
+    <th>Ganancia/cab</th>
+    <th style="color:var(--green);">Ganancia total</th>
+    <th>Ranking</th>`;
+  document.getElementById('igTablaBody').innerHTML=rows.map((g,i)=>{
+    const mar=g.nMar>0?(g.sMar/g.nMar).toFixed(2):null;
+    const bkc=g.nBsKgC>0?(g.sBsKgC/g.nBsKgC).toFixed(2):null;
+    const bkv=g.nBsKgV>0?(g.sBsKgV/g.nBsKgV).toFixed(2):null;
+    const dias=g.nDias>0?Math.round(g.sDias/g.nDias):null;
+    const gmd=g.nGmd>0?(g.sGmd/g.nGmd).toFixed(3):null;
+    const ganCab=g.nGan>0?Math.round(g.totGan/g.nGan):null;
+    const pct=totGanTotal>0?((g.totGan/totGanTotal)*100).toFixed(1):'0';
+    const marCol=mar!=null?(parseFloat(mar)>30?'var(--green)':parseFloat(mar)>15?'var(--gold)':'var(--red)'):'var(--t2)';
+    const medals=['🥇','🥈','🥉'];
+    return`<tr style="cursor:pointer;" title="Click para ver detalle">
+      <td style="font-size:11px;"><b>${g.tipo}</b></td>
+      <td style="font-size:11px;">${g.cat}</td>
+      <td class="mn tg">${g.n}</td>
+      <td class="mn" style="color:var(--t2);font-size:11px;">${pct}%</td>
+      <td class="mn">${gmd?gmd+' kg/d':'—'}</td>
+      <td class="mn">${dias?dias+' d':'—'}</td>
+      <td class="mn">${bkc?'Bs '+bkc:'—'}</td>
+      <td class="mn">${bkv?'Bs '+bkv:'—'}</td>
+      <td class="mn" style="color:${marCol};font-weight:800;">${mar?'Bs '+mar:'—'}</td>
+      <td class="mn">${ganCab?'Bs '+fmt(ganCab):'—'}</td>
+      <td class="mn tg"><b>Bs ${fmt(g.totGan)}</b></td>
+      <td class="mn" style="font-size:14px;">${medals[i]||'#'+(i+1)}</td>
+    </tr>`;
+  }).join('');
+
+  // Nivel 3: Por Origen
+  const byOrig={};
+  data.forEach(b=>{
+    const m=calcIG(b);
+    const o=m.origen||'—';
+    if(!byOrig[o])byOrig[o]={o,n:0,sGmd:0,nGmd:0,sDias:0,nDias:0,
+      sBkc:0,nBkc:0,sBkv:0,nBkv:0,totGan:0,nGan:0,sMar:0,nMar:0};
+    byOrig[o].n++;
+    if(m.gmd!=null){byOrig[o].sGmd+=m.gmd;byOrig[o].nGmd++;}
+    if(m.dias>30&&m.dias<600){byOrig[o].sDias+=m.dias;byOrig[o].nDias++;}
+    if(m.bsKgComp!=null){byOrig[o].sBkc+=m.bsKgComp;byOrig[o].nBkc++;}
+    if(m.bsKgVent!=null){byOrig[o].sBkv+=m.bsKgVent;byOrig[o].nBkv++;}
+    if(m.ganancia!=null){byOrig[o].totGan+=m.ganancia;byOrig[o].nGan++;}
+    if(m.margen!=null){byOrig[o].sMar+=m.margen;byOrig[o].nMar++;}
+  });
+  const origRows=Object.values(byOrig).sort((a,b)=>b.totGan-a.totGan);
+  document.getElementById('igOrigen').innerHTML=origRows.map(o=>{
+    const mar=o.nMar>0?(o.sMar/o.nMar).toFixed(2):null;
+    const bkc=o.nBkc>0?(o.sBkc/o.nBkc).toFixed(2):null;
+    const bkv=o.nBkv>0?(o.sBkv/o.nBkv).toFixed(2):null;
+    const dias=o.nDias>0?Math.round(o.sDias/o.nDias):null;
+    const gmd=o.nGmd>0?(o.sGmd/o.nGmd).toFixed(3):null;
+    const ganCab=o.nGan>0?Math.round(o.totGan/o.nGan):null;
+    const marCol=mar!=null?(parseFloat(mar)>30?'var(--green)':parseFloat(mar)>15?'var(--gold)':'var(--red)'):'var(--t2)';
+    return`<tr>
+      <td><b>${o.o}</b></td>
+      <td class="mn tg">${o.n}</td>
+      <td class="mn">${gmd?gmd+' kg/d':'—'}</td>
+      <td class="mn">${dias?dias+' d':'—'}</td>
+      <td class="mn">${bkc?'Bs '+bkc:'—'}</td>
+      <td class="mn">${bkv?'Bs '+bkv:'—'}</td>
+      <td class="mn" style="color:${marCol};font-weight:700;">${mar?'Bs '+mar:'—'}</td>
+      <td class="mn">${ganCab?'Bs '+fmt(ganCab):'—'}</td>
+      <td class="mn tg"><b>Bs ${fmt(o.totGan)}</b></td>
+    </tr>`;
+  }).join('');
+
+  // Nivel 4: Exportación vs Nacional
+  const byMerc={};
+  data.forEach(b=>{
+    const m=calcIG(b);
+    const mer=(b.mercado||'—').toUpperCase();
+    if(!byMerc[mer])byMerc[mer]={mer,n:0,totKg:0,totBsV:0,totGan:0,nGan:0,sMar:0,nMar:0};
+    byMerc[mer].n++;
+    byMerc[mer].totKg+=(b.pesoVenta||0);
+    byMerc[mer].totBsV+=(b.precioVenta||0);
+    if(m.ganancia!=null){byMerc[mer].totGan+=m.ganancia;byMerc[mer].nGan++;}
+    if(m.margen!=null){byMerc[mer].sMar+=m.margen;byMerc[mer].nMar++;}
+  });
+  const totN=data.length;
+  const mercColors={'EXPORTACION':'var(--green)','NACIONAL':'var(--blue)'};
+  document.getElementById('igMercado').innerHTML=Object.values(byMerc).map(m=>{
+    const bkv=m.totKg>0?Math.round(m.totBsV/m.totKg*100)/100:null;
+    const mar=m.nMar>0?(m.sMar/m.nMar).toFixed(2):null;
+    const col=mercColors[m.mer]||'var(--t2)';
+    const pct=totN>0?((m.n/totN)*100).toFixed(1):'0';
+    return`<div style="background:var(--card2);border-radius:10px;padding:14px;border-left:4px solid ${col};">
+      <div style="font-size:13px;font-weight:800;color:${col};margin-bottom:10px;">${m.mer==='EXPORTACION'?'🌍':'🏠'} ${m.mer}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;">
+        <div><span style="color:var(--t2);">Cabezas</span><br><b>${m.n} (${pct}%)</b></div>
+        <div><span style="color:var(--t2);">Bs/kg venta prom</span><br><b style="color:${col};">${bkv?'Bs '+bkv:'—'}</b></div>
+        <div><span style="color:var(--t2);">Ganancia total</span><br><b>Bs ${fmt(m.totGan)}</b></div>
+        <div><span style="color:var(--t2);">Margen Bs/kg</span><br><b>${mar?'Bs '+mar:'—'}</b></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Nivel 5: Por Destino/Frigorífico
+  const byDest={};
+  data.forEach(b=>{
+    const m=calcIG(b);
+    const frig=b.frigorifico||'PRIVADO';
+    const merc=(b.mercado||'—').toUpperCase();
+    const k=frig+'|'+merc;
+    if(!byDest[k])byDest[k]={frig,merc,n:0,totKg:0,totBsV:0,totGan:0,nGan:0,sMar:0,nMar:0};
+    byDest[k].n++;
+    byDest[k].totKg+=(b.pesoVenta||0);
+    byDest[k].totBsV+=(b.precioVenta||0);
+    if(m.ganancia!=null){byDest[k].totGan+=m.ganancia;byDest[k].nGan++;}
+    if(m.margen!=null){byDest[k].sMar+=m.margen;byDest[k].nMar++;}
+  });
+  const destRows=Object.values(byDest).sort((a,b)=>b.totGan-a.totGan);
+  document.getElementById('igDestino').innerHTML=destRows.map(d=>{
+    const bkv=d.totKg>0?Math.round(d.totBsV/d.totKg*100)/100:null;
+    const mar=d.nMar>0?(d.sMar/d.nMar).toFixed(2):null;
+    const marCol=mar!=null?(parseFloat(mar)>30?'var(--green)':parseFloat(mar)>15?'var(--gold)':'var(--red)'):'var(--t2)';
+    return`<tr>
+      <td><b>${d.frig}</b></td>
+      <td style="font-size:11px;color:var(--t2);">${d.merc}</td>
+      <td class="mn tg">${d.n}</td>
+      <td class="mn">${bkv?'Bs '+bkv:'—'}</td>
+      <td class="mn" style="color:${marCol};font-weight:700;">${mar?'Bs '+mar:'—'}</td>
+      <td class="mn tg"><b>Bs ${fmt(d.totGan)}</b></td>
+    </tr>`;
+  }).join('');
+}
+
+
 function renderInformes(){
   var data=getVentasData();
   var sel=document.getElementById('ifPeriodo');
