@@ -348,8 +348,9 @@ tr:hover td{background:rgba(109,186,58,.04);}
 
 <!-- ═══════ VENTAS ═══════ -->
 <div class="pg" id="pg-ventas">
-  <div class="ar">
+  <div class="ar" style="display:flex;gap:8px;flex-wrap:wrap;">
     <button class="btn bp" onclick="openV()">💰 Registrar Venta</button>
+    <button class="btn bs" onclick="exportarInformeExcel()" title="Descarga Excel con todos los animales vendidos: IDE, precio compra, precio venta, ganancia">📥 Exportar Animales Vendidos</button>
   </div>
   <!-- RESUMEN -->
   <div class="stats" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:12px;">
@@ -793,6 +794,17 @@ async function loadAll(){
     // Índice de último pesaje por animal
     window._lastPes = {};
     pesajes.forEach(p=>{ if(!window._lastPes[p.ide]||p.fecha>window._lastPes[p.ide].fecha) window._lastPes[p.ide]=p; });
+    // Calcular GMD real: (pesoÚltPesaje - pesoIngreso) / díasDesdeIngreso
+    // Esto sobreescribe cualquier gmd guardado (vacío o incorrecto) con el valor calculado real
+    Object.keys(window._lastPes).forEach(ide=>{
+      const a=animales[ide];
+      const lp=window._lastPes[ide];
+      if(!a||!a.pesoIngreso||!a.fechaIngreso||!lp.peso||!lp.fecha) return;
+      const fi=parseFecha(a.fechaIngreso);
+      if(!fi) return;
+      const dias=Math.round((new Date(lp.fecha+'T12:00:00')-new Date(fi+'T12:00:00'))/86400000);
+      if(dias>0) lp.gmd=Math.round((lp.peso-a.pesoIngreso)/dias*1000)/1000;
+    });
   } catch(e){ ntf('Error al cargar datos: '+e.message, true); }
 }
 
@@ -1180,8 +1192,16 @@ function verDet(ide){
   const baja=bajas.find(b=>String(b.ide)===String(ide));
   const est=calcEst(a);
   const lastP=pAnim[0];
-  const pesoHoy=lastP?(Math.round((lastP.peso+(lastP.gmd||0)*Math.floor((Date.now()-new Date(lastP.fecha+'T12:00:00'))/86400000))*10)/10):a.pesoIngreso;
-  const gdmAcum=lastP&&lastP.gmd!=null?Number(lastP.gmd).toFixed(3):'—';
+  // Calcular GMD real desde pesoIngreso/fechaIngreso → último pesaje
+  let gmdReal=null;
+  if(lastP&&a.pesoIngreso&&a.fechaIngreso&&lastP.peso&&lastP.fecha){
+    const _fi=parseFecha(a.fechaIngreso);
+    if(_fi){const _d=Math.round((new Date(lastP.fecha+'T12:00:00')-new Date(_fi+'T12:00:00'))/86400000);
+    if(_d>0) gmdReal=Math.round((lastP.peso-a.pesoIngreso)/_d*1000)/1000;}
+  }
+  const diasDesdeUltPes=lastP?Math.max(0,Math.floor((Date.now()-new Date(lastP.fecha+'T12:00:00'))/86400000)):0;
+  const pesoHoy=lastP&&gmdReal!=null?(Math.round((lastP.peso+gmdReal*diasDesdeUltPes)*10)/10):(lastP?lastP.peso:a.pesoIngreso);
+  const gdmAcum=gmdReal!=null?Number(gmdReal).toFixed(3):'—';
 
   let html=`<div class="dg">
     <div class="di"><div class="di-l">IDE Chip</div><div class="di-v mn tg" style="font-size:14px;font-weight:700;">${a.ide}</div></div>
