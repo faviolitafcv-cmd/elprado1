@@ -739,34 +739,13 @@ async function loadAll(){
       fbGet('ventas')
     ]);
     animales = rA || {};
-    // Normalizar categorías viejas al formato nuevo
-    const NORM_CAT = {
-      'VQ_INV':{tipo:'INVERNADA',   categoria:'VAQUILLA'},
-      'VQ_PDC':{tipo:'CRIA-REPRODUCTORES', categoria:'VAQUILLA'},
-      'TR_INV':{tipo:'INVERNADA',   categoria:'TORILLO'},
-      'TR_REP':{tipo:'CRIA-REPRODUCTORES', categoria:'TORILLO'},
-      'VC_INV':{tipo:'INVERNADA',   categoria:'VACA'}
-    };
-    const updates_norm = {};
-    Object.values(animales).forEach(a=>{
-      if(NORM_CAT[a.categoria]){
-        const norm = NORM_CAT[a.categoria];
-        if(!a.tipo || a.tipo !== norm.tipo){
-          a.tipo = norm.tipo;
-          a.categoria = norm.categoria;
-          updates_norm['animales/'+a.ide+'/tipo'] = norm.tipo;
-          updates_norm['animales/'+a.ide+'/categoria'] = norm.categoria;
-        }
-      }
-    });
-    if(Object.keys(updates_norm).length>0){
-      fbPatch('', updates_norm).catch(()=>{});
-      console.log('Normalizados '+Object.keys(updates_norm).length/2+' animales con categoría vieja');
-    }
     pesajes  = toArr(rP).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
     bajas    = toArr(rB).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
     compras  = toArr(rC).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
     ventas   = toArr(rV).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+    // Índice de último pesaje por animal
+    window._lastPes = {};
+    pesajes.forEach(p=>{ if(!window._lastPes[p.ide]||p.fecha>window._lastPes[p.ide].fecha) window._lastPes[p.ide]=p; });
   } catch(e){ ntf('Error al cargar datos: '+e.message, true); }
 }
 
