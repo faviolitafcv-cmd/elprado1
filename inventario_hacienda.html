@@ -826,16 +826,7 @@ window.onload = async () => {
     else if(_pgId==='ventas') renderV();
     else if(_pgId==='bajas') renderB();
   }
-  // Re-renderizar la pestaña activa si el usuario navegó antes de que cargaran los datos
-  const _pgActiva = document.querySelector('.pg.active');
-  if(_pgActiva && _pgActiva.id !== 'pg-dash' && _pgActiva.id !== 'pg-animales'){
-    const _pgId = _pgActiva.id.replace('pg-','');
-    if(_pgId==='informes') renderInf();
-    else if(_pgId==='ventas') renderV();
-    else if(_pgId==='bajas') renderB();
-    else if(_pgId==='pesajes') renderP();
-    else if(_pgId==='compras') renderCo();
-  }
+
 };
 
 async function loadAll(){
