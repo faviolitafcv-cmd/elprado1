@@ -2735,9 +2735,10 @@ function readVentasHist(file){
   const rd=new FileReader();
   rd.onload=function(e){
     try{
-      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:false});
       const ws=wb.Sheets[wb.SheetNames[0]];
-      const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,dateNF:'yyyy-mm-dd'});
+      // raw:true para recibir números seriales de fecha sin conversión automática
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true});
       if(rows.length<2){ntf('Archivo vacío',true);return;}
       const hdr=rows[0].map(h=>String(h||'').trim().toUpperCase());
       const ci=hdr.findIndex(h=>h==='IDE');
@@ -2762,7 +2763,26 @@ function readVentasHist(file){
         let ide=String(r[ci]).trim().replace('.0','');
         const ideN=parseFloat(ide);if(ideN>0)ide=String(Math.round(ideN));
         if(!ide||ide==='0')continue;
-        const fv=parseFecha(r[cfv]);if(!fv)continue;
+        // Convertir fecha Excel (número serial o string) a yyyy-mm-dd
+        function xlDate(v){
+          if(!v)return null;
+          if(typeof v==='number'){
+            // Serial Excel → fecha: restar 25569 días desde epoch Unix
+            const d=new Date(Math.round((v-25569)*86400000));
+            return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+          }
+          // String: puede ser dd/mm/yyyy, yyyy-mm-dd, etc.
+          const s=String(v).trim();
+          // Si tiene formato dd/mm/yyyy o dd/mm/yy
+          const p=s.split('/');
+          if(p.length===3){
+            let d=parseInt(p[0]),m=parseInt(p[1]),y=parseInt(p[2]);
+            if(y<100)y+=2000;
+            return y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+          }
+          return parseFecha(s);
+        }
+        const fv=xlDate(r[cfv]);if(!fv)continue;
         const dest=cfrig>=0&&r[cfrig]?String(r[cfrig]).trim():'';
         const td=ctd>=0&&r[ctd]?String(r[ctd]).trim():'';
         const mer=cmer>=0&&r[cmer]?String(r[cmer]).trim():'';
@@ -2774,7 +2794,7 @@ function readVentasHist(file){
         const pig=cpig>=0?parseFloat(String(r[cpig]||0).replace(',','.')):0;
         const prc=cprc>=0?parseFloat(String(r[cprc]||0).replace(',','.')):0;
         if(ctp>=0&&r[ctp])byV[vKey].tipo=String(r[ctp]).trim();
-        byV[vKey].animales.push({ide,fechaVenta:fv,fechaIngreso:cfi>=0?parseFecha(r[cfi]):'',tipo:ctp>=0&&r[ctp]?String(r[ctp]).trim():'',categoria:ccat>=0&&r[ccat]?String(r[ccat]).trim():'',grupo:cgr>=0&&r[cgr]?String(r[cgr]).trim():'',origen:cor>=0&&r[cor]?String(r[cor]).trim():'',pesoVenta:isNaN(pv)?0:pv,precioVenta:isNaN(prv)?0:prv,pesoIngreso:isNaN(pig)?0:pig,precioCompra:isNaN(prc)?0:prc,raza:crz>=0&&r[crz]?String(r[crz]).trim():''});
+        byV[vKey].animales.push({ide,fechaVenta:fv,fechaIngreso:cfi>=0?xlDate(r[cfi])||'':'',tipo:ctp>=0&&r[ctp]?String(r[ctp]).trim():'',categoria:ccat>=0&&r[ccat]?String(r[ccat]).trim():'',grupo:cgr>=0&&r[cgr]?String(r[cgr]).trim():'',origen:cor>=0&&r[cor]?String(r[cor]).trim():'',pesoVenta:isNaN(pv)?0:pv,precioVenta:isNaN(prv)?0:prv,pesoIngreso:isNaN(pig)?0:pig,precioCompra:isNaN(prc)?0:prc,raza:crz>=0&&r[crz]?String(r[crz]).trim():''});
         total++;
       }
       window._vhData=byV;
