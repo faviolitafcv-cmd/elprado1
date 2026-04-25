@@ -2814,548 +2814,94 @@ async function confirmarImportVH(){
   const data=window._vhData;if(!data)return;
   const btn=document.getElementById('btnConfVH');
   btn.disabled=true;btn.textContent='⏳ Importando...';
-  const g=calcGestion();
-  let codigoN=ventas.filter(v=>v.codigo&&v.codigo.indexOf(String(g)+'-V')===0).length;
-  const keys=Object.keys(data);
-  for(let ki=0;ki<keys.length;ki++){
-    const vObj=data[keys[ki]];codigoN++;
-    const vId='vh_'+vObj.fecha.replace(/-/g,'')+'_'+codigoN;
-    const codigo=g+'-V'+String(codigoN).padStart(3,'0');
-    const kgTot=Math.round(vObj.animales.reduce((s,a)=>s+a.pesoVenta,0)*10)/10;
-    const totalBs=Math.round(vObj.animales.reduce((s,a)=>s+a.precioVenta,0)*100)/100;
-    const precKg=kgTot>0?totalBs/kgTot:0;
-    const ventaObj={id:vId,codigo,fecha:vObj.fecha,destino:vObj.destino,frigorifico:vObj.frigorifico||null,mercado:vObj.mercado,tipoDestino:vObj.tipoDestino,tipo:vObj.tipo,municipio:'',cabezasRegistradas:vObj.animales.length,cabezasTotales:vObj.animales.length,kgTotal:kgTot,kgNeto:kgTot,totalCobrar:totalBs,precioKg:precKg,estado:'CERRADA',usuario,importado:true};
-    const updates={};updates['ventas/'+vId]=ventaObj;
-    // Índice de bajas existentes para detectar duplicados
-    const bajasIdx=new Set(bajas.map(b=>b.ide+'|'+b.fecha));
-    for(let ai=0;ai<vObj.animales.length;ai++){
-      const a=vObj.animales[ai];
-      let ideReg=a.ide;
-      const animalActual=animales[String(a.ide)];
-      if(animalActual&&animalActual.estado==='ACTIVO') ideReg=a.ide+'R';
-      // VERIFICAR DUPLICADO — si ya existe baja con mismo IDE+fecha, saltar
-      if(bajasIdx.has(ideReg+'|'+a.fechaVenta)){continue;}
-      const bid='b_'+ideReg+'_'+a.fechaVenta.replace(/-/g,'');
-      // Guardar TODOS los datos del animal en la baja para cálculos correctos
-      updates['bajas/'+bid]={
-        id:bid, ide:ideReg, tipo:'VENTA',
-        fecha:a.fechaVenta,
-        fechaIngreso:a.fechaIngreso||null,
-        pesoVenta:a.pesoVenta,
-        precioVenta:a.precioVenta,
-        pesoIngreso:a.pesoIngreso||null,
-        precioCompra:a.precioCompra||null,
-        tipoAnimal:a.tipo||null,
-        categoriaAnimal:a.categoria||null,
-        grupoAnimal:a.grupo||null,
-        origenAnimal:a.origen||null,
-        raza:a.raza||null,
-        destino:vObj.tipoDestino||'',
-        frigorifico:vObj.frigorifico||null,
-        mercado:vObj.mercado||null,
-        ventaId:vId,
-        usuario, historico:true
-      };
-      // Crear/actualizar animal solo si no está activo
-      if(!animalActual||animalActual.estado!=='ACTIVO'){
-        updates['animales/'+ideReg]={
-          ide:ideReg, tipo:a.tipo||null, categoria:a.categoria||null,
-          grupo:a.grupo||null, origen:a.origen||null,
-          fechaIngreso:a.fechaIngreso||null,
-          pesoIngreso:a.pesoIngreso||null,
-          precioCompra:a.precioCompra||null,
-          raza:a.raza||null,
-          estado:'VENDIDO', usuario, historico:true
-        };
-      }
-    }
-    const allKeys=Object.keys(updates);
-    for(let bi=0;bi<allKeys.length;bi+=30){
-      const batch={};allKeys.slice(bi,bi+30).forEach(k=>{batch[k]=updates[k];});
-      try{await fbPatch('',batch);}catch(e){console.error(e);}
-      await new Promise(r=>setTimeout(r,150));
-    }
-  }
-  const res=await Promise.all([fbGet('ventas'),fbGet('bajas')]);
-  if(res[0])ventas=Object.values(res[0]).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
-  if(res[1])bajas=Object.values(res[1]).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
-  btn.disabled=false;cerrar('moImportVH');
-  renderV();renderDash();renderA();
-  ntf('✅ '+keys.length+' ventas históricas importadas — inventario intacto');
-}
-
-// ═══ EDITAR VENTA ═══
-function editarVenta(vId){
-  const v=ventas.find(x=>x.id===vId);if(!v){ntf('Venta no encontrada',true);return;}
-  document.getElementById('evCodigo').value=v.codigo||'';
-  document.getElementById('evFecha').value=fechaParaInput(v.fecha)||'';
-  document.getElementById('evTipo').value=v.tipo||'';
-  document.getElementById('evMun').value=v.municipio||'';
-  document.getElementById('evMercado').value=v.mercado||'';
-  document.getElementById('evTipoDestino').value=v.tipoDestino||'';
-  document.getElementById('evFrigorifico').value=v.frigorifico||'';
-  document.getElementById('evDestino').value=v.destino||'';
-  document.getElementById('moEditV').dataset.vid=vId;
-  toggleEditVenta();
-  document.getElementById('moEditV').classList.add('open');
-}
-function toggleEditVenta(){
-  const td=document.getElementById('evTipoDestino')?.value||'';
-  const fw=document.getElementById('evFrigWrap');const pw=document.getElementById('evPrivWrap');
-  if(fw)fw.style.display=td==='FRIGORIFICO'?'':'none';
-  if(pw)pw.style.display=td==='PRIVADO'?'':'none';
-}
-async function guardarEditVenta(){
-  const vId=document.getElementById('moEditV').dataset.vid;
-  const v=ventas.find(x=>x.id===vId);if(!v){ntf('Error',true);return;}
-  const fecha=document.getElementById('evFecha').value;
-  const tipo=document.getElementById('evTipo').value;
-  const mun=document.getElementById('evMun').value.trim();
-  const mercado=document.getElementById('evMercado').value;
-  const td=document.getElementById('evTipoDestino').value;
-  let frig='',dest='';
-  if(td==='FRIGORIFICO'){frig=document.getElementById('evFrigorifico').value||'';dest=frig;}
-  else{dest=document.getElementById('evDestino').value.trim();}
-  const upd={};const fields={fecha,tipo,municipio:mun,mercado,tipoDestino:td,frigorifico:frig,destino:dest};
-  Object.entries(fields).forEach(([k,val])=>{upd['ventas/'+vId+'/'+k]=val;});
-  try{await fbPatch('',upd);Object.assign(v,fields);cerrar('moEditV');renderV();ntf('✅ Venta actualizada');}
-  catch(e){ntf('Error: '+e.message,true);}
-}
-
-// ═══ COMPLETAR VENTA ABIERTA ═══
-let _ventaAbiertaId=null;
-function completarVenta(vId){
-  const v=ventas.find(x=>x.id===vId);if(!v||v.estado!=='ABIERTA'){ntf('Venta no abierta',true);return;}
-  _ventaAbiertaId=vId;
-  document.getElementById('cvIde').value='';document.getElementById('cvPeso').value='';document.getElementById('cvPrecio').value='';
-  document.getElementById('cvMaxKg').textContent=v.kgFaltantes+' kg';
-  let info='<div style="font-weight:700;color:#f90;margin-bottom:6px;">'+v.codigo+' — ABIERTA</div>';
-  info+='<div>Faltantes: <strong>'+v.animalesFaltantes+' animales</strong></div>';
-  info+='<div>Kg faltantes: <strong>'+v.kgFaltantes+' kg</strong></div>';
-  info+='<div>Monto faltante: <strong>Bs '+fmt(v.bsFaltantes)+'</strong></div>';
-  if(v.idesFaltantes&&v.idesFaltantes.length)info+='<div style="margin-top:4px;">IDEs: <span style="font-family:monospace;color:#f90;">'+v.idesFaltantes.join(', ')+'</span></div>';
-  document.getElementById('moCompletarVInfo').innerHTML=info;
-  document.getElementById('moCompletarV').classList.add('open');
-}
-function calcCompletarVenta(){
-  const v=ventas.find(x=>x.id===_ventaAbiertaId);if(!v)return;
-  const peso=parseFloat(document.getElementById('cvPeso').value)||0;
-  if(peso>v.kgFaltantes+0.5){document.getElementById('cvPrecio').value='⚠️ Supera los kg faltantes';return;}
-  const precio=Math.round(peso*(v.precioKg||0)*100)/100;
-  document.getElementById('cvPrecio').value=precio>0?'Bs '+fmt(precio):'—';
-}
-async function guardarCompletarVenta(){
-  const vId=_ventaAbiertaId;const v=ventas.find(x=>x.id===vId);if(!v)return;
-  const ide=document.getElementById('cvIde').value.trim();
-  const peso=parseFloat(document.getElementById('cvPeso').value)||0;
-  if(!ide){ntf('Ingresá el IDE',true);return;}
-  if(peso<=0||peso>v.kgFaltantes+0.5){ntf('Peso inválido',true);return;}
-  if(!animales[ide]){ntf('IDE no encontrado',true);return;}
-  const precA=Math.round(peso*(v.precioKg||0)*100)/100;
-  const bid='b_'+ide+'_'+v.fecha.replace(/-/g,'');
-  const nF=v.animalesFaltantes-1;const nKg=Math.round((v.kgFaltantes-peso)*10)/10;const nBs=Math.round((v.bsFaltantes-precA)*100)/100;
-  const nuevoEst=nF<=0?'CERRADA':'ABIERTA';
-  const upd={};
-  upd['bajas/'+bid]={id:bid,ide,tipo:'VENTA',fecha:v.fecha,pesoVenta:peso,precioVenta:precA,destino:v.destino,ventaId:vId,categoriaAnimal:animales[ide]?.categoria||null,grupoAnimal:animales[ide]?.grupo||null,origenAnimal:animales[ide]?.origen||null,usuario};
-  upd['animales/'+ide+'/estado']='VENDIDO';
-  upd['ventas/'+vId+'/animalesFaltantes']=nF;upd['ventas/'+vId+'/kgFaltantes']=nKg;upd['ventas/'+vId+'/bsFaltantes']=nBs;
-  upd['ventas/'+vId+'/cabezasRegistradas']=(v.cabezasRegistradas||0)+1;upd['ventas/'+vId+'/estado']=nuevoEst;
-  try{
-    await fbPatch('',upd);
-    animales[ide].estado='VENDIDO';v.animalesFaltantes=nF;v.kgFaltantes=nKg;v.bsFaltantes=nBs;v.cabezasRegistradas=(v.cabezasRegistradas||0)+1;v.estado=nuevoEst;
-    bajas.unshift(upd['bajas/'+bid]);
-    cerrar('moCompletarV');renderV();renderDash();renderA();
-    ntf(nuevoEst==='CERRADA'?'✅ Venta cerrada':'✅ Animal agregado — faltan '+nF);
-  }catch(e){ntf('Error: '+e.message,true);}
-}
-
-function readVentaXls(file){
-  if(!file)return;
-  const rd=new FileReader();
-  rd.onload=function(e){
+  (async()=>{
     try{
-      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
-      const ws=wb.Sheets[wb.SheetNames[0]];
-      const rows=XLSX.utils.sheet_to_json(ws,{header:1});
-      if(rows.length<2){ntf('Archivo vacío',true);return;}
-      const hdr=rows[0].map(h=>String(h||'').trim().toUpperCase());
-      const ci=hdr.findIndex(h=>h==='IDE');
-      const cp=hdr.findIndex(h=>h==='PESO'||h.indexOf('PESO')===0);
-      const cr=hdr.findIndex(h=>h==='RAZA');
-      const cc=hdr.findIndex(h=>h==='CATEGORIA'||h.indexOf('CAT')===0);
-      const ccl=hdr.findIndex(h=>h==='CLASF. PESAJ'||h.indexOf('CLAS')===0);
-      if(ci<0){ntf('No se encontró columna IDE',true);return;}
-      _ventaAnimales=[];window._ventaNoEnc=[];let kgTot=0;
-      for(let i=1;i<rows.length;i++){
-        const r=rows[i];if(!r)continue;
-        let ide=r[ci];if(typeof ide==='number')ide=String(Math.round(ide));
-        ide=String(ide||'').trim().replace(/\.0$/,'');if(!ide||ide==='0')continue;
-        const peso=parseFloat(r[cp])||0;
-        const aEx=animales[ide];
-        if(!aEx){window._ventaNoEnc.push(ide);continue;}
-        if(aEx.estado==='EN VENTA'||aEx.estado==='VENDIDO'){
-          const vRef=aEx.ventaId?ventas.find(v=>v.id===aEx.ventaId):null;
-          window._ventaNoEnc.push(ide+' (ya en '+(vRef?vRef.codigo:aEx.estado)+')');continue;
+      const g=calcGestion();
+      let codigoN=0;
+      const keys=Object.keys(data);
+      let totalAnimales=0, totalSaltados=0;
+      for(let ki=0;ki<keys.length;ki++){
+        const vObj=data[keys[ki]]; codigoN++;
+        // ID determinístico basado en fecha+destino — evita duplicar si se importa 2 veces
+        const vId='vh_'+vObj.fecha.replace(/-/g,'')+'_'+(vObj.frigorifico||vObj.destino||'priv').replace(/[^a-zA-Z0-9]/g,'').substring(0,8);
+        const codigo=g+'-VH'+String(codigoN).padStart(3,'0');
+        const kgTot=Math.round(vObj.animales.reduce((s,a)=>s+(a.pesoVenta||0),0)*10)/10;
+        const totalBs=Math.round(vObj.animales.reduce((s,a)=>s+(a.precioVenta||0),0)*100)/100;
+        const precKg=kgTot>0?Math.round(totalBs/kgTot*100)/100:0;
+        const ventaObj={
+          id:vId, codigo, fecha:vObj.fecha,
+          destino:vObj.tipoDestino||vObj.destino||'',
+          frigorifico:vObj.frigorifico||null,
+          mercado:vObj.mercado||null,
+          tipoDestino:vObj.tipoDestino||null,
+          tipo:vObj.tipo||'INVERNADA',
+          cabezasRegistradas:vObj.animales.length,
+          cabezasTotales:vObj.animales.length,
+          kgTotal:kgTot, kgNeto:kgTot,
+          totalCobrar:totalBs, precioKg:precKg,
+          estado:'CERRADA', usuario, importado:true
+        };
+        const updates={};
+        updates['ventas/'+vId]=ventaObj;
+        for(let ai=0;ai<vObj.animales.length;ai++){
+          const a=vObj.animales[ai];
+          // ID determinístico de baja — evita duplicar
+          const bid='bv_'+String(a.ide)+'_'+a.fechaVenta.replace(/-/g,'');
+          updates['bajas/'+bid]={
+            id:bid, ide:String(a.ide), tipo:'VENTA',
+            fecha:a.fechaVenta,
+            fechaIngreso:a.fechaIngreso||null,
+            pesoVenta:a.pesoVenta||0,
+            precioVenta:a.precioVenta||0,
+            pesoIngreso:a.pesoIngreso||null,
+            precioCompra:a.precioCompra||null,
+            tipoAnimal:a.tipo||null,
+            categoriaAnimal:a.categoria||null,
+            grupoAnimal:a.grupo||null,
+            origenAnimal:a.origen||null,
+            raza:a.raza||null,
+            destino:vObj.tipoDestino||'',
+            frigorifico:vObj.frigorifico||null,
+            mercado:vObj.mercado||null,
+            ventaId:vId, usuario, historico:true
+          };
+          // Animal con estado VENDIDO
+          updates['animales/'+String(a.ide)]={
+            ide:String(a.ide), tipo:a.tipo||null,
+            categoria:a.categoria||null, grupo:a.grupo||null,
+            origen:a.origen||null,
+            fechaIngreso:a.fechaIngreso||null,
+            pesoIngreso:a.pesoIngreso||null,
+            precioCompra:a.precioCompra||null,
+            raza:a.raza||null,
+            estado:'VENDIDO', usuario, historico:true
+          };
+          totalAnimales++;
         }
-        _ventaAnimales.push({ide,peso,raza:cr>=0?String(r[cr]||''):'',categoria:cc>=0?String(r[cc]||''):'',clasificacion:ccl>=0?String(r[ccl]||''):''});
-        kgTot+=peso;
+        // Subir en lotes de 30
+        const allKeys=Object.keys(updates);
+        for(let bi=0;bi<allKeys.length;bi+=30){
+          const batch={};
+          allKeys.slice(bi,bi+30).forEach(k=>{batch[k]=updates[k];});
+          try{await fbPatch('',batch);}catch(e){console.error('batch error',e);}
+          await new Promise(r=>setTimeout(r,100));
+        }
+        btn.textContent='⏳ '+(ki+1)+'/'+keys.length+' ventas...';
       }
-      const pesoProm=_ventaAnimales.length>0?kgTot/_ventaAnimales.length:0;
-      let prev='<div style="margin-top:8px;padding:10px;background:rgba(109,186,58,.07);border-radius:6px;">';
-      prev+='<div style="font-weight:700;color:var(--gr);">✅ '+_ventaAnimales.length+' animales leídos</div>';
-      prev+='<div style="font-size:11px;color:var(--t3);">Kg total: <strong>'+kgTot.toFixed(1)+' kg</strong> — Peso prom: <strong>'+pesoProm.toFixed(1)+' kg</strong></div>';
-      if(window._ventaNoEnc.length>0){
-        prev+='<div style="margin-top:6px;padding:6px;background:rgba(220,50,50,.1);border:1px solid rgba(220,50,50,.3);border-radius:4px;">';
-        prev+='<div style="font-size:11px;font-weight:700;color:var(--red);">⚠️ '+window._ventaNoEnc.length+' IDEs no encontrados:</div>';
-        prev+='<div style="font-size:11px;color:var(--red);font-family:monospace;line-height:1.8;">'+window._ventaNoEnc.join('<br>')+'</div></div>';
-      }
-      prev+='</div>';
-      document.getElementById('vXlsPrev').innerHTML=prev;
-      // Actualizar kg brutos
-      const kb=document.getElementById('vKgBruto');if(kb){kb.value=kgTot.toFixed(1);calcVenta();}
-    }catch(err){ntf('Error: '+err.message,true);}
-  };
-  rd.readAsArrayBuffer(file);
-}
-
-// ═══════════ EDITAR / ELIMINAR ANIMAL ═══════════
-function calcPermanencia(fechaIngreso){
-  if(!fechaIngreso) return '—';
-  const iso=parseFecha(fechaIngreso);
-  if(!iso) return '—';
-  const hoy=new Date(), ing=new Date(iso+'T12:00:00');
-  if(isNaN(ing)) return '—';
-  let y=hoy.getFullYear()-ing.getFullYear(), m=hoy.getMonth()-ing.getMonth(), d=hoy.getDate()-ing.getDate();
-  if(d<0){m--;d+=new Date(hoy.getFullYear(),hoy.getMonth(),0).getDate();}
-  if(m<0){y--;m+=12;}
-  const parts=[];
-  if(y>0)parts.push(y+' año'+(y>1?'s':''));
-  if(m>0)parts.push(m+' mes'+(m>1?'es':''));
-  if(d>0)parts.push(d+' día'+(d>1?'s':''));
-  return parts.length?parts.join(', '):'Hoy';
-}
-
-function toggleCambioIDE(){
-  const wrap=document.getElementById('eaCambioIDEWrap');
-  const arrow=document.getElementById('eaCambioIDEArrow');
-  if(!wrap)return;
-  if(wrap.style.display==='none'){wrap.style.display='block';if(arrow)arrow.textContent='▲';}
-  else{wrap.style.display='none';if(arrow)arrow.textContent='▼';const n=document.getElementById('eaIdeNuevo');if(n)n.value='';}
-}
-
-function editarAnimal(ide){
-  const a=animales[ide];
-  if(!a){ntf('Animal no encontrado',true);return;}
-  document.getElementById('eaIde').value=ide;
-  const ni=document.getElementById('eaIdeNuevo');if(ni)ni.value='';
-  const cw=document.getElementById('eaCambioIDEWrap');if(cw)cw.style.display='none';
-  const ca=document.getElementById('eaCambioIDEArrow');if(ca)ca.textContent='▼';
-  document.getElementById('eaTipo').value=a.tipo||'';
-  document.getElementById('eaCat').value=a.categoria||'';
-  updGruposSel('eaCat','eaGrupo'); // Poblar opciones de grupo según categoría
-  document.getElementById('eaGrupo').value=a.grupo||'';
-  document.getElementById('eaIda').value=a.ida||'';
-  document.getElementById('eaOrigen').value=a.origen||'';
-  const fi=fechaParaInput(a.fechaIngreso);
-  document.getElementById('eaFecha').value=fi;
-  document.getElementById('eaPeso').value=a.pesoIngreso||'';
-  document.getElementById('eaPrecio').value=a.precioCompra?Number(a.precioCompra).toFixed(2):'';
-  document.getElementById('eaRaza').value=a.raza||'';
-  document.getElementById('eaEstado').value=a.estado||'ACTIVO';
-  const ep=document.getElementById('eaPermanencia');if(ep)ep.value=calcPermanencia(fi||a.fechaIngreso);
-  document.getElementById('moEditA').classList.add('open');
-}
-
-async function guardarEditAnimal(){
-  const ideViejo=document.getElementById('eaIde').value;
-  const ideNuevoEl=document.getElementById('eaIdeNuevo');
-  const ideNuevo=ideNuevoEl?ideNuevoEl.value.trim():'';
-  const tipo=document.getElementById('eaTipo').value;
-  const cat=document.getElementById('eaCat').value;
-  const gru=document.getElementById('eaGrupo').value;
-  const ida=document.getElementById('eaIda').value.trim()||null;
-  const ori=document.getElementById('eaOrigen').value.trim();
-  const fecha=document.getElementById('eaFecha').value;
-  const peso=parseFloat(document.getElementById('eaPeso').value)||0;
-  const prec=parseFloat(document.getElementById('eaPrecio').value)||0;
-  const raza=document.getElementById('eaRaza').value.trim()||null;
-  const est=document.getElementById('eaEstado').value;
-  if(!ideViejo){ntf('Error: sin IDE',true);return;}
-  const btn=document.querySelector('#moEditA .btn.bp');
-  if(btn){btn.disabled=true;btn.textContent='⏳ Guardando...';}
-  try{
-    if(ideNuevo && ideNuevo!==ideViejo){
-      if(animales[ideNuevo]){ntf('⚠️ El IDE '+ideNuevo+' ya existe',true);return;}
-      if(!confirm('Cambiar IDE?  Viejo: '+ideViejo+' Nuevo: '+ideNuevo)) return;
-      const upd={};
-      upd['animales/'+ideNuevo]={...animales[ideViejo],ide:ideNuevo,tipo,categoria:cat,grupo:gru,ida:ideViejo,origen:ori,fechaIngreso:fecha,pesoIngreso:peso,precioCompra:prec,raza,estado:est};
-      upd['animales/'+ideViejo]=null;
-      pesajes.filter(p=>String(p.ide)===String(ideViejo)).forEach(p=>{
-        const np={...p,ide:ideNuevo};const nid=p.id?p.id.replace(ideViejo,ideNuevo):'p_'+ideNuevo+'_'+(p.fecha||'').replace(/-/g,'');
-        np.id=nid;upd['pesajes/'+nid]=np;upd['pesajes/'+p.id]=null;
-      });
-      await fbPatch('',upd);
-      animales[ideNuevo]={...animales[ideViejo],...upd['animales/'+ideNuevo]};
-      delete animales[ideViejo];
-      pesajes.forEach(p=>{if(String(p.ide)===String(ideViejo))p.ide=ideNuevo;});
-      window._lastPes={};pesajes.forEach(p=>{if(!window._lastPes[p.ide]||p.fecha>window._lastPes[p.ide].fecha)window._lastPes[p.ide]=p;});
-      cerrar('moEditA');renderDash();renderA();
-      ntf('✅ IDE cambiado: '+ideViejo+' → '+ideNuevo);
-    } else {
-      const upd={tipo,categoria:cat,grupo:gru,ida,origen:ori,fechaIngreso:fecha,pesoIngreso:peso,precioCompra:prec,raza,estado:est};
-      const updObj={};updObj['animales/'+ideViejo]={...animales[ideViejo],...upd};
-      await fbPatch('',updObj);
-      animales[ideViejo]={...animales[ideViejo],...upd};
-      cerrar('moEditA');renderDash();renderA();ntf('✅ Animal actualizado');
+      // Recargar datos
+      const [rV,rB]=await Promise.all([fbGet('ventas'),fbGet('bajas')]);
+      if(rV) ventas=Object.values(rV).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+      if(rB) bajas=Object.values(rB).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+      window._lastPes={};
+      pesajes.forEach(p=>{if(!window._lastPes[p.ide]||p.fecha>window._lastPes[p.ide].fecha)window._lastPes[p.ide]=p;});
+      cerrar('moVH');
+      ntf('✅ '+totalAnimales+' animales importados en '+keys.length+' ventas');
+      renderV(); renderDash();
+    }catch(e){
+      console.error(e);
+      ntf('Error al importar: '+e.message,true);
+      btn.disabled=false;btn.textContent='✅ Confirmar e Importar';
     }
-  }catch(e){ntf('Error: '+e.message,true);}
-  finally{if(btn){btn.disabled=false;btn.textContent='💾 Guardar Cambios';}}
+  })();
 }
 
-async function eliminarAnimal(ide){
-  const a=animales[ide];
-  if(!a){ntf('Animal no encontrado',true);return;}
-  if(!confirm('Eliminar animal IDE '+ide+'?')) return;
-  try{
-    await fetch(FB+'/animales/'+ide+'.json',{method:'DELETE'});
-    delete animales[ide];renderDash();renderA();ntf('✅ Animal eliminado');
-  }catch(e){ntf('Error: '+e.message,true);}
-}
-
-async function corregirCategoriasMasivo(){
-  const act=Object.values(animales).filter(a=>a.estado==='ACTIVO');
-  const cambios=[];
-  act.forEach(a=>{
-    const map=MAPA_GRUPO_CAT[a.grupo];
-    if(!map)return;
-    if(a.tipo!==map.tipo||a.categoria!==map.categoria)
-      cambios.push({ide:a.ide,grupo:a.grupo,tipoNuevo:map.tipo,catNueva:map.categoria});
-  });
-  if(!cambios.length){ntf('✅ Todos ya tienen tipo/categoría correctos');return;}
-  if(!confirm('Se van a corregir '+cambios.length+' animales. Confirmar?'))return;
-  const btn=document.getElementById('btnCorregirCats');
-  if(btn){btn.disabled=true;btn.textContent='⏳ Corrigiendo...';}
-  const BATCH=50;let ok=0;
-  for(let i=0;i<cambios.length;i+=BATCH){
-    const batch=cambios.slice(i,i+BATCH);const upd={};
-    batch.forEach(ch=>{upd['animales/'+ch.ide+'/tipo']=ch.tipoNuevo;upd['animales/'+ch.ide+'/categoria']=ch.catNueva;if(animales[ch.ide]){animales[ch.ide].tipo=ch.tipoNuevo;animales[ch.ide].categoria=ch.catNueva;}});
-    try{await fbPatch('',upd);ok+=batch.length;}catch(e){console.error(e);}
-    await new Promise(r=>setTimeout(r,200));
-  }
-  if(btn){btn.disabled=false;btn.textContent='✅ Listo';}
-  renderDash();renderA();ntf('✅ '+ok+' animales corregidos');
-}
-
-function verDetalleGrupo(grupo){
-  const hoy=new Date();
-  const lp=window._lastPes||{};
-  const animGrupo=Object.values(animales).filter(a=>a.estado==='ACTIVO'&&(a.grupo===grupo||(grupo==='SIN GRUPO'&&!a.grupo)));
-  document.getElementById('dGrupoDetalleTit').textContent='🐄 Grupo: '+(GRUS[grupo]||grupo)+' — '+animGrupo.length+' animales activos';
-
-  // Sub-resumen por origen (O5)
-  const porOrigen={};
-  animGrupo.forEach(a=>{
-    const o=a.origen||'SIN ORIGEN';
-    if(!porOrigen[o]) porOrigen[o]={n:0,sumGmd:0,nGmd:0,sumPeso:0,nPeso:0,sumPesoProy:0};
-    porOrigen[o].n++;
-    const lpa=lp[a.ide];
-    if(lpa&&lpa.gmd!=null){
-      porOrigen[o].sumGmd+=lpa.gmd; porOrigen[o].nGmd++;
-      porOrigen[o].sumPeso+=(lpa.peso||0); porOrigen[o].nPeso++;
-      const dsd=Math.max(0,Math.round((hoy-new Date(lpa.fecha+'T12:00:00'))/86400000));
-      porOrigen[o].sumPesoProy+=Math.round((lpa.peso+lpa.gmd*dsd)*10)/10;
-    }
-  });
-
-  const oriResumen=Object.entries(porOrigen).sort((a,b)=>b[1].n-a[1].n).map(([ori,d])=>{
-    const gmd=d.nGmd>0?(d.sumGmd/d.nGmd).toFixed(3):null;
-    const peso=d.nPeso>0?Math.round(d.sumPeso/d.nPeso):null;
-    const pHoy=d.nGmd>0?Math.round(d.sumPesoProy/d.nGmd):null;
-    const gCol=gmd!=null?(parseFloat(gmd)>=0.8?'var(--green)':parseFloat(gmd)>=0.5?'var(--gold)':'var(--red)'):'var(--t2)';
-    return`<tr>
-      <td style="font-size:12px;"><b>${ori}</b></td>
-      <td class="mn tg">${d.n}</td>
-      <td class="mn">${peso?peso+' kg':'—'}</td>
-      <td class="mn" style="color:${gCol};font-weight:bold;">${gmd?gmd+' kg/d':'—'}</td>
-      <td class="mn tg"><b>${pHoy?pHoy+' kg':'—'}</b></td>
-      <td><button class="btn bs btn-sm" style="font-size:11px;" onclick="filtQuickGrupoOrigen('${grupo}','${ori}')">Ver</button></td>
-    </tr>`;
-  }).join('');
-
-  document.getElementById('dGrupoDetalleCats').innerHTML=
-    '<table style="width:100%;border-collapse:collapse;margin-bottom:8px;">'
-    +'<thead><tr style="font-size:11px;color:var(--t2);">'
-    +'<th style="text-align:left;padding:4px;">Origen</th><th>Cabezas</th><th>Peso Últ.Pes.</th><th>GMD Prom.</th><th>Peso Hoy (proy.)</th><th></th>'
-    +'</tr></thead><tbody>'+oriResumen+'</tbody></table>';
-
-  // Tabla detalle de animales
-  const tb=document.getElementById('dGrupoDetalleBody');
-  if(!animGrupo.length){tb.innerHTML='<tr><td colspan="8" class="emp">Sin animales</td></tr>';document.getElementById('dGrupoDetalle').style.display='';return;}
-  tb.innerHTML=animGrupo.sort((a,b)=>(a.origen||'').localeCompare(b.origen||'')||String(a.ide).localeCompare(String(b.ide))).map(a=>{
-    const lpa=lp[a.ide];const gmd=lpa?.gmd;
-    let pp=a.pesoIngreso||0;
-    if(lpa&&gmd!=null){const dias=Math.max(0,Math.round((hoy-new Date(lpa.fecha+'T12:00:00'))/86400000));pp=Math.round((lpa.peso+gmd*dias)*10)/10;}
-    const gCol=gmd!=null?(gmd>=0.8?'var(--green)':gmd>=0.5?'var(--gold)':'var(--red)'):'var(--t2)';
-    return`<tr>
-      <td class="mn tg" style="font-size:11px;cursor:pointer;" onclick="editarAnimal('${a.ide}')">${a.ide}</td>
-      <td style="font-size:11px;">${a.tipo||'—'}</td>
-      <td style="font-size:11px;">${a.categoria||'—'}</td>
-      <td style="font-size:11px;">${a.origen||'—'}</td>
-      <td class="mn">${a.pesoIngreso||'—'} kg</td>
-      <td class="mn" style="font-size:11px;">${lpa?fmtFecha(lpa.fecha)+' ('+lpa.peso+' kg)':'Sin pesaje'}</td>
-      <td class="mn" style="color:${gCol};font-weight:bold;">${gmd!=null?(gmd>=0?'+':'')+Number(gmd).toFixed(3)+' kg/d':'—'}</td>
-      <td class="mn tg"><b>${pp} kg</b></td>
-    </tr>`;
-  }).join('');
-  document.getElementById('dGrupoDetalle').style.display='';
-  document.getElementById('dGrupoDetalle').scrollIntoView({behavior:'smooth'});
-}
-
-function filtQuickGrupo(){
-  const tit=document.getElementById('dGrupoDetalleTit').textContent;
-  const grupo=tit.replace('🐄 Grupo: ','').split(' — ')[0].trim();
-  // Encontrar la key real del grupo
-  const gKey=Object.keys(GRUS).find(k=>GRUS[k]===grupo)||grupo;
-  document.getElementById('dGrupoDetalle').style.display='none';
-  showPg('animales');
-  document.getElementById('fGrupo').value=gKey;
-  filtA();
-}
-function filtQuickGrupoOrigen(grupo, origen){
-  document.getElementById('dGrupoDetalle').style.display='none';
-  showPg('animales');
-  document.getElementById('fGrupo').value=grupo;
-  const fBus=document.getElementById('fBus');
-  if(fBus) fBus.value=origen==='SIN ORIGEN'?'':origen;
-  filtA();
-}
-
-
-function verNoVinieron(){
-  const hoy=new Date();
-  const hace30=new Date(hoy-30*86400000).toISOString().split('T')[0];
-  const lp=window._lastPes||{};
-  const noV=Object.values(animales).filter(a=>{
-    if(a.estado!=='ACTIVO')return false;
-    const lpa=lp[a.ide];
-    return !lpa||lpa.fecha<hace30;
-  });
-  if(!noV.length){ntf('✅ Todos tienen pesaje reciente');return;}
-  const rows=[['IDE','IDA','Tipo','Categoría','Grupo','Origen','Último Pesaje','Peso Ing.'],
-    ...noV.map(a=>{const lpa=lp[a.ide];return[a.ide,a.ida||'',a.tipo||'',a.categoria||'',a.grupo||'',a.origen||'',lpa?lpa.fecha:'Sin pesaje',a.pesoIngreso||''];})];
-  const ws=XLSX.utils.aoa_to_sheet(rows);const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'Sin pesaje');
-  XLSX.writeFile(wb,'animales_sin_pesaje.xlsx');
-  ntf('⬇️ '+noV.length+' animales sin pesaje reciente');
-}
-</script>
-
-<!-- Modal: Importar Inventario Inicial -->
-<div class="modal-bg" id="moImportInv">
-  <div class="modal" style="max-width:520px;">
-    <div class="mh"><div class="mt">📥 Importar Inventario Inicial desde Excel</div>
-      <button class="mc" onclick="cerrar('moImportInv')">✕</button></div>
-    <div style="font-size:12px;color:var(--t2);margin-bottom:12px;line-height:1.6;">
-      Seleccioná tu planilla Excel con las columnas:<br>
-      <strong>IDE · IDV · Fecha Ingreso · Peso Ingreso · Precio · Raza · Origen · TIPO · CATEGORIA · GRUPO</strong>
-    </div>
-    <input type="file" id="fInvXls" accept=".xls,.xlsx" style="margin-bottom:12px;font-size:12px;" onchange="readInvExcel(this.files[0])">
-    <div id="invImportPrev" style="max-height:300px;overflow-y:auto;margin-bottom:12px;"></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;">
-      <button class="btn bs" onclick="cerrar('moImportInv')">Cancelar</button>
-      <button class="btn bp" id="btnConfInv" style="display:none;" onclick="confirmarImportInv()">✅ Confirmar e Importar</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal: Registrar Venta -->
-<div class="mo" id="moV2">
-  <div class="md md-lg" style="max-width:700px;">
-    <div class="mh"><div class="mt">💰 Registrar Venta de Animales</div><button class="mc" onclick="cerrar('moV2')">✕</button></div>
-    <div class="mb"><div class="fg">
-      <div class="sep">Datos Generales</div>
-      <div class="fm"><label>Fecha *</label><input id="vF2" type="date"></div>
-      <div class="fm"><label>Municipio</label><input id="vMun" type="text" placeholder="San Ignacio..."></div>
-      <div class="fm"><label>Tipo Animal</label><select id="vTipo"><option value="">— Seleccionar —</option><option value="INVERNADA">INVERNADA</option><option value="CRIA-REPRODUCTORES">CRIA-REPRODUCTORES</option></select></div>
-      <div class="fm"><label>Mercado *</label><select id="vMercado" onchange="toggleDestinoVenta()"><option value="">— Seleccionar —</option><option value="EXPORTACION">EXPORTACIÓN</option><option value="NACIONAL">NACIONAL</option></select></div>
-      <div class="fm"><label>Tipo Destino *</label><select id="vTipoDestino" onchange="toggleDestinoVenta()"><option value="">— Seleccionar —</option><option value="FRIGORIFICO">FRIGORÍFICO</option><option value="PRIVADO">PRIVADO</option></select></div>
-      <div class="fm" id="vFrigorificoWrap" style="display:none;"><label>Frigorífico *</label><select id="vFrigorifico" onchange="toggleDestinoVenta()"><option value="">— Seleccionar —</option><option value="BFC S.A.">BFC S.A.</option><option value="FRIGOR S.A.">FRIGOR S.A.</option><option value="FRIGOSI S.A.">FRIGOSI S.A.</option><option value="FRIDOSA">FRIDOSA</option><option value="OTRO">OTRO</option></select></div>
-      <div class="fm" id="vFrigorificoOtroWrap" style="display:none;"><label>Otro frigorífico</label><input id="vFrigorificoOtro" type="text"></div>
-      <div class="fm" id="vPrivadoWrap" style="display:none;"><label>Comprador *</label><input id="vDest" type="text" placeholder="Nombre del comprador"></div>
-      <div class="sep">Kilogramos</div>
-      <div class="fm"><label>Kg Brutos *</label><input id="vKgBruto" type="number" step="0.1" oninput="calcVenta()"></div>
-      <div class="fm"><label>Desbaste %</label><div style="display:flex;gap:6px;align-items:center;"><input id="vDesbaste" type="number" step="0.1" value="0" min="0" max="20" oninput="calcVenta()" style="width:80px;"><span style="font-size:12px;color:var(--t3);">% → <span id="vKgDesbaste" style="color:var(--gold);">0 kg</span></span></div></div>
-      <div class="fm full"><label>Kg Netos</label><input id="vKgNeto" readonly style="background:rgba(109,186,58,.07);color:var(--gr);font-weight:700;"></div>
-      <div class="sep" style="grid-column:1/-1;">Precio</div>
-      <div class="fm full" style="grid-column:1/-1;">
-        <div style="display:flex;gap:12px;margin-bottom:8px;">
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="radio" name="vModoPrice" value="porkg" id="vModoKg" onchange="calcVenta()" checked> Por Bs/kg</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="radio" name="vModoPrice" value="total" id="vModoTotal" onchange="calcVenta()"> Por monto total</label>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div id="vPorKgWrap" class="fm"><label>Bs/kg</label><input id="vPrecKgInput" type="number" step="0.01" oninput="calcVenta()"></div>
-          <div id="vPorTotalWrap" class="fm" style="display:none;"><label>Monto Total Bs</label><input id="vPrecBruto" type="number" step="0.01" oninput="calcVenta()"></div>
-          <div class="fm"><label>Precio Bruto Calculado</label><input id="vPrecBrutoCalc" readonly style="background:rgba(109,186,58,.07);color:var(--gr);"></div>
-        </div>
-      </div>
-      <div class="fm"><label>Comisionista</label><input id="vComNombre" type="text"></div>
-      <div class="fm"><label>Comisión (Bs)</label><input id="vComPrecio" type="number" step="0.01" value="0" oninput="calcVenta()"></div>
-      <div class="fm"><label>Transporte (Bs)</label><input id="vTransporte" type="number" step="0.01" value="0" oninput="calcVenta()"></div>
-      <div class="fm"><label>Total a Cobrar</label><input id="vTotalCobrar" readonly style="background:rgba(109,186,58,.1);font-weight:700;color:var(--gr);font-size:14px;"></div>
-      <div class="fm"><label>Bs/kg neto</label><input id="vPrecKg" readonly style="background:rgba(109,186,58,.1);color:var(--gr);"></div>
-      <div class="sep" style="grid-column:1/-1;">Animales — Excel de la Balanza</div>
-      <div class="fm full" style="grid-column:1/-1;">
-        <input type="file" id="vXls" accept=".xls,.xlsx" style="font-size:12px;" onchange="readVentaXls(this.files[0])">
-      </div>
-      <div id="vXlsPrev" style="grid-column:1/-1;font-size:12px;"></div>
-    </div></div>
-    <div class="mf"><button class="btn bs" onclick="cerrar('moV2')">Cancelar</button><button class="btn bp" id="btnSaveV" onclick="saveVenta()">💰 Registrar Venta</button></div>
-  </div>
-</div>
-
-<!-- Modal: Importar Ventas Históricas -->
-<div class="mo" id="moImportVH">
-  <div class="md" style="max-width:540px;">
-    <div class="mh"><div class="mt">📤 Importar Ventas Históricas</div><button class="mc" onclick="cerrar('moImportVH')">✕</button></div>
-    <div style="font-size:11px;color:var(--t2);padding:8px 14px 0;">Columnas: IDE · FECHA_VENTA · FECHA_INGRESO · TIPO_ANIMAL · CATEGORIA · GRUPO · ORIGEN · MERCADO · TIPO_DESTINO · FRIGORIFICO_O_COMPRADOR · PESO_VENTA_KG · PRECIO_VENTA_BS · PESO_INGRESO_KG · PRECIO_COMPRA_BS · RAZA</div>
-    <div class="mb"><input type="file" id="fVH" accept=".xls,.xlsx" style="font-size:12px;margin-bottom:12px;" onchange="readVentasHist(this.files[0])"><div id="vhPrev" style="max-height:280px;overflow-y:auto;"></div></div>
-    <div class="mf"><button class="btn bs" onclick="cerrar('moImportVH')">Cancelar</button><button class="btn bp" id="btnConfVH" style="display:none;" onclick="confirmarImportVH()">✅ Confirmar e Importar</button></div>
-  </div>
-</div>
-
-<!-- Modal: Editar Venta -->
-<div class="mo" id="moEditV">
-  <div class="md" style="max-width:500px;">
-    <div class="mh"><div class="mt">✏️ Editar Venta</div><button class="mc" onclick="cerrar('moEditV')">✕</button></div>
-    <div class="mb"><div class="fg">
-      <div class="fm"><label>Código</label><input id="evCodigo" readonly style="opacity:.6;"></div>
-      <div class="fm"><label>Fecha</label><input id="evFecha" type="date"></div>
-      <div class="fm"><label>Tipo Animal</label><select id="evTipo"><option value="">—</option><option value="INVERNADA">INVERNADA</option><option value="CRIA-REPRODUCTORES">CRIA-REPRODUCTORES</option></select></div>
-      <div class="fm"><label>Municipio</label><input id="evMun" type="text"></div>
-      <div class="fm"><label>Mercado</label><select id="evMercado"><option value="">—</option><option value="EXPORTACION">EXPORTACIÓN</option><option value="NACIONAL">NACIONAL</option></select></div>
-      <div class="fm"><label>Tipo Destino</label><select id="evTipoDestino" onchange="toggleEditVenta()"><option value="">—</option><option value="FRIGORIFICO">FRIGORÍFICO</option><option value="PRIVADO">PRIVADO</option></select></div>
-      <div class="fm" id="evFrigWrap" style="display:none;"><label>Frigorífico</label><select id="evFrigorifico"><option value="">—</option><option value="BFC S.A.">BFC S.A.</option><option value="FRIGOR S.A.">FRIGOR S.A.</option><option value="FRIGOSI S.A.">FRIGOSI S.A.</option><option value="FRIDOSA">FRIDOSA</option></select></div>
-      <div class="fm" id="evPrivWrap" style="display:none;"><label>Comprador</label><input id="evDestino" type="text"></div>
-    </div></div>
-    <div class="mf"><button class="btn bs" onclick="cerrar('moEditV')">Cancelar</button><button class="btn bp" onclick="guardarEditVenta()">💾 Guardar</button></div>
-  </div>
-</div>
-
-<!-- Modal: Completar Venta Abierta -->
-<div class="mo" id="moCompletarV">
-  <div class="md" style="max-width:480px;">
-    <div class="mh"><div class="mt">➕ Completar Venta Abierta</div><button class="mc" onclick="cerrar('moCompletarV')">✕</button></div>
-    <div class="mb">
-      <div id="moCompletarVInfo" style="padding:10px;background:rgba(255,150,0,.1);border:1px solid rgba(255,150,0,.3);border-radius:6px;margin-bottom:12px;font-size:12px;"></div>
-      <div class="fg">
-        <div class="fm full"><label>IDE del animal *</label><input id="cvIde" type="text" placeholder="Número de chip"></div>
-        <div class="fm"><label>Peso (kg) — máx: <span id="cvMaxKg" style="color:#f90;"></span></label><input id="cvPeso" type="number" step="0.1" oninput="calcCompletarVenta()"></div>
-        <div class="fm"><label>Precio calculado</label><input id="cvPrecio" readonly style="background:rgba(109,186,58,.07);color:var(--gr);"></div>
-      </div>
-    </div>
-    <div class="mf"><button class="btn bs" onclick="cerrar('moCompletarV')">Cancelar</button><button class="btn bp" onclick="guardarCompletarVenta()">✅ Agregar</button></div>
-  </div>
-</div>
-
-</body>
-</html>
