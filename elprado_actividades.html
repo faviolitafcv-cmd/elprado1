@@ -1721,7 +1721,6 @@ function migrarGruposYRegistros() {
       fechaBase:g.fechaBase||''};
   });
   setData('grupos', gruposNuevos);
-  fbSet('grupos', gruposNuevos);
 
   // 2. Migrar actividades (campo lote)
   const acts = getActividades();
@@ -1732,7 +1731,6 @@ function migrarGruposYRegistros() {
     return {...a, lote: nuevo};
   });
   setData('actividades', actsNuevas);
-  fbSet('actividades', actsNuevas);
 
   // 3. Migrar plan (campo lote)
   const plan = getData('plan', []);
@@ -1743,7 +1741,6 @@ function migrarGruposYRegistros() {
     return {...p, lote: nuevo};
   });
   setData('plan', planNuevo);
-  fbSet('plan', planNuevo);
 
   // 4. Migrar vaqueros (grupos asignados)
   const vaqueros = getData('vaqueros', []);
@@ -1753,7 +1750,6 @@ function migrarGruposYRegistros() {
     return {...v, grupos: gruposMigrados};
   });
   setData('vaqueros', vaquerosNuevos);
-  fbSet('vaqueros', vaquerosNuevos);
 
   notif('✅ Migración completa — ' + cambios + ' registros actualizados');
   setTimeout(() => location.reload(), 1500);
@@ -1872,9 +1868,30 @@ async function syncFromFirebase() {
   try {
     const r = await fetch(FB_URL + '.json');
     const data = await r.json();
-    if(data) {
+    if(data && typeof data === 'object' && !data.error) {
+      // *** FIX CRITICO: usar _lsOrig para NO disparar el interceptor.
+      // Con localStorage.setItem normal, el interceptor reescribia Firebase
+      // con datos locales viejos, borrando cambios de otros usuarios (ej: lluvia de abril). ***
+      const _set = window._lsOrig || Storage.prototype.setItem;
       Object.entries(data).forEach(([key, val]) => {
-        if(val !== null) localStorage.setItem('elprado_' + key, JSON.stringify(val));
+        if(val === null || val === undefined) return;
+        const lsKey = 'elprado_' + key;
+        try {
+          // Estrategia merge para arrays: conservar el que tenga MAS registros
+          const localRaw = localStorage.getItem(lsKey);
+          const localVal = localRaw ? JSON.parse(localRaw) : null;
+          const fbArr = Array.isArray(val) ? val
+            : (val && typeof val === 'object') ? Object.values(val) : null;
+          if(fbArr && Array.isArray(localVal) && localVal.length > fbArr.length) {
+            // Local tiene mas registros que Firebase -> conservar local
+            console.log('[sync] conservando local para ' + key + ': local=' + localVal.length + ' fb=' + fbArr.length);
+            return;
+          }
+          _set.call(localStorage, lsKey, JSON.stringify(fbArr || val));
+        } catch(e2) {
+          const _set2 = window._lsOrig || Storage.prototype.setItem;
+          _set2.call(localStorage, lsKey, JSON.stringify(val));
+        }
       });
     }
     return true;
@@ -1927,7 +1944,7 @@ function setData(key, val) {
 function getActividades() { return getData('actividades', []); }
 function getGrupos() { return getData('grupos', GRUPOS_BASE); }
 function getPotreroAreas() { return getData('potreroAreas', {}); }
-function setPotreroAreas(v) { setData('potreroAreas', v); fbSet('potreroAreas', v); }
+function setPotreroAreas(v) { setData('potreroAreas', v); }
 function getPotreroArea(pot) { const a=getPotreroAreas(); return a[pot]?parseFloat(a[pot]):null; }
 
 // ═══════════════════════════════════════
@@ -2709,11 +2726,11 @@ function guardarActividad() {
     const _pot    = document.getElementById('fPotrero').value;
     const _par    = document.getElementById('fParcela').value;
     const _fec    = document.getElementById('fFechaIng')?.value || document.getElementById('fFecha').value;
-    const _lote   = document.getElementById('fLote')?.value || '';
     const _editId = document.getElementById('formComun').dataset.editId;
-    const _err    = validarParcelaDuplicada(_pot, _lote, _par, _fec, _editId);
-    if(_err && !_editId) {
-      notif(_err, true); return;
+    // FIX: usar la definicion completa (linea 2502) con params correctos
+    const _dup    = validarParcelaDuplicada(_pot, _lote, _par, _fec, _editId);
+    if(_dup && !_editId) {
+      notif(_dup, true); return;
     }
   }
   // Verificar si es edición
@@ -2734,7 +2751,7 @@ function guardarActividad() {
   const fecha = document.getElementById('fFecha').value;
   const potrero = document.getElementById('fPotrero').value;
   if(!fecha) { notif('Ingresá la fecha', true); return; }
-  if(!potrero) { notif('Elegí el potrero', true); return; }
+  if(!potrero) { notif('⚠️ Seleccioná el potrero desde la lista desplegable (hacé click en el nombre)', true); return; }
 
   const mes = mesDeDate(fecha);
   const variedad = getVariedad(potrero);
@@ -2833,7 +2850,7 @@ function guardarActividad() {
   // Una sola fila — no se genera duplicado de INGRESO HDA
 
   setData('actividades', acts);
-  fbSet('actividades', acts); // ← sincronizar con Firebase siempre (nuevo Y edición)
+  // setData ya llama fbSet internamente — no duplicar
 
   // ── FIN DE VUELTA: si el checkbox está marcado, guardar registro especial ──
   const chkFV = document.getElementById('chkFinVuelta');
@@ -2896,7 +2913,6 @@ function limpiarDuplicados() {
 
   const eliminados = total_antes - acts.length;
   setData('actividades', acts);
-  fbSet('actividades', acts);
   
   // También limpiar el plan de duplicados
   let plan = getPlan();
@@ -2910,7 +2926,6 @@ function limpiarDuplicados() {
     }
   }
   setPlan(planLimpio);
-  fbSet('plan', planLimpio);
   
   renderTabla();
   renderStats();
@@ -2969,7 +2984,6 @@ function sincronizarPlanDesdeMS() {
         autoDesdeMS: true
       });
       setPlan(plan);
-      fbSet('plan', plan);
     }
   }
 
@@ -3128,7 +3142,6 @@ function borrarActividad(id) {
   if(!confirm('¿Eliminar este registro?')) return;
   const nuevas = acts.filter(a => a.id !== id);
   setData('actividades', nuevas);
-  fbSet('actividades', nuevas);
 
   // ── Limpiar entradas del plan generadas desde este registro ──
   const planLimpio = getPlan().filter(p => {
@@ -3138,7 +3151,6 @@ function borrarActividad(id) {
     return true;
   });
   setPlan(planLimpio);
-  fbSet('plan', planLimpio);
 
   renderTabla();
   renderStats();
@@ -3171,7 +3183,6 @@ function limpiarPlanHuerfano() {
     return true;
   });
   setPlan(planDedup);
-  fbSet('plan', planDedup);
   renderPlan();
   notif('✅ Plan limpiado: ' + removidos + ' entr' + (removidos===1?'ada':'adas') + ' eliminada' + (removidos===1?'':'s'));
 }
@@ -4310,9 +4321,7 @@ function confirmarCambioSalida() {
   });
 
   setData('actividades', acts);
-  fbSet('actividades', acts);
-
-  // Actualizar plan también
+  // setData ya llama fbSet — no duplicar
   let plan = getPlan();
   _cambioActual.cambios.forEach(c => {
     plan = plan.map(p => {
@@ -4326,7 +4335,6 @@ function confirmarCambioSalida() {
     });
   });
   setPlan(plan);
-  fbSet('plan', plan);
 
   cerrarModal('modalCambioSalida');
   renderCampo();
@@ -4486,7 +4494,7 @@ function getLluvia() {
     lecturas: Array.isArray(r.lecturas) ? r.lecturas : Object.values(r.lecturas || {})
   }));
 }
-function setLluvia(v) { setData('lluvia', v); fbSet('lluvia', v); }
+function setLluvia(v) { setData('lluvia', v); }
 
 function abrirModalPluviometro(idx) {
   const pluvios = getPluviometros();
@@ -5748,22 +5756,6 @@ function mostrarPromedioMV(potrero) {
 }
 
 // ═══════════════════════════════════════
-// VALIDACIÓN PARCELA DUPLICADA
-// ═══════════════════════════════════════
-function validarParcelaDuplicada(potrero, parcela, fecha) {
-  if(!potrero || !parcela || !fecha) return false;
-  const acts = getActividades();
-  const hoy = fecha;
-  const existe = acts.some(a => 
-    a.potrero === potrero && 
-    a.parcela === parcela && 
-    a.fecha === hoy &&
-    a.actividad === 'MATERIA SECA'
-  );
-  return existe;
-}
-
-// ═══════════════════════════════════════
 // ELIMINAR SELECCIONADOS
 // ═══════════════════════════════════════
 function actualizarBotonesSel() {
@@ -5787,7 +5779,6 @@ function borrarSeleccionados() {
   const ids = [...checks].map(c => c.value);
   let acts = getActividades().filter(a => !ids.includes(a.id));
   setData('actividades', acts);
-  fbSet('actividades', acts);
   renderTabla();
   renderStats();
   notif('✓ ' + ids.length + ' registro' + (ids.length>1?'s':'') + ' eliminado' + (ids.length>1?'s':''));
@@ -5825,6 +5816,7 @@ function borrarSeleccionados() {
 
   // Interceptar localStorage.setItem para auto-sincronizar
   var _orig = Storage.prototype.setItem;
+  window._lsOrig = _orig; // ← exponer para uso externo sin disparar interceptor
   Storage.prototype.setItem = function(key, value) {
     _orig.call(this, key, value);
     try {
