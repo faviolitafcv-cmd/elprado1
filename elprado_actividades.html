@@ -6,6 +6,16 @@
 // CONTROL DE SESIÓN Y PERMISOS
 // ═══════════════════════════════════════
 (function() {
+  // ── VISTAS PUBLICAS: no requieren login ──
+  var params = new URLSearchParams(window.location.search);
+  window._vistaPublica = params.get('vista'); // 'publica' | 'vaquero' | null
+
+  if(window._vistaPublica === 'publica' || window._vistaPublica === 'vaquero') {
+    window._epRol = 'VISTA';
+    window._epUsuario = 'vista';
+    return; // saltar login
+  }
+
   var usuario = sessionStorage.getItem('ep_usuario');
   var loginTime = parseInt(sessionStorage.getItem('ep_login')||0);
   var horasDesde = (Date.now() - loginTime) / 3600000;
@@ -583,6 +593,53 @@ tr:hover td { background: rgba(255,255,255,.02); }
 </head>
 <body>
 
+<!-- ══════════════════════════════════════════════════════════
+     VISTA PÚBLICA — ?vista=publica
+     Sin login, 3 días: ayer / hoy / mañana
+     Solo lectura
+══════════════════════════════════════════════════════════ -->
+<div id="vistaPublicaContainer" style="display:none;font-family:var(--font,sans-serif);background:#0d1a0d;min-height:100vh;padding:0;color:#e8f5e9;">
+
+  <div style="background:#1a2e1a;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #2d5a1b;">
+    <div>
+      <div style="font-size:18px;font-weight:800;color:#6dba3a;letter-spacing:1px;">⬡ EL PRADO 1</div>
+      <div style="font-size:11px;color:#8caa7e;">Vista de campo — Solo lectura</div>
+    </div>
+    <div id="vpFechaHoy" style="font-size:13px;font-weight:700;color:#c9c9c9;background:#0d1a0d;padding:6px 12px;border-radius:8px;border:1px solid #2d5a1b;"></div>
+  </div>
+
+  <div style="padding:14px 12px;">
+    <div id="vpTabla" style="overflow-x:auto;"></div>
+    <div style="text-align:center;margin-top:16px;font-size:10px;color:#4a6a3a;">
+      Actualización automática cada 5 min · Solo lectura
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     VISTA VAQUEROS — ?vista=vaquero
+     Sin login, 4 días + largo de parcela
+     Solo lectura
+══════════════════════════════════════════════════════════ -->
+<div id="vistaVaqueroContainer" style="display:none;font-family:var(--font,sans-serif);background:#0d1420;min-height:100vh;padding:0;color:#e8f0ff;">
+
+  <div style="background:#1a2040;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #2d4a8a;">
+    <div>
+      <div style="font-size:18px;font-weight:800;color:#5b8fff;letter-spacing:1px;">🐄 EL PRADO 1 — VAQUEROS</div>
+      <div style="font-size:11px;color:#7a9acc;">Mudanzas y parcelas · Solo lectura</div>
+    </div>
+    <div id="vvFechaHoy" style="font-size:13px;font-weight:700;color:#c9c9c9;background:#0d1420;padding:6px 12px;border-radius:8px;border:1px solid #2d4a8a;"></div>
+  </div>
+
+  <div style="padding:14px 12px;">
+    <div id="vvTabla" style="overflow-x:auto;"></div>
+    <div style="text-align:center;margin-top:16px;font-size:10px;color:#3a5a8a;">
+      Actualización automática cada 5 min · Solo lectura
+    </div>
+  </div>
+</div>
+
+<div id="appContainer">
 <div class="header">
   <div>
     <div class="header-logo">⬡ El Prado 1</div>
@@ -5415,6 +5472,177 @@ function exportarExcel() {
   notif('✓ Excel exportado correctamente');
 }
 
+
+// ═══════════════════════════════════════════════════════════════
+// VISTAS PÚBLICAS (sin login)
+// ═══════════════════════════════════════════════════════════════
+
+function _vpSumarDias(fecha, n) {
+  const d = new Date(fecha + 'T12:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toISOString().split('T')[0];
+}
+function _vpFmtFecha(fecha) {
+  const dias = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const d = new Date(fecha + 'T12:00:00');
+  return dias[d.getDay()] + ' ' + d.getDate() + ' ' + meses[d.getMonth()];
+}
+function _vpFmtHoy(fecha) {
+  const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const d = new Date(fecha + 'T12:00:00');
+  return d.getDate() + ' de ' + meses[d.getMonth()] + ' ' + d.getFullYear();
+}
+
+function _vpGetRegDia(acts, lote, dia) {
+  // Buscar registro activo para este lote en este dia
+  const candidatos = acts.filter(a =>
+    a.actividad === 'MATERIA SECA' && a.lote === lote && a.fechaIng &&
+    ((a.fechaSal && a.fechaIng <= dia && a.fechaSal >= dia) ||
+     (!a.fechaSal && a.fechaIng === dia))
+  );
+  if(!candidatos.length) return null;
+  return candidatos.reduce((b, a) => a.fechaIng >= b.fechaIng ? a : b);
+}
+
+function _vpCeldaPublica(reg, dia, hoy) {
+  if(!reg) return `<td style="text-align:center;padding:6px 4px;color:#4a6a3a;font-size:12px;">— pendiente —</td>`;
+  const esHoy = dia === hoy;
+  const bg = esHoy ? 'background:rgba(109,186,58,.15);' : '';
+  const salLabel = reg.horaSal === 'MAÑANA' ? '🌅 Mañana' : reg.horaSal === 'TARDE' ? '🌇 Tarde' : '';
+  return `<td style="text-align:center;padding:6px 4px;${bg}">
+    <div style="background:rgba(45,90,27,.4);border-radius:6px;padding:5px 8px;display:inline-block;min-width:80px;">
+      <div style="font-size:13px;font-weight:800;color:#6dba3a;">${reg.potrero}·P${reg.parcela}</div>
+      ${salLabel ? `<div style="font-size:10px;color:#c9a227;font-weight:700;margin-top:2px;">${salLabel}</div>` : ''}
+    </div>
+  </td>`;
+}
+
+function _vvCeldaVaquero(reg, dia, hoy) {
+  if(!reg) return `<td style="text-align:center;padding:6px 4px;color:#3a5a8a;font-size:12px;">— pendiente —</td>`;
+  const esHoy = dia === hoy;
+  const bg = esHoy ? 'background:rgba(91,143,255,.12);' : '';
+  const ingLabel = reg.horaIng === 'MAÑANA' ? '🌅 Mañana' : reg.horaIng === 'TARDE' ? '🌇 Tarde' : '';
+  const salLabel = reg.horaSal === 'MAÑANA' ? '🌅 Mañana' : reg.horaSal === 'TARDE' ? '🌇 Tarde' : '';
+  const largo = reg.largoM ? `<div style="font-size:10px;color:#8ab4ff;margin-top:2px;">📏 ${Math.round(reg.largoM)} m</div>` : '';
+  const turno = salLabel || ingLabel;
+  return `<td style="text-align:center;padding:6px 4px;${bg}">
+    <div style="background:rgba(30,50,100,.5);border-radius:6px;padding:5px 8px;display:inline-block;min-width:90px;">
+      <div style="font-size:13px;font-weight:800;color:#5b8fff;">${reg.potrero}·P${reg.parcela}</div>
+      ${turno ? `<div style="font-size:11px;color:#f0c040;font-weight:700;margin-top:2px;">${turno}</div>` : ''}
+      ${largo}
+    </div>
+  </td>`;
+}
+
+async function iniciarVistaPublica() {
+  // Ocultar app normal, mostrar vista pública
+  document.getElementById('appContainer').style.display = 'none';
+  document.getElementById('vistaPublicaContainer').style.display = 'block';
+  await renderVistaPublica();
+  setInterval(renderVistaPublica, 5 * 60 * 1000); // refrescar cada 5 min
+}
+
+async function iniciarVistaVaquero() {
+  document.getElementById('appContainer').style.display = 'none';
+  document.getElementById('vistaVaqueroContainer').style.display = 'block';
+  await renderVistaVaquero();
+  setInterval(renderVistaVaquero, 5 * 60 * 1000);
+}
+
+async function _vpCargarDatos() {
+  // Cargar desde Firebase sin login
+  const FB_URL_VP = 'https://elprado1-153ef-default-rtdb.firebaseio.com/elprado1';
+  try {
+    const r = await fetch(FB_URL_VP + '.json');
+    const data = await r.json();
+    if(data) {
+      const _set = window._lsOrig || Storage.prototype.setItem;
+      Object.entries(data).forEach(([key, val]) => {
+        if(val !== null) {
+          try { _set.call(localStorage, 'elprado_' + key, JSON.stringify(val)); } catch(e){}
+        }
+      });
+    }
+  } catch(e) { console.log('Vista: error cargando Firebase', e); }
+}
+
+async function renderVistaPublica() {
+  await _vpCargarDatos();
+  const hoy = new Date().toISOString().split('T')[0];
+  const dias = [_vpSumarDias(hoy,-1), hoy, _vpSumarDias(hoy,1)];
+  const labels = ['Ayer', 'Hoy', 'Mañana'];
+  const acts = getData ? getData('actividades', []) : JSON.parse(localStorage.getItem('elprado_actividades')||'[]');
+  const grupos = getData ? getData('grupos', []) : JSON.parse(localStorage.getItem('elprado_grupos')||'[]');
+  const lotes = grupos.map(g => g.nombre);
+
+  document.getElementById('vpFechaHoy').textContent = _vpFmtHoy(hoy);
+
+  const headCols = labels.map((l, i) => {
+    const esHoy = i === 1;
+    return `<th style="min-width:110px;text-align:center;padding:8px 4px;font-size:12px;color:${esHoy?'#6dba3a':'#8caa7e'};${esHoy?'border-bottom:2px solid #6dba3a;':''}">${l}<br><span style="font-size:10px;font-weight:400;">${_vpFmtFecha(dias[i])}</span></th>`;
+  }).join('');
+
+  const filas = lotes.map(lote => {
+    const lparts = lote.split('|');
+    const label = lparts.length >= 3 ? lparts[1] + ' · ' + lparts[2] : lote;
+    const celdas = dias.map((d, i) => _vpCeldaPublica(_vpGetRegDia(acts, lote, d), d, hoy)).join('');
+    return `<tr style="border-bottom:1px solid #1e3a1a;">
+      <td style="padding:6px 10px;font-size:12px;font-weight:700;color:#a0c878;white-space:nowrap;">${label}</td>
+      ${celdas}
+    </tr>`;
+  }).join('');
+
+  document.getElementById('vpTabla').innerHTML = `
+    <table style="width:100%;border-collapse:collapse;background:#111f11;border-radius:10px;overflow:hidden;">
+      <thead style="background:#1a3a1a;">
+        <tr>
+          <th style="text-align:left;padding:8px 10px;font-size:12px;color:#8caa7e;min-width:130px;">Grupo</th>
+          ${headCols}
+        </tr>
+      </thead>
+      <tbody>${filas}</tbody>
+    </table>`;
+}
+
+async function renderVistaVaquero() {
+  await _vpCargarDatos();
+  const hoy = new Date().toISOString().split('T')[0];
+  const dias = [_vpSumarDias(hoy,-1), hoy, _vpSumarDias(hoy,1), _vpSumarDias(hoy,2)];
+  const labels = ['Ayer', 'Hoy', 'Mañana', 'Pasado'];
+  const acts = getData ? getData('actividades', []) : JSON.parse(localStorage.getItem('elprado_actividades')||'[]');
+  const grupos = getData ? getData('grupos', []) : JSON.parse(localStorage.getItem('elprado_grupos')||'[]');
+  const lotes = grupos.map(g => g.nombre);
+
+  document.getElementById('vvFechaHoy').textContent = _vpFmtHoy(hoy);
+
+  const headCols = labels.map((l, i) => {
+    const esHoy = i === 1;
+    return `<th style="min-width:110px;text-align:center;padding:8px 4px;font-size:12px;color:${esHoy?'#5b8fff':'#7a9acc'};${esHoy?'border-bottom:2px solid #5b8fff;':''}">${l}<br><span style="font-size:10px;font-weight:400;">${_vpFmtFecha(dias[i])}</span></th>`;
+  }).join('');
+
+  const filas = lotes.map(lote => {
+    const lparts = lote.split('|');
+    const label = lparts.length >= 3 ? lparts[1] + ' · ' + lparts[2] : lote;
+    const celdas = dias.map((d, i) => _vvCeldaVaquero(_vpGetRegDia(acts, lote, d), d, hoy)).join('');
+    return `<tr style="border-bottom:1px solid #1a2a50;">
+      <td style="padding:6px 10px;font-size:12px;font-weight:700;color:#8ab4ff;white-space:nowrap;">${label}</td>
+      ${celdas}
+    </tr>`;
+  }).join('');
+
+  document.getElementById('vvTabla').innerHTML = `
+    <table style="width:100%;border-collapse:collapse;background:#0d1a30;border-radius:10px;overflow:hidden;">
+      <thead style="background:#1a2a50;">
+        <tr>
+          <th style="text-align:left;padding:8px 10px;font-size:12px;color:#7a9acc;min-width:130px;">Grupo</th>
+          ${headCols}
+        </tr>
+      </thead>
+      <tbody>${filas}</tbody>
+    </table>`;
+}
+
 // ═══════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════
@@ -5440,6 +5668,10 @@ document.addEventListener('change', function(e) {
 });
 
 window.onload = async () => {
+  // ── VISTAS PUBLICAS: renderizar directamente sin cargar el app completo ──
+  if(window._vistaPublica === 'publica') { await iniciarVistaPublica(); return; }
+  if(window._vistaPublica === 'vaquero') { await iniciarVistaVaquero(); return; }
+
   // Mostrar indicador de carga
   document.body.insertAdjacentHTML('beforeend', '<div id="fb-loading" style="position:fixed;inset:0;background:rgba(15,26,11,.92);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;"><div style="font-size:14px;color:#6dba3a;font-weight:600;letter-spacing:2px;">SINCRONIZANDO CON FIREBASE...</div><div style="width:200px;height:4px;background:#2e4020;border-radius:2px;overflow:hidden;"><div id="fb-bar" style="height:100%;background:#6dba3a;width:0%;transition:width 1s;"></div></div></div>');
   setTimeout(()=>{ const b=document.getElementById('fb-bar'); if(b) b.style.width='80%'; }, 100);
@@ -5945,5 +6177,6 @@ window.addEventListener('load', function() {
   document.body.appendChild(barra);
 });
 </script>
+</div><!-- /appContainer -->
 </body>
 </html>
