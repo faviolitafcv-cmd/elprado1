@@ -1274,7 +1274,6 @@ function renderSimulador(){
   // Usar los promedios calculados directamente
   const pesoH = nPH>0?sumPesoH/nPH:0;
   const gmd = nGmd>0?sumGmd/nGmd:0;
-  const cabezas = gd.n;
   const dias = [0,30,60,90];
 
   // Días promedio actuales en campo de los animales del grupo
@@ -1296,13 +1295,7 @@ function renderSimulador(){
     const costoRUnit = pesoIngProm * precRepos;
     const ingresos = peso * precVenta * cabezas;
 
-    // Precio compra original promedio del grupo (Bs/animal)
-    const precCompOrig = gd.animales.length>0
-      ? gd.animales.reduce((s,a)=>{
-          const anim=animales[String(a.ide)];
-          return s+(anim&&anim.precioCompra?anim.precioCompra:pesoIngProm*(precRepos||0));
-        },0)/gd.animales.length
-      : pesoIngProm*(precRepos||0);
+    // precCompOrig calculado arriba desde sumPC/nPC
 
     // ─── INDICADOR 1: Rentabilidad diaria ajustada (reposición) ───
     // (P.venta − P.compra repos.) ÷ días
