@@ -1043,7 +1043,14 @@ function showPg(id){
   if(id==='pesajes')   renderP();
   if(id==='bajas')     renderB();
   if(id==='informes'){renderInf();if(window._dataLoaded){renderIG();renderValuacion();}}
-  if(id==='proyecciones') renderProyecciones();
+  if(id==='proyecciones'){
+    // Sincronizar precio de reposición
+    if(window._precRepos){
+      const inp=document.getElementById('proyPrecRepos');
+      if(inp&&!inp.value) inp.value=window._precRepos;
+    }
+    renderProyecciones();
+  }
   if(id==='ventas')    renderV();
   if(id==='compras')   renderCo();
 }
@@ -1073,9 +1080,20 @@ function getPesoMin(tipo, cat){
 
 function renderProyecciones(){
   if(!window._dataLoaded) return;
-  const precRepos = window._precRepos || parseFloat(document.getElementById('proyPrecRepos')?.value)||null;
-  if(precRepos && document.getElementById('proyPrecRepos'))
-    document.getElementById('proyPrecRepos').value = precRepos;
+  // Tomar precio de reposición del input o de window._precRepos o del borrador
+  let precRepos = parseFloat(document.getElementById('proyPrecRepos')?.value)||window._precRepos||null;
+  if(!precRepos && window._valPreciosBorrador && window._valPreciosBorrador._precRepos)
+    precRepos = window._valPreciosBorrador._precRepos;
+  if(precRepos){
+    window._precRepos = precRepos;
+    const inp=document.getElementById('proyPrecRepos');
+    if(inp&&!inp.value) inp.value=precRepos;
+    // Sincronizar con dashboard
+    const inp2=document.getElementById('dashPrecRepos');
+    if(inp2&&!inp2.value) inp2.value=precRepos;
+    const inp3=document.getElementById('igPrecRepos');
+    if(inp3&&!inp3.value) inp3.value=precRepos;
+  }
 
   const hoy = new Date();
   const lp = window._lastPes||{};
