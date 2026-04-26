@@ -718,6 +718,70 @@ tr:hover td{background:rgba(109,186,58,.04);}
 
 </div>
 
+<!-- Modal: Editar Animal -->
+<div class="mo" id="moEditA">
+  <div class="md" style="max-width:560px;">
+    <div class="mh">
+      <div class="mt">✏️ Editar Animal</div>
+      <button class="mc" onclick="cerrar('moEditA')">✕</button>
+    </div>
+    <div class="mb">
+      <div class="fg">
+        <div class="fm" style="grid-column:1/-1;">
+          <label>IDE Chip actual</label>
+          <input id="eaIde" type="text" readonly style="background:var(--card3);color:var(--gold);font-weight:700;">
+        </div>
+        <div class="fm" style="grid-column:1/-1;">
+          <label style="cursor:pointer;color:var(--gold);" onclick="toggleCambioIDE()">
+            🔁 Cambiar número de chip <span id="eaCambioIDEArrow">▼</span>
+          </label>
+          <div id="eaCambioIDEWrap" style="display:none;margin-top:6px;padding:10px;background:var(--card3);border-radius:6px;border:1px solid var(--gold);">
+            <div style="font-size:11px;color:var(--t2);margin-bottom:6px;">⚠️ El chip actual pasará a ser la IDA. Toda la info se migra al nuevo chip.</div>
+            <input id="eaIdeNuevo" type="text" placeholder="Nuevo número de chip..." style="width:100%;">
+          </div>
+        </div>
+        <div class="fm"><label>IDA (Identif. Anterior)</label><input id="eaIda" type="text" placeholder="Opcional"></div>
+        <div class="fm"><label>Tipo</label>
+          <select id="eaTipo">
+            <option value="">— Sin tipo —</option>
+            <option value="INVERNADA">INVERNADA</option>
+            <option value="CRIA-REPRODUCTORES">CRIA-REPRODUCTORES</option>
+          </select>
+        </div>
+        <div class="fm"><label>Categoría</label>
+          <select id="eaCat" onchange="updGruposSel('eaCat','eaGrupo')">
+            <option value="">— Seleccionar —</option>
+            <option value="VAQUILLA">Vaquilla</option>
+            <option value="TORILLO">Torillo</option>
+            <option value="VACA">Vaca</option>
+          </select>
+        </div>
+        <div class="fm"><label>Grupo</label>
+          <select id="eaGrupo"><option value="">— Primero categoría —</option></select>
+        </div>
+        <div class="fm"><label>Origen (Predio)</label><input id="eaOrigen" type="text"></div>
+        <div class="fm"><label>Fecha de Ingreso</label><input id="eaFecha" type="date"></div>
+        <div class="fm"><label>Permanencia (días)</label><input id="eaPermanencia" type="text" readonly style="background:var(--card3);color:var(--t2);"></div>
+        <div class="fm"><label>Peso de Ingreso (kg)</label><input id="eaPeso" type="number" step="0.1"></div>
+        <div class="fm"><label>Precio de Compra (Bs)</label><input id="eaPrecio" type="number" step="0.01"></div>
+        <div class="fm"><label>Raza</label><input id="eaRaza" type="text"></div>
+        <div class="fm"><label>Estado</label>
+          <select id="eaEstado">
+            <option value="ACTIVO">ACTIVO</option>
+            <option value="EN VENTA">EN VENTA</option>
+            <option value="VENDIDO">VENDIDO</option>
+            <option value="MUERTO">MUERTO</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn bs" onclick="cerrar('moEditA')">Cancelar</button>
+      <button class="btn bp" onclick="guardarEditAnimal()">💾 Guardar Cambios</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════════════════ MODALES ══════════════════════════ -->
 
 <!-- Modal: Agregar Animal -->
@@ -1430,13 +1494,15 @@ function renderProyIngresos(porGrupo, precRepos){
 
 function filtQuickGrupo2(grupo){
   showPg('animales');
-  const sel=document.getElementById('fGrupo');
-  if(sel){sel.value=grupo;}
-  // Limpiar otros filtros
+  // Limpiar todos los filtros primero
   const fTipo=document.getElementById('fTipo');if(fTipo)fTipo.value='';
   const fCat=document.getElementById('fCat');if(fCat)fCat.value='';
   const fOrigen=document.getElementById('fOrigen');if(fOrigen)fOrigen.value='';
+  const fEst=document.getElementById('fEst');if(fEst)fEst.value='ACTIVO';
   const fBus=document.getElementById('fBus');if(fBus)fBus.value='';
+  // Setear grupo — SIN GRUPO = string vacío en el filtro
+  const sel=document.getElementById('fGrupo');
+  if(sel) sel.value=(grupo==='SIN GRUPO'?'':grupo);
   filtA();
 }
 
