@@ -98,6 +98,49 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 .arm-vacio{text-align:center;padding:32px;color:var(--text3);font-size:13px;
   border:1px dashed var(--border2);border-radius:10px;}
 
+/* ARMADORES REDISEÑO */
+.arm-grupo-btn{background:var(--card);border:1px solid var(--border);border-radius:10px;
+  padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px;
+  cursor:pointer;transition:background .15s;}
+.arm-grupo-btn:active{background:var(--card2);}
+.arm-grupo-icon{font-size:24px;width:40px;text-align:center;flex-shrink:0;}
+.arm-grupo-info{flex:1;}
+.arm-grupo-nombre{font-size:14px;font-weight:800;color:var(--white);}
+.arm-grupo-meta{font-size:11px;color:var(--text3);margin-top:2px;}
+.arm-grupo-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;
+  background:rgba(109,186,58,.15);color:var(--green);border:1px solid rgba(109,186,58,.3);}
+.arm-grupo-badge.nuevas{background:rgba(224,90,74,.15);color:var(--red);border-color:rgba(224,90,74,.3);}
+
+.arm-parcela-card{border-radius:10px;margin-bottom:8px;overflow:hidden;
+  border:1px solid var(--border);transition:opacity .2s;}
+.arm-parcela-card.ejecutado{opacity:0.5;border-color:var(--border);}
+.arm-parcela-header{padding:10px 14px;display:flex;align-items:center;gap:10px;}
+.arm-parcela-header.ejecutado{background:rgba(109,186,58,.06);}
+.arm-parcela-header.pendiente{background:var(--card);}
+.arm-parcela-num{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;
+  justify-content:center;font-size:15px;font-weight:800;flex-shrink:0;}
+.arm-parcela-num.pendiente{background:rgba(201,162,39,.15);color:var(--gold);}
+.arm-parcela-num.ejecutado{background:rgba(109,186,58,.15);color:var(--green);}
+.arm-parcela-info{flex:1;}
+.arm-parcela-titulo{font-size:13px;font-weight:700;}
+.arm-parcela-titulo.pendiente{color:var(--white);}
+.arm-parcela-titulo.ejecutado{color:var(--text3);text-decoration:line-through;}
+.arm-parcela-fecha{font-size:11px;color:var(--text3);margin-top:2px;}
+.arm-parcela-medidas{font-size:12px;font-weight:700;color:var(--green-soft);margin-top:3px;}
+.arm-parcela-medidas.ejecutado{color:var(--text3);}
+.btn-ejecutar{padding:6px 14px;border-radius:20px;font-size:11px;font-weight:700;
+  cursor:pointer;border:none;transition:all .15s;flex-shrink:0;}
+.btn-ejecutar.pendiente{background:rgba(109,186,58,.15);color:var(--green);
+  border:1px solid rgba(109,186,58,.35);}
+.btn-ejecutar.ejecutado{background:rgba(109,186,58,.8);color:white;}
+.arm-parcela-card.nueva .arm-parcela-header{border-left:3px solid var(--red);}
+
+.notif-nuevas{background:rgba(224,90,74,.12);border:1px solid rgba(224,90,74,.4);
+  border-radius:10px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;}
+.notif-nuevas-icon{font-size:22px;flex-shrink:0;}
+.notif-nuevas-txt{font-size:12px;color:var(--red);font-weight:700;}
+.notif-nuevas-sub{font-size:11px;color:var(--text2);margin-top:2px;font-weight:400;}
+
 /* VISTA PÚBLICA 3 días */
 .pub-row{background:var(--card);border:1px solid var(--border);border-radius:10px;
   margin-bottom:8px;overflow:hidden;}
@@ -240,13 +283,40 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 ══════════════════════════════════ -->
 <div id="pagArmadores" class="pag">
   <div class="sec-header">
-    <div class="sec-titulo">🔧 ARMADORES — Parcelas a armar</div>
+    <div class="sec-titulo">🔧 ARMADORES — Grupos</div>
     <button class="btn-refresh" onclick="refrescar('armadores')">↻</button>
   </div>
-  <div style="font-size:11px;color:var(--text3);margin-bottom:10px;">
-    Mostrando los próximos 14 días · ordenado por fecha de ingreso
+  <div id="notifNuevas" style="display:none;" class="notif-nuevas">
+    <div class="notif-nuevas-icon">🆕</div>
+    <div>
+      <div class="notif-nuevas-txt" id="notifNuevasTxt"></div>
+      <div class="notif-nuevas-sub">Nuevas parcelas agregadas desde tu última visita</div>
+    </div>
   </div>
   <div id="listaArmadores"></div>
+</div>
+
+<!-- PAG ARMADORES GRUPO -->
+<div id="pagArmadoresGrupo" class="pag">
+  <div class="sec-header">
+    <div class="sec-titulo" id="armGrupoTitulo">🔧 Parcelas</div>
+    <button class="btn-refresh" onclick="refrescarGrupoActual()">↻</button>
+  </div>
+  <div id="filtroArmadores" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+    <button onclick="setFiltroArm('todos')" id="filtroTodos"
+      style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;background:var(--green2);color:white;border:none;">
+      Todos
+    </button>
+    <button onclick="setFiltroArm('pendientes')" id="filtroPendientes"
+      style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;background:var(--card2);color:var(--text2);border:1px solid var(--border);">
+      Pendientes
+    </button>
+    <button onclick="setFiltroArm('ejecutados')" id="filtroEjecutados"
+      style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;background:var(--card2);color:var(--text2);border:1px solid var(--border);">
+      Ejecutados
+    </button>
+  </div>
+  <div id="listaArmadoresGrupo"></div>
 </div>
 
 <!-- ══════════════════════════════════
@@ -422,6 +492,7 @@ const titulos = {
   pagHome: 'San Ignacio de Velazco',
   pagVaqueros: '🐄 Vaqueros',
   pagArmadores: '🔧 Armadores',
+  pagArmadoresGrupo: '🔧 Parcelas del grupo',
   pagPublica: '👁 Visualización',
   pagCapataz: '👨‍🌾 Capataz'
 };
@@ -492,71 +563,198 @@ function renderVaqueros() {
 // ══════════════════════════════════════════════
 // RENDER ARMADORES
 // ══════════════════════════════════════════════
-function renderArmadores() {
+// ── EJECUTADOS en Firebase ──
+function getEjecutados() { return getData('armEjecutados', {}); }
+function setEjecutados(v) { setData('armEjecutados', v); }
+function armKey(a) { return (a.lote+'_'+a.potrero+'_'+a.parcela+'_'+(a.fechaIng||'')).replace(/[|.]/g,'_'); }
+function esEjecutado(a) { const e = getEjecutados(); return !!(e[armKey(a)]); }
+
+// ── Marcar/desmarcar ejecutado ──
+function toggleEjecutado(key) {
+  const ejs = getEjecutados();
+  if(ejs[key]) {
+    delete ejs[key]; // desmarcar
+  } else {
+    ejs[key] = { ts: Date.now() }; // marcar
+  }
+  setEjecutados(ejs);
+  // Re-render sin recargar Firebase
+  renderArmadoresGrupo(_armGrupoActual, false);
+  renderArmadores(false);
+}
+
+// ── Grupo actual en armadores ──
+let _armGrupoActual = null;
+let _armFiltro = 'todos';
+const ARM_ULTIMA_VISITA_KEY = 'arm_ultima_visita';
+
+function setFiltroArm(f) {
+  _armFiltro = f;
+  ['todos','pendientes','ejecutados'].forEach(id => {
+    const btn = document.getElementById('filtro'+id.charAt(0).toUpperCase()+id.slice(1));
+    if(btn) {
+      btn.style.background = id===f ? 'var(--green2)' : 'var(--card2)';
+      btn.style.color = id===f ? 'white' : 'var(--text2)';
+      btn.style.border = id===f ? 'none' : '1px solid var(--border)';
+    }
+  });
+  renderArmadoresGrupo(_armGrupoActual, false);
+}
+
+function refrescarGrupoActual() {
+  syncFB().then(() => {
+    renderArmadoresGrupo(_armGrupoActual, false);
+    notifV('✓ Datos actualizados');
+  });
+}
+
+// ── RENDER ARMADORES: lista de grupos ──
+function renderArmadores(checkNuevas=true) {
   const hoy    = new Date().toISOString().split('T')[0];
-  const fin    = sumarDias(hoy, 14);
+  const fin    = sumarDias(hoy, 21);
   const acts   = getActs().filter(a =>
     a.actividad==='MATERIA SECA' && a.fechaIng && a.lote &&
     a.fechaIng >= hoy && a.fechaIng <= fin
   );
   const grupos = getGrupos();
+  const ejs    = getEjecutados();
 
-  if(!acts.length) {
+  // Notificacion de parcelas nuevas desde ultima visita
+  if(checkNuevas) {
+    const ultimaVisita = localStorage.getItem(ARM_ULTIMA_VISITA_KEY) || '0000-00-00';
+    const nuevas = acts.filter(a => {
+      const cargadoEn = a.fechaCarga || a.fecha || hoy;
+      return cargadoEn > ultimaVisita;
+    });
+    const notifEl = document.getElementById('notifNuevas');
+    const notifTxt = document.getElementById('notifNuevasTxt');
+    if(nuevas.length > 0 && notifEl && notifTxt) {
+      notifTxt.textContent = nuevas.length + ' parcela' + (nuevas.length>1?'s':'') + ' nueva' + (nuevas.length>1?'s':'') + ' agregada' + (nuevas.length>1?'s':'');
+      notifEl.style.display = 'flex';
+    } else if(notifEl) {
+      notifEl.style.display = 'none';
+    }
+    // Guardar visita actual
+    localStorage.setItem(ARM_ULTIMA_VISITA_KEY, hoy);
+  }
+
+  if(!grupos.length) {
     document.getElementById('listaArmadores').innerHTML =
-      '<div class="arm-vacio">Sin aforos registrados para los próximos 14 días.<br>A medida que se carguen aforos, aparecen acá automáticamente.</div>';
+      '<div class="arm-vacio">Sin grupos configurados</div>';
     return;
   }
 
-  // Agrupar por fecha de ingreso
-  const porFecha = {};
-  acts.forEach(a => {
-    if(!porFecha[a.fechaIng]) porFecha[a.fechaIng] = [];
-    porFecha[a.fechaIng].push(a);
-  });
+  const html = grupos.map(g => {
+    const lote    = getLoteKey(g);
+    const nombre  = getNombreGrupo(g);
+    const tipo    = getTipoGrupo(g);
+    const actsG   = acts.filter(a => a.lote===lote);
+    const total   = actsG.length;
+    const ejec    = actsG.filter(a => ejs[armKey(a)]).length;
+    const pend    = total - ejec;
+    const hayNvas = actsG.some(a => {
+      const ultimaVisita = localStorage.getItem(ARM_ULTIMA_VISITA_KEY) || '0000-00-00';
+      return (a.fechaCarga||a.fecha||hoy) > ultimaVisita;
+    });
 
-  const fechasOrdenadas = Object.keys(porFecha).sort();
+    if(!total) return ''; // grupo sin parcelas programadas, no mostrar
 
-  const html = fechasOrdenadas.map(fecha => {
-    const esHoy   = fecha === hoy;
-    const dt      = new Date(fecha+'T12:00:00');
-    const diasStr = esHoy ? 'HOY' : sumarDias(hoy,0)===fecha ? 'HOY' :
-      Math.round((dt-new Date(hoy+'T12:00:00'))/86400000)===1 ? 'MAÑANA' :
-      DIAS[dt.getDay()]+' '+dt.getDate()+' '+MESES[dt.getMonth()];
-
-    const items = porFecha[fecha].map((a, i) => {
-      const g      = grupos.find(x => getLoteKey(x)===a.lote);
-      const nombre = g ? getNombreGrupo(g) : a.lote.split('|')[2]||a.lote;
-      const tipo   = g ? getTipoGrupo(g) : '';
-      const largo  = getLargoM(a);
-      const ancho  = a.anchoM;
-      const turno  = a.horaIng==='MAÑANA'?'🌅 Ingresa mañana': a.horaIng==='TARDE'?'🌇 Ingresa tarde':'';
-      let medidas  = '';
-      if(ancho && largo) medidas = `↔ ${ancho}m ancho · ${largo}m largo`;
-      else if(ancho)     medidas = `↔ ${ancho}m ancho`;
-      else if(largo)     medidas = `📏 ${largo}m largo`;
-      else               medidas = 'Sin medidas registradas';
-
-      return `<div class="arm-item">
-        <div class="arm-num">${i+1}</div>
-        <div class="arm-info">
-          <div class="arm-grupo">${nombre}${tipo?` <span style="font-size:10px;color:var(--text3);">· ${tipo}</span>`:''}</div>
-          <div class="arm-potpar">${a.potrero} · Parcela ${a.parcela}</div>
-          <div class="arm-medidas">${medidas}</div>
-          ${turno?`<div class="arm-turno">${turno}</div>`:''}
-        </div>
-      </div>`;
-    }).join('');
-
-    return `<div class="arm-card">
-      <div class="arm-card-header">
-        <div class="arm-fecha-badge">${diasStr}</div>
-        <div class="arm-dias-label">${fmtLargo(fecha)}</div>
+    return `<div class="arm-grupo-btn" onclick="abrirGrupoArmadores('${lote}')">
+      <div class="arm-grupo-icon">🐄</div>
+      <div class="arm-grupo-info">
+        <div class="arm-grupo-nombre">${nombre}</div>
+        <div class="arm-grupo-meta">${tipo||''}${tipo?' · ':''}<strong style="color:var(--text);">${total}</strong> parcela${total!==1?'s':''} · <span style="color:var(--green);">${ejec} ✓</span> · <span style="color:var(--gold2);">${pend} pend.</span></div>
       </div>
-      ${items}
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+        ${pend>0?`<span class="arm-grupo-badge">${pend} pend.</span>`:'<span class="arm-grupo-badge" style="background:rgba(109,186,58,.2);color:var(--green);">✓ Listo</span>'}
+        ${hayNvas?`<span class="arm-grupo-badge nuevas">🆕 nuevas</span>`:''}
+      </div>
+    </div>`;
+  }).filter(Boolean).join('') || '<div class="arm-vacio">Sin parcelas programadas para los próximos 21 días</div>';
+
+  document.getElementById('listaArmadores').innerHTML = html;
+}
+
+// ── RENDER PARCELAS DE UN GRUPO ──
+function abrirGrupoArmadores(lote) {
+  _armGrupoActual = lote;
+  _armFiltro = 'todos';
+  setFiltroArm('todos');
+  const grupos = getGrupos();
+  const g = grupos.find(x => getLoteKey(x)===lote);
+  const nombre = g ? getNombreGrupo(g) : lote.split('|')[2]||lote;
+  document.getElementById('armGrupoTitulo').textContent = '🔧 ' + nombre;
+  renderArmadoresGrupo(lote, false);
+  irA('pagArmadoresGrupo');
+}
+
+function renderArmadoresGrupo(lote, recargar=false) {
+  if(!lote) return;
+  const hoy  = new Date().toISOString().split('T')[0];
+  const fin  = sumarDias(hoy, 21);
+  const ejs  = getEjecutados();
+  const ultimaVisita = localStorage.getItem(ARM_ULTIMA_VISITA_KEY) || '0000-00-00';
+
+  let acts = getActs().filter(a =>
+    a.actividad==='MATERIA SECA' && a.lote===lote && a.fechaIng &&
+    a.fechaIng >= hoy && a.fechaIng <= fin
+  ).sort((a,b) => (a.fechaIng||'').localeCompare(b.fechaIng||''));
+
+  // Aplicar filtro
+  if(_armFiltro==='pendientes') acts = acts.filter(a => !ejs[armKey(a)]);
+  if(_armFiltro==='ejecutados') acts = acts.filter(a =>  ejs[armKey(a)]);
+
+  if(!acts.length) {
+    const msg = _armFiltro==='pendientes' ? '✓ Todas las parcelas ejecutadas' :
+                _armFiltro==='ejecutados' ? 'Sin parcelas ejecutadas aún' :
+                'Sin parcelas programadas para los próximos 21 días';
+    document.getElementById('listaArmadoresGrupo').innerHTML =
+      `<div class="arm-vacio">${msg}</div>`;
+    return;
+  }
+
+  const html = acts.map((a) => {
+    const key     = armKey(a);
+    const ejec    = !!ejs[key];
+    const largo   = getLargoM(a);
+    const ancho   = a.anchoM;
+    const turno   = a.horaIng==='MAÑANA'?'🌅 Ingresa mañana': a.horaIng==='TARDE'?'🌇 Ingresa tarde':'';
+    const esNueva = (a.fechaCarga||a.fecha||hoy) > ultimaVisita;
+    let medidas   = '';
+    if(ancho && largo) medidas = `↔ ${ancho}m ancho · 📏 ${largo}m largo`;
+    else if(ancho)     medidas = `↔ ${ancho}m ancho`;
+    else if(largo)     medidas = `📏 ${largo}m largo`;
+    else               medidas = '⚠️ Sin medidas';
+
+    const dt = new Date((a.fechaIng||hoy)+'T12:00:00');
+    const diasR = Math.round((dt - new Date(hoy+'T12:00:00'))/86400000);
+    const diasLabel = diasR===0?'HOY': diasR===1?'MAÑANA': diasR===2?'PASADO': DIAS[dt.getDay()]+' '+dt.getDate()+'/'+MESES[dt.getMonth()];
+
+    return `<div class="arm-parcela-card${ejec?' ejecutado':''}${esNueva&&!ejec?' nueva':''}">
+      <div class="arm-parcela-header ${ejec?'ejecutado':'pendiente'}">
+        <div class="arm-parcela-num ${ejec?'ejecutado':'pendiente'}">${ejec?'✓':a.parcela}</div>
+        <div class="arm-parcela-info">
+          <div class="arm-parcela-titulo ${ejec?'ejecutado':'pendiente'}">
+            ${a.potrero} · Parcela ${a.parcela}
+            ${esNueva&&!ejec?`<span style="font-size:9px;background:rgba(224,90,74,.2);color:var(--red);padding:1px 6px;border-radius:4px;margin-left:4px;">NUEVA</span>`:''}
+          </div>
+          <div class="arm-parcela-fecha">
+            <span style="font-weight:700;color:${diasR===0?'var(--red)':diasR===1?'var(--gold2)':'var(--text3)'};">${diasLabel}</span>
+            ${a.fechaIng?' · '+a.fechaIng:''}
+            ${a.fechaSal?' → '+a.fechaSal:''}
+          </div>
+          <div class="arm-parcela-medidas ${ejec?'ejecutado':''}">${medidas}</div>
+          ${turno&&!ejec?`<div style="font-size:10px;color:var(--gold2);margin-top:2px;">${turno}</div>`:''}
+          ${ejec?`<div style="font-size:10px;color:var(--green);margin-top:2px;">✓ Ejecutado · ${new Date(ejs[key].ts).toLocaleString('es-BO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</div>`:''}
+        </div>
+        <button class="btn-ejecutar ${ejec?'ejecutado':'pendiente'}" onclick="toggleEjecutado('${key}')">
+          ${ejec?'✓ Listo':'Ejecutar'}
+        </button>
+      </div>
     </div>`;
   }).join('');
 
-  document.getElementById('listaArmadores').innerHTML = html;
+  document.getElementById('listaArmadoresGrupo').innerHTML = html;
 }
 
 // ══════════════════════════════════════════════
@@ -802,9 +1000,10 @@ function confirmarCambioSal() {
 async function refrescar(vista) {
   notifV('↻ Actualizando...');
   await syncFB();
-  if(vista==='vaqueros')   renderVaqueros();
-  if(vista==='armadores')  renderArmadores();
-  if(vista==='publica')    renderPublica();
+  if(vista==='vaqueros')        renderVaqueros();
+  if(vista==='armadores')       renderArmadores(false);
+  if(vista==='armadoresGrupo')  renderArmadoresGrupo(_armGrupoActual, false);
+  if(vista==='publica')         renderPublica();
   notifV('✓ Datos actualizados');
 }
 
@@ -839,14 +1038,15 @@ function notifV(msg, error=false) {
 
   // Pre-render todas las vistas
   renderVaqueros();
-  renderArmadores();
+  renderArmadores(true);
   renderPublica();
 
   // Refrescar automático cada 5 min
   setInterval(async()=>{
     await syncFB();
-    renderVaqueros(); renderArmadores(); renderPublica();
+    renderVaqueros(); renderArmadores(false); renderPublica();
     if(paginaActual==='pagCapataz') renderCapataz();
+    if(paginaActual==='pagArmadoresGrupo' && _armGrupoActual) renderArmadoresGrupo(_armGrupoActual, false);
   }, 5*60*1000);
 })();
 </script>
