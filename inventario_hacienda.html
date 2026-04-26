@@ -225,7 +225,7 @@ tr:hover td{background:rgba(109,186,58,.04);}
   <!-- CARD: MARGEN DE REPOSICIÓN POR GRUPO -->
   <div class="card" style="margin-top:12px;">
     <div class="ch">
-      <div class="ct">🎯 Margen de Reposición por Grupo — ¿Qué conviene vender?</div>
+      <div class="ct">🎯 Rentabilidad y Decisión por Grupo</div>
       <div style="display:flex;gap:8px;align-items:center;">
         <span style="font-size:11px;color:var(--t2);">Precio repos. Bs/kg:</span>
         <input type="number" id="dashPrecRepos" step="0.5" min="0" placeholder="ej: 22"
@@ -241,10 +241,11 @@ tr:hover td{background:rgba(109,186,58,.04);}
       <table>
         <thead><tr>
           <th>Grupo</th><th>Cab.</th>
-          <th>Peso prom. hoy</th><th>Costo repos. prom.</th>
-          <th>Valor venta prom.</th><th>Kg ganados prom.</th>
-          <th style="color:var(--gold);">Margen repos. Bs/kg</th>
-          <th style="color:var(--green);">Margen repos. total</th>
+          <th>Peso hoy</th><th>Kg ganados</th>
+          <th>Días campo</th>
+          <th style="color:var(--gold);">③ Bs/kg ganado (repos.)</th>
+          <th style="color:var(--green);">① Bs/día (repos.)</th>
+          <th style="color:var(--blue);">Margen total repos.</th>
           <th>Decisión</th>
         </tr></thead>
         <tbody id="dashMargRepos"><tr><td colspan="9" class="emp">Ingresá el precio de reposición para calcular</td></tr></tbody>
@@ -1234,21 +1235,34 @@ function renderSimulador(){
     const costoRUnit = pesoIngProm * precRepos;
     const ingresos = peso * precVenta * cabezas;
 
-    // ─── VARIABLE A: Eficiencia real ajustada (reposición) ───
-    // (Precio venta − Precio compra reposición) ÷ kg ganados ÷ días
-    // Bs por cada kg ganado por día → ¿sigue rindiendo a precios de hoy?
-    const margenA = (peso * precVenta) - costoRUnit; // por animal
-    const varA = kgGanados > 0 && diasTotal > 0
-      ? Math.round(margenA / kgGanados / diasTotal * 100) / 100
-      : null;
-    // Margen total grupo con reposición
-    const margenATot = margenA * cabezas;
+    // Precio compra original promedio del grupo (Bs/animal)
+    const precCompOrig = gd.animales.length>0
+      ? gd.animales.reduce((s,a)=>{
+          const anim=animales[String(a.ide)];
+          return s+(anim&&anim.precioCompra?anim.precioCompra:pesoIngProm*(precRepos||0));
+        },0)/gd.animales.length
+      : pesoIngProm*(precRepos||0);
 
-    // ─── VARIABLE C: Rentabilidad diaria ajustada (reposición) ───
-    // (Precio venta proyectado − Precio compra reposición) ÷ días totales
-    // Bs por día que lleva en campo → ¿vale cada día adicional?
-    const varC = diasTotal > 0
-      ? Math.round(margenA / diasTotal * 100) / 100
+    // ─── INDICADOR 1: Rentabilidad diaria ajustada (reposición) ───
+    // (P.venta − P.compra repos.) ÷ días
+    const margenRepos = (peso * precVenta) - costoRUnit; // por animal
+    const margenReposTot = margenRepos * cabezas;
+    const ind1 = diasTotal > 0
+      ? Math.round(margenRepos / diasTotal * 100) / 100
+      : null;
+
+    // ─── INDICADOR 2: Rentabilidad diaria histórica (costo real) ───
+    // (P.venta − P.compra original) ÷ días
+    const margenHist = (peso * precVenta) - precCompOrig; // por animal
+    const margenHistTot = margenHist * cabezas;
+    const ind2 = diasTotal > 0
+      ? Math.round(margenHist / diasTotal * 100) / 100
+      : null;
+
+    // ─── INDICADOR 3: Eficiencia por kg ganado (ajustada reposición) ───
+    // (P.venta − P.compra repos.) ÷ kg ganados
+    const ind3 = kgGanados > 0
+      ? Math.round(margenRepos / kgGanados * 100) / 100
       : null;
     const label = d===0?'HOY':('En '+d+' días');
     const col = d===0?'var(--red)':d===30?'var(--gold)':d===60?'var(--blue)':'var(--green)';
@@ -1257,16 +1271,18 @@ function renderSimulador(){
       kgGanados:Math.round(kgGanados),
       diasTotal,
       ingresos:Math.round(ingresos),
-      margenATot:Math.round(margenATot),
-      varA,  // Bs/kg ganado/día (eficiencia ajustada reposición)
-      varC,  // Bs/día en campo (rentabilidad diaria ajustada)
+      margenReposTot:Math.round(margenReposTot),
+      margenHistTot:Math.round(margenHistTot),
+      ind1,  // Rentabilidad diaria ajustada (repos)
+      ind2,  // Rentabilidad diaria histórica (costo real)
+      ind3,  // Eficiencia Bs/kg ganado (ajustada repos)
       col};
   });
 
-  // Óptimo = mayor varA (eficiencia Bs/kg ganado/día)
-  // Si todos igualan o bajan → vender ya (HOY es el óptimo)
+  // Óptimo = mayor ind1 (rentabilidad diaria ajustada reposición)
+  // Cuando empieza a bajar → señal de venta
   const optimo = filas.reduce((best,f)=>
-    f.varA!=null&&(best.varA==null||f.varA>best.varA)?f:best,
+    f.ind1!=null&&(best.ind1==null||f.ind1>best.ind1)?f:best,
     filas[0]);
 
   div.innerHTML=`
@@ -1275,32 +1291,32 @@ function renderSimulador(){
       <div style="background:var(--card2);padding:14px;border-radius:8px;border:2px solid ${f.d===optimo.d?f.col:'transparent'};position:relative;">
         ${f.d===optimo.d?`<div style="position:absolute;top:6px;right:8px;font-size:11px;font-weight:800;color:${f.col};">⭐ ÓPTIMO</div>`:''}
         <div style="color:${f.col};font-weight:800;font-size:13px;">${f.label}</div>
-        <div style="font-size:11px;color:var(--t2);margin-top:6px;">Peso: <b>${f.peso} kg</b> · <span style="color:var(--green);">+${f.kgGanados} kg ganados</span></div>
+        <div style="font-size:11px;color:var(--t2);margin-top:6px;">Peso: <b>${f.peso} kg</b> · <span style="color:var(--green);">+${f.kgGanados} kg gan.</span></div>
         <div style="font-size:11px;color:var(--t2);">Días en campo: <b>${f.diasTotal}</b></div>
-        <div style="font-size:11px;color:var(--t2);margin-top:4px;">Ingreso total: <b>Bs ${fmt(f.ingresos)}</b></div>
-        <div style="font-size:12px;color:${f.col};font-weight:700;margin-top:4px;">Margen total: Bs ${fmt(f.margenATot)}</div>
+        <div style="font-size:11px;color:var(--t2);">Ingreso venta: <b>Bs ${fmt(f.ingresos)}</b></div>
         <div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--card3);">
-          <div style="font-size:10px;color:var(--t2);margin-bottom:2px;">🅐 Eficiencia ajustada repos.:</div>
-          <div style="font-size:14px;font-weight:800;color:${f.col};"
-            title="(P.venta − P.compra repos.) ÷ kg ganados ÷ días">${f.varA!=null?'Bs '+f.varA+'/kg gan./día':'—'}</div>
+          <div style="font-size:10px;color:var(--t2);font-weight:700;">① RENT. DIARIA (ajust. repos.)</div>
+          <div style="font-size:15px;font-weight:800;color:${f.col};">${f.ind1!=null?'Bs '+f.ind1+'/día':'—'}</div>
+          <div style="font-size:10px;color:var(--t2);">Margen total: Bs ${fmt(f.margenReposTot)}</div>
         </div>
-        <div style="margin-top:6px;">
-          <div style="font-size:10px;color:var(--t2);margin-bottom:2px;">🅒 Rentabilidad diaria:</div>
-          <div style="font-size:14px;font-weight:800;color:${f.col};"
-            title="(P.venta − P.compra repos.) ÷ días en campo">${f.varC!=null?'Bs '+f.varC+'/día':'—'}</div>
+        <div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--card3);">
+          <div style="font-size:10px;color:var(--t2);font-weight:700;">② RENT. DIARIA (costo real)</div>
+          <div style="font-size:15px;font-weight:800;color:${f.col};">${f.ind2!=null?'Bs '+f.ind2+'/día':'—'}</div>
+          <div style="font-size:10px;color:var(--t2);">Margen total: Bs ${fmt(f.margenHistTot)}</div>
+        </div>
+        <div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--card3);">
+          <div style="font-size:10px;color:var(--t2);font-weight:700;">③ EFICIENCIA (Bs/kg ganado, repos.)</div>
+          <div style="font-size:15px;font-weight:800;color:${f.col};">${f.ind3!=null?'Bs '+f.ind3+'/kg':'—'}</div>
         </div>
       </div>`).join('')}
     </div>
     <div style="padding:10px 14px;background:var(--card2);border-radius:8px;border-left:4px solid ${optimo.col};font-size:12px;">
-      <b style="color:${optimo.col};">📊 Recomendación:</b> El momento óptimo de venta para <b>${GRUS[g]||g}</b> es <b style="color:${optimo.col};">${optimo.label}</b>.
-      <br><span style="font-size:12px;">
-      🅐 <b>Eficiencia:</b> Bs ${optimo.varA||'—'}/kg ganado/día ·
-      🅒 <b>Rentabilidad:</b> Bs ${optimo.varC||'—'}/día ·
-      Margen total: <b>Bs ${fmt(optimo.margenATot)}</b>
-      </span>
-      <br><span style="font-size:10px;color:var(--t2);">
-      🅐 = (P.venta − P.repos.) ÷ kg ganados ÷ días · 
-      🅒 = (P.venta − P.repos.) ÷ días en campo
+      <b style="color:${optimo.col};">📊 Recomendación:</b> El momento óptimo de venta para <b>${GRUS[g]||g}</b> es <b style="color:${optimo.col};">${optimo.label}</b> 
+      (mayor rentabilidad diaria ajustada: <b>Bs ${optimo.ind1||'—'}/día</b>).
+      <br><span style="font-size:11px;color:var(--t2);">
+      ① (P.venta − P.repos.) ÷ días · 
+      ② (P.venta − P.compra real) ÷ días · 
+      ③ (P.venta − P.repos.) ÷ kg ganados
       </span>
     </div>`;
 }
@@ -1405,6 +1421,8 @@ function renderMargRepos(){
     gmap[g].sumPesoHoy+=pesoHoy; gmap[g].nPesoH++;
     gmap[g].sumKgGan+=kgGan; gmap[g].nKgGan++;
     gmap[g].sumCostoRepos+=costoR; gmap[g].nCostoR++;
+    if(!gmap[g].animales) gmap[g].animales=[];
+    gmap[g].animales.push({ide:a.ide,diasCampo:diasTotal});
     gmap[g].sumValorVenta+=valorVenta; gmap[g].nValorV++;
     gmap[g].totMargenR+=margenR;
     if(margenRKg!=null){gmap[g].sumMargenR+=margenRKg;gmap[g].nMargenR++;}
@@ -1425,25 +1443,29 @@ function renderMargRepos(){
 
   tb.innerHTML = rows.map((g,i)=>{
     const pesoH = g.nPesoH>0?Math.round(g.sumPesoHoy/g.nPesoH):null;
-    const costoR = g.nCostoR>0?Math.round(g.sumCostoRepos/g.nCostoR):null;
-    const valV = g.nValorV>0?Math.round(g.sumValorVenta/g.nValorV):null;
     const kgGan = g.nKgGan>0?Math.round(g.sumKgGan/g.nKgGan):null;
-    const marKg = g.nMargenR>0?(g.sumMargenR/g.nMargenR).toFixed(2):null;
     const totMar = Math.round(g.totMargenR);
+    // ③ Bs/kg ganado (ajustado reposición) = margen repos / kg ganados prom
+    const ind3dash = g.nKgGan>0&&kgGan>0 ? (totMar/g.n/kgGan).toFixed(2) : null;
+    // ① Bs/día (ajustado reposición) = margen repos / días campo prom
+    const diasProm = g.animales&&g.animales.length>0 
+      ? Math.round(g.animales.reduce((s,a)=>s+(a.diasCampo||0),0)/g.animales.length) 
+      : null;
+    const ind1dash = diasProm&&diasProm>0 ? (totMar/g.n/diasProm).toFixed(2) : null;
 
-    // Color por posición: rojo = bajo margen (vender), verde = alto (retener)
+    // Color: ordenado por ind1 (rentabilidad diaria)
     const ratio = rows.length>1?(i/(rows.length-1)):0.5;
     const col = ratio<0.33?'var(--red)':ratio<0.66?'var(--gold)':'var(--green)';
-    const decision = ratio<0.33?'⚠️ Candidato a venta':ratio<0.66?'⏳ Monitorear':'✅ Retener';
+    const decision = ratio<0.33?'⚠️ Vender primero':ratio<0.66?'⏳ Monitorear':'✅ Retener';
 
     return`<tr>
       <td><b>${GRUS[g.grupo]||g.grupo}</b></td>
       <td class="mn tg">${g.n}</td>
       <td class="mn">${pesoH?pesoH+' kg':'—'}</td>
-      <td class="mn">${costoR?'Bs '+fmt(costoR):'—'}</td>
-      <td class="mn">${valV?'Bs '+fmt(valV):'—'}</td>
-      <td class="mn">${kgGan?'+'+kgGan+' kg':'—'}</td>
-      <td class="mn" style="color:${col};font-weight:800;font-size:13px;">${marKg?'Bs '+marKg:'—'}</td>
+      <td class="mn" style="color:var(--green);">${kgGan?'+'+kgGan+' kg':'—'}</td>
+      <td class="mn" style="color:var(--t2);">${diasProm?diasProm+' d':'—'}</td>
+      <td class="mn" style="color:${col};font-weight:800;">${ind3dash?'Bs '+ind3dash+'/kg':'—'}</td>
+      <td class="mn" style="color:${col};font-weight:800;font-size:13px;">${ind1dash?'Bs '+ind1dash+'/día':'—'}</td>
       <td class="mn tg" style="color:${col};">${totMar?'Bs '+fmt(totMar):'—'}</td>
       <td style="font-size:11px;color:${col};font-weight:700;">${decision}</td>
     </tr>`;
