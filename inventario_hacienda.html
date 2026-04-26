@@ -209,7 +209,13 @@ tr:hover td{background:rgba(109,186,58,.04);}
   <div class="card">
     <div class="ch"><div class="ct">📊 Inventario por Grupo</div></div>
     <div class="tw"><table>
-      <thead><tr><th>Grupo</th><th>Cabezas</th><th>Peso Últ. Pesaje</th><th>GMD Prom.</th><th style="color:var(--green);">⚖️ Peso Hoy</th><th>Orígenes</th></tr></thead>
+      <thead><tr>
+  <th>Grupo</th><th>Cabezas</th><th>Peso Últ. Pesaje</th><th>GMD Prom.</th>
+  <th style="color:var(--green);">⚖️ Peso Hoy</th>
+  <th style="color:var(--gold);" title="(Valor venta hoy − Costo repos. animales más livianos) ÷ días en campo">① Rent. Ajust. Repos. Bs/día</th>
+  <th style="color:var(--blue);" title="(Valor venta hoy − Precio compra original) ÷ días en campo">② Rent. Real Bs/día</th>
+  <th>Orígenes</th>
+</tr></thead>
       <tbody id="dGrupos"><tr><td colspan="6"><div class="ldr"><div class="ls"></div></div></td></tr></tbody>
     </table></div>
   </div>
@@ -1422,6 +1428,19 @@ function renderProyIngresos(porGrupo, precRepos){
 }
 
 
+function filtQuickGrupo2(grupo){
+  showPg('animales');
+  const sel=document.getElementById('fGrupo');
+  if(sel){sel.value=grupo;}
+  // Limpiar otros filtros
+  const fTipo=document.getElementById('fTipo');if(fTipo)fTipo.value='';
+  const fCat=document.getElementById('fCat');if(fCat)fCat.value='';
+  const fOrigen=document.getElementById('fOrigen');if(fOrigen)fOrigen.value='';
+  const fBus=document.getElementById('fBus');if(fBus)fBus.value='';
+  filtA();
+}
+
+
 function renderMargRepos(){
   const precRepos = parseFloat(document.getElementById('dashPrecRepos')?.value)||window._precRepos||null;
   const tb = document.getElementById('dashMargRepos');
@@ -1550,12 +1569,29 @@ function renderDash(){
   // TABLA GRUPOS: solo grupo sin repetir, con GMD real y peso proyectado
   const hoy_d=new Date();
   const lp_d=window._lastPes||{};
+
+  // ─── Precio de reposición inteligente por categoría ───
+  // Toma el Bs/kg de los animales más livianos activos de cada categoría
+  const precReposCat={};
+  ['VAQUILLA','TORILLO','VACA'].forEach(cat=>{
+    const livianos=act.filter(a=>a.categoria===cat&&a.pesoIngreso&&a.precioCompra&&a.pesoIngreso>0)
+      .sort((a,b)=>a.pesoIngreso-b.pesoIngreso)
+      .slice(0,Math.max(1,Math.floor(act.filter(x=>x.categoria===cat).length*0.1))); // 10% más livianos
+    if(livianos.length>0){
+      const promBsKg=livianos.reduce((s,a)=>s+a.precioCompra/a.pesoIngreso,0)/livianos.length;
+      precReposCat[cat]=Math.round(promBsKg*100)/100;
+    }
+  });
+
   const gmap={};
   act.forEach(a=>{
     const g=a.grupo||'SIN GRUPO';
-    if(!gmap[g])gmap[g]={grupo:g,n:0,origenes:new Set(),sumGmd:0,nGmd:0,sumPeso:0,nPeso:0,sumPesoProy:0};
+    if(!gmap[g])gmap[g]={grupo:g,n:0,origenes:new Set(),sumGmd:0,nGmd:0,sumPeso:0,nPeso:0,sumPesoProy:0,
+      // Acumuladores para rentabilidad
+      sumInd1:0,nInd1:0,sumInd2:0,nInd2:0,cat:a.categoria||''};
     gmap[g].n++;
     if(a.origen)gmap[g].origenes.add(a.origen);
+    if(!gmap[g].cat&&a.categoria)gmap[g].cat=a.categoria;
     const lpa=lp_d[a.ide];
     if(lpa&&a.pesoIngreso&&a.fechaIngreso&&lpa.peso&&lpa.fecha){
       let fi=parseFecha(a.fechaIngreso);
@@ -1570,6 +1606,27 @@ function renderDash(){
           gmap[g].sumPeso+=lpa.peso;gmap[g].nPeso++;
           const dsd=Math.max(0,Math.round((hoy_d-new Date(lpa.fecha+'T12:00:00'))/86400000));
           gmap[g].sumPesoProy+=(lpa.peso+gmdR*dsd);
+          // Calcular rentabilidades individuales
+          const pesoHoyAnim=lpa.peso+gmdR*dsd;
+          const diasCampo=diasTot+dsd;
+          if(diasCampo>0&&pesoHoyAnim>0){
+            // Precio de reposición para esta categoría
+            const cat=a.categoria||'';
+            const pRep=precReposCat[cat]||window._precRepos||0;
+            // ① Rent. ajustada reposición = (valor venta hoy − costo repos) / días
+            if(pRep>0&&a.pesoIngreso){
+              const valorVentaEst=pesoHoyAnim*(window._precRepos||pRep*1.1);
+              const costoRep=a.pesoIngreso*pRep;
+              gmap[g].sumInd1+=(valorVentaEst-costoRep)/diasCampo;
+              gmap[g].nInd1++;
+            }
+            // ② Rent. real = (valor venta hoy − precio compra original) / días
+            if(a.precioCompra&&a.pesoIngreso){
+              const valorVentaEst2=pesoHoyAnim*(window._precRepos||pRep*1.1);
+              gmap[g].sumInd2+=(valorVentaEst2-a.precioCompra)/diasCampo;
+              gmap[g].nInd2++;
+            }
+          }
         }
       }
     }
@@ -1583,12 +1640,22 @@ function renderDash(){
     const pesoH=g.nGmd>0?Math.round(g.sumPesoProy/g.nGmd):null;
     const origStr=[...g.origenes].slice(0,4).join(', ')+(g.origenes.size>4?'...':'');
     const gCol=gmd!=null?(parseFloat(gmd)>=0.8?'var(--green)':parseFloat(gmd)>=0.5?'var(--gold)':'var(--red)'):'var(--t2)';
-    return`<tr style="cursor:pointer;" onclick="verDetalleGrupo('${g.grupo}');showPg('informes');">
-      <td><b>${GRUS[g.grupo]||g.grupo}</b></td>
+    const ind1=g.nInd1>0?Math.round(g.sumInd1/g.nInd1*100)/100:null;
+    const ind2=g.nInd2>0?Math.round(g.sumInd2/g.nInd2*100)/100:null;
+    const i1Col=ind1!=null?(ind1>10?'var(--green)':ind1>0?'var(--gold)':'var(--red)'):'var(--t2)';
+    const i2Col=ind2!=null?(ind2>10?'var(--green)':ind2>0?'var(--gold)':'var(--red)'):'var(--t2)';
+    const pRepCat=precReposCat[g.cat]||window._precRepos||null;
+    return`<tr style="cursor:pointer;" title="Click → ver animales del grupo"
+      onclick="filtQuickGrupo2('${g.grupo}')">
+      <td><b style="color:var(--green);">${GRUS[g.grupo]||g.grupo}</b>
+        ${pRepCat?`<br><span style="font-size:9px;color:var(--t2);">repos: Bs ${pRepCat}/kg</span>`:''}
+      </td>
       <td class="mn tg">${g.n}</td>
       <td class="mn">${pesoU?pesoU+' kg':'—'}</td>
       <td class="mn" style="color:${gCol};font-weight:bold;">${gmd?gmd+' kg/d':'—'}</td>
       <td class="mn tg"><b>${pesoH?pesoH+' kg':'—'}</b></td>
+      <td class="mn" style="color:${i1Col};font-weight:700;">${ind1!=null?'Bs '+ind1+'/día':'—'}</td>
+      <td class="mn" style="color:${i2Col};">${ind2!=null?'Bs '+ind2+'/día':'—'}</td>
       <td style="font-size:10px;color:var(--t2);">${origStr||'—'}</td>
     </tr>`;
   }).join('');}
