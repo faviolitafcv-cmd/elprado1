@@ -1977,59 +1977,66 @@ function notif(msg, err=false) {
 // RETORNO AUTOMÁTICO
 // ═══════════════════════════════════════
 function calcRetornoAuto(potrero, parcela, excludeId) {
+  // ================================================================
+  // LOGICA CORRECTA:
+  // Buscar la VUELTA ANTERIOR completa del potrero.
+  // De todas las parcelas de esa vuelta anterior, tomar la fecha de
+  // salida MAS TARDIA de cualquier actividad que cuente:
+  // INGRESO HDA (fechaSal), DESBROZAR (fechaSalMaq), ROLO (fechaSalMaq),
+  // MATERIA SECA con fechaSal (historico).
+  // El retorno = dias desde esa fecha hasta hoy.
+  // ================================================================
+
   const acts = getActividades();
   const today = new Date().toISOString().split('T')[0];
+
+  // ── Determinar limites de vuelta actual y vuelta anterior ──
+  const vueltas = getVueltasData();
+  const inicios = vueltas
+    .filter(f => f.potrero === potrero && f.tipo === 'INICIO')
+    .sort((a,b) => b.fecha.localeCompare(a.fecha)); // desc
+
+  // inicios[0] = inicio vuelta actual, inicios[1] = inicio vuelta anterior
+  const inicioActual   = inicios[0] ? inicios[0].fecha : null;
+  const inicioAnterior = inicios[1] ? inicios[1].fecha : null;
+
+  // Si no hay al menos un inicio de vuelta registrado, sin historial
+  if(!inicioActual) return { dias: null, lastDate: null, lastEvt: null };
+
+  // Registros de la vuelta ANTERIOR: entre inicioAnterior y inicioActual
+  // Si no hay inicioAnterior, tomar todo lo anterior a inicioActual
+  const actsVueltaAnterior = acts.filter(a => {
+    if(a.potrero !== potrero) return false;
+    if(excludeId && a.id === excludeId) return false;
+    if(a.actividad === 'FIN_VUELTA') return false;
+    const fechaAct = a.fechaIng || a.fecha;
+    if(inicioAnterior && fechaAct < inicioAnterior) return false;
+    if(fechaAct >= inicioActual) return false; // no incluir vuelta actual
+    return true;
+  });
+
+  if(!actsVueltaAnterior.length) return { dias: null, lastDate: null, lastEvt: null };
+
+  // ── Encontrar la fecha de salida MAS TARDIA de la vuelta anterior ──
   let lastDate = null;
-  let lastEvt = null;
+  let lastEvt  = null;
 
-  // ── Buscar el último FIN_VUELTA de este potrero ──
-  let lastFinVuelta = null;
-  for(const a of acts) {
-    if(a.potrero !== potrero) continue;
-    if(excludeId && a.id === excludeId) continue;
-    if(a.actividad === 'FIN_VUELTA') {
-      if(!lastFinVuelta || a.fecha > lastFinVuelta.fecha) lastFinVuelta = a;
-    }
-  }
+  for(const a of actsVueltaAnterior) {
+    let fecha = null;
 
-  for(const a of acts) {
-    if(a.potrero !== potrero) continue;
-    if(excludeId && a.id === excludeId) continue;
-    if(a.actividad === 'FIN_VUELTA') continue; // se maneja aparte
-
-    // CASO 1: Desbrozar potrero completo → afecta todas las parcelas
-    if(a.actividad === 'DESBROZAR' && a.modoDesb === 'POTRERO_COMPLETO') {
-      const fecha = a.fechaSalMaq || a.fecha;
-      if(fecha && (!lastDate || fecha > lastDate)) { lastDate = fecha; lastEvt = a; }
-      continue;
+    if(a.actividad === 'INGRESO HDA') {
+      fecha = a.fechaSal || null;
+    } else if(a.actividad === 'DESBROZAR' || a.actividad === 'ROLO') {
+      fecha = a.fechaSalMaq || null;
+    } else if(a.actividad === 'MATERIA SECA' && a.fechaSal) {
+      fecha = a.fechaSal;
+    } else {
+      continue; // actividad que no cuenta
     }
 
-    // CASO 2: MATERIA SECA con fechaSal (histórico Excel) → cuenta como ingreso/salida
-    if(a.actividad === 'MATERIA SECA' && a.fechaSal && a.parcela === parcela) {
-      const fecha = a.fechaSal;
-      if(fecha && (!lastDate || fecha > lastDate)) { lastDate = fecha; lastEvt = a; }
-      continue;
-    }
-
-    // CASO 3: Actividades que afectan retorno (INGRESO HDA, DESBROZAR, ROLO, SIEMBRA)
-    if(!AFECTA_RETORNO.includes(a.actividad)) continue;
-    if(a.parcela !== parcela) continue;
-
-    let fecha = a.fecha;
-    if(a.actividad === 'INGRESO HDA')                    fecha = a.fechaSal || a.fecha;
-    if(a.actividad === 'DESBROZAR' || a.actividad === 'ROLO') fecha = a.fechaSalMaq || a.fecha;
-    if(a.actividad === 'SIEMBRA')                        fecha = a.fechaSalMaq || a.fecha;
-
-    if(fecha && (!lastDate || fecha > lastDate)) { lastDate = fecha; lastEvt = a; }
-  }
-
-  // ── Si no hay registro propio de esta parcela posterior al FIN_VUELTA,
-  //    usar la fecha del FIN_VUELTA como inicio del descanso ──
-  if(lastFinVuelta) {
-    const fvFecha = lastFinVuelta.fecha;
-    if(!lastDate || fvFecha > lastDate) {
-      lastDate = fvFecha;
-      lastEvt = { ...lastFinVuelta, actividad: 'FIN VUELTA' };
+    if(fecha && (!lastDate || fecha > lastDate)) {
+      lastDate = fecha;
+      lastEvt  = a;
     }
   }
 
@@ -2310,26 +2317,57 @@ function eliminarPotreroExtra(nombre) {
 
 function sugerirProximaParcela() {
   if(actActual !== 'MATERIA SECA') return;
-  const potrero = document.getElementById('fPotrero').value;
-  const lote    = document.getElementById('fLote')?.value;
+  const potrero  = document.getElementById('fPotrero').value;
+  const lote     = document.getElementById('fLote')?.value;
   const elParcela = document.getElementById('fParcela');
   if(!potrero || !lote || !elParcela) return;
-  if(elParcela.value) return; // No sobreescribir si ya tiene algo
+  if(elParcela.value) return;
 
   const editId = document.getElementById('formComun')?.dataset?.editId || null;
-  const acts = getActividades().filter(a =>
+
+  // Determinar inicio de vuelta actual
+  const vueltas = getVueltasData();
+  const ultInicio = vueltas
+    .filter(f => f.potrero === potrero && f.tipo === 'INICIO')
+    .sort((a,b) => b.fecha.localeCompare(a.fecha))[0];
+  const desdeFecha = ultInicio ? ultInicio.fecha : '0000-00-00';
+
+  // Si hay FIN_VUELTA posterior al ultimo INICIO -> nueva vuelta -> P1
+  const hayFinPosterior = vueltas.some(f =>
+    f.potrero === potrero && f.tipo === 'FIN' && f.fecha >= desdeFecha
+  );
+  const hayFinAct = getActividades().some(a =>
+    a.potrero === potrero &&
+    a.actividad === 'FIN_VUELTA' &&
+    a.fecha >= desdeFecha &&
+    (!editId || a.id !== editId)
+  );
+  if(hayFinPosterior || hayFinAct) {
+    elParcela.value = 1;
+    elParcela.style.borderColor = 'var(--green2)';
+    actualizarSaldoHA();
+    return;
+  }
+
+  // Solo registros de la vuelta actual
+  const actsVuelta = getActividades().filter(a =>
     a.actividad === 'MATERIA SECA' &&
     a.potrero === potrero &&
     a.lote === lote &&
-    (!editId || a.id !== editId)
+    (!editId || a.id !== editId) &&
+    (a.fechaIng || a.fecha) >= desdeFecha
   );
-  if(!acts.length) return;
 
-  // Encontrar número de parcela más alto
-  const nums = acts.map(a => parseInt(a.parcela)).filter(n => !isNaN(n));
+  if(!actsVuelta.length) {
+    elParcela.value = 1;
+    elParcela.style.borderColor = 'var(--green2)';
+    actualizarSaldoHA();
+    return;
+  }
+
+  const nums = actsVuelta.map(a => parseInt(a.parcela)).filter(n => !isNaN(n));
   if(!nums.length) return;
-  const maxParcela = Math.max(...nums);
-  elParcela.value = maxParcela + 1;
+  elParcela.value = Math.max(...nums) + 1;
   elParcela.style.borderColor = 'var(--green2)';
   actualizarSaldoHA();
 }
@@ -2426,15 +2464,29 @@ function actualizarSaldoHA() {
     }
   }
 
-  // Próxima parcela sugerida
+  // Próxima parcela sugerida — solo vuelta actual
   if(elProx) {
-    const acts = getActividades().filter(a =>
-      a.actividad === 'MATERIA SECA' && a.potrero === potrero && a.lote === lote &&
-      (!editId || a.id !== editId)
-    );
-    const nums = acts.map(a => parseInt(a.parcela)).filter(n => !isNaN(n));
-    const proxNum = nums.length > 0 ? Math.max(...nums) + 1 : 1;
-    elProx.textContent = 'P' + proxNum;
+    const vueltas = getVueltasData();
+    const ultInicio = vueltas
+      .filter(f => f.potrero === potrero && f.tipo === 'INICIO')
+      .sort((a,b) => b.fecha.localeCompare(a.fecha))[0];
+    const desdeFecha = ultInicio ? ultInicio.fecha : '0000-00-00';
+
+    // Si hay FIN posterior al ultimo INICIO -> nueva vuelta -> P1
+    const hayFin = vueltas.some(f => f.potrero === potrero && f.tipo === 'FIN' && f.fecha >= desdeFecha)
+      || getActividades().some(a => a.potrero === potrero && a.actividad === 'FIN_VUELTA' && a.fecha >= desdeFecha && (!editId || a.id !== editId));
+
+    if(hayFin) {
+      elProx.textContent = 'P1';
+    } else {
+      const actsV = getActividades().filter(a =>
+        a.actividad === 'MATERIA SECA' && a.potrero === potrero && a.lote === lote &&
+        (!editId || a.id !== editId) &&
+        (a.fechaIng || a.fecha) >= desdeFecha
+      );
+      const nums = actsV.map(a => parseInt(a.parcela)).filter(n => !isNaN(n));
+      elProx.textContent = 'P' + (nums.length > 0 ? Math.max(...nums) + 1 : 1);
+    }
   }
 
   // Mostrar fecha de inicio de vuelta
