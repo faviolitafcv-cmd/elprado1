@@ -1239,9 +1239,16 @@ function renderSimulador(){
   const diasCampoActual = gd.animales.length>0
     ? Math.round(gd.animales.reduce((s,a)=>s+(a.diasCampo||0),0)/gd.animales.length)
     : 0;
-  // Peso promedio de ingreso
+  // Peso promedio de ingreso REAL (desde animales[])
   const pesoIngProm = gd.animales.length>0
-    ? gd.animales.reduce((s,a)=>s+(a.pesoMin?a.pesoMin:pesoH-gmd*diasCampoActual),0)/gd.animales.length
+    ? (()=>{
+        let sum=0,n=0;
+        gd.animales.forEach(a=>{
+          const anim=animales[String(a.ide)];
+          if(anim&&anim.pesoIngreso&&anim.pesoIngreso>0){sum+=anim.pesoIngreso;n++;}
+        });
+        return n>0 ? sum/n : pesoH - gmd*diasCampoActual;
+      })()
     : pesoH - gmd*diasCampoActual;
   // Precio compra real promedio Bs/kg
   const bsKgCompraReal = pesoIngProm>0&&precCompOrig>0
