@@ -687,10 +687,14 @@ tr:hover td{background:rgba(109,186,58,.04);}
         <select id="simGrupo" onchange="renderSimulador()" style="font-size:12px;">
           <option value="">— Seleccioná un grupo —</option>
         </select>
-        <span style="font-size:11px;color:var(--t2);">Precio venta Bs/kg:</span>
+        <span style="font-size:11px;color:var(--t2);">P. venta Bs/kg:</span>
         <input type="number" id="simPrecVenta" step="0.5" min="0" placeholder="ej: 24"
           style="width:80px;background:var(--card3);color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:3px 8px;font-size:12px;"
           onchange="renderSimulador()">
+        <span style="font-size:11px;color:var(--t2);">P. repos. Bs/kg:</span>
+        <input type="number" id="simPrecRepos" step="0.5" min="0" placeholder="ej: 22"
+          style="width:80px;background:var(--card3);color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:3px 8px;font-size:12px;"
+          onchange="window._precRepos=parseFloat(this.value)||null;renderSimulador()">
       </div>
       <div id="simResultado"></div>
     </div>
@@ -1222,7 +1226,12 @@ function renderProyecciones(){
 function renderSimulador(){
   const g = document.getElementById('simGrupo')?.value;
   const precVenta = parseFloat(document.getElementById('simPrecVenta')?.value)||null;
-  const precRepos = window._precRepos || parseFloat(document.getElementById('proyPrecRepos')?.value)||null;
+  const precRepos = parseFloat(document.getElementById('simPrecRepos')?.value)
+    || window._precRepos 
+    || parseFloat(document.getElementById('proyPrecRepos')?.value)
+    || parseFloat(document.getElementById('dashPrecRepos')?.value)
+    || null;
+  if(precRepos){window._precRepos=precRepos;const si=document.getElementById('simPrecRepos');if(si&&!si.value)si.value=precRepos;}
   const div = document.getElementById('simResultado');
   if(!g){div.innerHTML='<p style="color:var(--t2);font-size:12px;">Seleccioná un grupo para simular</p>';return;}
   if(!precVenta){div.innerHTML='<p style="color:var(--t2);font-size:12px;">Ingresá el precio de venta Bs/kg</p>';return;}
@@ -3153,10 +3162,9 @@ async function cargarBorradorValuacion(){
       // Si hay precio de reposición guardado, cargarlo
       if(r.precRepos){
         window._precRepos = r.precRepos;
-        const inp = document.getElementById('dashPrecRepos');
-        if(inp) inp.value = r.precRepos;
-        const inp2 = document.getElementById('igPrecRepos');
-        if(inp2) inp2.value = r.precRepos;
+        ['dashPrecRepos','igPrecRepos','proyPrecRepos','simPrecRepos'].forEach(id=>{
+          const el=document.getElementById(id);if(el&&!el.value)el.value=r.precRepos;
+        });
       }
       // Rellenar inputs
       Object.entries(r.precios).forEach(([g,v])=>{
