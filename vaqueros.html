@@ -3,1231 +3,851 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>El Prado 1 — Vaqueros</title>
+<title>El Prado 1 — Campo</title>
 <style>
 :root {
-  --bg: #0f1a0b;
-  --bg2: #162010;
-  --card: #1c2916;
-  --card2: #223218;
-  --border: #2e4020;
-  --border2: #3a5228;
-  --green: #6dba3a;
-  --green2: #4e9024;
-  --green-soft: #a8d878;
-  --gold: #c9a227;
-  --gold2: #e8bc40;
-  --red: #e05a4a;
-  --text: #d8e8c8;
-  --text2: #9ab888;
-  --text3: #607850;
-  --white: #f0f8e8;
+  --bg:#0f1a0b; --bg2:#162010; --card:#1c2916; --card2:#223218;
+  --border:#2e4020; --border2:#3a5228;
+  --green:#6dba3a; --green2:#4e9024; --green-soft:#a8d878;
+  --gold:#c9a227; --gold2:#e8bc40; --red:#e05a4a;
+  --blue:#5b8fff; --blue2:#3a6acc;
+  --text:#d8e8c8; --text2:#9ab888; --text3:#607850; --white:#f0f8e8;
 }
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body {
-  font-family: 'Segoe UI', Arial, sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  min-height: 100vh;
-  font-size: 15px;
-}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
 
-/* ── HEADER ── */
-.topbar {
-  background: var(--bg2);
-  border-bottom: 1px solid var(--border);
-  padding: 12px 16px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-.topbar-back {
-  background: rgba(109,186,58,.12);
-  border: 1px solid rgba(109,186,58,.3);
-  color: var(--green);
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.topbar-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--white);
-  letter-spacing: 1px;
-}
-.topbar-sub {
-  font-size: 11px;
-  color: var(--text3);
-  margin-left: auto;
-}
+/* TOPBAR */
+.topbar{background:var(--bg2);border-bottom:2px solid var(--border);padding:10px 14px;
+  display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100;}
+.topbar-logo{font-size:15px;font-weight:800;color:var(--green);letter-spacing:1px;}
+.topbar-sub{font-size:10px;color:var(--text3);}
+.topbar-fecha{margin-left:auto;font-size:12px;font-weight:700;color:var(--text2);
+  background:var(--card);padding:4px 10px;border-radius:6px;border:1px solid var(--border);}
+.topbar-back{background:rgba(109,186,58,.12);border:1px solid rgba(109,186,58,.3);
+  color:var(--green);padding:5px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;}
 
-/* ── PÁGINAS ── */
-.pag { display: none; padding: 16px; max-width: 500px; margin: 0 auto; }
-.pag.activo { display: block; }
+/* PÁGINAS */
+.pag{display:none;padding:16px;max-width:560px;margin:0 auto;}
+.pag.activo{display:block;}
 
-/* ── SPLASH ── */
-.splash {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  text-align: center;
-  gap: 8px;
-}
-.splash-logo {
-  font-size: 11px;
-  letter-spacing: 4px;
-  text-transform: uppercase;
-  color: var(--green);
-  font-weight: 700;
-  margin-bottom: 4px;
-}
-.splash-titulo {
-  font-size: 36px;
-  font-weight: 700;
-  color: var(--white);
-  letter-spacing: 4px;
-  text-transform: uppercase;
-  font-family: Georgia, serif;
-}
-.splash-sub {
-  font-size: 11px;
-  letter-spacing: 3px;
-  color: var(--text3);
-  text-transform: uppercase;
-  margin-bottom: 24px;
-}
-.splash-label {
-  font-size: 12px;
-  color: var(--text2);
-  margin-bottom: 12px;
-  letter-spacing: 1px;
-}
+/* SPLASH HOME */
+.splash{min-height:calc(100vh - 52px);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;padding:24px;text-align:center;gap:6px;}
+.splash-logo{font-size:11px;letter-spacing:4px;text-transform:uppercase;color:var(--green);font-weight:700;margin-bottom:2px;}
+.splash-titulo{font-size:34px;font-weight:700;color:var(--white);letter-spacing:4px;
+  text-transform:uppercase;font-family:Georgia,serif;}
+.splash-sub{font-size:11px;letter-spacing:3px;color:var(--text3);text-transform:uppercase;margin-bottom:20px;}
+.splash-label{font-size:12px;color:var(--text2);margin-bottom:14px;letter-spacing:1px;}
 
-/* ── LISTA VAQUEROS ── */
-.vaquero-btn {
-  width: 100%;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--green);
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 10px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  cursor: pointer;
-  transition: background .2s;
-}
-.vaquero-btn:hover, .vaquero-btn:active { background: var(--card2); }
-.vaquero-avatar {
-  width: 44px; height: 44px;
-  border-radius: 50%;
-  background: rgba(109,186,58,.15);
-  border: 2px solid rgba(109,186,58,.3);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 22px; flex-shrink: 0;
-}
-.vaquero-nombre { font-size: 16px; font-weight: 600; color: var(--white); }
-.vaquero-grupos { font-size: 12px; color: var(--text3); margin-top: 2px; }
+/* BOTONES ROL */
+.rol-btn{width:100%;max-width:340px;display:flex;align-items:center;gap:14px;
+  padding:16px 18px;border-radius:14px;cursor:pointer;margin-bottom:10px;
+  border:1px solid var(--border);background:var(--card);transition:background .15s;}
+.rol-btn:active{background:var(--card2);}
+.rol-icon{font-size:28px;flex-shrink:0;width:44px;text-align:center;}
+.rol-info{flex:1;text-align:left;}
+.rol-nombre{font-size:15px;font-weight:700;color:var(--white);}
+.rol-desc{font-size:11px;color:var(--text3);margin-top:2px;}
+.rol-arr{color:var(--text3);font-size:20px;}
+.rol-btn.verde{border-left:4px solid var(--green);}
+.rol-btn.azul{border-left:4px solid var(--blue);}
+.rol-btn.gold{border-left:4px solid var(--gold);}
+.rol-btn.rojo{border-left:4px solid var(--red);}
 
-/* ── LISTA GRUPOS ── */
-.grupo-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 10px;
-  cursor: pointer;
-  transition: background .2s;
-}
-.grupo-card:active { background: var(--card2); }
-.grupo-badge {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: rgba(109,186,58,.15);
-  color: var(--green-soft);
-  border: 1px solid rgba(109,186,58,.2);
-  display: inline-block;
-  margin-bottom: 6px;
-}
-.grupo-nombre { font-size: 16px; font-weight: 700; color: var(--white); margin-bottom: 4px; }
-.grupo-ubicacion { font-size: 13px; color: var(--text2); }
-.grupo-ubicacion strong { color: var(--green-soft); font-size: 15px; }
+/* TABLA GRUPOS */
+.grupo-row{background:var(--card);border:1px solid var(--border);border-radius:10px;
+  margin-bottom:8px;overflow:hidden;cursor:pointer;transition:background .15s;}
+.grupo-row:active{background:var(--card2);}
+.grupo-row-header{padding:9px 12px;display:flex;align-items:center;gap:8px;
+  border-bottom:1px solid var(--border);}
+.grupo-nombre-tag{font-size:13px;font-weight:800;color:var(--white);}
+.grupo-tipo-tag{font-size:9px;font-weight:700;letter-spacing:1.5px;padding:2px 7px;
+  border-radius:4px;background:rgba(109,186,58,.12);color:var(--green-soft);
+  border:1px solid rgba(109,186,58,.2);text-transform:uppercase;}
+.grupo-row-dias{display:grid;grid-template-columns:repeat(4,1fr);}
+.dia-celda{padding:8px 4px;text-align:center;border-right:1px solid var(--border);}
+.dia-celda:last-child{border-right:none;}
+.dia-celda.hoy{background:rgba(109,186,58,.08);}
+.dia-celda.sale-hoy .dia-potpar{color:var(--red);}
+.dia-celda.sale-mnn .dia-potpar{color:var(--gold2);}
+.dia-lbl{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;}
+.dia-fecha{font-size:9px;color:var(--text3);margin-bottom:3px;}
+.dia-potpar{font-size:13px;font-weight:800;color:var(--green-soft);line-height:1.2;}
+.dia-turno{font-size:10px;font-weight:700;color:var(--gold2);margin-top:2px;}
+.dia-ancho{font-size:10px;color:var(--blue);margin-top:1px;}
+.dia-vacio{font-size:11px;color:var(--text3);}
 
-/* ── DETALLE ── */
-.detalle-header {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.detalle-avatar {
-  width: 44px; height: 44px;
-  border-radius: 50%;
-  background: rgba(109,186,58,.15);
-  border: 2px solid rgba(109,186,58,.3);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 22px; flex-shrink: 0;
-}
-.detalle-nombre { font-size: 15px; font-weight: 700; color: var(--white); }
-.detalle-meta { font-size: 12px; color: var(--text3); margin-top: 2px; }
+/* TABLA ARMADORES */
+.arm-card{background:var(--card);border:1px solid var(--border);border-radius:10px;
+  margin-bottom:8px;overflow:hidden;}
+.arm-card-header{padding:10px 12px;background:rgba(109,186,58,.07);
+  border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+.arm-fecha-badge{font-size:10px;font-weight:700;letter-spacing:1px;padding:3px 9px;
+  border-radius:5px;background:rgba(109,186,58,.15);color:var(--green);border:1px solid rgba(109,186,58,.3);}
+.arm-dias-label{font-size:11px;color:var(--text3);}
+.arm-item{padding:10px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;}
+.arm-item:last-child{border-bottom:none;}
+.arm-num{width:32px;height:32px;border-radius:7px;background:rgba(201,162,39,.15);
+  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;
+  color:var(--gold);flex-shrink:0;}
+.arm-info{flex:1;}
+.arm-grupo{font-size:13px;font-weight:700;color:var(--white);}
+.arm-potpar{font-size:12px;color:var(--text2);margin-top:1px;}
+.arm-medidas{font-size:12px;color:var(--green-soft);margin-top:3px;font-weight:700;}
+.arm-turno{font-size:10px;color:var(--gold2);margin-top:2px;}
+.arm-vacio{text-align:center;padding:32px;color:var(--text3);font-size:13px;
+  border:1px dashed var(--border2);border-radius:10px;}
 
-.parcela-hoy {
-  background: rgba(109,186,58,.08);
-  border: 1px solid rgba(109,186,58,.25);
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 12px;
-}
-.parcela-tag {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  color: var(--green);
-  margin-bottom: 10px;
-  display: block;
-}
-.parcela-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-.parcela-campo { }
-.parcela-campo-lbl {
-  font-size: 10px;
-  color: var(--text3);
-  margin-bottom: 2px;
-  text-transform: uppercase;
-  letter-spacing: .5px;
-}
-.parcela-campo-val {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--green-soft);
-}
-.parcela-campo-val.sm { font-size: 14px; color: var(--text); }
+/* VISTA PÚBLICA 3 días */
+.pub-row{background:var(--card);border:1px solid var(--border);border-radius:10px;
+  margin-bottom:8px;overflow:hidden;}
+.pub-row-header{padding:9px 12px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:8px;}
+.pub-row-dias{display:grid;grid-template-columns:repeat(3,1fr);}
+.pub-celda{padding:9px 5px;text-align:center;border-right:1px solid var(--border);}
+.pub-celda:last-child{border-right:none;}
+.pub-celda.hoy{background:rgba(109,186,58,.1);}
+.pub-lbl{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;}
+.pub-fecha{font-size:9px;color:var(--text3);margin-bottom:3px;}
+.pub-potpar{font-size:14px;font-weight:800;color:var(--green-soft);}
+.pub-vacio{font-size:11px;color:var(--text3);}
 
-.prox-label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  color: var(--text3);
-  text-transform: uppercase;
-  margin: 16px 0 8px;
-}
-.prox-item {
-  background: var(--card2);
-  border-radius: 8px;
-  padding: 12px 14px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-.prox-num {
-  width: 30px; height: 30px;
-  border-radius: 6px;
-  background: rgba(201,162,39,.15);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 700;
-  color: var(--gold);
-  flex-shrink: 0;
-}
-.prox-info { flex: 1; }
-.prox-potpar { font-size: 13px; font-weight: 600; color: var(--text); }
-.prox-fecha { font-size: 11px; color: var(--text3); margin-top: 1px; }
-.prox-metros { font-size: 11px; color: var(--green-soft); margin-top: 2px; }
+/* CAPATAZ */
+.cap-wrap{overflow-x:auto;}
+.cap-tabla{border-collapse:separate;border-spacing:3px;width:100%;}
+.cap-th{font-size:10px;font-weight:700;color:var(--text3);text-align:center;padding:4px 2px;white-space:nowrap;}
+.cap-td-lote{font-size:11px;font-weight:700;color:var(--text2);padding:4px 6px;white-space:nowrap;}
+.cap-td{min-width:68px;padding:5px 3px;text-align:center;background:var(--bg2);border-radius:5px;cursor:pointer;vertical-align:middle;}
+.cap-td.hoy-col{background:rgba(109,186,58,.1);}
 
-.sin-plan {
-  text-align: center;
-  padding: 20px;
-  color: var(--text3);
-  font-size: 13px;
-  border: 1px dashed var(--border2);
-  border-radius: 8px;
-  margin-bottom: 12px;
-}
+/* DETALLE OVERLAY */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:500;overflow-y:auto;padding:14px;}
+.overlay.open{display:block;}
+.overlay-box{max-width:500px;margin:0 auto;}
+.overlay-close{display:block;margin-bottom:10px;margin-left:auto;width:34px;height:34px;
+  border-radius:50%;background:var(--red);color:white;border:none;font-size:16px;cursor:pointer;}
 
-/* ── PEDIDOS ── */
-.pedidos-section {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
-  margin-top: 16px;
-}
-.pedidos-label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  color: var(--text3);
-  text-transform: uppercase;
-  margin-bottom: 12px;
-}
-.pedido-item {
-  background: var(--bg2);
-  border-radius: 8px;
-  padding: 10px 12px;
-  margin-bottom: 8px;
-  font-size: 12px;
-  color: var(--text2);
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-}
-.pedido-fecha { font-size: 10px; color: var(--text3); margin-top: 2px; }
+/* SECCIÓN HEADER */
+.sec-header{display:flex;align-items:center;gap:8px;margin-bottom:12px;}
+.sec-titulo{font-size:13px;font-weight:800;color:var(--white);letter-spacing:1px;}
+.btn-refresh{margin-left:auto;background:rgba(109,186,58,.12);border:1px solid rgba(109,186,58,.3);
+  color:var(--green);padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;}
 
-.pedido-form {
-  display: flex;
-  gap: 8px;
-  margin-top: 4px;
-}
-.pedido-input {
-  flex: 1;
-  background: var(--bg2);
-  border: 1px solid var(--border2);
-  border-radius: 8px;
-  padding: 10px 12px;
-  color: var(--white);
-  font-size: 14px;
-  font-family: 'Segoe UI', Arial, sans-serif;
-}
-.pedido-input::placeholder { color: var(--text3); }
-.pedido-input:focus { outline: none; border-color: var(--green2); }
-.pedido-send {
-  background: var(--green2);
-  border: none;
-  border-radius: 8px;
-  padding: 10px 16px;
-  color: white;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.pedido-send:active { background: var(--green); }
+/* PEDIDO */
+.pedido-form{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;}
+.pedido-titulo{font-size:13px;font-weight:700;color:var(--white);margin-bottom:10px;}
+.pedido-input{width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;
+  color:var(--white);padding:10px;font-size:14px;resize:vertical;min-height:80px;
+  margin-bottom:10px;font-family:inherit;}
+.btn-enviar{width:100%;background:var(--green2);color:white;border:none;padding:12px;
+  border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;}
 
-/* ── NOTIF ── */
-#notifV {
-  display: none;
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--green2);
-  color: white;
-  padding: 10px 20px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  z-index: 200;
-  white-space: nowrap;
-}
-#notifV.error { background: var(--red); }
+/* MODAL */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);
+  z-index:999;align-items:center;justify-content:center;}
+.modal-bg.open{display:flex;}
+.modal-box{background:var(--card);border:1px solid var(--border2);border-radius:14px;
+  padding:26px 22px;width:290px;text-align:center;}
 
-/* ── ESTADOS VACÍOS ── */
-.vacio {
-  text-align: center;
-  padding: 40px 20px;
-  color: var(--text3);
-  font-size: 13px;
-}
-.vacio-icon { font-size: 36px; margin-bottom: 8px; }
+/* ALERTA */
+.alerta-card{background:var(--card);border:1px solid var(--border2);border-radius:8px;
+  padding:10px 12px;margin-bottom:6px;font-size:12px;}
+
+/* NOTIF */
+#notifV{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+  background:var(--green2);color:white;padding:10px 20px;border-radius:20px;
+  font-size:13px;font-weight:600;display:none;z-index:9999;white-space:nowrap;
+  box-shadow:0 2px 12px rgba(0,0,0,.4);}
+#notifV.error{background:var(--red);}
+
+.vacio{text-align:center;padding:32px;color:var(--text3);font-size:13px;
+  border:1px dashed var(--border2);border-radius:10px;}
 </style>
 </head>
 <body>
 
-<!-- BARRA SUPERIOR -->
-<div class="topbar" id="topbar" style="display:none;">
-  <button class="topbar-back" id="btnVolver" onclick="volver()">← Volver</button>
-  <span class="topbar-title" id="topbarTitulo">El Prado 1</span>
-  <span class="topbar-sub" id="topbarFecha"></span>
+<!-- TOPBAR -->
+<div class="topbar" id="topbar">
+  <button class="topbar-back" id="btnVolver" onclick="volverHome()" style="display:none;">← Volver</button>
+  <div>
+    <div class="topbar-logo">⬡ EL PRADO 1</div>
+    <div class="topbar-sub" id="topbarSubtitulo">San Ignacio de Velazco</div>
+  </div>
+  <div class="topbar-fecha" id="topbarFecha"></div>
 </div>
 
-<!-- PÁGINA 0: SPLASH / SELECCIÓN VAQUERO -->
-<div id="pag0" class="pag activo">
+<!-- ══════════════════════════════════
+     PAG 0: HOME — ELEGIR ROL
+══════════════════════════════════ -->
+<div id="pagHome" class="pag activo">
   <div class="splash">
     <div class="splash-logo">Hacienda Ganadera</div>
     <div class="splash-titulo">El Prado 1</div>
     <div class="splash-sub">San Ignacio de Velazco · Bolivia</div>
-    <div class="splash-label">¿Quién sos?</div>
-    <div id="listaVaquerosV" style="width:100%; max-width:320px;"></div>
-    <div id="sinVaqueros" style="display:none;" class="vacio">
-      <div class="vacio-icon">🤠</div>
-      No hay vaqueros configurados.<br>Pedí al administrador que los cargue.
-    </div>
-    <!-- Acceso Capataz -->
-    <div style="margin-top:24px;width:100%;max-width:320px;">
-      <div onclick="abrirPINCapataz()" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:rgba(109,186,58,.08);border:1px solid rgba(109,186,58,.25);border-radius:10px;cursor:pointer;">
-        <div style="font-size:28px;">👨‍🌾</div>
-        <div>
-          <div style="font-weight:700;color:var(--white);font-size:14px;">Capataz</div>
-          <div style="font-size:11px;color:var(--text3);">Vista general + modificaciones</div>
-        </div>
-        <div style="margin-left:auto;color:var(--text3);font-size:18px;">›</div>
+    <div class="splash-label">¿Qué vista necesitás?</div>
+
+    <div class="rol-btn verde" onclick="irA('pagVaqueros')">
+      <div class="rol-icon">🐄</div>
+      <div class="rol-info">
+        <div class="rol-nombre">Vaqueros</div>
+        <div class="rol-desc">Mudanza diaria · parcelas + turnos</div>
       </div>
+      <div class="rol-arr">›</div>
     </div>
-    <!-- Modal PIN -->
-    <div id="modalPIN" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;display:none;align-items:center;justify-content:center;">
-      <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:28px 24px;width:280px;text-align:center;">
-        <div style="font-size:32px;margin-bottom:8px;">🔐</div>
-        <div style="font-weight:700;color:var(--white);margin-bottom:4px;">Acceso Capataz</div>
-        <div style="font-size:12px;color:var(--text3);margin-bottom:16px;">Ingresá el PIN de capataz</div>
-        <input type="password" id="pinInput" maxlength="6" inputmode="numeric"
-          style="width:100%;padding:12px;font-size:20px;text-align:center;letter-spacing:8px;border:1px solid var(--border2);border-radius:8px;background:var(--bg2);color:var(--white);margin-bottom:12px;"
-          placeholder="••••" onkeydown="if(event.key==='Enter') verificarPIN()">
-        <div style="display:flex;gap:8px;">
-          <button onclick="cerrarPIN()" style="flex:1;padding:10px;border:1px solid var(--border);background:none;color:var(--text2);border-radius:8px;cursor:pointer;">Cancelar</button>
-          <button onclick="verificarPIN()" style="flex:1;padding:10px;background:var(--green2);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:700;">Entrar</button>
-        </div>
-        <div id="pinError" style="color:var(--red);font-size:12px;margin-top:8px;display:none;">PIN incorrecto</div>
+
+    <div class="rol-btn azul" onclick="irA('pagArmadores')">
+      <div class="rol-icon">🔧</div>
+      <div class="rol-info">
+        <div class="rol-nombre">Armadores de Parcela</div>
+        <div class="rol-desc">Medidas a armar por fecha y grupo</div>
       </div>
+      <div class="rol-arr">›</div>
+    </div>
+
+    <div class="rol-btn gold" onclick="irA('pagPublica')">
+      <div class="rol-icon">👁</div>
+      <div class="rol-info">
+        <div class="rol-nombre">Visualización</div>
+        <div class="rol-desc">Ayer · Hoy · Mañana — todos los grupos</div>
+      </div>
+      <div class="rol-arr">›</div>
+    </div>
+
+    <div class="rol-btn rojo" onclick="abrirPINCapataz()">
+      <div class="rol-icon">👨‍🌾</div>
+      <div class="rol-info">
+        <div class="rol-nombre">Capataz 🔐</div>
+        <div class="rol-desc">Vista completa + modificar salidas</div>
+      </div>
+      <div class="rol-arr">›</div>
     </div>
   </div>
 </div>
 
-<!-- PÁGINA 1: GRUPOS DEL VAQUERO -->
-<div id="pag1" class="pag">
-  <div id="listaGruposV"></div>
+<!-- ══════════════════════════════════
+     PAG VAQUEROS
+══════════════════════════════════ -->
+<div id="pagVaqueros" class="pag">
+  <div class="sec-header">
+    <div class="sec-titulo">🐄 VAQUEROS — Mudanzas</div>
+    <button class="btn-refresh" onclick="refrescar('vaqueros')">↻</button>
+  </div>
+  <div id="listaVaqueros"></div>
 </div>
 
-<!-- PÁGINA 2: DETALLE DEL GRUPO -->
-<div id="pag2" class="pag">
-  <div id="detalleGrupoV"></div>
+<!-- ══════════════════════════════════
+     PAG ARMADORES
+══════════════════════════════════ -->
+<div id="pagArmadores" class="pag">
+  <div class="sec-header">
+    <div class="sec-titulo">🔧 ARMADORES — Parcelas a armar</div>
+    <button class="btn-refresh" onclick="refrescar('armadores')">↻</button>
+  </div>
+  <div style="font-size:11px;color:var(--text3);margin-bottom:10px;">
+    Mostrando los próximos 14 días · ordenado por fecha de ingreso
+  </div>
+  <div id="listaArmadores"></div>
 </div>
 
-<!-- PÁGINA 3: VISTA CAPATAZ -->
-<div id="pag3" class="pag">
-  <div style="padding:12px 0 4px;">
-    <div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;">📍 Estado del Campo — 7 días</div>
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
-      <button onclick="capNavegar(-1)" style="background:var(--card2);border:1px solid var(--border);color:var(--text2);padding:4px 14px;border-radius:4px;cursor:pointer;font-size:16px;">‹</button>
-      <span id="capFechaLabel" style="font-size:12px;font-weight:700;color:var(--green-soft);flex:1;text-align:center;"></span>
-      <button onclick="capNavegar(1)" style="background:var(--card2);border:1px solid var(--border);color:var(--text2);padding:4px 14px;border-radius:4px;cursor:pointer;font-size:16px;">›</button>
-      <button onclick="capIrHoy()" style="background:var(--green2);color:white;border:none;padding:5px 12px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:700;">Hoy</button>
+<!-- ══════════════════════════════════
+     PAG PÚBLICA
+══════════════════════════════════ -->
+<div id="pagPublica" class="pag">
+  <div class="sec-header">
+    <div class="sec-titulo">👁 VISUALIZACIÓN — Estado del campo</div>
+    <button class="btn-refresh" onclick="refrescar('publica')">↻</button>
+  </div>
+  <div id="listaPublica"></div>
+</div>
+
+<!-- ══════════════════════════════════
+     PAG CAPATAZ
+══════════════════════════════════ -->
+<div id="pagCapataz" class="pag">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+    <div style="font-size:13px;font-weight:800;color:var(--white);">👨‍🌾 CAPATAZ — Estado del Campo</div>
+    <div style="display:flex;gap:6px;align-items:center;margin-left:auto;">
+      <button onclick="capNavegar(-1)" style="background:var(--card2);border:1px solid var(--border);color:var(--text2);padding:4px 12px;border-radius:4px;cursor:pointer;font-size:14px;">‹</button>
+      <span id="capFechaLabel" style="font-size:11px;font-weight:700;color:var(--green-soft);"></span>
+      <button onclick="capNavegar(1)" style="background:var(--card2);border:1px solid var(--border);color:var(--text2);padding:4px 12px;border-radius:4px;cursor:pointer;font-size:14px;">›</button>
+      <button onclick="capIrHoy()" style="background:var(--green2);color:white;border:none;padding:5px 10px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:700;">Hoy</button>
     </div>
-    <div id="capTablaWrap" style="overflow-x:auto;"></div>
-    <!-- Alertas de modificaciones -->
-    <div id="capAlertas" style="margin-top:12px;"></div>
+  </div>
+  <div class="cap-wrap"><div id="capTabla"></div></div>
+  <div id="capAlertas" style="margin-top:12px;"></div>
+</div>
+
+<!-- ══════════════════════════════════
+     OVERLAY DETALLE GRUPO
+══════════════════════════════════ -->
+<div class="overlay" id="overlayDetalle">
+  <div class="overlay-box">
+    <button class="overlay-close" onclick="cerrarDetalle()">✕</button>
+    <div id="detalleContenido"></div>
+  </div>
+</div>
+
+<!-- MODAL PIN -->
+<div class="modal-bg" id="modalPIN">
+  <div class="modal-box">
+    <div style="font-size:32px;margin-bottom:8px;">🔐</div>
+    <div style="font-weight:700;color:var(--white);margin-bottom:4px;">Acceso Capataz</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:16px;">Ingresá el PIN</div>
+    <input type="password" id="pinInput" maxlength="6" inputmode="numeric"
+      style="width:100%;padding:12px;font-size:20px;text-align:center;letter-spacing:8px;
+      border:1px solid var(--border2);border-radius:8px;background:var(--bg2);color:var(--white);margin-bottom:12px;"
+      placeholder="••••" onkeydown="if(event.key==='Enter')verificarPIN()">
+    <div style="display:flex;gap:8px;">
+      <button onclick="cerrarPIN()" style="flex:1;padding:10px;border:1px solid var(--border);background:none;color:var(--text2);border-radius:8px;cursor:pointer;">Cancelar</button>
+      <button onclick="verificarPIN()" style="flex:1;padding:10px;background:var(--green2);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:700;">Entrar</button>
+    </div>
+    <div id="pinError" style="color:var(--red);font-size:12px;margin-top:8px;display:none;">PIN incorrecto</div>
+  </div>
+</div>
+
+<!-- MODAL CAMBIO SALIDA -->
+<div class="modal-bg" id="modalCambioSal">
+  <div class="modal-box" style="width:310px;">
+    <div style="font-size:16px;font-weight:800;color:var(--white);margin-bottom:6px;">✏️ Modificar Salida</div>
+    <div id="cambioSalInfo" style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.6;"></div>
+    <div style="font-size:10px;color:var(--text3);margin-bottom:5px;">NUEVA FECHA SALIDA</div>
+    <input type="date" id="cambioSalFecha"
+      style="width:100%;padding:9px;background:var(--bg2);border:1px solid var(--border2);
+      border-radius:8px;color:var(--white);font-size:14px;margin-bottom:10px;">
+    <div style="font-size:10px;color:var(--text3);margin-bottom:5px;">TURNO DE SALIDA</div>
+    <select id="cambioSalTurno"
+      style="width:100%;background:var(--bg2);border:1px solid var(--border2);
+      border-radius:8px;color:var(--white);padding:9px;font-size:13px;margin-bottom:14px;">
+      <option value="">— Sin especificar —</option>
+      <option value="MAÑANA">🌅 Mañana</option>
+      <option value="TARDE">🌇 Tarde</option>
+    </select>
+    <div style="display:flex;gap:8px;">
+      <button onclick="cerrarModalCambioSal()" style="flex:1;padding:10px;border:1px solid var(--border);background:none;color:var(--text2);border-radius:8px;cursor:pointer;">Cancelar</button>
+      <button onclick="confirmarCambioSal()" style="flex:1;padding:10px;background:var(--gold);color:#111;border:none;border-radius:8px;cursor:pointer;font-weight:700;">Guardar</button>
+    </div>
   </div>
 </div>
 
 <div id="notifV"></div>
 
 <script>
-// ── STORAGE + FIREBASE ──
-const FB_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com/elprado';
+// ══════════════════════════════════════════════
+// FIREBASE + STORAGE
+// ══════════════════════════════════════════════
+const FB_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com/elprado1';
 
 function getData(key, def) {
-  try { return JSON.parse(localStorage.getItem('elprado_' + key)) || def; }
+  try { const v = localStorage.getItem('elprado_' + key); return v ? JSON.parse(v) : def; }
   catch(e) { return def; }
 }
 function setData(key, val) {
   localStorage.setItem('elprado_' + key, JSON.stringify(val));
   fetch(FB_URL + '/' + key + '.json', {
-    method: 'PUT',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(val)
-  }).catch(e => console.log('Firebase write error:', e));
+    method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(val)
+  }).catch(()=>{});
 }
-
-async function syncFromFirebase() {
+function asArr(v) {
+  if(!v) return [];
+  if(Array.isArray(v)) return v;
+  return Object.values(v).filter(x => x !== null && x !== undefined);
+}
+async function syncFB() {
   try {
     const r = await fetch(FB_URL + '.json');
     const data = await r.json();
-    if(data) {
-      Object.entries(data).forEach(([key, val]) => {
-        if(val !== null) localStorage.setItem('elprado_' + key, JSON.stringify(val));
+    if(data && typeof data === 'object') {
+      const orig = Storage.prototype.setItem;
+      Object.entries(data).forEach(([k, v]) => {
+        if(v !== null) try { orig.call(localStorage, 'elprado_'+k, JSON.stringify(v)); } catch(e){}
       });
     }
     return true;
   } catch(e) { return false; }
 }
-function getVaqueros() { return asArray(getData('vaqueros', [])); }
-function asArray(v) {
-  if(!v) return [];
-  if(Array.isArray(v)) return v;
-  // Firebase convierte arrays a objetos con claves numéricas
-  return Object.values(v).filter(x => x !== null && x !== undefined);
+const getActs    = () => asArr(getData('actividades', []));
+const getGrupos  = () => asArr(getData('grupos', []));
+const getPedidos = () => asArr(getData('pedidos', []));
+const setPedidos = p  => setData('pedidos', p);
+const uuid = () => Date.now().toString(36) + Math.random().toString(36).substr(2,5);
+
+// ══════════════════════════════════════════════
+// FECHA UTILS
+// ══════════════════════════════════════════════
+const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const DIAS  = ['Do','Lu','Ma','Mi','Ju','Vi','Sa'];
+function sumarDias(f, n) {
+  const d = new Date(f+'T12:00:00'); d.setDate(d.getDate()+n); return d.toISOString().split('T')[0];
 }
-function getPlan() { return asArray(getData('plan', [])); }
-function getPedidos() { return asArray(getData('pedidos', [])); }
-function setPedidos(p) { setData('pedidos', p); }
-function uuid() { return Date.now().toString(36) + Math.random().toString(36).substr(2,5); }
-function fmt(n,d=1) { if(n===null||n===undefined||isNaN(n)) return '—'; return parseFloat(n.toFixed(d)).toString(); }
+function fmtC(f) {
+  const d = new Date(f+'T12:00:00');
+  return DIAS[d.getDay()]+' '+d.getDate()+'/'+MESES[d.getMonth()];
+}
+function fmtLargo(f) {
+  const d = new Date(f+'T12:00:00');
+  return DIAS[d.getDay()]+' '+d.getDate()+' '+MESES[d.getMonth()];
+}
 
-// ── ESTADO ──
-let vaqueroActual = null;
-let grupoActual = null;
-let histPag = ['pag0'];
+// ══════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════
+function getRegDia(acts, lote, dia) {
+  const cands = acts.filter(a =>
+    a.actividad==='MATERIA SECA' && a.lote===lote && a.fechaIng &&
+    ((a.fechaSal && a.fechaIng<=dia && a.fechaSal>=dia)||(!a.fechaSal && a.fechaIng===dia))
+  );
+  return cands.length ? cands.reduce((b,a)=>a.fechaIng>=b.fechaIng?a:b) : null;
+}
+function getLargoM(reg) {
+  if(!reg) return null;
+  if(reg.largoM) return Math.round(reg.largoM/5)*5;
+  if(reg.anchoM && reg.ha) return Math.round((reg.ha*10000/reg.anchoM)/5)*5;
+  return null;
+}
+function getNombreGrupo(g) {
+  return g.grupo || g.nombre || '';
+}
+function getTipoGrupo(g) {
+  return [g.tipo, g.categoria].filter(Boolean).join(' · ');
+}
+function getLoteKey(g) {
+  return (g.tipo||'')+'|'+(g.categoria||'')+'|'+(g.grupo||g.nombre||'');
+}
 
-function pagActual() { return histPag[histPag.length-1]; }
+// ══════════════════════════════════════════════
+// NAVEGACIÓN
+// ══════════════════════════════════════════════
+let paginaActual = 'pagHome';
+const titulos = {
+  pagHome: 'San Ignacio de Velazco',
+  pagVaqueros: '🐄 Vaqueros',
+  pagArmadores: '🔧 Armadores',
+  pagPublica: '👁 Visualización',
+  pagCapataz: '👨‍🌾 Capataz'
+};
 
 function irA(id) {
-  document.querySelectorAll('.pag').forEach(p=>p.classList.remove('activo'));
+  document.querySelectorAll('.pag').forEach(p => p.classList.remove('activo'));
   document.getElementById(id).classList.add('activo');
-  histPag.push(id);
-  actualizarTopbar();
+  paginaActual = id;
+  document.getElementById('btnVolver').style.display = id==='pagHome' ? 'none' : 'block';
+  document.getElementById('topbarSubtitulo').textContent = titulos[id] || '';
   window.scrollTo(0,0);
 }
 
-function volver() {
-  if(histPag.length <= 1) return;
-  histPag.pop();
-  const anterior = pagActual();
-  document.querySelectorAll('.pag').forEach(p=>p.classList.remove('activo'));
-  document.getElementById(anterior).classList.add('activo');
-  actualizarTopbar();
-  window.scrollTo(0,0);
-}
+function volverHome() { irA('pagHome'); }
 
-// ── CAPATAZ PIN ──
-const PIN_CAPATAZ = '2810';
-var capFechaBase = null;
-var _capCambioActual = null;
-
-function abrirPINCapataz() {
-  const modal = document.getElementById('modalPIN');
-  if(modal) { modal.style.display = 'flex'; }
-  const inp = document.getElementById('pinInput');
-  if(inp) { inp.value = ''; inp.focus(); }
-  const err = document.getElementById('pinError');
-  if(err) err.style.display = 'none';
-}
-function cerrarPIN() {
-  const modal = document.getElementById('modalPIN');
-  if(modal) modal.style.display = 'none';
-}
-async function verificarPIN() {
-  const inp = document.getElementById('pinInput');
-  const pin = inp ? inp.value : '';
-  if(pin === PIN_CAPATAZ) {
-    cerrarPIN();
-    await syncFromFirebase();
-    capIrHoy();
-    irA('pag3');
-  } else {
-    const err = document.getElementById('pinError');
-    if(err) err.style.display = 'block';
-    if(inp) inp.value = '';
-  }
-}
-
-function capIrHoy() {
-  capFechaBase = new Date().toISOString().split('T')[0];
-  renderCapatazCampo();
-}
-function capNavegar(dir) {
-  if(!capFechaBase) capFechaBase = new Date().toISOString().split('T')[0];
-  const d = new Date(capFechaBase + 'T12:00:00');
-  d.setDate(d.getDate() + dir);
-  capFechaBase = d.toISOString().split('T')[0];
-  renderCapatazCampo();
-}
-
-function renderCapatazCampo() {
-  const hoy = new Date().toISOString().split('T')[0];
-  if(!capFechaBase) capFechaBase = hoy;
-  const MESES_C = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-  const DIAS_C  = ['Do','Lu','Ma','Mi','Ju','Vi','Sa'];
-  const dias = [];
-  for(let i = -3; i <= 3; i++) dias.push(sumarDiasV(capFechaBase, i));
-
-  const d0 = new Date(dias[0]+'T12:00:00'), d6 = new Date(dias[6]+'T12:00:00');
-  const lbl = document.getElementById('capFechaLabel');
-  if(lbl) lbl.textContent = d0.getDate()+' '+MESES_C[d0.getMonth()]+' — '+d6.getDate()+' '+MESES_C[d6.getMonth()];
-
-  const acts = asArray(getData('actividades', [])).filter(function(a) {
-    return a.actividad === 'MATERIA SECA' && a.fechaIng && a.lote;
-  });
-  const grupos = asArray(getData('grupos', []));
-  const lotes = grupos.map(function(g){ return (g.tipo||'')+'|'+(g.categoria||'')+'|'+(g.grupo||''); });
-
-  const diasHead = dias.map(function(d) {
-    const esHoy = d === hoy;
-    const dt = new Date(d+'T12:00:00');
-    return '<th style="min-width:72px;text-align:center;padding:4px;font-size:10px;'+(esHoy?'background:rgba(109,186,58,.15);color:var(--green);':'color:var(--text3);')+'">'+DIAS_C[dt.getDay()]+'<br>'+dt.getDate()+' '+MESES_C[dt.getMonth()]+'</th>';
-  }).join('');
-
-  const filas = lotes.map(function(lote) {
-    const lparts = lote.split('|');
-    const loteLabel = lparts.length >= 3 ? lparts[1]+'·'+lparts[2] : lote;
-    const celdas = dias.map(function(d) {
-      const esHoy = d === hoy;
-      const candidatos = acts.filter(function(a) {
-        return a.lote === lote && a.fechaIng && (
-          (a.fechaSal && a.fechaIng <= d && a.fechaSal >= d) ||
-          (!a.fechaSal && a.fechaIng === d)
-        );
-      });
-      const reg = candidatos.length > 0
-        ? candidatos.reduce(function(best, a){ return a.fechaIng >= best.fechaIng ? a : best; })
-        : null;
-      const bg = esHoy ? 'rgba(109,186,58,.08)' : 'transparent';
-      if(!reg) return '<td style="text-align:center;padding:3px;background:'+bg+';"><span style="color:var(--text3);font-size:11px;">—</span></td>';
-      const diasRest = reg.fechaSal ? Math.round((new Date(reg.fechaSal+'T12:00:00') - new Date(hoy+'T12:00:00')) / 86400000) : null;
-      let color = 'var(--green-soft)', bgCell = esHoy ? 'rgba(109,186,58,.12)' : 'rgba(109,186,58,.06)';
-      if(diasRest !== null) {
-        if(diasRest < 0) { color='var(--text3)'; bgCell='rgba(100,100,100,.08)'; }
-        else if(diasRest === 0) { color='var(--red)'; bgCell='rgba(224,90,74,.12)'; }
-        else if(diasRest === 1) { color='var(--gold2)'; bgCell='rgba(201,162,39,.1)'; }
-      }
-      const turno = reg.horaSal === 'MAÑANA' ? '🌅' : reg.horaSal === 'TARDE' ? '🌇' : '';
-      const badge = (reg.fechaSal === d && diasRest === 0) ? '<br><span style="font-size:9px;color:var(--red);font-weight:700;">SALE HOY</span>' :
-                    (reg.fechaSal === d && diasRest === 1) ? '<br><span style="font-size:9px;color:var(--gold2);font-weight:700;">SALE MÑN</span>' : '';
-      const rId = reg.id || '';
-      const rHSal = reg.horaSal || '';
-      const rFSal = reg.fechaSal || '';
-      const onClick = 'capAbrirCambio(this)';
-      return '<td data-lote="'+lote+'" data-pot="'+reg.potrero+'" data-par="'+reg.parcela+'" data-fsal="'+rFSal+'" data-rid="'+rId+'" data-hsal="'+rHSal+'" style="text-align:center;padding:3px;cursor:pointer;background:'+bgCell+';border-radius:4px;" onclick="capAbrirCambioEl(this)">'
-        +'<div style="font-size:9px;color:var(--text3);">'+( reg.fechaSal||'—' )+' '+turno+'</div>'
-        +badge+'</td>';
-    }).join('');
-    return '<tr><td style="font-size:11px;font-weight:600;color:var(--text2);padding:4px 6px;white-space:nowrap;">'+loteLabel+'</td>'+celdas+'</tr>';
-  }).join('');
-
-  const wrap = document.getElementById('capTablaWrap');
-  if(wrap) wrap.innerHTML = '<table style="border-collapse:separate;border-spacing:2px;font-size:11px;width:100%;"><thead><tr><th style="text-align:left;padding:4px;color:var(--text3);font-size:10px;">Grupo</th>'+diasHead+'</tr></thead><tbody>'+filas+'</tbody></table>';
-  renderCapAlertas();
-}
-
-function capCerrarModal() {
-  const m = document.getElementById('modalCapCambio');
-  if(m) m.remove();
-}
-function capAbrirCambioEl(el) {
-  const lote = el.dataset.lote || '';
-  const pot  = el.dataset.pot  || '';
-  const par  = el.dataset.par  || '';
-  const fsal = el.dataset.fsal || '';
-  const rid  = el.dataset.rid  || '';
-  const hsal = el.dataset.hsal || '';
-  capAbrirCambio(lote, pot, par, fsal, rid, hsal);
-}
-function capAbrirCambio(lote, potrero, parcela, fechaSal, regId, horaSal) {
-  _capCambioActual = { lote, potrero, parcela, fechaSal, regId, horaSal };
-  const lparts = lote.split('|');
-  const loteLabel = lparts.length >= 3 ? lparts[1]+' · '+lparts[2] : lote;
-  const viejo = document.getElementById('modalCapCambio');
-  if(viejo) viejo.remove();
-  const modal = document.createElement('div');
-  modal.id = 'modalCapCambio';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px;';
-  modal.innerHTML = '<div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:20px;width:100%;max-width:340px;">'
-    +'<div style="font-weight:700;color:var(--white);margin-bottom:4px;">✏️ Modificar Salida</div>'
-    +'<div style="font-size:12px;color:var(--text2);margin-bottom:12px;"><strong>'+loteLabel+'</strong> — '+potrero+'·P'+parcela+'<br>Salida actual: <span style="color:var(--gold2);">'+(fechaSal||'—')+' '+(horaSal||'')+'</span></div>'
-    +'<div style="display:flex;gap:8px;margin-bottom:8px;">'
-    +'<div style="flex:1;"><div style="font-size:10px;color:var(--text3);margin-bottom:4px;">Nueva fecha</div><input type="date" id="capNuevaFecha" value="'+(fechaSal||'')+'" style="width:100%;padding:8px;border:1px solid var(--border2);border-radius:6px;background:var(--bg2);color:var(--white);font-size:13px;"></div>'
-    +'<div style="flex:1;"><div style="font-size:10px;color:var(--text3);margin-bottom:4px;">Turno salida</div><select id="capNuevoTurno" style="width:100%;padding:8px;border:1px solid var(--border2);border-radius:6px;background:var(--bg2);color:var(--white);font-size:13px;"><option value="">Sin esp.</option><option value="MAÑANA" '+(horaSal==="MAÑANA"?'selected':'')+'>🌅 Mañana</option><option value="TARDE" '+(horaSal==="TARDE"?'selected':'')+'>🌇 Tarde</option></select></div>'
-    +'</div>'
-    +'<div id="capPreviewDiv" style="font-size:11px;color:var(--text2);background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:10px;display:none;"></div>'
-    +'<div style="display:flex;gap:8px;">'
-    +'<button onclick="capCerrarModal()" style="flex:1;padding:10px;border:1px solid var(--border);background:none;color:var(--text2);border-radius:8px;cursor:pointer;">Cancelar</button>'
-    +'<button onclick="capPrevisualizar()" style="flex:1;padding:10px;border:1px solid var(--blue);background:none;color:var(--blue);border-radius:8px;cursor:pointer;font-weight:700;">👁 Preview</button>'
-    +'<button onclick="capConfirmar()" style="flex:1;padding:10px;background:var(--green2);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:700;">✅ OK</button>'
-    +'</div></div>';
-  document.body.appendChild(modal);
-}
-
-function capPrevisualizar() {
-  if(!_capCambioActual) return;
-  const nuevaFecha = document.getElementById('capNuevaFecha') ? document.getElementById('capNuevaFecha').value : '';
-  const nuevoTurno = document.getElementById('capNuevoTurno') ? document.getElementById('capNuevoTurno').value : '';
-  if(!nuevaFecha) return;
-  const fechaSal = _capCambioActual.fechaSal;
-  const lote = _capCambioActual.lote;
-  const potrero = _capCambioActual.potrero;
-  const regId = _capCambioActual.regId;
-  const horaSal = _capCambioActual.horaSal;
-  if(!fechaSal) return;
-  const diff = Math.round((new Date(nuevaFecha+'T12:00:00') - new Date(fechaSal+'T12:00:00')) / 86400000);
-  const turnoCambio = nuevoTurno !== (horaSal||'');
-  if(diff === 0 && !turnoCambio) { notifV('Sin cambios'); return; }
-  const acts = asArray(getData('actividades', []));
-  const siguientes = acts.filter(function(a) {
-    return a.actividad === 'MATERIA SECA' && a.lote === lote && a.potrero === potrero && a.fechaIng >= fechaSal && a.id !== regId;
-  }).sort(function(a,b){ return a.fechaIng > b.fechaIng ? 1 : -1; });
-  const regPropio = acts.find(function(a){ return a.id === regId; });
-  const cambios = [];
-  if(regPropio) cambios.push({ id: regPropio.id, parcela: regPropio.parcela, de: regPropio.fechaSal, a: nuevaFecha, aTurno: nuevoTurno });
-  let turnoAnterior = nuevoTurno;
-  siguientes.forEach(function(a) {
-    const nIng = diff !== 0 ? sumarDiasV(a.fechaIng, diff) : a.fechaIng;
-    const nSal = a.fechaSal && diff !== 0 ? sumarDiasV(a.fechaSal, diff) : a.fechaSal;
-    cambios.push({ id: a.id, parcela: a.parcela, deIng: a.fechaIng, aIng: nIng, deSal: a.fechaSal, aSal: nSal, aTurno: turnoCambio ? turnoAnterior : a.horaSal });
-    turnoAnterior = turnoCambio ? turnoAnterior : a.horaSal;
-  });
-  _capCambioActual.cambios = cambios;
-  _capCambioActual.diff = diff;
-  _capCambioActual.nuevoTurno = nuevoTurno;
-  _capCambioActual.nuevaFecha = nuevaFecha;
-  const signo = diff > 0 ? '+' : '';
-  const prev = document.getElementById('capPreviewDiv');
-  if(prev) {
-    prev.style.display = 'block';
-    prev.innerHTML = '<strong style="color:var(--gold2);">⚠️ '+cambios.length+' registro(s) — '+signo+diff+' día(s)'+(turnoCambio?' · turno cambia':'')+'</strong><br>'
-      +cambios.map(function(c){ return c.de ? 'P'+c.parcela+': salida '+c.de+' → <strong>'+c.a+'</strong>' : 'P'+c.parcela+': '+c.deIng+'→'+c.aIng+' · '+c.deSal+'→'+c.aSal; }).join('<br>');
-  }
-}
-
-async function capConfirmar() {
-  if(!_capCambioActual || !_capCambioActual.cambios) { capPrevisualizar(); return; }
-  if(!confirm('¿Confirmar '+_capCambioActual.cambios.length+' cambio(s)?')) return;
-  const diff = _capCambioActual.diff;
-  const lote = _capCambioActual.lote;
-  const potrero = _capCambioActual.potrero;
-  const cambios = _capCambioActual.cambios;
-  let acts = asArray(getData('actividades', []));
-  cambios.forEach(function(c) {
-    const idx = acts.findIndex(function(a){ return a.id === c.id; });
-    if(idx === -1) return;
-    if(c.de !== undefined) {
-      acts[idx] = Object.assign({}, acts[idx], { fechaSal: c.a, horaSal: c.aTurno });
-    } else {
-      acts[idx] = Object.assign({}, acts[idx], { fechaIng: c.aIng, fechaSal: c.aSal, horaSal: c.aTurno });
-    }
-  });
-  setData('actividades', acts);
-  // Registrar alerta
-  const alertas = JSON.parse(localStorage.getItem('elprado_capAlerts') || '[]');
-  const loteNombre = lote.split('|')[2] || lote;
-  alertas.unshift({ ts: Date.now(), quien: 'Capataz', lote, potrero, cambios: cambios.length, diff,
-    desc: loteNombre+' — '+potrero+': '+cambios.length+' registro(s) corridos '+(diff>0?'+':'')+diff+' día(s)' });
-  localStorage.setItem('elprado_capAlerts', JSON.stringify(alertas.slice(0,50)));
-  fetch('https://elprado1-153ef-default-rtdb.firebaseio.com/elprado/capAlerts.json', {
-    method: 'PUT', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify(alertas.slice(0,50))
-  }).catch(function(){});
-  const m = document.getElementById('modalCapCambio');
-  if(m) m.remove();
-  _capCambioActual = null;
-  renderCapatazCampo();
-  notifV('✅ Cambios guardados y enviados al sistema');
-}
-
-function renderCapAlertas() {
-  const el = document.getElementById('capAlertas');
-  if(!el) return;
-  const alertas = JSON.parse(localStorage.getItem('elprado_capAlerts') || '[]');
-  if(!alertas.length) { el.innerHTML = ''; return; }
-  el.innerHTML = '<div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">🔔 Últimas modificaciones</div>'
-    +alertas.slice(0,3).map(function(a){
-      return '<div style="font-size:11px;color:var(--text2);background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:4px;">'
-        +'<span style="color:var(--gold2);font-weight:700;">✏ '+a.quien+'</span> — '+a.desc+'<br>'
-        +'<span style="font-size:10px;color:var(--text3);">'+new Date(a.ts).toLocaleString('es-BO')+'</span></div>';
-    }).join('');
-}
-
-function actualizarTopbar() {
-  const pag = pagActual();
-  const tb = document.getElementById('topbar');
-  const titulo = document.getElementById('topbarTitulo');
-  const fecha = document.getElementById('topbarFecha');
-  const hoy = new Date().toLocaleDateString('es-BO',{day:'2-digit',month:'short'});
-  fecha.textContent = hoy;
-  if(pag === 'pag0') {
-    tb.style.display = 'none';
-  } else {
-    tb.style.display = 'flex';
-    if(pag === 'pag1') titulo.textContent = vaqueroActual?.nombre || 'Mis grupos';
-    if(pag === 'pag2') titulo.textContent = grupoActual ? grupoActual.split('|')[2] : 'Detalle';
-  }
-}
-
-// ── PÁGINA 0: VAQUEROS ──
-function renderVaquerosV() {
-  const vaqueros = getVaqueros();
-  const cont = document.getElementById('listaVaquerosV');
-  const sinV = document.getElementById('sinVaqueros');
-  if(!vaqueros.length) {
-    cont.style.display = 'none';
-    sinV.style.display = 'block';
-    return;
-  }
-  cont.style.display = 'block';
-  sinV.style.display = 'none';
-  cont.innerHTML = vaqueros.map((v,i) => {
-    const nGrupos = (v.grupos||[]).length;
-    return `<div class="vaquero-btn" onclick="selVaquero(${i})">
-      <div class="vaquero-avatar">🤠</div>
-      <div>
-        <div class="vaquero-nombre">${v.nombre}</div>
-        <div class="vaquero-grupos">${nGrupos} grupo${nGrupos!==1?'s':''} asignado${nGrupos!==1?'s':''}</div>
-      </div>
-      <div style="margin-left:auto;color:var(--text3);font-size:18px;">›</div>
-    </div>`;
-  }).join('');
-}
-
-// ── PÁGINA 1: GRUPOS DEL VAQUERO ──
-async function selVaquero(i) {
-  vaqueroActual = getVaqueros()[i];
-  await syncFromFirebase();
-  renderGruposV();
-  irA('pag1');
-}
-
-function renderGruposV() {
-  const plan = getPlan();
-
-  const today = new Date().toISOString().split('T')[0];
-  const cont = document.getElementById('listaGruposV');
-  const grupos = vaqueroActual?.grupos || [];
+// ══════════════════════════════════════════════
+// RENDER VAQUEROS
+// ══════════════════════════════════════════════
+function renderVaqueros() {
+  const hoy   = new Date().toISOString().split('T')[0];
+  const dias  = [sumarDias(hoy,-1), hoy, sumarDias(hoy,1), sumarDias(hoy,2)];
+  const lbls  = ['Ayer','Hoy','Mañana','Pasado'];
+  const acts  = getActs();
+  const grupos = getGrupos();
 
   if(!grupos.length) {
-    cont.innerHTML = '<div class="vacio"><div class="vacio-icon">🐄</div>Sin grupos asignados</div>';
+    document.getElementById('listaVaqueros').innerHTML =
+      '<div class="vacio">Sin grupos configurados</div>'; return;
+  }
+
+  const html = grupos.map(g => {
+    const lote   = getLoteKey(g);
+    const nombre = getNombreGrupo(g);
+    const tipo   = getTipoGrupo(g);
+
+    const celdas = dias.map((d,i) => {
+      const reg   = getRegDia(acts, lote, d);
+      const esHoy = i===1;
+      const ancho = reg?.anchoM ? reg.anchoM+'m' : null;
+      const turno = reg?.horaSal==='MAÑANA'?'🌅 Mñ': reg?.horaSal==='TARDE'?'🌇 Td':'';
+      const dr    = reg?.fechaSal ? Math.round((new Date(reg.fechaSal+'T12:00:00')-new Date(hoy+'T12:00:00'))/86400000) : null;
+      let ex      = esHoy?' hoy':'';
+      if(d===reg?.fechaSal && dr===0) ex+=' sale-hoy';
+      if(d===reg?.fechaSal && dr===1) ex+=' sale-mnn';
+      return `<div class="dia-celda${ex}">
+        <div class="dia-lbl">${lbls[i]}</div>
+        <div class="dia-fecha">${fmtC(d)}</div>
+        ${reg
+          ? `<div class="dia-potpar">${reg.potrero}·P${reg.parcela}</div>
+             ${turno?`<div class="dia-turno">${turno}</div>`:''}
+             ${ancho?`<div class="dia-ancho">↔ ${ancho}</div>`:''}`
+          : `<div class="dia-vacio">—</div>`}
+      </div>`;
+    }).join('');
+
+    return `<div class="grupo-row" onclick="verDetalle('${lote}','vaquero')">
+      <div class="grupo-row-header">
+        <div class="grupo-nombre-tag">${nombre}</div>
+        ${tipo?`<div class="grupo-tipo-tag">${tipo}</div>`:''}
+      </div>
+      <div class="grupo-row-dias">${celdas}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('listaVaqueros').innerHTML = html;
+}
+
+// ══════════════════════════════════════════════
+// RENDER ARMADORES
+// ══════════════════════════════════════════════
+function renderArmadores() {
+  const hoy    = new Date().toISOString().split('T')[0];
+  const fin    = sumarDias(hoy, 14);
+  const acts   = getActs().filter(a =>
+    a.actividad==='MATERIA SECA' && a.fechaIng && a.lote &&
+    a.fechaIng >= hoy && a.fechaIng <= fin
+  );
+  const grupos = getGrupos();
+
+  if(!acts.length) {
+    document.getElementById('listaArmadores').innerHTML =
+      '<div class="arm-vacio">Sin aforos registrados para los próximos 14 días.<br>A medida que se carguen aforos, aparecen acá automáticamente.</div>';
     return;
   }
 
-  cont.innerHTML = '<div style="font-size:13px;color:var(--text3);margin-bottom:12px;text-align:center;">Tocá un grupo para ver el detalle</div>' +
-  grupos.map(lote => {
-    const parts = lote.split('|');
-    const tipo = parts[0]||''; const cat = parts[1]||''; const nombre = parts[2]||lote;
-    // Buscar parcela hoy
-    const planHoy = plan.filter(p => p.lote===lote && p.fi<=today && (!p.fs||p.fs>today));
-    const hoy = planHoy.length ? planHoy[0] : null;
-    const ubicacionHTML = hoy
-      ? `<strong>${hoy.potrero}</strong> · Parcela ${hoy.parcela} · ${hoy.anchoM?hoy.anchoM+'m':'—'}`
-      : '<span style="color:var(--text3);">Sin planificación hoy</span>';
-    return `<div class="grupo-card" onclick="selGrupo('${lote}')">
-      <div class="grupo-badge">${tipo} · ${cat}</div>
-      <div class="grupo-nombre">${nombre}</div>
-      <div class="grupo-ubicacion">📍 ${ubicacionHTML}</div>
-    </div>`;
-  }).join('');
-}
-
-// ── PÁGINA 2: DETALLE DEL GRUPO ──
-async function selGrupo(lote) {
-  grupoActual = lote;
-  await syncFromFirebase();
-  renderDetalleV();
-  irA('pag2');
-}
-
-function getLargoRedondeado(p) {
-  const actividades = getData('actividades', []);
-  const act = actividades.find(function(a) {
-    return a.potrero === p.potrero && 
-      a.parcela === p.parcela && 
-      a.lote === p.lote &&
-      (a.actividad === 'MATERIA SECA' || a.actividad === 'INGRESO HDA');
+  // Agrupar por fecha de ingreso
+  const porFecha = {};
+  acts.forEach(a => {
+    if(!porFecha[a.fechaIng]) porFecha[a.fechaIng] = [];
+    porFecha[a.fechaIng].push(a);
   });
-  const largoM = p.largoM || (act && act.largoM);
-  const anchoM = p.anchoM || (act && act.anchoM);
-  const ha = p.ha || (act && act.ha);
-  
-  if(largoM) return (Math.round(largoM / 10) * 10) + 'm largo';
-  if(anchoM && ha) {
-    return (Math.round((ha * 10000 / anchoM) / 10) * 10) + 'm largo';
-  }
-  if(anchoM) return anchoM + 'm ancho';
-  return '—';
-}
 
-function renderDetalleV() {
-  const lote = grupoActual;
-  const parts = lote.split('|');
-  const tipo = parts[0]||''; const cat = parts[1]||''; const nombre = parts[2]||lote;
-  const plan = getPlan();
-  const today = new Date().toISOString().split('T')[0];
-  const pedidos = getPedidos().filter(p=>p.lote===lote && p.vaquero===vaqueroActual?.nombre);
+  const fechasOrdenadas = Object.keys(porFecha).sort();
 
-  // Planificación ordenada para este grupo, desde hoy
-  const planGrupo = plan
-    .filter(p=>p.lote===lote)
-    .sort((a,b)=>a.fi>b.fi?1:-1);
+  const html = fechasOrdenadas.map(fecha => {
+    const esHoy   = fecha === hoy;
+    const dt      = new Date(fecha+'T12:00:00');
+    const diasStr = esHoy ? 'HOY' : sumarDias(hoy,0)===fecha ? 'HOY' :
+      Math.round((dt-new Date(hoy+'T12:00:00'))/86400000)===1 ? 'MAÑANA' :
+      DIAS[dt.getDay()]+' '+dt.getDate()+' '+MESES[dt.getMonth()];
 
-  const planHoy = planGrupo.filter(p=>p.fi<=today && (!p.fs||p.fs>today));
-  const planFuturo = planGrupo.filter(p=>p.fi>today);
+    const items = porFecha[fecha].map((a, i) => {
+      const g      = grupos.find(x => getLoteKey(x)===a.lote);
+      const nombre = g ? getNombreGrupo(g) : a.lote.split('|')[2]||a.lote;
+      const tipo   = g ? getTipoGrupo(g) : '';
+      const largo  = getLargoM(a);
+      const ancho  = a.anchoM;
+      const turno  = a.horaIng==='MAÑANA'?'🌅 Ingresa mañana': a.horaIng==='TARDE'?'🌇 Ingresa tarde':'';
+      let medidas  = '';
+      if(ancho && largo) medidas = `↔ ${ancho}m ancho · ${largo}m largo`;
+      else if(ancho)     medidas = `↔ ${ancho}m ancho`;
+      else if(largo)     medidas = `📏 ${largo}m largo`;
+      else               medidas = 'Sin medidas registradas';
 
-  // Detectar próximo potrero (diferente al actual)
-  const potreroActual = planHoy.length ? planHoy[0].potrero : null;
-  const proximoPotrero = planGrupo.find(p=>p.fi>today && p.potrero !== potreroActual);
-
-  // Bloque HOY
-  let hoyHTML = '';
-  if(planHoy.length) {
-    const h = planHoy[0];
-    const metrosHTML = getLargoRedondeado(h);
-    hoyHTML = `<div class="parcela-hoy">
-      <span class="parcela-tag">📍 HOY — PARCELA ACTUAL</span>
-      <div class="parcela-grid">
-        <div class="parcela-campo">
-          <div class="parcela-campo-lbl">Potrero · Parcela</div>
-          <div class="parcela-campo-val">${h.potrero} · N° ${h.parcela}</div>
-        </div>
-        <div class="parcela-campo">
-          <div class="parcela-campo-lbl">Medida</div>
-          <div class="parcela-campo-val">${metrosHTML}</div>
-        </div>
-        <div class="parcela-campo">
-          <div class="parcela-campo-lbl">Entrada</div>
-          <div class="parcela-campo-val sm">${formatFecha(h.fi)}${h.horaIng?' · '+h.horaIng:''}</div>
-        </div>
-        <div class="parcela-campo">
-          <div class="parcela-campo-lbl">Salida</div>
-          <div class="parcela-campo-val sm">${h.fs?formatFecha(h.fs):'—'}${h.horaSal?' · '+h.horaSal:''}</div>
-        </div>
-        ${h.obs?`<div class="parcela-campo" style="grid-column:1/-1;"><div class="parcela-campo-lbl">Observación</div><div style="font-size:13px;color:var(--gold2);">⚠ ${h.obs}</div></div>`:''}
-      </div>
-    </div>`;
-  } else {
-    hoyHTML = `<div class="sin-plan">📅 Sin parcela planificada para hoy</div>`;
-  }
-
-  // Próximas parcelas
-  let proxHTML = '';
-  if(planFuturo.length) {
-    proxHTML = '<div class="prox-label">Próximas parcelas</div>' +
-    planFuturo.map((p,i) => {
-      const metros = getLargoRedondeado(p);
-      return `<div class="prox-item">
-        <div class="prox-num">${i+1}</div>
-        <div class="prox-info">
-          <div class="prox-potpar">${p.potrero} · Parcela ${p.parcela}</div>
-          <div class="prox-fecha">${formatFecha(p.fi)}${p.horaIng?' '+p.horaIng:''}${p.fs?' → '+formatFecha(p.fs)+(p.horaSal?' '+p.horaSal:''):''} · ${p.dias||1} día${(p.dias||1)!==1?'s':''}</div>
-          <div class="prox-metros">${metros}</div>
+      return `<div class="arm-item">
+        <div class="arm-num">${i+1}</div>
+        <div class="arm-info">
+          <div class="arm-grupo">${nombre}${tipo?` <span style="font-size:10px;color:var(--text3);">· ${tipo}</span>`:''}</div>
+          <div class="arm-potpar">${a.potrero} · Parcela ${a.parcela}</div>
+          <div class="arm-medidas">${medidas}</div>
+          ${turno?`<div class="arm-turno">${turno}</div>`:''}
         </div>
       </div>`;
     }).join('');
-  }
 
-  // Próximo potrero
-  let proxPotreroHTML = '';
-  if(proximoPotrero && potreroActual) {
-    proxPotreroHTML = `<div class="prox-item" style="opacity:0.7;margin-top:4px;">
-      <div class="prox-num" style="color:var(--text3);background:rgba(96,120,80,.1);">→</div>
-      <div class="prox-info">
-        <div style="font-size:12px;color:var(--text3);">Próximo potrero: <strong style="color:var(--text2);">${proximoPotrero.potrero}</strong> · aprox. ${formatFecha(proximoPotrero.fi)}</div>
+    return `<div class="arm-card">
+      <div class="arm-card-header">
+        <div class="arm-fecha-badge">${diasStr}</div>
+        <div class="arm-dias-label">${fmtLargo(fecha)}</div>
       </div>
+      ${items}
     </div>`;
-  }
-
-  // Pedidos previos
-  let pedidosPrevHTML = '';
-  if(pedidos.length) {
-    pedidosPrevHTML = '<div style="margin-bottom:10px;">' +
-      pedidos.slice(0,3).map(p=>`<div class="pedido-item">
-        <span>📝</span>
-        <div>
-          <div>${p.mensaje}</div>
-          <div class="pedido-fecha">${new Date(p.ts).toLocaleString('es-BO')}</div>
-        </div>
-      </div>`).join('') + '</div>';
-  }
-
-  document.getElementById('detalleGrupoV').innerHTML = `
-    <div class="detalle-header">
-      <div class="detalle-avatar">🐄</div>
-      <div>
-        <div class="detalle-nombre">${nombre}</div>
-        <div class="detalle-meta">${tipo} · ${cat} · Resp: ${vaqueroActual?.nombre||'—'}</div>
-      </div>
-    </div>
-
-    ${hoyHTML}
-
-    <!-- Vista 7 días Estado del Campo -->
-    <div style="margin:12px 0 6px;font-size:11px;font-weight:700;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;">📅 Movimientos — 7 días</div>
-    <div style="overflow-x:auto;margin-bottom:8px;">
-      ${renderCampoVaquero(lote)}
-    </div>
-
-    ${proxHTML}
-    ${proxPotreroHTML}
-
-    <div class="pedidos-section">
-      <div class="pedidos-label">📬 Pedidos y Observaciones</div>
-      ${pedidosPrevHTML}
-      <div class="pedido-form" style="flex-direction:column;gap:8px;">
-        <div style="display:flex;gap:8px;">
-          <input type="text" class="pedido-input" id="pedidoInput" placeholder="Escribí tu pedido o comentario..." maxlength="200">
-          <label style="background:var(--card2);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;cursor:pointer;color:var(--text2);font-size:14px;flex-shrink:0;" title="Adjuntar foto">
-            📷
-            <input type="file" id="pedidoFoto" accept="image/*" capture="environment" style="display:none;" onchange="previsualizarFoto(this)">
-          </label>
-          <button class="pedido-send" onclick="enviarPedido()">Enviar</button>
-        </div>
-        <div id="fotoPreview" style="display:none;">
-          <img id="fotoPreviewImg" style="max-width:100%;max-height:200px;border-radius:8px;border:1px solid var(--border2);">
-          <button onclick="cancelarFoto()" style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer;margin-left:8px;">✕ Quitar foto</button>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function sumarDiasV(fecha, dias) {
-  const d = new Date(fecha + 'T12:00:00');
-  d.setDate(d.getDate() + dias);
-  return d.toISOString().split('T')[0];
-}
-
-function renderCampoVaquero(lote) {
-  const hoy = new Date().toISOString().split('T')[0];
-  const dias = [];
-  for(let i = -3; i <= 3; i++) dias.push(sumarDiasV(hoy, i));
-
-  const MESES_C = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-  const DIAS_C  = ['Do','Lu','Ma','Mi','Ju','Vi','Sa'];
-
-  // Leer actividades de Materia Seca para este lote
-  const acts = (getData('actividades', [])).filter(a =>
-    a.actividad === 'MATERIA SECA' && a.lote === lote && a.fechaIng
-  );
-
-  const celdas = dias.map(d => {
-    const esHoy = d === hoy;
-    const dt = new Date(d + 'T12:00:00');
-    const dow = DIAS_C[dt.getDay()];
-    const label = dt.getDate() + ' ' + MESES_C[dt.getMonth()];
-
-    // Buscar registro activo — prioridad: ingresó más tarde
-    const candidatos = acts.filter(a =>
-      a.fechaIng && (
-        (a.fechaSal && a.fechaIng <= d && a.fechaSal >= d) ||
-        (!a.fechaSal && a.fechaIng === d)
-      )
-    );
-    const reg = candidatos.length > 0
-      ? candidatos.reduce((best, a) => a.fechaIng >= best.fechaIng ? a : best)
-      : null;
-
-    // Color urgencia
-    let bgH = esHoy ? 'rgba(109,186,58,.18)' : 'var(--bg2)';
-    let borderH = esHoy ? '2px solid var(--green2)' : '1px solid var(--border)';
-    let textColor = 'var(--text2)';
-
-    let contenido = '<span style="color:var(--text3);font-size:13px;">—</span>';
-    if(reg) {
-      const diasRest = reg.fechaSal ? Math.round((new Date(reg.fechaSal+'T12:00:00') - new Date(hoy+'T12:00:00')) / 86400000) : null;
-      if(diasRest !== null) {
-        if(diasRest < 0)  { bgH = 'rgba(100,100,100,.1)'; textColor = 'var(--text3)'; }
-        else if(diasRest === 0) { bgH = 'rgba(224,90,74,.18)'; textColor = 'var(--red)'; borderH = '2px solid var(--red)'; }
-        else if(diasRest === 1) { bgH = 'rgba(201,162,39,.15)'; textColor = 'var(--gold2)'; }
-        else { textColor = 'var(--green-soft)'; }
-      }
-      const turno = reg.horaSal === 'MAÑANA' ? '🌅 Mañana' : reg.horaSal === 'TARDE' ? '🌇 Tarde' : '';
-      const badge = reg.fechaSal === d ? (diasRest === 0 ? '<div style="font-size:10px;font-weight:700;color:var(--red);">SALE HOY</div>' : diasRest === 1 ? '<div style="font-size:10px;font-weight:700;color:var(--gold2);">SALE MÑN</div>' : '') : '';
-      contenido = `
-        <div style="font-size:13px;font-weight:700;color:${textColor};">${reg.potrero}·P${reg.parcela}</div>
-        <div style="font-size:10px;color:var(--text3);">${reg.fechaSal||'—'}</div>
-        ${turno ? `<div style="font-size:10px;font-weight:700;color:var(--gold2);">${turno}</div>` : ''}
-        ${badge}`;
-    }
-
-    return `<td style="min-width:80px;padding:5px 4px;text-align:center;background:${bgH};border:${borderH};border-radius:6px;">
-      <div style="font-size:10px;font-weight:700;color:${esHoy?'var(--green)':'var(--text3)'};">${dow}</div>
-      <div style="font-size:10px;color:var(--text3);margin-bottom:4px;">${label}</div>
-      ${contenido}
-    </td>`;
   }).join('');
 
-  return `<table style="border-collapse:separate;border-spacing:3px;width:100%;">
-    <tbody><tr>${celdas}</tr></tbody>
-  </table>`;
+  document.getElementById('listaArmadores').innerHTML = html;
 }
 
-async function enviarPedido() {
-  const inp = document.getElementById('pedidoInput');
-  const msg = inp?.value?.trim();
-  const fotoInput = document.getElementById('pedidoFoto');
-  const fotoImg = document.getElementById('fotoPreviewImg');
-  
-  if(!msg && (!fotoInput.files || !fotoInput.files[0])) { 
-    notifV('Escribí un mensaje o adjuntá una foto', true); 
-    return; 
+// ══════════════════════════════════════════════
+// RENDER PÚBLICA (3 días)
+// ══════════════════════════════════════════════
+function renderPublica() {
+  const hoy    = new Date().toISOString().split('T')[0];
+  const dias   = [sumarDias(hoy,-1), hoy, sumarDias(hoy,1)];
+  const lbls   = ['Ayer','Hoy','Mañana'];
+  const acts   = getActs();
+  const grupos = getGrupos();
+
+  if(!grupos.length) {
+    document.getElementById('listaPublica').innerHTML =
+      '<div class="vacio">Sin grupos configurados</div>'; return;
   }
-  
-  let fotoBase64 = null;
-  if(fotoInput.files && fotoInput.files[0]) {
-    fotoBase64 = await new Promise(resolve => {
-      const reader = new FileReader();
-      reader.onload = e => resolve(e.target.result);
-      reader.readAsDataURL(fotoInput.files[0]);
-    });
+
+  const html = grupos.map(g => {
+    const lote   = getLoteKey(g);
+    const nombre = getNombreGrupo(g);
+    const tipo   = getTipoGrupo(g);
+
+    const celdas = dias.map((d,i) => {
+      const reg   = getRegDia(acts, lote, d);
+      const esHoy = i===1;
+      const turno = reg?.horaSal==='MAÑANA'?'🌅 Mñ': reg?.horaSal==='TARDE'?'🌇 Td':'';
+      return `<div class="pub-celda${esHoy?' hoy':''}">
+        <div class="pub-lbl">${lbls[i]}</div>
+        <div class="pub-fecha">${fmtC(d)}</div>
+        ${reg
+          ? `<div class="pub-potpar">${reg.potrero}·P${reg.parcela}</div>
+             ${turno?`<div style="font-size:10px;color:var(--gold2);font-weight:700;">${turno}</div>`:''}`
+          : `<div class="pub-vacio">—</div>`}
+      </div>`;
+    }).join('');
+
+    return `<div class="pub-row">
+      <div class="pub-row-header">
+        <div class="grupo-nombre-tag">${nombre}</div>
+        ${tipo?`<div class="grupo-tipo-tag">${tipo}</div>`:''}
+      </div>
+      <div class="pub-row-dias">${celdas}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('listaPublica').innerHTML = html;
+}
+
+// ══════════════════════════════════════════════
+// DETALLE GRUPO (overlay)
+// ══════════════════════════════════════════════
+function verDetalle(lote, modo) {
+  const hoy   = new Date().toISOString().split('T')[0];
+  const dias  = [sumarDias(hoy,-1), hoy, sumarDias(hoy,1), sumarDias(hoy,2)];
+  const lbls  = ['Ayer','Hoy','Mañana','Pasado'];
+  const acts  = getActs();
+  const grupos = getGrupos();
+  const g     = grupos.find(x => getLoteKey(x)===lote);
+  const nombre = g ? getNombreGrupo(g) : lote.split('|')[2]||lote;
+  const tipo   = g ? getTipoGrupo(g) : '';
+
+  const regHoy = getRegDia(acts, lote, hoy);
+  const largo  = getLargoM(regHoy);
+  const ancho  = regHoy?.anchoM;
+
+  const secHoy = regHoy ? `
+    <div style="background:rgba(109,186,58,.08);border:1px solid rgba(109,186,58,.25);border-radius:10px;padding:14px;margin-bottom:12px;">
+      <div style="font-size:9px;font-weight:700;letter-spacing:2px;color:var(--green);margin-bottom:10px;">📍 HOY — ${fmtLargo(hoy)}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+        <div><div style="font-size:10px;color:var(--text3);">POTRERO</div><div style="font-size:18px;font-weight:800;color:var(--green-soft);">${regHoy.potrero}</div></div>
+        <div><div style="font-size:10px;color:var(--text3);">PARCELA</div><div style="font-size:18px;font-weight:800;color:var(--green-soft);">P${regHoy.parcela}</div></div>
+        <div><div style="font-size:10px;color:var(--text3);">ESTADÍA</div><div style="font-size:18px;font-weight:800;color:var(--green-soft);">${regHoy.estadia||'—'}d</div></div>
+        ${ancho?`<div><div style="font-size:10px;color:var(--text3);">ANCHO</div><div style="font-size:16px;font-weight:700;color:var(--blue);">↔ ${ancho}m</div></div>`:''}
+        ${largo?`<div><div style="font-size:10px;color:var(--text3);">LARGO</div><div style="font-size:16px;font-weight:700;color:var(--blue);">📏 ${largo}m</div></div>`:''}
+        <div><div style="font-size:10px;color:var(--text3);">SALE</div><div style="font-size:14px;font-weight:700;color:var(--text);">${regHoy.fechaSal||'—'}</div></div>
+        <div><div style="font-size:10px;color:var(--text3);">TURNO SAL.</div><div style="font-size:13px;font-weight:700;color:var(--gold2);">${regHoy.horaSal==='MAÑANA'?'🌅 Mañana':regHoy.horaSal==='TARDE'?'🌇 Tarde':'—'}</div></div>
+      </div>
+    </div>` :
+    `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;text-align:center;color:var(--text3);font-size:13px;">Sin registro para hoy</div>`;
+
+  const diasItems = dias.map((d,i) => {
+    const reg   = getRegDia(acts, lote, d);
+    const esHoy = i===1;
+    const dt    = new Date(d+'T12:00:00');
+    const lM    = getLargoM(reg);
+    const turno = reg?.horaSal==='MAÑANA'?'🌅 Mañana': reg?.horaSal==='TARDE'?'🌇 Tarde':'';
+    return `<div style="background:${esHoy?'rgba(109,186,58,.1)':'var(--card2)'};border-radius:8px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:12px;">
+      <div style="width:36px;height:36px;border-radius:8px;background:rgba(109,186,58,.1);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:9px;color:var(--text3);font-weight:700;flex-shrink:0;">
+        <span style="font-size:14px;font-weight:800;color:var(--green);line-height:1;">${dt.getDate()}</span>${MESES[dt.getMonth()]}
+      </div>
+      <div style="flex:1;">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:2px;">${lbls[i]} — ${DIAS[dt.getDay()]}</div>
+        ${reg
+          ? `<div style="font-size:14px;font-weight:700;color:var(--text);">${reg.potrero} · Parcela ${reg.parcela}</div>
+             ${turno?`<div style="font-size:11px;color:var(--gold2);font-weight:700;">${turno}</div>`:''}
+             ${reg.anchoM?`<div style="font-size:11px;color:var(--blue);">↔ ${reg.anchoM}m ancho${lM?' · 📏'+lM+'m largo':''}</div>`:
+               lM?`<div style="font-size:11px;color:var(--blue);">📏 ${lM}m largo</div>`:''}`
+          : `<div style="color:var(--text3);font-size:12px;">— pendiente —</div>`}
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('detalleContenido').innerHTML = `
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;">
+      <div style="font-size:18px;font-weight:800;color:var(--white);">${nombre}</div>
+      ${tipo?`<div style="font-size:11px;color:var(--text3);margin-top:2px;">${tipo}</div>`:''}
+    </div>
+    ${secHoy}
+    <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--text3);text-transform:uppercase;margin:14px 0 8px;">📅 Ayer — Hoy — Mañana — Pasado</div>
+    ${diasItems}`;
+
+  document.getElementById('overlayDetalle').classList.add('open');
+}
+function cerrarDetalle() { document.getElementById('overlayDetalle').classList.remove('open'); }
+
+// ══════════════════════════════════════════════
+// CAPATAZ
+// ══════════════════════════════════════════════
+const PIN_CAPATAZ = '2810';
+let capFechaBase  = null;
+let _cambioActual = null;
+
+function abrirPINCapataz() {
+  document.getElementById('modalPIN').classList.add('open');
+  document.getElementById('pinInput').value = '';
+  document.getElementById('pinInput').focus();
+  document.getElementById('pinError').style.display = 'none';
+}
+function cerrarPIN() { document.getElementById('modalPIN').classList.remove('open'); }
+async function verificarPIN() {
+  if(document.getElementById('pinInput').value === PIN_CAPATAZ) {
+    cerrarPIN();
+    await syncFB();
+    capIrHoy();
+    irA('pagCapataz');
+  } else {
+    document.getElementById('pinError').style.display = 'block';
+    document.getElementById('pinInput').value = '';
   }
-  
-  const pedidos = getPedidos();
-  pedidos.unshift({
-    id: uuid(),
-    ts: Date.now(),
-    vaquero: vaqueroActual?.nombre||'—',
-    lote: grupoActual,
-    mensaje: msg || '(foto adjunta)',
-    foto: fotoBase64,
-    leido: false
-  });
-  setPedidos(pedidos);
-  inp.value = '';
-  cancelarFoto();
-  notifV('✓ Pedido enviado al administrador');
-  renderDetalleV();
+}
+function capIrHoy() { capFechaBase = new Date().toISOString().split('T')[0]; renderCapataz(); }
+function capNavegar(d) {
+  if(!capFechaBase) capFechaBase = new Date().toISOString().split('T')[0];
+  capFechaBase = sumarDias(capFechaBase, d); renderCapataz();
+}
+function renderCapataz() {
+  const hoy = new Date().toISOString().split('T')[0];
+  if(!capFechaBase) capFechaBase = hoy;
+  const dias = []; for(let i=-3;i<=3;i++) dias.push(sumarDias(capFechaBase,i));
+  const d0=new Date(dias[0]+'T12:00:00'), d6=new Date(dias[6]+'T12:00:00');
+  document.getElementById('capFechaLabel').textContent =
+    d0.getDate()+'/'+MESES[d0.getMonth()]+' — '+d6.getDate()+'/'+MESES[d6.getMonth()];
+
+  const acts  = getActs().filter(a=>a.actividad==='MATERIA SECA'&&a.fechaIng&&a.lote);
+  const grupos = getGrupos();
+
+  const thead = `<tr>
+    <th class="cap-th" style="text-align:left;min-width:90px;">Grupo</th>
+    ${dias.map(d=>{
+      const esH=d===hoy; const dt=new Date(d+'T12:00:00');
+      return `<th class="cap-th" style="${esH?'color:var(--green);':''}">${DIAS[dt.getDay()]}<br>${dt.getDate()}/${dt.getMonth()+1}</th>`;
+    }).join('')}
+  </tr>`;
+
+  const tbody = grupos.map(g => {
+    const lote  = getLoteKey(g);
+    const nombre= getNombreGrupo(g);
+    const celdas = dias.map(d => {
+      const esH = d===hoy;
+      const reg = getRegDia(acts, lote, d);
+      const turno = reg?.horaSal==='MAÑANA'?'🌅': reg?.horaSal==='TARDE'?'🌇':'';
+      const dr  = reg?.fechaSal?Math.round((new Date(reg.fechaSal+'T12:00:00')-new Date(hoy+'T12:00:00'))/86400000):null;
+      let col   = 'var(--green-soft)';
+      if(dr!==null){if(dr<0)col='var(--text3)';else if(dr===0)col='var(--red)';else if(dr===1)col='var(--gold2)';}
+      const oc  = reg?`onclick="abrirCambioSal('${lote}','${reg.potrero}','${reg.parcela}','${reg.fechaSal||''}','${reg.id}','${reg.horaSal||''}')"`:'';
+      return `<td class="cap-td${esH?' hoy-col':''}" ${oc}>
+        ${reg?`<div style="font-size:11px;font-weight:700;color:${col};">${reg.potrero}·P${reg.parcela}</div>
+               ${turno?`<div style="font-size:10px;color:var(--gold2);">${turno}</div>`:''}`
+             :`<div style="color:var(--text3);font-size:11px;">—</div>`}
+      </td>`;
+    }).join('');
+    return `<tr><td class="cap-td-lote">${nombre}</td>${celdas}</tr>`;
+  }).join('');
+
+  document.getElementById('capTabla').innerHTML =
+    `<table class="cap-tabla"><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
+
+  // Alertas
+  const alertas = asArr(getData('alertasCapataz',[]));
+  const ac = document.getElementById('capAlertas');
+  if(!alertas.length){ac.innerHTML='';return;}
+  ac.innerHTML = '<div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:1px;margin-bottom:6px;">🔔 MODIFICACIONES RECIENTES</div>' +
+    alertas.slice(0,10).map(a=>`<div class="alerta-card">
+      <div style="font-weight:700;color:var(--gold2);margin-bottom:2px;">${a.grupo||'—'} · ${a.potrero||''} P${a.parcela||''}</div>
+      <div>${a.mensaje||''}</div>
+      <div style="color:var(--text3);font-size:10px;margin-top:3px;">${new Date(a.ts||0).toLocaleString('es-BO')}</div>
+    </div>`).join('');
 }
 
-function formatFecha(iso) {
-  if(!iso) return '—';
-  const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-  const p = iso.split('-');
-  return parseInt(p[2])+' '+meses[parseInt(p[1])-1];
+function abrirCambioSal(lote, potrero, parcela, fechaSal, regId, horaSal) {
+  _cambioActual = {lote, potrero, parcela, fechaSal, regId, horaSal};
+  const lp = lote.split('|');
+  const label = lp.length>=3 ? lp[1]+' · '+lp[2] : lote;
+  document.getElementById('cambioSalInfo').innerHTML =
+    `<strong>${label}</strong><br>Potrero: <strong>${potrero}</strong> · Parcela: <strong>${parcela}</strong><br>Salida actual: <strong style="color:var(--gold2);">${fechaSal||'—'}</strong>`;
+  document.getElementById('cambioSalFecha').value = fechaSal||'';
+  document.getElementById('cambioSalTurno').value = horaSal||'';
+  document.getElementById('modalCambioSal').classList.add('open');
+}
+function cerrarModalCambioSal(){document.getElementById('modalCambioSal').classList.remove('open');}
+function confirmarCambioSal() {
+  if(!_cambioActual) return;
+  const nueva   = document.getElementById('cambioSalFecha').value;
+  const turnoNvo= document.getElementById('cambioSalTurno').value;
+  if(!nueva){notifV('Ingresá la nueva fecha',true);return;}
+  const acts = asArr(getData('actividades',[]));
+  const idx  = acts.findIndex(a=>a.id===_cambioActual.regId);
+  if(idx===-1){notifV('Registro no encontrado',true);return;}
+  const anterior = acts[idx].fechaSal;
+  acts[idx].fechaSal = nueva;
+  acts[idx].horaSal  = turnoNvo;
+  if(acts[idx].fechaIng){
+    const fi=new Date(acts[idx].fechaIng+'T12:00:00'), fs=new Date(nueva+'T12:00:00');
+    acts[idx].estadia = Math.round((fs-fi)/86400000);
+  }
+  setData('actividades', acts);
+  // Guardar alerta
+  const alertas = asArr(getData('alertasCapataz',[]));
+  alertas.unshift({ts:Date.now(), grupo:_cambioActual.lote.split('|')[2]||_cambioActual.lote,
+    potrero:_cambioActual.potrero, parcela:_cambioActual.parcela,
+    mensaje:`Salida cambiada de ${anterior||'—'} a ${nueva} (${turnoNvo||'sin turno'})`});
+  setData('alertasCapataz', alertas.slice(0,50));
+  cerrarModalCambioSal();
+  renderCapataz();
+  renderVaqueros();
+  renderPublica();
+  notifV('✓ Salida actualizada y notificada');
 }
 
-function previsualizarFoto(input) {
-  if(!input.files || !input.files[0]) return;
-  const file = input.files[0];
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    document.getElementById('fotoPreviewImg').src = e.target.result;
-    document.getElementById('fotoPreview').style.display = 'block';
-  };
-  reader.readAsDataURL(file);
+// ══════════════════════════════════════════════
+// REFRESCAR
+// ══════════════════════════════════════════════
+async function refrescar(vista) {
+  notifV('↻ Actualizando...');
+  await syncFB();
+  if(vista==='vaqueros')   renderVaqueros();
+  if(vista==='armadores')  renderArmadores();
+  if(vista==='publica')    renderPublica();
+  notifV('✓ Datos actualizados');
 }
 
-function cancelarFoto() {
-  document.getElementById('pedidoFoto').value = '';
-  document.getElementById('fotoPreview').style.display = 'none';
-  document.getElementById('fotoPreviewImg').src = '';
-}
-
+// ══════════════════════════════════════════════
+// NOTIF
+// ══════════════════════════════════════════════
 function notifV(msg, error=false) {
   const el = document.getElementById('notifV');
-  el.textContent = msg;
-  el.className = error ? 'error' : '';
-  el.style.display = 'block';
+  el.textContent=msg; el.className=error?'error':'';
+  el.style.display='block';
   setTimeout(()=>el.style.display='none', 3000);
 }
 
-// ── INIT ──
+// ══════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════
 (async () => {
-  // Mostrar loader
-  document.body.insertAdjacentHTML('beforeend', '<div id="v-loading" style="position:fixed;inset:0;background:#0f1a0b;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;"><div style="font-size:13px;color:#6dba3a;font-weight:600;letter-spacing:2px;">CARGANDO...</div><div style="font-size:28px;">🐄</div></div>');
-  await syncFromFirebase();
-  const loader = document.getElementById('v-loading');
-  if(loader) loader.remove();
-  renderVaquerosV();
-  actualizarTopbar();
-})();
-
-// Actualizar fecha cada minuto
-setInterval(()=>{ document.getElementById('topbarFecha').textContent = new Date().toLocaleDateString('es-BO',{day:'2-digit',month:'short'}); }, 60000);
-</script>
-<script>
-(function() {
-  var FB_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com';
-  
-  // Claves RRHH
-  var RRHH_KEYS = ['personalFijoDB','personalEventualDB','actividadesDB',
-    'asistFijoCierres','asistFijoPeriodoInicio','prestamosEventualDB',
-    'retirosDB','saldoOcultos','smn_prado'];
-  
-  // Claves PASTURAS
-  var PASTURAS_KEYS = ['elprado_actividades','elprado_grupos','elprado_vaqueros',
-    'elprado_plan','elprado_pedidos'];
-
-  function fbWrite(path, val) {
-    fetch(FB_URL + path + '.json', {
-      method: 'PUT',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify(val)
-    }).catch(function(){});
-  }
-
-  function fbRead(path, cb) {
-    fetch(FB_URL + path + '.json')
-      .then(function(r){ return r.json(); })
-      .then(cb)
-      .catch(function(){ cb(null); });
-  }
-
-  // Interceptar localStorage.setItem para auto-sincronizar
-  var _orig = Storage.prototype.setItem;
-  Storage.prototype.setItem = function(key, value) {
-    _orig.call(this, key, value);
-    try {
-      var val = JSON.parse(value);
-      if(RRHH_KEYS.indexOf(key) >= 0) {
-        fbWrite('/rrhh/' + key, val);
-      } else if(key.indexOf('elprado_') === 0 && key !== 'elprado_usuario') {
-        var subkey = key.replace('elprado_','');
-        fbWrite('/elprado/' + subkey, val);
-      }
-    } catch(e) {}
+  // Fecha topbar
+  const fechaEl = document.getElementById('topbarFecha');
+  const actualizarFecha = () => {
+    fechaEl.textContent = new Date().toLocaleDateString('es-BO',{weekday:'short',day:'2-digit',month:'short'});
   };
+  actualizarFecha();
+  setInterval(actualizarFecha, 60000);
 
-  // Al cargar: sincronizar desde Firebase
-  window.addEventListener('load', function() {
-    // Bajar datos RRHH
-    fbRead('/rrhh', function(data) {
-      if(data && typeof data === 'object') {
-        Object.keys(data).forEach(function(key) {
-          if(data[key] !== null) {
-            _orig.call(localStorage, key, JSON.stringify(data[key]));
-          }
-        });
-      }
-    });
-    
-    // Bajar datos PASTURAS (prefijo elprado_)
-    fbRead('/elprado', function(data) {
-      if(data && typeof data === 'object') {
-        Object.keys(data).forEach(function(key) {
-          if(data[key] !== null && key !== 'usuario') {
-            _orig.call(localStorage, 'elprado_' + key, JSON.stringify(data[key]));
-          }
-        });
-      }
-    });
+  // Loader
+  document.body.insertAdjacentHTML('beforeend',
+    '<div id="vLoader" style="position:fixed;inset:0;background:#0f1a0b;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;"><div style="font-size:32px;">🐄</div><div style="font-size:13px;color:#6dba3a;font-weight:600;letter-spacing:2px;">CARGANDO...</div></div>');
 
-    // Botón flotante para subida manual (primera vez)
-    var btn = document.createElement('button');
-    btn.id = 'btnFbUpload';
-    btn.innerHTML = '&#x2601; Subir a Firebase';
-    btn.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:99999;' +
-      'background:#e67e22;color:white;border:none;padding:10px 16px;' +
-      'border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;' +
-      'box-shadow:0 2px 8px rgba(0,0,0,.3);';
-    btn.onclick = function() {
-      btn.innerHTML = '&#x23F3; Subiendo...';
-      btn.disabled = true;
-      // Subir RRHH
-      RRHH_KEYS.forEach(function(key) {
-        var v = localStorage.getItem(key);
-        if(v) { try { fbWrite('/rrhh/' + key, JSON.parse(v)); } catch(e){} }
-      });
-      // Subir PASTURAS
-      Object.keys(localStorage).forEach(function(key) {
-        if(key.indexOf('elprado_') === 0 && key !== 'elprado_usuario') {
-          var subkey = key.replace('elprado_','');
-          var v = localStorage.getItem(key);
-          if(v) { try { fbWrite('/elprado/' + subkey, JSON.parse(v)); } catch(e){} }
-        }
-      });
-      setTimeout(function() {
-        btn.innerHTML = '&#x2705; Subido!';
-        setTimeout(function() {
-          btn.innerHTML = '&#x2601; Subir a Firebase';
-          btn.disabled = false;
-        }, 3000);
-      }, 2000);
-    };
-    document.body.appendChild(btn);
-  });
+  await syncFB();
+  document.getElementById('vLoader')?.remove();
+
+  // Pre-render todas las vistas
+  renderVaqueros();
+  renderArmadores();
+  renderPublica();
+
+  // Refrescar automático cada 5 min
+  setInterval(async()=>{
+    await syncFB();
+    renderVaqueros(); renderArmadores(); renderPublica();
+    if(paginaActual==='pagCapataz') renderCapataz();
+  }, 5*60*1000);
 })();
 </script>
 </body>
