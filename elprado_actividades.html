@@ -2726,6 +2726,7 @@ function guardarActividad() {
     const _pot    = document.getElementById('fPotrero').value;
     const _par    = document.getElementById('fParcela').value;
     const _fec    = document.getElementById('fFechaIng')?.value || document.getElementById('fFecha').value;
+    const _lote   = document.getElementById('fLote')?.value || '';
     const _editId = document.getElementById('formComun').dataset.editId;
     // FIX: usar la definicion completa (linea 2502) con params correctos
     const _dup    = validarParcelaDuplicada(_pot, _lote, _par, _fec, _editId);
