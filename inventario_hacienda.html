@@ -220,6 +220,36 @@ tr:hover td{background:rgba(109,186,58,.04);}
       <tbody id="dPesajes"><tr><td colspan="8" class="emp">—</td></tr></tbody>
     </table></div>
   </div>
+
+  <!-- CARD: MARGEN DE REPOSICIÓN POR GRUPO -->
+  <div class="card" style="margin-top:12px;">
+    <div class="ch">
+      <div class="ct">🎯 Margen de Reposición por Grupo — ¿Qué conviene vender?</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span style="font-size:11px;color:var(--t2);">Precio repos. Bs/kg:</span>
+        <input type="number" id="dashPrecRepos" step="0.5" min="0" placeholder="ej: 22"
+          style="width:80px;background:var(--card3);color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:3px 8px;font-size:13px;font-weight:700;"
+          onchange="renderMargRepos()" oninput="window._precRepos=parseFloat(this.value)||null;renderMargRepos()">
+        <button class="btn bs btn-sm" onclick="calcPrecReposAuto();setTimeout(()=>{document.getElementById('dashPrecRepos').value=window._precRepos||'';renderMargRepos();},500)">🔄 Auto</button>
+      </div>
+    </div>
+    <div style="padding:8px 14px;font-size:11px;color:var(--t2);">
+      💡 Ordenado de <b style="color:var(--red);">menor a mayor margen</b> — los de abajo son los que más conviene retener, los de arriba los candidatos a vender primero.
+    </div>
+    <div class="tw">
+      <table>
+        <thead><tr>
+          <th>Grupo</th><th>Cab.</th>
+          <th>Peso prom. hoy</th><th>Costo repos. prom.</th>
+          <th>Valor venta prom.</th><th>Kg ganados prom.</th>
+          <th style="color:var(--gold);">Margen repos. Bs/kg</th>
+          <th style="color:var(--green);">Margen repos. total</th>
+          <th>Decisión</th>
+        </tr></thead>
+        <tbody id="dashMargRepos"><tr><td colspan="9" class="emp">Ingresá el precio de reposición para calcular</td></tr></tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <!-- ═══════ ANIMALES ═══════ -->
@@ -950,6 +980,110 @@ function filtQuick(tipo, cat){
 }
 
 // ═══════════ DASHBOARD ═══════════
+function renderMargRepos(){
+  const precRepos = parseFloat(document.getElementById('dashPrecRepos')?.value)||window._precRepos||null;
+  const tb = document.getElementById('dashMargRepos');
+  if(!tb) return;
+  if(!precRepos){
+    tb.innerHTML='<tr><td colspan="9" class="emp">Ingresá el precio de reposición para calcular</td></tr>';
+    return;
+  }
+  window._precRepos = precRepos;
+  const hoy = new Date();
+  const lp = window._lastPes||{};
+  const act = Object.values(animales).filter(a=>a.estado==='ACTIVO');
+
+  // Calcular por grupo
+  const gmap = {};
+  act.forEach(a=>{
+    const g = a.grupo||'SIN GRUPO';
+    if(!gmap[g]) gmap[g]={grupo:g,n:0,
+      sumPesoHoy:0,nPesoH:0,
+      sumKgGan:0,nKgGan:0,
+      sumCostoRepos:0,nCostoR:0,
+      sumValorVenta:0,nValorV:0,
+      sumMargenR:0,nMargenR:0,
+      totMargenR:0};
+    gmap[g].n++;
+
+    const lpa = lp[a.ide];
+    if(!lpa||!a.pesoIngreso||!a.fechaIngreso) return;
+
+    // Calcular peso hoy
+    let fi = parseFecha(a.fechaIngreso);
+    if(!fi) return;
+    if(new Date(fi+'T12:00:00')>=new Date(lpa.fecha+'T12:00:00')){
+      const p=fi.split('-');if(p.length===3){const sw=p[0]+'-'+p[2]+'-'+p[1];if(new Date(sw+'T12:00:00')<new Date(lpa.fecha+'T12:00:00'))fi=sw;}
+    }
+    const diasTotal = Math.round((new Date(lpa.fecha+'T12:00:00')-new Date(fi+'T12:00:00'))/86400000);
+    if(diasTotal<=0) return;
+    const gmdR = (lpa.peso-a.pesoIngreso)/diasTotal;
+    const diasExtra = Math.max(0,Math.round((hoy-new Date(lpa.fecha+'T12:00:00'))/86400000));
+    const pesoHoy = Math.round((lpa.peso+gmdR*diasExtra)*10)/10;
+    const kgGan = pesoHoy - a.pesoIngreso;
+
+    // Precio promedio de venta para este grupo (de las últimas ventas)
+    // Usar Bs/kg venta del informe o estimado
+    const bsventa = window._bsKgVentaGrupo&&window._bsKgVentaGrupo[g] ? window._bsKgVentaGrupo[g] : null;
+
+    // Costo reposición = kg ingreso × precio repos actual
+    const costoR = a.pesoIngreso * precRepos;
+    // Valor venta estimado = peso hoy × último precio venta de ese tipo en informes
+    // Si no hay precio de venta, usar precio repos × 1.5 como estimado
+    const precVenta = bsventa || (precRepos * 1.5);
+    const valorVenta = pesoHoy * precVenta;
+    const margenR = valorVenta - costoR;
+    const margenRKg = kgGan > 0 ? Math.round(margenR/kgGan*100)/100 : null;
+
+    gmap[g].sumPesoHoy+=pesoHoy; gmap[g].nPesoH++;
+    gmap[g].sumKgGan+=kgGan; gmap[g].nKgGan++;
+    gmap[g].sumCostoRepos+=costoR; gmap[g].nCostoR++;
+    gmap[g].sumValorVenta+=valorVenta; gmap[g].nValorV++;
+    gmap[g].totMargenR+=margenR;
+    if(margenRKg!=null){gmap[g].sumMargenR+=margenRKg;gmap[g].nMargenR++;}
+  });
+
+  // Ordenar por margen Bs/kg ASCENDENTE (menor = vender primero)
+  const rows = Object.values(gmap)
+    .filter(g=>g.nMargenR>0)
+    .sort((a,b)=>(a.sumMargenR/a.nMargenR)-(b.sumMargenR/b.nMargenR));
+
+  if(!rows.length){
+    tb.innerHTML='<tr><td colspan="9" class="emp">Sin datos de pesaje para calcular</td></tr>';
+    return;
+  }
+
+  const maxMar = Math.max(...rows.map(g=>g.sumMargenR/g.nMargenR));
+  const minMar = Math.min(...rows.map(g=>g.sumMargenR/g.nMargenR));
+
+  tb.innerHTML = rows.map((g,i)=>{
+    const pesoH = g.nPesoH>0?Math.round(g.sumPesoHoy/g.nPesoH):null;
+    const costoR = g.nCostoR>0?Math.round(g.sumCostoRepos/g.nCostoR):null;
+    const valV = g.nValorV>0?Math.round(g.sumValorVenta/g.nValorV):null;
+    const kgGan = g.nKgGan>0?Math.round(g.sumKgGan/g.nKgGan):null;
+    const marKg = g.nMargenR>0?(g.sumMargenR/g.nMargenR).toFixed(2):null;
+    const totMar = Math.round(g.totMargenR);
+
+    // Color por posición: rojo = bajo margen (vender), verde = alto (retener)
+    const ratio = rows.length>1?(i/(rows.length-1)):0.5;
+    const col = ratio<0.33?'var(--red)':ratio<0.66?'var(--gold)':'var(--green)';
+    const decision = ratio<0.33?'⚠️ Candidato a venta':ratio<0.66?'⏳ Monitorear':'✅ Retener';
+
+    return`<tr>
+      <td><b>${GRUS[g.grupo]||g.grupo}</b></td>
+      <td class="mn tg">${g.n}</td>
+      <td class="mn">${pesoH?pesoH+' kg':'—'}</td>
+      <td class="mn">${costoR?'Bs '+fmt(costoR):'—'}</td>
+      <td class="mn">${valV?'Bs '+fmt(valV):'—'}</td>
+      <td class="mn">${kgGan?'+'+kgGan+' kg':'—'}</td>
+      <td class="mn" style="color:${col};font-weight:800;font-size:13px;">${marKg?'Bs '+marKg:'—'}</td>
+      <td class="mn tg" style="color:${col};">${totMar?'Bs '+fmt(totMar):'—'}</td>
+      <td style="font-size:11px;color:${col};font-weight:700;">${decision}</td>
+    </tr>`;
+  }).join('');
+}
+
+
 function renderDash(){
   const act = Object.values(animales).filter(a=>a.estado==='ACTIVO');
   document.getElementById('dTot').textContent = act.length;
@@ -1028,6 +1162,7 @@ function renderDash(){
       <td>${mig?'<span class="bg bg-mig">✓ Migró</span>':''}</td>
     </tr>`;
   }).join('');
+  if(window._precRepos) renderMargRepos();
 }
 
 // ═══════════ ANIMALES ═══════════
@@ -2569,6 +2704,14 @@ async function cargarBorradorValuacion(){
     const r = await fbGet('valuacion/borrador');
     if(r&&r.precios){
       window._valPrecios = r.precios;
+      // Si hay precio de reposición guardado, cargarlo
+      if(r.precRepos){
+        window._precRepos = r.precRepos;
+        const inp = document.getElementById('dashPrecRepos');
+        if(inp) inp.value = r.precRepos;
+        const inp2 = document.getElementById('igPrecRepos');
+        if(inp2) inp2.value = r.precRepos;
+      }
       // Rellenar inputs
       Object.entries(r.precios).forEach(([g,v])=>{
         // Los inputs se crean en renderValuacion, se setean después
@@ -2595,7 +2738,7 @@ async function guardarBorradorValuacion(){
   Object.assign(window._valPrecios, precios);
   const hoy = new Date().toISOString().split('T')[0];
   try{
-    await fbSet('valuacion/borrador', {precios: window._valPrecios, fecha: hoy, usuario});
+    await fbSet('valuacion/borrador', {precios: window._valPrecios, precRepos: window._precRepos||null, fecha: hoy, usuario});
     ntf('💾 Precios guardados como borrador');
     const info = document.getElementById('valBorradorInfo');
     if(info){info.style.display='block';info.innerHTML=`📋 Borrador guardado el <b>${hoy}</b>.`;}
