@@ -1609,21 +1609,20 @@ function renderDash(){
           // Calcular rentabilidades individuales
           const pesoHoyAnim=lpa.peso+gmdR*dsd;
           const diasCampo=diasTot+dsd;
-          if(diasCampo>0&&pesoHoyAnim>0){
-            // Precio de reposición para esta categoría
-            const cat=a.categoria||'';
-            const pRep=precReposCat[cat]||window._precRepos||0;
-            // ① Rent. ajustada reposición = (valor venta hoy − costo repos) / días
+          const diasCampoA=dTot+dsd;
+          if(diasCampoA>0&&pesoHoyAnim>0){
+            const catA=a.categoria||'';
+            const pRep=precReposCat[catA]||window._precRepos||0;
+            const precVentaRef=window._precRepos?window._precRepos*1.1:pRep*1.1;
             if(pRep>0&&a.pesoIngreso){
-              const valorVentaEst=pesoHoyAnim*(window._precRepos||pRep*1.1);
+              const valorVentaEst=pesoHoyAnim*precVentaRef;
               const costoRep=a.pesoIngreso*pRep;
-              gmap[g].sumInd1+=(valorVentaEst-costoRep)/diasCampo;
+              gmap[g].sumInd1+=(valorVentaEst-costoRep)/diasCampoA;
               gmap[g].nInd1++;
             }
-            // ② Rent. real = (valor venta hoy − precio compra original) / días
             if(a.precioCompra&&a.pesoIngreso){
-              const valorVentaEst2=pesoHoyAnim*(window._precRepos||pRep*1.1);
-              gmap[g].sumInd2+=(valorVentaEst2-a.precioCompra)/diasCampo;
+              const valorVentaEst2=pesoHoyAnim*precVentaRef;
+              gmap[g].sumInd2+=(valorVentaEst2-a.precioCompra)/diasCampoA;
               gmap[g].nInd2++;
             }
           }
@@ -3252,7 +3251,7 @@ async function guardarBorradorValuacion(){
   Object.assign(window._valPrecios, precios);
   const hoy = new Date().toISOString().split('T')[0];
   try{
-    await fbSet('valuacion/borrador', {precios: window._valPrecios, precRepos: window._precRepos||null, fecha: hoy, usuario});
+    await fbSet('valuacion/borrador', {precios: window._valPrecios||{}, precRepos: window._precRepos||null, fecha: hoy, usuario});
     ntf('💾 Precios guardados como borrador');
     const info = document.getElementById('valBorradorInfo');
     if(info){info.style.display='block';info.innerHTML=`📋 Borrador guardado el <b>${hoy}</b>.`;}
@@ -3324,7 +3323,7 @@ async function cerrarMesValuacion(){
     mes: mesKey, fechaCierre, cabezas: totCab, cabezasProm: cabProm,
     pesoProm, kgTotales: Math.round(totKg), valorTotal: Math.round(totValor),
     precioPromBsKg: precProm, uaTotales: uaTot, cargaUAha,
-    precios: {...window._valPrecios}, usuario
+    precios: {...(window._valPrecios||{})}, usuario
   };
 
   try{
