@@ -1216,21 +1216,46 @@ function renderSimulador(){
   const cabezas = gd.n;
   const dias = [0,30,60,90];
 
+  // Días promedio actuales en campo de los animales del grupo
+  const diasCampoActual = gd.animales.length>0
+    ? Math.round(gd.animales.reduce((s,a)=>s+(a.diasCampo||0),0)/gd.animales.length)
+    : 0;
+  // Peso promedio de ingreso
+  const pesoIngProm = gd.animales.length>0
+    ? gd.animales.reduce((s,a)=>s+(a.pesoMin?a.pesoMin:pesoH-gmd*diasCampoActual),0)/gd.animales.length
+    : pesoH - gmd*diasCampoActual;
+
   const filas = dias.map(d=>{
+    const diasTotal = diasCampoActual + d;
     const peso = pesoH + gmd*d;
-    const costoR = gd.animales.length>0 ? gd.animales.reduce((s,a)=>s+(a.pesoMin?a.pesoMin*precRepos:0),0)/gd.animales.length : pesoH*precRepos;
-    const ingresos = peso*precVenta*cabezas;
-    const costoTotal = costoR*cabezas;
-    const margen = ingresos-costoTotal;
-    const marKg = gmd*d>0 ? Math.round((ingresos-costoTotal)/(gmd*d*cabezas)*100)/100 : null;
-    const rendDia = d>0 ? Math.round(margen/(d)*100)/100 : null;
+    // Costo de reposición = peso ingreso promedio × precio repos actual
+    const costoRUnit = pesoIngProm * precRepos;
+    const costoTotal = costoRUnit * cabezas;
+    const ingresos = peso * precVenta * cabezas;
+    const margen = ingresos - costoTotal;
+    // kg ganados por animal = peso actual - peso ingreso
+    const kgGanados = peso - pesoIngProm;
+    // FÓRMULA FAVI:
+    // Eficiencia = (ingreso venta - costo repos) / kg ganados / días en campo
+    // = Bs generado por cada kg ganado por cada día en campo
+    const eficiencia = kgGanados>0 && diasTotal>0
+      ? Math.round(margen / cabezas / kgGanados / diasTotal * 100) / 100
+      : null;
+    // Margen por kg ganado (total grupo)
+    const marKgGan = kgGanados>0
+      ? Math.round(margen / cabezas / kgGanados * 100) / 100
+      : null;
     const label = d===0?'HOY':('En '+d+' días');
     const col = d===0?'var(--red)':d===30?'var(--gold)':d===60?'var(--blue)':'var(--green)';
-    return{d,label,peso:Math.round(peso),ingresos:Math.round(ingresos),margen:Math.round(margen),marKg,rendDia,col};
+    return{d,label,peso:Math.round(peso),ingresos:Math.round(ingresos),
+      margen:Math.round(margen),kgGanados:Math.round(kgGanados),
+      eficiencia,marKgGan,diasTotal,col};
   });
 
-  // Encontrar el óptimo
-  const optimo = filas.reduce((best,f)=>f.rendDia!=null&&(best.rendDia==null||f.rendDia>best.rendDia)?f:best, filas[0]);
+  // Óptimo = mayor eficiencia (Bs/kg ganado/día)
+  const optimo = filas.reduce((best,f)=>
+    f.eficiencia!=null&&(best.eficiencia==null||f.eficiencia>best.eficiencia)?f:best,
+    filas[0]);
 
   div.innerHTML=`
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:16px;">
@@ -1238,16 +1263,19 @@ function renderSimulador(){
       <div style="background:var(--card2);padding:14px;border-radius:8px;border:2px solid ${f.d===optimo.d?f.col:'transparent'};position:relative;">
         ${f.d===optimo.d?`<div style="position:absolute;top:6px;right:8px;font-size:11px;font-weight:800;color:${f.col};">⭐ ÓPTIMO</div>`:''}
         <div style="color:${f.col};font-weight:800;font-size:13px;">${f.label}</div>
-        <div style="font-size:11px;color:var(--t2);margin-top:8px;">Peso prom: <b>${f.peso} kg</b></div>
+        <div style="font-size:11px;color:var(--t2);margin-top:8px;">Peso prom: <b>${f.peso} kg</b> <span style="color:var(--green);">(+${f.kgGanados} kg ganados)</span></div>
+        <div style="font-size:11px;color:var(--t2);">Días en campo: <b>${f.diasTotal}</b></div>
         <div style="font-size:11px;color:var(--t2);">Ingreso total: <b>Bs ${fmt(f.ingresos)}</b></div>
         <div style="font-size:13px;color:${f.col};font-weight:700;margin-top:4px;">Margen: Bs ${fmt(f.margen)}</div>
-        <div style="font-size:11px;color:var(--t2);">${f.rendDia!=null?'Rend. diario: Bs '+fmt(f.rendDia)+'/día':'—'}</div>
-        <div style="font-size:11px;color:var(--t2);">${f.marKg!=null?'Bs '+f.marKg+'/kg gan.':'—'}</div>
+        <div style="font-size:11px;color:var(--t2);">${f.marKgGan!=null?'Bs '+f.marKgGan+'/kg ganado':'—'}</div>
+        <div style="font-size:13px;font-weight:800;color:${f.col};margin-top:4px;border-top:1px solid var(--card3);padding-top:4px;"
+          title="(Ingreso − Costo repos) ÷ kg ganados ÷ días en campo">${f.eficiencia!=null?'⚡ Bs '+f.eficiencia+'/kg/día':'—'}</div>
       </div>`).join('')}
     </div>
     <div style="padding:10px 14px;background:var(--card2);border-radius:8px;border-left:4px solid ${optimo.col};font-size:12px;">
-      <b style="color:${optimo.col};">📊 Recomendación:</b> El momento óptimo de venta para <b>${GRUS[g]||g}</b> es <b style="color:${optimo.col};">${optimo.label}</b>, 
-      con un rendimiento diario de <b>Bs ${fmt(optimo.rendDia||0)}/día</b> y margen total de <b>Bs ${fmt(optimo.margen)}</b>.
+      <b style="color:${optimo.col};">📊 Recomendación:</b> El momento óptimo de venta para <b>${GRUS[g]||g}</b> es <b style="color:${optimo.col};">${optimo.label}</b>.
+      Eficiencia: <b>Bs ${optimo.eficiencia||'—'}/kg ganado/día</b> · Margen total: <b>Bs ${fmt(optimo.margen)}</b> · 
+      <span style="font-size:11px;color:var(--t2);">Fórmula: (Ingreso venta − Costo reposición) ÷ kg ganados ÷ días en campo</span>
     </div>`;
 }
 
