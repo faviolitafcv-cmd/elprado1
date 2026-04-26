@@ -525,6 +525,49 @@ tr:hover td{background:rgba(109,186,58,.04);}
       </table></div>
     </div>
   </div>
+
+  <!-- ═══════════ VALUACIÓN DE INVENTARIO ═══════════ -->
+  <div class="card" style="margin-top:16px;" id="cardValuacion">
+    <div class="ch">
+      <div class="ct">💰 Valuación del Inventario Activo</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span style="font-size:11px;color:var(--t2);">Fecha de valuación:</span>
+        <input type="date" id="valFecha" style="font-size:11px;" onchange="renderValuacion()">
+        <button class="btn bp btn-sm" onclick="renderValuacion()">📊 Calcular</button>
+        <button class="btn bs btn-sm" onclick="exportValuacion()">📥 Exportar</button>
+      </div>
+    </div>
+    <div style="padding:10px 14px;background:var(--card2);margin:0 14px 12px;border-radius:8px;font-size:12px;color:var(--t2);">
+      💡 <b style="color:var(--gold);">¿Cómo funciona?</b> Ingresá el precio Bs/kg para cada grupo según el mercado de hoy. 
+      El sistema calcula el peso proyectado de cada animal a la fecha seleccionada y te da el valor total del inventario.
+      Podés simular escenarios cambiando los precios.
+    </div>
+
+    <!-- Resumen total -->
+    <div id="valResumen" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;padding:0 14px 14px;"></div>
+
+    <!-- Tabla por grupo con precios editables -->
+    <div style="padding:0 14px 16px;">
+      <div style="font-size:11px;font-weight:700;color:var(--gold);margin-bottom:8px;">
+        PRECIO Bs/KG POR GRUPO — ingresá el precio de mercado hoy para cada grupo
+      </div>
+      <div class="tw"><table>
+        <thead><tr>
+          <th>Grupo</th>
+          <th>Cabezas</th>
+          <th>Peso prom. proyectado</th>
+          <th>Kg totales proyectados</th>
+          <th style="color:var(--gold);">Precio Bs/kg <small style="font-weight:normal;">(editable)</small></th>
+          <th style="color:var(--green);">Valor del grupo</th>
+          <th>Kg ganados prom.</th>
+          <th>Costo compra prom.</th>
+          <th style="color:var(--gold);">Margen proyectado</th>
+        </tr></thead>
+        <tbody id="valTabla"></tbody>
+        <tfoot id="valTotal"></tfoot>
+      </table></div>
+    </div>
+  </div>
 </div>
 
 <!-- ══════════════════════════ MODALES ══════════════════════════ -->
@@ -810,7 +853,7 @@ window.onload = async () => {
   }
 
   const hoy = new Date().toISOString().split('T')[0];
-  ['aFI','vF','mF','pmFecha'].forEach(id=>{ const el=document.getElementById(id); if(el)el.value=hoy; });
+  ['aFI','vF','mF','pmFecha','valFecha'].forEach(id=>{ const el=document.getElementById(id); if(el)el.value=hoy; });
 
   ntf('Cargando datos...', false, 0);
   await loadAll();
@@ -860,7 +903,7 @@ function showPg(id){
   if(id==='animales')  renderA();
   if(id==='pesajes')   renderP();
   if(id==='bajas')     renderB();
-  if(id==='informes'){renderInf();if(window._dataLoaded)renderIG();}
+  if(id==='informes'){renderInf();if(window._dataLoaded){renderIG();renderValuacion();}}
   if(id==='ventas')    renderV();
   if(id==='compras')   renderCo();
 }
@@ -2352,7 +2395,7 @@ function renderIG(){
   const rows=Object.values(byTC).sort((a,b)=>b.totGan-a.totGan);
   const totG=rows.reduce((s,r)=>s+r.totGan,0);
   const medals=['🥇','🥈','🥉'];
-  document.getElementById('igTablaHead').innerHTML='<th>Tipo</th><th>Categoría</th><th>Cab.</th><th>%</th><th>GMD</th><th>Días</th><th>Bs/kg compra</th><th>Bs/kg venta</th><th style="color:var(--gold);">Margen Bs/kg</th><th>Gan./cab.</th><th style="color:var(--green);">Ganancia total</th><th>#</th>';
+  document.getElementById('igTablaHead').innerHTML='<th>Tipo</th><th>Categoría</th><th>Cab.</th><th>%</th><th>GMD</th><th>Días</th><th>Bs/kg compra</th><th>Bs/kg venta</th><th style="color:var(--gold);" title="Ganancia ÷ kg ganado en campo. Mide cuánto vale cada kg que le pusiste al animal.">Margen Bs/kg ganado ⓘ</th><th>Gan./cab.</th><th style="color:var(--green);">Ganancia total</th><th>#</th>';
   document.getElementById('igTablaBody').innerHTML=rows.map((g,i)=>{
     const mar=g.nMar>0?(g.sMar/g.nMar).toFixed(2):null;
     const bkc=g.nBkc>0?(g.sBkc/g.nBkc).toFixed(2):null;
@@ -2419,6 +2462,141 @@ function renderIG(){
       <td class="mn" style="color:${mc};font-weight:700;">${mar?'Bs '+mar:'—'}</td>
       <td class="mn tg"><b>Bs ${fmt(d.totGan)}</b></td></tr>`;
   }).join('');
+}
+
+
+// ════════════════════════════════════════════════════
+// VALUACIÓN DE INVENTARIO
+// ════════════════════════════════════════════════════
+let _valPrecios = {}; // cache de precios ingresados por grupo
+
+function renderValuacion(){
+  if(!window._dataLoaded) return;
+  const hoy = new Date();
+  const fechaEl = document.getElementById('valFecha');
+  if(!fechaEl.value) fechaEl.value = hoy.toISOString().split('T')[0];
+  const fechaVal = new Date(fechaEl.value+'T12:00:00');
+  const lp = window._lastPes||{};
+  const act = Object.values(animales).filter(a=>a.estado==='ACTIVO');
+
+  // Calcular peso proyectado a fecha de valuación para cada animal
+  const gmap = {};
+  act.forEach(a=>{
+    const g = a.grupo||'SIN GRUPO';
+    if(!gmap[g]) gmap[g]={grupo:g, n:0, sumPesoP:0, nPesoP:0, sumKgGan:0, nKgGan:0, sumCosto:0, nCosto:0};
+    gmap[g].n++;
+
+    // Costo de compra
+    if(a.precioCompra&&a.pesoIngreso&&a.pesoIngreso>0){
+      gmap[g].sumCosto += a.precioCompra/a.pesoIngreso;
+      gmap[g].nCosto++;
+    }
+
+    // Peso proyectado a fecha valuación
+    const lpa = lp[a.ide];
+    if(lpa&&a.pesoIngreso&&a.fechaIngreso&&lpa.peso&&lpa.fecha){
+      let fi = parseFecha(a.fechaIngreso);
+      if(fi){
+        if(new Date(fi+'T12:00:00')>=new Date(lpa.fecha+'T12:00:00')){
+          const p=fi.split('-');if(p.length===3){const sw=p[0]+'-'+p[2]+'-'+p[1];if(new Date(sw+'T12:00:00')<new Date(lpa.fecha+'T12:00:00'))fi=sw;}
+        }
+        const diasTot = Math.round((new Date(lpa.fecha+'T12:00:00')-new Date(fi+'T12:00:00'))/86400000);
+        if(diasTot>0){
+          const gmdR = (lpa.peso - a.pesoIngreso)/diasTot;
+          const diasExtra = Math.max(0, Math.round((fechaVal - new Date(lpa.fecha+'T12:00:00'))/86400000));
+          const pesoP = Math.round((lpa.peso + gmdR*diasExtra)*10)/10;
+          gmap[g].sumPesoP += pesoP;
+          gmap[g].nPesoP++;
+          gmap[g].sumKgGan += (pesoP - a.pesoIngreso);
+          gmap[g].nKgGan++;
+        }
+      }
+    }
+  });
+
+  const rows = Object.values(gmap).sort((a,b)=>(GRU_ORD.indexOf(a.grupo)-GRU_ORD.indexOf(b.grupo))||a.grupo.localeCompare(b.grupo));
+  let totCabezas=0, totKgP=0, totValor=0, totCosto=0;
+
+  const tbody = document.getElementById('valTabla');
+  const tfoot = document.getElementById('valTotal');
+
+  tbody.innerHTML = rows.map(g=>{
+    const pesoProm = g.nPesoP>0 ? Math.round(g.sumPesoP/g.nPesoP) : null;
+    const kgTot = g.nPesoP>0 ? Math.round(g.sumPesoP) : null;
+    const kgGanProm = g.nKgGan>0 ? Math.round(g.sumKgGan/g.nKgGan) : null;
+    const costoProm = g.nCosto>0 ? (g.sumCosto/g.nCosto).toFixed(2) : null;
+    const precioKey = g.grupo;
+    const precioGuardado = _valPrecios[precioKey]||'';
+    const precio = parseFloat(precioGuardado)||0;
+    const valor = kgTot&&precio>0 ? Math.round(kgTot*precio) : null;
+    const margenP = valor&&costoProm&&kgTot ? Math.round((precio - parseFloat(costoProm))*kgTot) : null;
+
+    if(kgTot) totKgP+=kgTot;
+    totCabezas+=g.n;
+    if(valor) totValor+=valor;
+
+    const marCol = margenP!=null?(margenP>0?'var(--green)':'var(--red)'):'var(--t2)';
+
+    return`<tr>
+      <td><b>${GRUS[g.grupo]||g.grupo}</b></td>
+      <td class="mn tg">${g.n}</td>
+      <td class="mn">${pesoProm?pesoProm+' kg':'—'}</td>
+      <td class="mn">${kgTot?fmt(kgTot)+' kg':'—'}</td>
+      <td class="mn">
+        <input type="number" step="0.5" min="0" value="${precioGuardado}"
+          style="width:80px;background:var(--card3);color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:3px 6px;font-size:12px;text-align:right;"
+          placeholder="Bs/kg"
+          onchange="_valPrecios['${precioKey}']=this.value;renderValuacion();"
+          oninput="_valPrecios['${precioKey}']=this.value;">
+      </td>
+      <td class="mn tg"><b>${valor?'Bs '+fmt(valor):'—'}</b></td>
+      <td class="mn">${kgGanProm?'+'+kgGanProm+' kg':'—'}</td>
+      <td class="mn">${costoProm?'Bs '+costoProm+'/kg':'—'}</td>
+      <td class="mn" style="color:${marCol};font-weight:700;">${margenP!=null?'Bs '+fmt(margenP):'—'}</td>
+    </tr>`;
+  }).join('');
+
+  tfoot.innerHTML=`<tr style="background:var(--card2);font-weight:800;">
+    <td><b>TOTAL</b></td>
+    <td class="mn tg">${totCabezas}</td>
+    <td class="mn">—</td>
+    <td class="mn"><b>${fmt(totKgP)} kg</b></td>
+    <td class="mn">—</td>
+    <td class="mn tg" style="color:var(--green);font-size:14px;"><b>Bs ${fmt(totValor)}</b></td>
+    <td class="mn">—</td><td class="mn">—</td><td class="mn">—</td>
+  </tr>`;
+
+  // Resumen en tarjetas
+  document.getElementById('valResumen').innerHTML=`
+    <div style="background:var(--card2);padding:12px;border-radius:8px;border-left:4px solid var(--green);">
+      <div style="color:var(--t2);font-size:11px;">Total cabezas</div>
+      <div style="font-size:20px;font-weight:800;">${totCabezas}</div>
+    </div>
+    <div style="background:var(--card2);padding:12px;border-radius:8px;border-left:4px solid var(--blue);">
+      <div style="color:var(--t2);font-size:11px;">Kg totales proyectados</div>
+      <div style="font-size:20px;font-weight:800;">${fmt(totKgP)} kg</div>
+    </div>
+    <div style="background:var(--card2);padding:12px;border-radius:8px;border-left:4px solid var(--gold);">
+      <div style="color:var(--t2);font-size:11px;">Valor total inventario</div>
+      <div style="font-size:20px;font-weight:800;color:var(--gold);">Bs ${fmt(totValor)}</div>
+    </div>
+    <div style="background:var(--card2);padding:12px;border-radius:8px;border-left:4px solid var(--green);">
+      <div style="color:var(--t2);font-size:11px;">Precio prom. ponderado</div>
+      <div style="font-size:20px;font-weight:800;color:var(--green);">Bs ${totKgP>0?(totValor/totKgP).toFixed(2):0}/kg</div>
+    </div>`;
+}
+
+function exportValuacion(){
+  if(!window.XLSX){ntf('XLSX no disponible',true);return;}
+  const rows=[['Grupo','Cabezas','Peso Prom. Proy. (kg)','Kg Totales','Precio Bs/kg','Valor Total Bs','Kg Ganados Prom.','Costo Compra Bs/kg','Margen Proy. Bs']];
+  document.querySelectorAll('#valTabla tr').forEach(tr=>{
+    const cells=[...tr.querySelectorAll('td')];
+    if(cells.length>0) rows.push(cells.map(td=>td.textContent.trim().replace(/[^0-9.,\-+]/g,'')||td.textContent.trim()));
+  });
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb,'Valuación',ws);
+  XLSX.writeFile(wb,'valuacion_inventario_'+new Date().toISOString().split('T')[0]+'.xlsx');
 }
 
 
