@@ -284,6 +284,7 @@ tr:hover td{background:rgba(109,186,58,.04);}
     </select>
     <select id="fGrupo" onchange="filtA()">
       <option value="">Todos los grupos</option>
+      <option value="__SIN_GRUPO__">Sin Grupo</option>
       <option value="VAQ. VENTA">Vaq. Venta</option>
       <option value="VAQ. CABEZA">Vaq. Cabeza</option>
       <option value="VAQ. CUERPO">Vaq. Cuerpo</option>
@@ -1502,7 +1503,7 @@ function filtQuickGrupo2(grupo){
   const fBus=document.getElementById('fBus');if(fBus)fBus.value='';
   // Setear grupo — SIN GRUPO = string vacío en el filtro
   const sel=document.getElementById('fGrupo');
-  if(sel) sel.value=(grupo==='SIN GRUPO'?'':grupo);
+  if(sel) sel.value=(grupo==='SIN GRUPO'?'__SIN_GRUPO__':grupo);
   filtA();
 }
 
@@ -1770,7 +1771,10 @@ function filtA(){
   aFilt=Object.values(animales).filter(a=>{
     if(tipo&&a.tipo!==tipo)return false;
     if(cat&&a.categoria!==cat)return false;
-    if(gru&&a.grupo!==gru)return false;
+    if(gru){
+      if(gru==='__SIN_GRUPO__'){if(a.grupo&&a.grupo.trim()!=='')return false;}
+      else if(a.grupo!==gru)return false;
+    }
     if(ori&&(a.origen||'')!==ori)return false;
     if(est&&a.estado!==est)return false;
     if(bus){
@@ -4356,7 +4360,22 @@ function verDetalleGrupo(grupo){
     const lpa=lp[a.ide];const gmd=lpa?.gmd;
     let pp=a.pesoIngreso||0;
     if(lpa&&gmd!=null){const dias=Math.max(0,Math.round((hoy-new Date(lpa.fecha+'T12:00:00'))/86400000));pp=Math.round((lpa.peso+gmd*dias)*10)/10;}
-    return`<tr><td class="mn tg" style="font-size:11px;cursor:pointer;" onclick="editarAnimal('${a.ide}')">${a.ide}</td><td style="font-size:11px;">${a.tipo||'—'}</td><td style="font-size:11px;">${a.categoria||'—'}</td><td style="font-size:11px;">${a.origen||'—'}</td><td class="mn">${a.pesoIngreso||'—'} kg</td><td class="mn" style="font-size:11px;">${lpa?lpa.fecha+' ('+lpa.peso+' kg)':'Sin pesaje'}</td><td class="mn">${gmd!=null?(gmd>=0?'+':'')+Number(gmd).toFixed(3):'—'}</td><td class="mn tg"><b>${pp} kg</b></td></tr>`;
+    return`<tr>
+      <td class="mn tg" style="font-size:11px;">${a.ide}</td>
+      <td style="font-size:11px;">${a.ida||'—'}</td>
+      <td style="font-size:11px;">${a.tipo||'—'}</td>
+      <td style="font-size:11px;"><span class="bg ${a.categoria==='VAQUILLA'?'bg-vi':a.categoria==='TORILLO'?'bg-ti':'bg-va'}">${a.categoria||'—'}</span></td>
+      <td style="font-size:11px;font-weight:700;color:${a.grupo?'inherit':'var(--red)'};">${a.grupo||'SIN GRUPO'}</td>
+      <td style="font-size:11px;">${a.origen||'—'}</td>
+      <td class="mn" style="font-size:11px;">${a.fechaIngreso||'—'}</td>
+      <td class="mn">${a.pesoIngreso||'—'} kg</td>
+      <td class="mn" style="color:var(--gold);">${a.precioCompra?'Bs '+fmt(a.precioCompra):'—'}</td>
+      <td style="font-size:11px;">${a.raza||'—'}</td>
+      <td class="mn"><span class="bg ${a.estado==='ACTIVO'?'bg-ok':'bg-mig'}" style="font-size:10px;">${a.estado||'—'}</span></td>
+      <td class="mn">
+        <button class="btn bs btn-sm" onclick="editarAnimal('${a.ide}')" title="Editar">✏️</button>
+      </td>
+    </tr>`;
   }).join('');
   document.getElementById('dGrupoDetalle').style.display='';
   document.getElementById('dGrupoDetalle').scrollIntoView({behavior:'smooth'});
