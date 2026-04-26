@@ -1243,6 +1243,10 @@ function renderSimulador(){
   const pesoIngProm = gd.animales.length>0
     ? gd.animales.reduce((s,a)=>s+(a.pesoMin?a.pesoMin:pesoH-gmd*diasCampoActual),0)/gd.animales.length
     : pesoH - gmd*diasCampoActual;
+  // Precio compra real promedio Bs/kg
+  const bsKgCompraReal = pesoIngProm>0&&precCompOrig>0
+    ? Math.round(precCompOrig/pesoIngProm*100)/100
+    : null;
 
   const filas = dias.map(d=>{
     const diasTotal = diasCampoActual + d;
@@ -1312,6 +1316,11 @@ function renderSimulador(){
         <div style="font-size:11px;color:var(--t2);margin-top:6px;">Peso: <b>${f.peso} kg</b> · <span style="color:var(--green);">+${f.kgGanados} kg gan.</span></div>
         <div style="font-size:11px;color:var(--t2);">Días en campo: <b>${f.diasTotal}</b></div>
         <div style="font-size:11px;color:var(--t2);">Ingreso venta: <b>Bs ${fmt(f.ingresos)}</b></div>
+        <div style="margin-top:6px;padding:5px 8px;background:var(--card3);border-radius:5px;font-size:11px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;">
+          <div><span style="color:var(--t2);">P. compra real</span><br><b style="color:var(--gold);">${bsKgCompraReal?'Bs '+bsKgCompraReal+'/kg':'—'}</b></div>
+          <div><span style="color:var(--t2);">P. reposición</span><br><b style="color:var(--gold);">${precRepos?'Bs '+precRepos+'/kg':'—'}</b></div>
+          <div><span style="color:var(--t2);">P. venta</span><br><b style="color:var(--gold);">${precVenta?'Bs '+precVenta+'/kg':'—'}</b></div>
+        </div>
         <div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--card3);">
           <div style="font-size:10px;color:var(--t2);font-weight:700;">① RENT. DIARIA (ajust. repos.)</div>
           <div style="font-size:15px;font-weight:800;color:${f.col};">${f.ind1!=null?'Bs '+f.ind1+'/día':'—'}</div>
