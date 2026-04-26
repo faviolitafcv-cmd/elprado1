@@ -546,13 +546,16 @@ tr:hover td{background:rgba(109,186,58,.04);}
   <div class="card" style="margin-top:16px;" id="cardValuacion">
     <div class="ch">
       <div class="ct">💰 Valuación del Inventario Activo</div>
-      <div style="display:flex;gap:8px;align-items:center;">
-        <span style="font-size:11px;color:var(--t2);">Fecha de valuación:</span>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <span style="font-size:11px;color:var(--t2);">Fecha:</span>
         <input type="date" id="valFecha" style="font-size:11px;" onchange="renderValuacion()">
         <button class="btn bp btn-sm" onclick="renderValuacion()">📊 Calcular</button>
         <button class="btn bs btn-sm" onclick="exportValuacion()">📥 Exportar</button>
+        <button class="btn btn-sm" style="background:var(--gold);color:#000;font-weight:700;" onclick="cerrarMesValuacion()">🔒 Cerrar Mes</button>
       </div>
     </div>
+    <!-- Estado del borrador activo -->
+    <div id="valBorradorInfo" style="padding:6px 14px;font-size:11px;color:var(--t2);display:none;"></div>
     <div style="padding:10px 14px;background:var(--card2);margin:0 14px 12px;border-radius:8px;font-size:12px;color:var(--t2);">
       💡 <b style="color:var(--gold);">¿Cómo funciona?</b> Ingresá el precio Bs/kg para cada grupo según el mercado de hoy. 
       El sistema calcula el peso proyectado de cada animal a la fecha seleccionada y te da el valor total del inventario.
@@ -581,6 +584,21 @@ tr:hover td{background:rgba(109,186,58,.04);}
         </tr></thead>
         <tbody id="valTabla"></tbody>
         <tfoot id="valTotal"></tfoot>
+      </table></div>
+    </div>
+
+    <!-- HISTORIAL MENSUAL -->
+    <div style="padding:0 14px 16px;">
+      <div style="font-size:11px;font-weight:700;color:var(--gold);margin-bottom:8px;">📅 HISTORIAL DE CIERRES MENSUALES</div>
+      <div class="tw"><table>
+        <thead><tr>
+          <th>Mes</th><th>Fecha cierre</th><th>Cabezas</th>
+          <th>Cab. prom. mes</th><th>Peso prom/cab</th><th>Kg totales</th>
+          <th style="color:var(--gold);">Valor Bs</th><th>Precio prom Bs/kg</th>
+          <th style="color:var(--green);">UA totales</th><th>Carga UA/ha</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="valHistorial"><tr><td colspan="11" class="emp">Sin cierres registrados</td></tr></tbody>
       </table></div>
     </div>
   </div>
@@ -878,6 +896,7 @@ window.onload = async () => {
   poblarFOrigen();
   renderDash();
   renderA();
+  cargarBorradorValuacion();
   const _pgActiva = document.querySelector('.pg.active');
   if(_pgActiva && _pgActiva.id !== 'pg-dash' && _pgActiva.id !== 'pg-animales'){
     const _pgId = _pgActiva.id.replace('pg-','');
@@ -2538,6 +2557,166 @@ function renderIG(){
 // ════════════════════════════════════════════════════
 let _valPrecios = {}; // cache de precios ingresados por grupo
 
+// ════════════════════════════════════════════
+// VALUACIÓN - BORRADOR, CIERRE DE MES, HISTORIAL
+// ════════════════════════════════════════════
+const HA_CAMPO = 1500;
+const KG_UA    = 450;
+
+async function cargarBorradorValuacion(){
+  // Cargar precios guardados en Firebase (borrador activo)
+  try{
+    const r = await fbGet('valuacion/borrador');
+    if(r&&r.precios){
+      window._valPrecios = r.precios;
+      // Rellenar inputs
+      Object.entries(r.precios).forEach(([g,v])=>{
+        // Los inputs se crean en renderValuacion, se setean después
+        window._valPreciosBorrador = r.precios;
+      });
+      const info = document.getElementById('valBorradorInfo');
+      if(info){
+        info.style.display='block';
+        info.innerHTML = `📋 Borrador cargado del <b>${r.fecha||'—'}</b>. Podés modificar los precios hasta dar "Cerrar Mes".`;
+      }
+    }
+    // Cargar historial
+    renderHistorialValuacion();
+  }catch(e){}
+}
+
+async function guardarBorradorValuacion(){
+  // Guardar precios actuales como borrador en Firebase
+  const precios = {};
+  document.querySelectorAll('#valTabla input[type="number"]').forEach(inp=>{
+    if(inp.value) precios[inp.closest('tr').querySelector('td b').textContent.trim()] = parseFloat(inp.value);
+  });
+  // Combinar con _valPrecios
+  Object.assign(window._valPrecios, precios);
+  const hoy = new Date().toISOString().split('T')[0];
+  try{
+    await fbSet('valuacion/borrador', {precios: window._valPrecios, fecha: hoy, usuario});
+    ntf('💾 Precios guardados como borrador');
+    const info = document.getElementById('valBorradorInfo');
+    if(info){info.style.display='block';info.innerHTML=`📋 Borrador guardado el <b>${hoy}</b>.`;}
+  }catch(e){ntf('Error al guardar borrador: '+e.message,true);}
+}
+
+async function cerrarMesValuacion(){
+  // Verificar que hay precios cargados
+  const tienePrecios = Object.values(window._valPrecios||{}).some(v=>v>0);
+  if(!tienePrecios){ntf('Ingresá al menos un precio antes de cerrar el mes',true);return;}
+
+  const hoy = new Date();
+  const mesKey = hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0');
+  const fechaCierre = hoy.toISOString().split('T')[0];
+
+  // Verificar si ya existe cierre para este mes
+  try{
+    const existe = await fbGet('valuacion/cierres/'+mesKey);
+    if(existe){
+      if(!confirm('Ya existe un cierre para '+mesKey+'. ¿Querés sobreescribirlo?')) return;
+    }
+  }catch(e){}
+
+  // Calcular totales actuales
+  const activos = Object.values(animales).filter(a=>a.estado==='ACTIVO');
+  const lp = window._lastPes||{};
+  const fechaValEl = document.getElementById('valFecha');
+  const fechaVal = fechaValEl.value ? new Date(fechaValEl.value+'T12:00:00') : hoy;
+
+  let totCab=0, totKg=0, totValor=0;
+  const porGrupo = {};
+
+  activos.forEach(a=>{
+    totCab++;
+    const g = a.grupo||'SIN GRUPO';
+    if(!porGrupo[g]) porGrupo[g]={n:0,kgP:0,precio:0};
+    porGrupo[g].n++;
+    const lpa=lp[a.ide];
+    if(lpa&&a.pesoIngreso&&a.fechaIngreso&&lpa.peso&&lpa.fecha){
+      let fi=parseFecha(a.fechaIngreso);
+      if(fi){
+        if(new Date(fi+'T12:00:00')>=new Date(lpa.fecha+'T12:00:00')){const p=fi.split('-');if(p.length===3){const sw=p[0]+'-'+p[2]+'-'+p[1];if(new Date(sw+'T12:00:00')<new Date(lpa.fecha+'T12:00:00'))fi=sw;}}
+        const d=Math.round((new Date(lpa.fecha+'T12:00:00')-new Date(fi+'T12:00:00'))/86400000);
+        if(d>0){const gR=(lpa.peso-a.pesoIngreso)/d;const ds=Math.max(0,Math.round((fechaVal-new Date(lpa.fecha+'T12:00:00'))/86400000));const pp=Math.round((lpa.peso+gR*ds)*10)/10;porGrupo[g].kgP+=pp;totKg+=pp;}
+      }
+    }
+    const precio=window._valPrecios[g]||0;
+    porGrupo[g].precio=precio;
+  });
+
+  Object.values(porGrupo).forEach(g=>{totValor+=Math.round(g.kgP*(g.precio||0));});
+
+  const uaTot = Math.round(totKg/KG_UA*10)/10;
+  const cargaUAha = Math.round(uaTot/HA_CAMPO*100)/100;
+  const pesoProm = totCab>0?Math.round(totKg/totCab):0;
+  const precProm = totKg>0?Math.round(totValor/totKg*100)/100:0;
+
+  // Obtener inventario del mes anterior para cabezas promedio
+  let cabMesAnterior = totCab;
+  try{
+    const mAnt = new Date(hoy.getFullYear(),hoy.getMonth()-1,1);
+    const mAntKey = mAnt.getFullYear()+'-'+String(mAnt.getMonth()+1).padStart(2,'0');
+    const rAnt = await fbGet('valuacion/cierres/'+mAntKey);
+    if(rAnt&&rAnt.cabezas) cabMesAnterior = rAnt.cabezas;
+  }catch(e){}
+  const cabProm = Math.round((totCab+cabMesAnterior)/2);
+
+  const snapshot = {
+    mes: mesKey, fechaCierre, cabezas: totCab, cabezasProm: cabProm,
+    pesoProm, kgTotales: Math.round(totKg), valorTotal: Math.round(totValor),
+    precioPromBsKg: precProm, uaTotales: uaTot, cargaUAha,
+    precios: {...window._valPrecios}, usuario
+  };
+
+  try{
+    await fbSet('valuacion/cierres/'+mesKey, snapshot);
+    // Limpiar borrador
+    await fbSet('valuacion/borrador', null);
+    window._valPrecios = {};
+    ntf('✅ Mes '+mesKey+' cerrado correctamente');
+    renderHistorialValuacion();
+    document.getElementById('valBorradorInfo').style.display='none';
+  }catch(e){ntf('Error al cerrar mes: '+e.message,true);}
+}
+
+async function renderHistorialValuacion(){
+  try{
+    const r = await fbGet('valuacion/cierres');
+    const tb = document.getElementById('valHistorial');
+    if(!tb) return;
+    if(!r||!Object.keys(r).length){
+      tb.innerHTML='<tr><td colspan="11" class="emp">Sin cierres registrados</td></tr>';
+      return;
+    }
+    const rows = Object.values(r).sort((a,b)=>b.mes.localeCompare(a.mes));
+    tb.innerHTML = rows.map(s=>`<tr>
+      <td><b>${s.mes}</b></td>
+      <td style="font-size:11px;">${s.fechaCierre||'—'}</td>
+      <td class="mn tg">${s.cabezas||'—'}</td>
+      <td class="mn">${s.cabezasProm||'—'}</td>
+      <td class="mn">${s.pesoProm?s.pesoProm+' kg':'—'}</td>
+      <td class="mn">${s.kgTotales?fmt(s.kgTotales)+' kg':'—'}</td>
+      <td class="mn tg" style="color:var(--gold);"><b>Bs ${fmt(s.valorTotal||0)}</b></td>
+      <td class="mn">Bs ${s.precioPromBsKg||'—'}/kg</td>
+      <td class="mn" style="color:var(--green);">${s.uaTotales||'—'} UA</td>
+      <td class="mn"><b>${s.cargaUAha||'—'} UA/ha</b></td>
+      <td><button class="btn bs btn-sm" onclick="verDetalleCierre('${s.mes}')" style="font-size:10px;">Ver</button></td>
+    </tr>`).join('');
+  }catch(e){console.warn('historial valuacion:',e);}
+}
+
+async function verDetalleCierre(mes){
+  try{
+    const r = await fbGet('valuacion/cierres/'+mes);
+    if(!r){ntf('No se encontró el cierre',true);return;}
+    let det = Object.entries(r.precios||{}).map(([g,p])=>`${g}: Bs ${p}/kg`).join(' | ');
+    alert('Cierre '+mes+'\n\nPrecios por grupo:\n'+det.replace(/\|/g,'\n'));
+  }catch(e){}
+}
+
+
 function renderValuacion(){
   if(!window._dataLoaded) return;
   const hoy = new Date();
@@ -2614,7 +2793,7 @@ function renderValuacion(){
         <input type="number" step="0.5" min="0" value="${precioGuardado}"
           style="width:80px;background:var(--card3);color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:3px 6px;font-size:12px;text-align:right;"
           placeholder="Bs/kg"
-          onchange="_valPrecios['${precioKey}']=this.value;renderValuacion();"
+          onchange="_valPrecios['${precioKey}']=this.value;renderValuacion();guardarBorradorValuacion();"
           oninput="_valPrecios['${precioKey}']=this.value;">
       </td>
       <td class="mn tg"><b>${valor?'Bs '+fmt(valor):'—'}</b></td>
