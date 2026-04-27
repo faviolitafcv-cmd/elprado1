@@ -1792,6 +1792,117 @@ function renderDash(){
     </tr>`;
   }).join('');
   if(window._precRepos) renderMargRepos();
+  // ── Sincronizar resumen de grupos con Firebase para módulo Actividades ──
+  escribirGruposResumen();
+}
+
+// ═══════════════════════════════════════════════════════════
+// GRUPOS RESUMEN — enlace con módulo Actividades (Pasturas)
+// Se escribe en elprado1/hacienda/grupos_resumen cada vez que
+// se carga el Dashboard. Solo agrega datos, no modifica nada
+// del resto del sistema.
+// ═══════════════════════════════════════════════════════════
+async function escribirGruposResumen() {
+  try {
+    const hoy = new Date();
+    const fechaHoy = hoy.toISOString().split('T')[0];
+    const lp = window._lastPes || {};
+
+    // ── Índice de penúltimo pesaje por animal ──
+    // pesajes[] está ordenado desc por fecha → [0]=último, [1]=penúltimo
+    const prevPes = {};
+    const pesajesPorIde = {};
+    pesajes.forEach(p => {
+      const ide = String(p.ide);
+      if (!pesajesPorIde[ide]) pesajesPorIde[ide] = [];
+      pesajesPorIde[ide].push(p);
+    });
+    Object.keys(pesajesPorIde).forEach(ide => {
+      if (pesajesPorIde[ide].length >= 2) prevPes[ide] = pesajesPorIde[ide][1];
+    });
+
+    const act = Object.values(animales).filter(a => a.estado === 'ACTIVO');
+    const gmap = {};
+
+    act.forEach(a => {
+      const g = a.grupo || 'SIN GRUPO';
+      if (!gmap[g]) gmap[g] = {
+        nombre: g,
+        tipo: a.tipo || '',
+        categoria: a.categoria || '',
+        cabezas: 0,
+        sumPesoHoy: 0, nPesoHoy: 0,
+        sumGmd: 0, nGmd: 0
+      };
+      gmap[g].cabezas++;
+      if (!gmap[g].tipo && a.tipo) gmap[g].tipo = a.tipo;
+      if (!gmap[g].categoria && a.categoria) gmap[g].categoria = a.categoria;
+
+      const lpa = lp[String(a.ide)];
+      if (!lpa || !lpa.peso || !lpa.fecha) return; // sin pesaje → excluir del promedio
+
+      let gmd = null;
+      const prev = prevPes[String(a.ide)];
+
+      if (prev && prev.peso && prev.fecha) {
+        // ── 2+ pesajes: GMD del ÚLTIMO intervalo (penúltimo → último) ──
+        const dias = Math.round((new Date(lpa.fecha + 'T12:00:00') - new Date(prev.fecha + 'T12:00:00')) / 86400000);
+        if (dias > 0) gmd = (lpa.peso - prev.peso) / dias;
+      }
+
+      if (gmd === null) {
+        // ── 1 solo pesaje: GMD acumulado desde ingreso ──
+        if (!a.pesoIngreso || !a.fechaIngreso) return;
+        let fi = parseFecha(a.fechaIngreso);
+        if (!fi) return;
+        // Corregir fecha invertida (fix conocido del sistema)
+        if (new Date(fi + 'T12:00:00') >= new Date(lpa.fecha + 'T12:00:00')) {
+          const p = fi.split('-');
+          if (p.length === 3) {
+            const sw = p[0] + '-' + p[2] + '-' + p[1];
+            if (new Date(sw + 'T12:00:00') < new Date(lpa.fecha + 'T12:00:00')) fi = sw;
+          }
+        }
+        const dias = Math.round((new Date(lpa.fecha + 'T12:00:00') - new Date(fi + 'T12:00:00')) / 86400000);
+        if (dias <= 0) return;
+        gmd = (lpa.peso - a.pesoIngreso) / dias;
+      }
+
+      if (gmd === null) return;
+
+      const diasDesde = Math.max(0, Math.round((hoy - new Date(lpa.fecha + 'T12:00:00')) / 86400000));
+      const pesoHoy = lpa.peso + gmd * diasDesde;
+
+      gmap[g].sumPesoHoy += pesoHoy;
+      gmap[g].nPesoHoy++;
+      gmap[g].sumGmd += gmd;
+      gmap[g].nGmd++;
+    });
+
+    // ── Construir objeto resumen ──
+    // Clave sanitizada para Firebase (sin puntos ni espacios)
+    // Nombre original preservado en campo 'nombre'
+    const resumen = {};
+    Object.values(gmap).forEach(g => {
+      if (g.cabezas === 0) return; // solo grupos con animales activos
+      const key = g.nombre.replace(/\./g, '').replace(/\s+/g, '_').toUpperCase();
+      resumen[key] = {
+        nombre:      g.nombre,
+        cabezas:     g.cabezas,
+        pesoHoy:     g.nPesoHoy > 0 ? Math.round(g.sumPesoHoy / g.nPesoHoy) : null,
+        gmd:         g.nGmd > 0 ? Math.round(g.sumGmd / g.nGmd * 1000) / 1000 : null,
+        tipo:        g.tipo,
+        categoria:   g.categoria,
+        sinPesaje:   g.cabezas - g.nPesoHoy,
+        fechaCalculo: fechaHoy
+      };
+    });
+
+    await fbSet('grupos_resumen', resumen);
+    console.log('✅ grupos_resumen: ' + Object.keys(resumen).length + ' grupos → Firebase OK');
+  } catch(e) {
+    console.log('⚠️ grupos_resumen error:', e.message || e);
+  }
 }
 
 // ═══════════ ANIMALES ═══════════
