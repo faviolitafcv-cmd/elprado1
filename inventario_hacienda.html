@@ -700,7 +700,7 @@ tr:hover td{background:rgba(109,186,58,.04);}
     </div>
     <div style="padding:12px 14px;">
       <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
-        <select id="simGrupo" onchange="renderSimulador()" style="font-size:12px;">
+        <select id="simGrupo" onchange="precargarPrecioVentaGrupo();renderSimulador()" style="font-size:12px;">
           <option value="">— Seleccioná un grupo —</option>
         </select>
         <span style="font-size:11px;color:var(--t2);">P. venta Bs/kg:</span>
@@ -1223,14 +1223,21 @@ function renderProyecciones(){
     porGrupo[g].sumPesoH+=pesoHoy; porGrupo[g].nPesoH++;
     porGrupo[g].sumGmd+=gmdR; porGrupo[g].nGmd++;
 
-    // Rendimiento diario (margen reposición / días en campo)
+    // Rendimiento diario real (usando precio del cierre/borrador por grupo)
     if(precRepos&&a.pesoIngreso){
       const costoR=a.pesoIngreso*precRepos;
       const diasCampo=diasTot+diasExt;
       if(diasCampo>0){
-        const bsventa=precRepos*1.5; // estimado si no hay precio
+        // Usar precio del borrador/valuación por grupo, fallback a precRepos*1.1
+        const grupo_a=a.grupo||'SIN GRUPO';
+        const bsventa=(window._preciosGrupo&&window._preciosGrupo[grupo_a])
+          ? parseFloat(window._preciosGrupo[grupo_a])
+          : precRepos*1.1;
         const marR=(pesoHoy*bsventa)-costoR;
-        porGrupo[g].sumRendDia+=marR/diasCampo; porGrupo[g].nRendDia++;
+        porGrupo[g].sumRendDia+=marR/diasCampo;
+        porGrupo[g].nRendDia++;
+        // Guardar precio de venta usado para el simulador
+        if(!porGrupo[g].precVentaRef) porGrupo[g].precVentaRef=bsventa;
       }
     }
 
@@ -1309,6 +1316,20 @@ function renderProyecciones(){
   // Sección 3: Proyección de ingresos por mes
   renderProyIngresos(porGrupo, precRepos);
 }
+
+function precargarPrecioVentaGrupo(){
+  const g = document.getElementById('simGrupo')?.value;
+  if(!g) return;
+  // Buscar precio del borrador/valuación para este grupo
+  const precGrupo = window._preciosGrupo&&window._preciosGrupo[g]
+    ? parseFloat(window._preciosGrupo[g])
+    : null;
+  if(precGrupo){
+    const inp = document.getElementById('simPrecVenta');
+    if(inp&&!inp.value) inp.value = precGrupo;
+  }
+}
+
 
 function renderSimulador(){
   const g = document.getElementById('simGrupo')?.value;
@@ -1475,7 +1496,13 @@ function renderProyIngresos(porGrupo, precRepos){
   });
 
   const prec = precRepos||0;
-  const precVenta = prec*1.5; // estimado
+  // Usar precio promedio del borrador si está disponible
+  const preciosDisp = window._preciosGrupo
+    ? Object.values(window._preciosGrupo).map(v=>parseFloat(v)).filter(v=>v>0)
+    : [];
+  const precVenta = preciosDisp.length>0
+    ? Math.round(preciosDisp.reduce((s,v)=>s+v,0)/preciosDisp.length*100)/100
+    : prec*1.5;
 
   const div = document.getElementById('proyIngresos');
   if(!div) return;
@@ -1488,10 +1515,14 @@ function renderProyIngresos(porGrupo, precRepos){
       const gmd=g.nGmd>0?g.sumGmd/g.nGmd:0;
       const pesoP=ph+gmd*dias;
       const listos=i===0?g.listoHoy+g.listo30:i===1?g.listoHoy+g.listo30+g.listo60:g.listoHoy+g.listo30+g.listo60+g.listo90;
-      if(listos>0&&prec>0){
-        const ing=pesoP*precVenta*listos;
-        const cost=ph*prec*listos;
-        totAnim+=listos; totIngresos+=ing; totMargen+=ing-cost;
+      if(listos>0){
+        // Precio de venta específico por grupo, fallback a promedio
+        const pvGrupo=(window._preciosGrupo&&window._preciosGrupo[g.grupo])
+          ? parseFloat(window._preciosGrupo[g.grupo])
+          : precVenta;
+        const ing=pesoP*pvGrupo*listos;
+        const cost=prec>0?ph*prec*listos:0;
+        totAnim+=listos; totIngresos+=ing; if(cost>0)totMargen+=ing-cost;
       }
     });
     const cols=['var(--gold)','var(--blue)','var(--green)'];
@@ -3366,6 +3397,7 @@ async function cargarBorradorValuacion(){
     const r = await fbGet('valuacion/borrador');
     if(r&&r.precios){
       window._valPrecios = r.precios;
+      window._preciosGrupo = r.precios; // disponible para Proyecciones y Simulador
       // Si hay precio de reposición guardado, cargarlo
       if(r.precRepos){
         window._precRepos = r.precRepos;
@@ -3399,6 +3431,7 @@ async function guardarBorradorValuacion(){
   Object.assign(window._valPrecios, precios);
   const hoy = new Date().toISOString().split('T')[0];
   try{
+    window._preciosGrupo = {...(window._valPrecios||{})};
     await fbSet('valuacion/borrador', {precios: window._valPrecios||{}, precRepos: window._precRepos||null, fecha: hoy, usuario});
     ntf('💾 Precios guardados como borrador');
     const info = document.getElementById('valBorradorInfo');
@@ -3597,7 +3630,7 @@ function renderValuacion(){
         <input type="number" step="0.5" min="0" value="${precioGuardado}"
           style="width:80px;background:var(--card3);color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:3px 6px;font-size:12px;text-align:right;"
           placeholder="Bs/kg"
-          onchange="_valPrecios['${precioKey}']=this.value;renderValuacion();guardarBorradorValuacion();"
+          onchange="_valPrecios['${precioKey}']=this.value;if(!window._preciosGrupo)window._preciosGrupo={};window._preciosGrupo['${precioKey}']=parseFloat(this.value)||0;renderValuacion();guardarBorradorValuacion();"
           oninput="_valPrecios['${precioKey}']=this.value;">
       </td>
       <td class="mn tg"><b>${valor?'Bs '+fmt(valor):'—'}</b></td>
