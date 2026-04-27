@@ -3565,8 +3565,41 @@ function setPrecioGrupo(grupo, valor){
   if(!window._preciosGrupo) window._preciosGrupo={};
   window._valPrecios[grupo] = valor;
   window._preciosGrupo[grupo] = parseFloat(valor)||0;
-  renderValuacion();
+  // Actualizar solo el total sin re-renderizar toda la tabla
+  actualizarTotalValuacion();
   guardarBorradorValuacion();
+}
+
+function actualizarTotalValuacion(){
+  // Recalcular totales leyendo los inputs actuales sin re-renderizar
+  let totKgP=0, totValor=0, totCab=0;
+  document.querySelectorAll('#valTabla tr[data-kg]').forEach(tr=>{
+    const kg = parseFloat(tr.dataset.kg)||0;
+    const n = parseInt(tr.dataset.cab)||0;
+    const inp = tr.querySelector('input[data-grupo]');
+    const precio = parseFloat(inp?.value)||0;
+    totKgP+=kg; totCab+=n;
+    if(precio>0) totValor+=Math.round(kg*precio);
+    // Actualizar celda valor del grupo
+    const tdValor = tr.querySelector('.td-valor');
+    if(tdValor) tdValor.textContent = precio>0 ? 'Bs '+fmt(Math.round(kg*precio)) : '—';
+  });
+  // Actualizar resumen
+  const rDiv = document.getElementById('valResumen');
+  if(rDiv){
+    const cards = rDiv.querySelectorAll('div > div:last-child');
+    if(cards[1]) cards[1].textContent = fmt(totKgP)+' kg';
+    if(cards[2]) cards[2].textContent = 'Bs '+fmt(totValor);
+    if(cards[3]) cards[3].textContent = 'Bs '+(totKgP>0?(totValor/totKgP).toFixed(2):0)+'/kg';
+  }
+  // Actualizar total en tfoot
+  const tf = document.getElementById('valTotal');
+  if(tf) tf.innerHTML=`<tr style="background:var(--card2);font-weight:800;">
+    <td><b>TOTAL</b></td><td class="mn tg">${totCab}</td><td class="mn">—</td>
+    <td class="mn"><b>${fmt(totKgP)} kg</b></td><td class="mn">—</td>
+    <td class="mn tg" style="color:var(--green);font-size:14px;"><b>Bs ${fmt(totValor)}</b></td>
+    <td class="mn">—</td><td class="mn">—</td><td class="mn">—</td>
+  </tr>`;
 }
 
 
@@ -3637,7 +3670,7 @@ function renderValuacion(){
 
     const marCol = margenP!=null?(margenP>0?'var(--green)':'var(--red)'):'var(--t2)';
 
-    return`<tr>
+    return`<tr data-kg="${kgTot||0}" data-cab="${g.n}">
       <td><b>${GRUS[g.grupo]||g.grupo}</b></td>
       <td class="mn tg">${g.n}</td>
       <td class="mn">${pesoProm?pesoProm+' kg':'—'}</td>
@@ -3648,9 +3681,10 @@ function renderValuacion(){
           style="width:80px;background:var(--card3);color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:3px 6px;font-size:12px;text-align:right;"
           placeholder="Bs/kg"
           onchange="setPrecioGrupo('${precioKey}',this.value)"
-          oninput="setPrecioGrupo('${precioKey}',this.value)">
+          onblur="setPrecioGrupo('${precioKey}',this.value)"
+          onkeydown="if(event.key==='Enter')setPrecioGrupo('${precioKey}',this.value)">
       </td>
-      <td class="mn tg"><b>${valor?'Bs '+fmt(valor):'—'}</b></td>
+      <td class="mn tg td-valor"><b>${valor?'Bs '+fmt(valor):'—'}</b></td>
       <td class="mn">${kgGanProm?'+'+kgGanProm+' kg':'—'}</td>
       <td class="mn">${costoProm?'Bs '+costoProm+'/kg':'—'}</td>
       <td class="mn" style="color:${marCol};font-weight:700;">${margenP!=null?'Bs '+fmt(margenP):'—'}</td>
