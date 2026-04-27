@@ -313,6 +313,11 @@ tr:hover td{background:rgba(109,186,58,.04);}
       <option value="VENDIDO">Vendidos</option>
       <option value="MUERTO">Muertos</option>
     </select>
+    <select id="fPesaje" onchange="filtA()" title="Filtrar por pesaje">
+      <option value="">Todos los pesajes</option>
+      <option value="SIN_PESAJE">⚠️ Sin pesaje</option>
+      <option value="CON_PESAJE">✅ Con pesaje</option>
+    </select>
     <input class="si" type="text" id="fBus" placeholder="🔍 IDE, caravana u origen..." oninput="filtA()">
   </div>
   <div class="card">
@@ -329,6 +334,10 @@ tr:hover td{background:rgba(109,186,58,.04);}
         <th data-col="precio" style="cursor:pointer;" onclick="sortA('precio')">Precio <span class="sort-ic">↕</span></th>
         <th>Raza</th>
         <th data-col="estado" style="cursor:pointer;" onclick="sortA('estado')">Estado <span class="sort-ic">↕</span></th>
+        <th data-col="ultPeso" style="cursor:pointer;color:var(--green);" onclick="sortA('ultPeso')">Últ. Peso <span class="sort-ic">↕</span></th>
+        <th data-col="ultFecha" style="cursor:pointer;" onclick="sortA('ultFecha')">F. Últ. Pesaje <span class="sort-ic">↕</span></th>
+        <th data-col="gmdAcum" style="cursor:pointer;color:var(--gold);" onclick="sortA('gmdAcum')">GMD Acum. <span class="sort-ic">↕</span></th>
+        <th data-col="gmdUlt" style="cursor:pointer;color:var(--gold);" onclick="sortA('gmdUlt')">GMD Últ. Pesaje <span class="sort-ic">↕</span></th>
         <th></th>
       </tr></thead>
       <tbody id="aBody"><tr><td colspan="11"><div class="ldr"><div class="ls"></div></div></td></tr></tbody>
@@ -1784,6 +1793,12 @@ function filtA(){
     }
     if(ori&&(a.origen||'')!==ori)return false;
     if(est&&a.estado!==est)return false;
+    const fpesaje=document.getElementById('fPesaje')?.value||'';
+    if(fpesaje){
+      const tienePesaje=!!(window._lastPes&&window._lastPes[a.ide]);
+      if(fpesaje==='SIN_PESAJE'&&tienePesaje)return false;
+      if(fpesaje==='CON_PESAJE'&&!tienePesaje)return false;
+    }
     if(bus){
       const s=String(a.ide).toLowerCase()+(a.ida||'').toLowerCase()+(a.origen||'').toLowerCase();
       if(!s.includes(bus))return false;
@@ -1820,23 +1835,75 @@ function renderA(){ filtA(); }
 function renderAT(){
   const tot=aFilt.length;
   document.getElementById('aCount').textContent=tot+' animal'+(tot!==1?'es':'');
+  // Aplicar sort con las columnas nuevas
+  if(_aSort.col){
+    const lp=window._lastPes||{};
+    aFilt.sort((a,b)=>{
+      let va,vb;
+      const lpA=lp[a.ide], lpB=lp[b.ide];
+      const col=_aSort.col;
+      if(col==='ultPeso'){va=lpA?lpA.peso:0;vb=lpB?lpB.peso:0;}
+      else if(col==='ultFecha'){va=lpA?lpA.fecha:'';vb=lpB?lpB.fecha:'';}
+      else if(col==='gmdUlt'){va=lpA&&lpA.gmd!=null?lpA.gmd:-999;vb=lpB&&lpB.gmd!=null?lpB.gmd:-999;}
+      else if(col==='gmdAcum'){
+        const g=(an,lpa)=>{if(!lpa||!an.pesoIngreso||!an.fechaIngreso)return -999;let fi=parseFecha(an.fechaIngreso);if(!fi)return -999;const d=Math.round((new Date(lpa.fecha+'T12:00:00')-new Date(fi+'T12:00:00'))/86400000);return d>0?(lpa.peso-an.pesoIngreso)/d:-999;};
+        va=g(a,lpA);vb=g(b,lpB);
+      }
+      else if(col==='ide'){va=String(a.ide);vb=String(b.ide);}
+      else if(col==='ida'){va=a.ida||'';vb=b.ida||'';}
+      else if(col==='tipo'){va=a.tipo||'';vb=b.tipo||'';}
+      else if(col==='cat'){va=a.categoria||'';vb=b.categoria||'';}
+      else if(col==='grupo'){va=a.grupo||'';vb=b.grupo||'';}
+      else if(col==='origen'){va=a.origen||'';vb=b.origen||'';}
+      else if(col==='fecha'){va=a.fechaIngreso||'';vb=b.fechaIngreso||'';}
+      else if(col==='peso'){va=a.pesoIngreso||0;vb=b.pesoIngreso||0;}
+      else if(col==='precio'){va=a.precioCompra||0;vb=b.precioCompra||0;}
+      else if(col==='estado'){va=a.estado||'';vb=b.estado||'';}
+      else{va=0;vb=0;}
+      if(typeof va==='string') return va.localeCompare(vb)*_aSort.dir;
+      return (va-vb)*_aSort.dir;
+    });
+  }
   const st=(pA-1)*PXP, sl=aFilt.slice(st,st+PXP);
   const tb=document.getElementById('aBody');
-  if(!sl.length){tb.innerHTML='<tr><td colspan="11"><div class="emp"><div class="emp-ic">🐄</div>Sin animales encontrados</div></td></tr>';document.getElementById('aPag').innerHTML='';return;}
-  tb.innerHTML=sl.map(a=>`<tr>
-    <td class="mn tg" style="font-size:11px;cursor:pointer;" onclick="verDet('${a.ide}')">${a.ide}</td>
-    <td class="mn" style="font-size:11px;">${a.ida||'—'}</td>
-    <td style="font-size:11px;color:var(--t2);">${a.tipo||'—'}</td>
-    <td><span class="bg ${CBADGE[a.categoria]||''}">${a.categoria||'—'}</span></td>
-    <td><b>${GRUS[a.grupo]||a.grupo||'—'}</b></td>
-    <td style="font-size:11px;">${a.origen||'—'}</td>
-    <td class="mn" style="font-size:11px;">${fmtFecha(a.fechaIngreso)}</td>
-    <td class="mn">${a.pesoIngreso||'—'} kg</td>
-    <td class="mn tgo" style="font-size:11px;">Bs ${fmt(a.precioCompra)}</td>
-    <td style="font-size:11px;color:var(--t3);">${a.raza||'—'}</td>
-    <td><span class="bg bg-${(a.estado||'activo').toLowerCase()}">${a.estado||'ACTIVO'}</span></td>
-    <td><button class="btn bs btn-sm" onclick="verDet('${a.ide}')">📋</button></td>
-  </tr>`).join('');
+  if(!sl.length){tb.innerHTML='<tr><td colspan="15"><div class="emp"><div class="emp-ic">🐄</div>Sin animales encontrados</div></td></tr>';document.getElementById('aPag').innerHTML='';return;}
+  const lp=window._lastPes||{};
+  tb.innerHTML=sl.map(a=>{
+    const lpA=lp[a.ide];
+    const ultPeso=lpA?lpA.peso:null;
+    const ultFecha=lpA?lpA.fecha:null;
+    const gmdUlt=lpA&&lpA.gmd!=null?Number(lpA.gmd).toFixed(3):null;
+    let gmdAcum=null;
+    if(lpA&&a.pesoIngreso&&a.fechaIngreso&&lpA.peso&&lpA.fecha){
+      let fi=parseFecha(a.fechaIngreso);
+      if(fi){
+        if(new Date(fi+'T12:00:00')>=new Date(lpA.fecha+'T12:00:00')){const p=fi.split('-');if(p.length===3){const sw=p[0]+'-'+p[2]+'-'+p[1];if(new Date(sw+'T12:00:00')<new Date(lpA.fecha+'T12:00:00'))fi=sw;}}
+        const d=Math.round((new Date(lpA.fecha+'T12:00:00')-new Date(fi+'T12:00:00'))/86400000);
+        if(d>0) gmdAcum=((lpA.peso-a.pesoIngreso)/d).toFixed(3);
+      }
+    }
+    const gCol=v=>v!=null?(parseFloat(v)>=0.8?'var(--green)':parseFloat(v)>=0.4?'var(--gold)':'var(--red)'):'var(--t2)';
+    return`<tr style="cursor:pointer;" onclick="verDet('${a.ide}')">
+      <td class="mn tg" style="font-size:11px;">${a.ide}</td>
+      <td style="font-size:11px;">${a.ida||'—'}</td>
+      <td style="font-size:11px;color:var(--t2);">${a.tipo||'—'}</td>
+      <td><span class="bg ${CBADGE[a.categoria]||''}">${a.categoria||'—'}</span></td>
+      <td><b style="color:${a.grupo?'inherit':'var(--red)'};">${GRUS[a.grupo]||a.grupo||'<span style="color:var(--red);">SIN GRUPO</span>'}</b></td>
+      <td style="font-size:11px;">${a.origen||'—'}</td>
+      <td class="mn" style="font-size:11px;">${fmtFecha(a.fechaIngreso)}</td>
+      <td class="mn">${a.pesoIngreso||'—'} kg</td>
+      <td class="mn tgo" style="font-size:11px;">Bs ${fmt(a.precioCompra)}</td>
+      <td style="font-size:11px;color:var(--t3);">${a.raza||'—'}</td>
+      <td><span class="bg bg-${(a.estado||'activo').toLowerCase()}">${a.estado||'ACTIVO'}</span></td>
+      <td class="mn tg" style="color:var(--green);font-weight:700;">${ultPeso?ultPeso+' kg':'<span style="color:var(--red);font-size:10px;">Sin pesaje</span>'}</td>
+      <td class="mn" style="font-size:10px;color:var(--t2);">${ultFecha||'—'}</td>
+      <td class="mn" style="color:${gCol(gmdAcum)};font-weight:700;">${gmdAcum?gmdAcum+' kg/d':'—'}</td>
+      <td class="mn" style="color:${gCol(gmdUlt)};">${gmdUlt?gmdUlt+' kg/d':'—'}</td>
+      <td class="mn" onclick="event.stopPropagation()">
+        <button class="btn bs btn-sm" onclick="editarAnimal('${a.ide}')" title="Editar">✏️</button>
+      </td>
+    </tr>`;
+  }).join('');
   renderPag('aPag',tot,pA,n=>{pA=n;renderAT();});
 }
 
@@ -4394,7 +4461,26 @@ function verDetalleGrupo(grupo){
     const lpa=lp[a.ide];const gmd=lpa?.gmd;
     let pp=a.pesoIngreso||0;
     if(lpa&&gmd!=null){const dias=Math.max(0,Math.round((hoy-new Date(lpa.fecha+'T12:00:00'))/86400000));pp=Math.round((lpa.peso+gmd*dias)*10)/10;}
-    return`<tr>
+    // Datos del último pesaje
+    const lpa=window._lastPes&&window._lastPes[a.ide];
+    const ultPeso=lpa?lpa.peso:null;
+    const ultFecha=lpa?lpa.fecha:null;
+    const gmdUlt=lpa&&lpa.gmd!=null?Number(lpa.gmd).toFixed(3):null;
+    // GMD acumulada = (peso últ pesaje - peso ingreso) / días desde ingreso
+    let gmdAcum=null;
+    if(lpa&&a.pesoIngreso&&a.fechaIngreso&&lpa.peso&&lpa.fecha){
+      let fi=parseFecha(a.fechaIngreso);
+      if(fi){
+        if(new Date(fi+'T12:00:00')>=new Date(lpa.fecha+'T12:00:00')){const p=fi.split('-');if(p.length===3){const sw=p[0]+'-'+p[2]+'-'+p[1];if(new Date(sw+'T12:00:00')<new Date(lpa.fecha+'T12:00:00'))fi=sw;}}
+        const dAcum=Math.round((new Date(lpa.fecha+'T12:00:00')-new Date(fi+'T12:00:00'))/86400000);
+        if(dAcum>0) gmdAcum=((lpa.peso-a.pesoIngreso)/dAcum).toFixed(3);
+      }
+    }
+    const gmdAcumCol=gmdAcum!=null?(parseFloat(gmdAcum)>=0.8?'var(--green)':parseFloat(gmdAcum)>=0.4?'var(--gold)':'var(--red)'):'var(--t2)';
+    const gmdUltCol=gmdUlt!=null?(parseFloat(gmdUlt)>=0.8?'var(--green)':parseFloat(gmdUlt)>=0.4?'var(--gold)':'var(--red)'):'var(--t2)';
+    // Flag: sin pesaje reciente
+    const sinPesaje=!lpa;
+    return`<tr style="${sinPesaje?'opacity:0.7;':''}" onclick="verDet('${a.ide}')" class="row-hover">
       <td class="mn tg" style="font-size:11px;">${a.ide}</td>
       <td style="font-size:11px;">${a.ida||'—'}</td>
       <td style="font-size:11px;">${a.tipo||'—'}</td>
@@ -4406,7 +4492,11 @@ function verDetalleGrupo(grupo){
       <td class="mn" style="color:var(--gold);">${a.precioCompra?'Bs '+fmt(a.precioCompra):'—'}</td>
       <td style="font-size:11px;">${a.raza||'—'}</td>
       <td class="mn"><span class="bg ${a.estado==='ACTIVO'?'bg-ok':'bg-mig'}" style="font-size:10px;">${a.estado||'—'}</span></td>
-      <td class="mn">
+      <td class="mn tg" style="color:var(--green);font-weight:700;">${ultPeso?ultPeso+' kg':'<span style="color:var(--red);">Sin pesaje</span>'}</td>
+      <td class="mn" style="font-size:11px;color:var(--t2);">${ultFecha||'—'}</td>
+      <td class="mn" style="color:${gmdAcumCol};font-weight:700;">${gmdAcum?gmdAcum+' kg/d':'—'}</td>
+      <td class="mn" style="color:${gmdUltCol};">${gmdUlt?gmdUlt+' kg/d':'—'}</td>
+      <td class="mn" onclick="event.stopPropagation()">
         <button class="btn bs btn-sm" onclick="editarAnimal('${a.ide}')" title="Editar">✏️</button>
       </td>
     </tr>`;
