@@ -991,6 +991,13 @@ tr:hover td{background:rgba(109,186,58,.04);}
   <div class="md md-lg">
     <div class="mh"><div class="mt" id="moDetT">🐄 Ficha del Animal</div><button class="mc" onclick="cerrar('moDet')">✕</button></div>
     <div class="mb" id="moDetB">—</div>
+    <div class="mf" style="justify-content:space-between;">
+      <div>
+        <button id="btnEditDet" class="btn bp" onclick="editarDesdeDetalle()" style="margin-right:8px;">✏️ Editar Animal</button>
+        <button id="btnDelDet" class="btn" style="background:var(--red);color:#fff;display:none;" onclick="eliminarDesdeDetalle()">🗑️ Eliminar</button>
+      </div>
+      <button class="btn bs" onclick="cerrar('moDet')">Cerrar</button>
+    </div>
   </div>
 </div>
 
@@ -2096,6 +2103,11 @@ function verDet(ide){
   }
 
   document.getElementById('moDetB').innerHTML=html;
+  document.getElementById('moDet').dataset.ide=ide;
+  // Mostrar eliminar solo para admin
+  const rol=sessionStorage.getItem('ep_rol')||'';
+  const btnDel=document.getElementById('btnDelDet');
+  if(btnDel) btnDel.style.display=(rol==='ADMIN'?'':'none');
   document.getElementById('moDet').classList.add('open');
 }
 
@@ -4243,6 +4255,27 @@ function toggleCambioIDE(){
   if(!wrap)return;
   if(wrap.style.display==='none'){wrap.style.display='block';if(arrow)arrow.textContent='▲';}
   else{wrap.style.display='none';if(arrow)arrow.textContent='▼';const n=document.getElementById('eaIdeNuevo');if(n)n.value='';}
+}
+
+function editarDesdeDetalle(){
+  const ide = document.getElementById('moDet').dataset.ide;
+  if(!ide) return;
+  cerrar('moDet');
+  setTimeout(()=>editarAnimal(ide), 150);
+}
+
+async function eliminarDesdeDetalle(){
+  const ide = document.getElementById('moDet').dataset.ide;
+  if(!ide) return;
+  if(!confirm('¿Eliminar el animal '+ide+'? Esta acción no se puede deshacer.')) return;
+  try{
+    await fbSet('animales/'+ide, null);
+    delete animales[ide];
+    cerrar('moDet');
+    ntf('Animal eliminado correctamente');
+    renderDash();
+    filtA();
+  }catch(e){ntf('Error al eliminar: '+e.message, true);}
 }
 
 function editarAnimal(ide){
