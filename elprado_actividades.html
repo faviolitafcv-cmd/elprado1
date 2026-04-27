@@ -3307,7 +3307,7 @@ function renderTabla() {
     if (r.lote && r.actividad === 'MATERIA SECA') {
       const invG = getPesoActualGrupo(r.lote);
       if (invG && invG.pesoHoy) {
-        const diff = r.pesoMedio ? invG.pesoHoy - r.pesoMedio : null;
+        const diff = r.pesoMedio ? Math.round((invG.pesoHoy - r.pesoMedio) * 10) / 10 : null;
         const diffTxt = diff !== null
           ? `<span style="color:${diff>=0?'var(--green-soft)':'var(--red)'};">${diff>=0?'+':''}${diff} kg</span>`
           : '';
