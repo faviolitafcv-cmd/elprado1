@@ -4254,6 +4254,7 @@ function editarAnimal(ide){
   const ca=document.getElementById('eaCambioIDEArrow');if(ca)ca.textContent='▼';
   document.getElementById('eaTipo').value=a.tipo||'';
   document.getElementById('eaCat').value=a.categoria||'';
+  updGruposSel('eaCat','eaGrupo'); // cargar opciones del grupo
   document.getElementById('eaGrupo').value=a.grupo||'';
   document.getElementById('eaIda').value=a.ida||'';
   document.getElementById('eaOrigen').value=a.origen||'';
