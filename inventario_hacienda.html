@@ -1133,7 +1133,7 @@ function showPg(id){
   if(id==='animales')  renderA();
   if(id==='pesajes')   renderP();
   if(id==='bajas')     renderB();
-  if(id==='informes'){renderInf();if(window._dataLoaded){renderIG();renderValuacion();}}
+  if(id==='informes'){renderInf();if(window._dataLoaded){renderIG();renderValuacion();renderHistorialValuacion();}}
   if(id==='proyecciones'){
     // Sincronizar precio de reposición
     if(window._precRepos){
@@ -1189,6 +1189,7 @@ function renderProyecciones(){
   const hoy = new Date();
   const lp = window._lastPes||{};
   if(!window._valPrecios) window._valPrecios = {};
+  const _valPrecios = window._valPrecios; // alias local
   const act = Object.values(animales).filter(a=>a.estado==='ACTIVO');
 
   // ─── Calcular datos por animal ───
