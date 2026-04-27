@@ -1940,14 +1940,12 @@ async function syncFromFirebase() {
           const fbArr = Array.isArray(val) ? val
             : (val && typeof val === 'object') ? Object.values(val) : null;
           if(fbArr && Array.isArray(localVal) && localVal.length > fbArr.length) {
-            // Local tiene mas registros que Firebase -> conservar local SOLO para actividades
-            // Para lluvia y pluviometros, Firebase siempre gana (datos compartidos entre usuarios)
-            if(key !== 'actividades') {
-              _set.call(localStorage, lsKey, JSON.stringify(fbArr || val));
+            // Para actividades: conservar local si tiene más registros
+            // Para lluvia/pluviómetros: Firebase siempre gana
+            if(key === 'actividades') {
+              console.log('[sync] conservando local actividades: local=' + localVal.length + ' fb=' + fbArr.length);
               return;
             }
-            console.log('[sync] conservando local para ' + key + ': local=' + localVal.length + ' fb=' + fbArr.length);
-            return;
           }
           _set.call(localStorage, lsKey, JSON.stringify(fbArr || val));
         } catch(e2) {
@@ -4614,19 +4612,18 @@ function guardarLluviaDia() {
     lecturas,
     usuario: localStorage.getItem('elprado_usuario') || ''
   });
+  const fechaGuardada = llDiaActual;
   setLluvia(filtrado);
-  // Subida inmediata y explícita a Firebase — sin depender del interceptor
+  // Subida directa a Firebase
   fetch('https://elprado1-153ef-default-rtdb.firebaseio.com/elprado1/lluvia.json', {
-    method: 'PUT',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify(filtrado)
-  }).then(() => console.log('[lluvia] subida a Firebase OK — ' + filtrado.length + ' registros'))
-    .catch(e => console.log('[lluvia] error subida Firebase:', e));
+    method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(filtrado)
+  }).then(() => console.log('[lluvia] Firebase OK — ' + filtrado.length))
+    .catch(e => console.log('[lluvia] Firebase error:', e));
   cerrarModalLluvia();
   renderCalendarioLluvia();
   renderResumenLluvia();
   renderAnalisisGestion();
-  notif('✅ Lluvia guardada para ' + llDiaActual);
+  notif('✅ Lluvia guardada para ' + fechaGuardada);
 }
 
 function getPluviometros() { return getData('pluviometros', []); }
@@ -4639,7 +4636,7 @@ function getLluvia() {
     lecturas: Array.isArray(r.lecturas) ? r.lecturas : Object.values(r.lecturas || {})
   }));
 }
-function setLluvia(v) { setData('lluvia', v); fbSet('lluvia', v).catch(e=>console.log('fbSet lluvia error:',e)); }
+function setLluvia(v) { setData('lluvia', v); fbSet('lluvia', v).catch(e=>{}); }
 
 function abrirModalPluviometro(idx) {
   const pluvios = getPluviometros();
