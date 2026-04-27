@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<script>
+(function(){
+  var u=sessionStorage.getItem('ep_usuario');
+  var t=parseInt(sessionStorage.getItem('ep_login')||0);
+  if(!u||(Date.now()-t)/3600000>=8) window.location.href='login.html';
+  localStorage.setItem('elprado_usuario',u||'');
+})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Insumos — El Prado 1</title>
+<style>
+:root{
+  --bg:#0d1f0d;--card:#152015;--card2:#1a2a1a;--card3:#1e2e1e;
+  --green:#6dba3a;--green2:#4a9a2a;--green3:#3a8a1a;--gs:#7de06a;
+  --gold:#c9a227;--gold2:#e8b830;--red:#e05a4a;--blue:#4a9aba;--purple:#9a7adb;
+  --text:#e8ffe8;--t2:#b8d4b8;--t3:#7a9a7a;--t4:#4a6a4a;
+  --brd:#2a4a2a;--brd2:#3a5a3a;
+  --green-soft:#7de06a;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;}
+
+/* HEADER */
+.hdr{background:var(--card);border-bottom:2px solid var(--brd2);padding:10px 18px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.hdr-t{font-size:14px;font-weight:700;color:var(--gs);letter-spacing:1px;text-transform:uppercase;}
+.hdr-s{font-size:11px;color:var(--t3);}
+.hdr-r{display:flex;align-items:center;gap:10px;}
+.btn-back{background:none;border:1px solid var(--brd2);color:var(--t2);padding:5px 12px;border-radius:5px;cursor:pointer;font-size:12px;text-decoration:none;display:inline-block;}
+.btn-back:hover{border-color:var(--green2);color:var(--gs);}
+.ubadge{font-size:11px;color:var(--t3);}
+
+/* NAV */
+.nav{background:var(--card2);border-bottom:1px solid var(--brd);display:flex;overflow-x:auto;padding:0 8px;gap:1px;scrollbar-width:none;}
+.nav::-webkit-scrollbar{display:none;}
+.tab{padding:10px 15px;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--t3);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;transition:all .15s;user-select:none;}
+.tab:hover{color:var(--t2);background:rgba(109,186,58,.05);}
+.tab.active{color:var(--gs);border-bottom-color:var(--green);}
+
+/* PAGES */
+.pg{display:none;padding:18px;max-width:1400px;margin:0 auto;}
+.pg.active{display:block;}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:18px;}
+.sc{background:var(--card);border:1px solid var(--brd);border-radius:8px;padding:14px;text-align:center;}
+.sc-v{font-size:26px;font-weight:700;color:var(--gs);}
+.sc-l{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-top:4px;}
+
+/* CARD */
+.card{background:var(--card);border:1px solid var(--brd);border-radius:8px;margin-bottom:14px;overflow:hidden;}
+.ch{padding:11px 15px;border-bottom:1px solid var(--brd);display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.ct{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t2);display:flex;align-items:center;gap:6px;}
+.cb{padding:14px;}
+
+/* TABLE */
+.tw{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{background:var(--card2);color:var(--t3);font-size:10px;letter-spacing:.8px;text-transform:uppercase;padding:8px 9px;text-align:left;border-bottom:2px solid var(--brd2);white-space:nowrap;}
+td{padding:7px 9px;border-bottom:1px solid var(--brd);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(109,186,58,.04);}
+.mn{font-family:monospace;font-size:11px;}
+.tg{color:var(--gs);font-weight:600;}
+.tgo{color:var(--gold2);}
+.tr{color:var(--red);}
+.tb{color:var(--blue);}
+
+/* BADGE */
+.bg{font-size:9px;font-weight:700;letter-spacing:.4px;padding:2px 7px;border-radius:4px;text-transform:uppercase;display:inline-block;white-space:nowrap;}
+.bg-ent{background:rgba(109,186,58,.15);color:var(--gs);}
+.bg-sal{background:rgba(201,162,39,.15);color:var(--gold2);}
+.bg-ok{background:rgba(109,186,58,.15);color:var(--gs);}
+.bg-warn{background:rgba(201,162,39,.15);color:var(--gold2);}
+.bg-low{background:rgba(224,90,74,.15);color:var(--red);}
+
+/* BUTTONS */
+.btn{padding:7px 13px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all .15s;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;}
+.bp{background:var(--green2);color:#fff;}
+.bp:hover{background:var(--green);}
+.bs{background:var(--card2);color:var(--t2);border:1px solid var(--brd2);}
+.bs:hover{border-color:var(--green2);color:var(--gs);}
+.bd{background:rgba(224,90,74,.12);color:var(--red);border:1px solid rgba(224,90,74,.25);}
+.bd:hover{background:rgba(224,90,74,.22);}
+.bg-btn{background:rgba(201,162,39,.12);color:var(--gold2);border:1px solid rgba(201,162,39,.25);}
+.bg-btn:hover{background:rgba(201,162,39,.22);}
+.btn-sm{padding:4px 9px;font-size:11px;}
+
+/* FORM */
+.fg{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:13px;}
+.fm{display:flex;flex-direction:column;gap:4px;}
+.fm label{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--t3);}
+.fm input,.fm select,.fm textarea{background:var(--card2);border:1px solid var(--brd);color:var(--text);padding:8px 9px;border-radius:5px;font-size:13px;outline:none;transition:border .12s;}
+.fm input:focus,.fm select:focus,.fm textarea:focus{border-color:var(--green2);}
+.sep{grid-column:1/-1;border-top:1px solid var(--brd);padding-top:10px;font-size:10px;font-weight:700;color:var(--t3);letter-spacing:1px;text-transform:uppercase;}
+
+/* MODAL */
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:1000;display:none;align-items:center;justify-content:center;padding:16px;}
+.mo.open{display:flex;}
+.md{background:var(--card);border:1px solid var(--brd2);border-radius:10px;width:100%;max-width:580px;max-height:92vh;overflow-y:auto;}
+.mh{padding:14px 18px;border-bottom:1px solid var(--brd);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--card);z-index:1;}
+.mt{font-size:13px;font-weight:700;color:var(--text);}
+.mc{background:none;border:none;color:var(--t3);font-size:20px;cursor:pointer;line-height:1;}
+.mc:hover{color:var(--red);}
+.mb{padding:18px;}
+.mf{padding:12px 18px;border-top:1px solid var(--brd);display:flex;gap:8px;justify-content:flex-end;}
+
+/* FILTERS */
+.ar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center;}
+.ar select,.ar input{background:var(--card2);border:1px solid var(--brd);color:var(--text);padding:7px 9px;border-radius:5px;font-size:12px;outline:none;}
+.ar select:focus,.ar input:focus{border-color:var(--green2);}
+
+/* EMPTY */
+.emp{text-align:center;padding:36px 16px;color:var(--t3);}
+.emp-ic{font-size:38px;margin-bottom:10px;}
+
+/* NOTIF */
+#ntf{position:fixed;bottom:18px;right:18px;padding:11px 16px;border-radius:8px;font-size:13px;font-weight:600;z-index:9999;display:none;max-width:340px;line-height:1.3;}
+#ntf.ok{background:#162016;border:1px solid var(--green);color:var(--gs);}
+#ntf.err{background:#2a1010;border:1px solid var(--red);color:#ffaaaa;}
+
+/* CONSUMO CARD */
+.cons-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:14px;}
+.cons-card{background:var(--card);border:1px solid var(--brd);border-radius:8px;padding:14px;}
+.cons-card.c-ok{border-left:3px solid var(--green);}
+.cons-card.c-warn{border-left:3px solid var(--gold2);}
+.cons-card.c-low{border-left:3px solid var(--red);}
+.cons-card.c-none{border-left:3px solid var(--t4);}
+.cons-grupo{font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px;}
+.cons-prod{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;}
+.cons-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.cons-lbl{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;}
+.cons-val{font-size:13px;font-weight:700;}
+.cons-val.ok{color:var(--gs);}
+.cons-val.warn{color:var(--gold2);}
+.cons-val.low{color:var(--red);}
+.cons-val.none{color:var(--t3);}
+.cons-bar-wrap{background:var(--card2);border-radius:4px;height:6px;margin-top:8px;overflow:hidden;}
+.cons-bar{height:100%;border-radius:4px;transition:width .3s;}
+.cons-bar.ok{background:var(--green);}
+.cons-bar.warn{background:var(--gold2);}
+.cons-bar.low{background:var(--red);}
+.cons-dias{font-size:10px;color:var(--t3);margin-top:6px;}
+
+/* STOCK CARD */
+.stock-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:18px;}
+.stock-card{background:var(--card);border:1px solid var(--brd);border-radius:8px;padding:14px;text-align:center;}
+.stock-card.alerta{border-color:rgba(224,90,74,.4);background:rgba(224,90,74,.04);}
+.stock-prod{font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+.stock-kg{font-size:28px;font-weight:700;color:var(--gs);}
+.stock-kg.alerta{color:var(--red);}
+.stock-unit{font-size:10px;color:var(--t3);}
+
+@media(max-width:600px){
+  .hdr{padding:8px 10px;}
+  .pg{padding:10px;}
+  .fg{grid-template-columns:1fr;}
+  .stats{grid-template-columns:repeat(2,1fr);}
+  .cons-grid{grid-template-columns:1fr;}
+  .stock-grid{grid-template-columns:repeat(2,1fr);}
+}
+</style>
+</head>
+<body>
+<div id="ntf"></div>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div>
+    <div class="hdr-t">🧂 Insumos & Nutrición</div>
+    <div class="hdr-s">El Prado 1 — San Ignacio de Velazco, Chiquitanía</div>
+  </div>
+  <div class="hdr-r">
+    <span class="ubadge" id="ubadge"></span>
+    <a href="gestion_elprado1.html" class="btn-back">← Inicio</a>
+  </div>
+</div>
+
+<!-- NAV -->
+<div class="nav">
+  <div class="tab active" onclick="showPg('dash')">📊 Dashboard</div>
+  <div class="tab" onclick="showPg('movimientos')">📋 Movimientos</div>
+  <div class="tab" onclick="showPg('consumo')">📈 Consumo Diario</div>
+  <div class="tab" onclick="showPg('productos')">🧪 Productos</div>
+</div>
+
+<!-- ═══════ DASHBOARD ═══════ -->
+<div class="pg active" id="pg-dash">
+  <div class="stats" id="dashStats">
+    <div class="sc"><div class="sc-v" id="st-productos">—</div><div class="sc-l">Productos</div></div>
+    <div class="sc"><div class="sc-v" id="st-grupos">—</div><div class="sc-l">Grupos con Sal</div></div>
+    <div class="sc"><div class="sc-v" id="st-alertas" style="color:var(--red)">—</div><div class="sc-l">Alertas Stock</div></div>
+    <div class="sc"><div class="sc-v" id="st-bajo" style="color:var(--gold2)">—</div><div class="sc-l">Consumo Bajo Mínimo</div></div>
+  </div>
+
+  <!-- Stock por producto -->
+  <div class="card">
+    <div class="ch"><div class="ct">🏪 Stock Actual por Producto</div></div>
+    <div class="cb">
+      <div class="stock-grid" id="stockGrid">
+        <div class="emp"><div class="emp-ic">⏳</div>Cargando...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Consumo resumen -->
+  <div class="card">
+    <div class="ch">
+      <div class="ct">📊 Consumo Diario por Grupo</div>
+      <div style="font-size:10px;color:var(--t3);">
+        <span style="color:var(--gs);">●</span> ≥40 g/100kg Óptimo &nbsp;
+        <span style="color:var(--gold2);">●</span> 30-40 g/100kg Aceptable &nbsp;
+        <span style="color:var(--red);">●</span> &lt;30 g/100kg Bajo mínimo
+      </div>
+    </div>
+    <div class="cb">
+      <div class="cons-grid" id="consGrid">
+        <div class="emp"><div class="emp-ic">⏳</div>Cargando...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ MOVIMIENTOS ═══════ -->
+<div class="pg" id="pg-movimientos">
+  <div class="ar">
+    <button class="btn bp" onclick="abrirModalMov('ENTRADA')">📥 Nueva Entrada (Compra)</button>
+    <button class="btn bg-btn" onclick="abrirModalMov('SALIDA')">📤 Nueva Salida (Asignar a Grupo)</button>
+    <select id="filtProd" onchange="renderMovimientos()">
+      <option value="">— Todos los productos —</option>
+    </select>
+    <select id="filtTipo" onchange="renderMovimientos()">
+      <option value="">— Todos los tipos —</option>
+      <option value="ENTRADA">Entradas</option>
+      <option value="SALIDA">Salidas</option>
+    </select>
+  </div>
+  <div class="card">
+    <div class="ch"><div class="ct">📋 Historial de Movimientos</div><span id="movCount" style="font-size:11px;color:var(--t3);"></span></div>
+    <div class="tw"><table>
+      <thead><tr>
+        <th>Fecha</th><th>Tipo</th><th>Producto</th><th>Cantidad</th><th>Grupo</th><th>Obs.</th><th>Usuario</th><th></th>
+      </tr></thead>
+      <tbody id="movBody"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- ═══════ CONSUMO ═══════ -->
+<div class="pg" id="pg-consumo">
+  <div style="background:rgba(109,186,58,.06);border:1px solid rgba(109,186,58,.2);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:12px;color:var(--t2);">
+    📌 El consumo se calcula dividiendo los kg asignados entre los días del período (hasta la siguiente asignación o hasta hoy).
+    Los pesos de los grupos se leen en tiempo real desde <strong>Inventario de Hacienda</strong>.
+    &nbsp;|&nbsp; Referencia: <span style="color:var(--red);">Mínimo 30 g/100kg PV/día</span> &nbsp; <span style="color:var(--gs);">Óptimo 40 g/100kg PV/día</span>
+  </div>
+
+  <div class="ar">
+    <select id="filtConsGrupo" onchange="renderConsumoDetalle()">
+      <option value="">— Todos los grupos —</option>
+    </select>
+    <select id="filtConsProd" onchange="renderConsumoDetalle()">
+      <option value="">— Todos los productos —</option>
+    </select>
+  </div>
+
+  <div class="card">
+    <div class="ch"><div class="ct">📈 Análisis de Consumo por Período</div></div>
+    <div class="tw"><table>
+      <thead><tr>
+        <th>Grupo</th><th>Producto</th><th>Kg Asignados</th><th>Período</th><th>Días</th><th>Cabezas</th><th>Peso Prom.</th>
+        <th>g/cab/día</th><th>g/100kg PV/día</th><th>Estado</th>
+      </tr></thead>
+      <tbody id="consumoBody"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- ═══════ PRODUCTOS ═══════ -->
+<div class="pg" id="pg-productos">
+  <div class="ar">
+    <button class="btn bp" onclick="abrirModalProd()">+ Agregar Producto</button>
+  </div>
+  <div class="card">
+    <div class="ch"><div class="ct">🧪 Catálogo de Productos</div></div>
+    <div class="tw"><table>
+      <thead><tr>
+        <th>Nombre</th><th>Tipo</th><th>Descripción</th><th>Stock Mínimo</th><th></th>
+      </tr></thead>
+      <tbody id="prodBody"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- ═══════ MODAL MOVIMIENTO ═══════ -->
+<div class="mo" id="moMov">
+  <div class="md">
+    <div class="mh">
+      <span class="mt" id="moMovTit">Nuevo Movimiento</span>
+      <button class="mc" onclick="cerrarMo('moMov')">✕</button>
+    </div>
+    <div class="mb">
+      <div class="fg">
+        <div class="fm">
+          <label>Tipo</label>
+          <select id="mTipo" onchange="onTipoChange()">
+            <option value="ENTRADA">📥 Entrada (Compra)</option>
+            <option value="SALIDA">📤 Salida (Asignar a Grupo)</option>
+          </select>
+        </div>
+        <div class="fm">
+          <label>Producto</label>
+          <select id="mProd"></select>
+        </div>
+        <div class="fm">
+          <label>Fecha</label>
+          <input type="date" id="mFecha">
+        </div>
+        <div class="fm">
+          <label>Cantidad (kg)</label>
+          <input type="number" id="mCantidad" min="0.1" step="0.1" placeholder="ej: 100">
+        </div>
+        <div class="fm" id="rowGrupo">
+          <label>Grupo de Animales</label>
+          <select id="mGrupo"><option value="">— Elegir grupo —</option></select>
+        </div>
+        <div class="fm" id="rowCosto" style="display:none;">
+          <label>Costo Total (Bs)</label>
+          <input type="number" id="mCosto" min="0" step="0.01" placeholder="opcional">
+        </div>
+        <div class="fm" style="grid-column:1/-1;">
+          <label>Observación</label>
+          <input type="text" id="mObs" placeholder="opcional">
+        </div>
+        <!-- Info consumo proyectado al asignar -->
+        <div id="infoConsProyect" style="grid-column:1/-1;display:none;background:rgba(109,186,58,.06);border:1px solid rgba(109,186,58,.2);border-radius:6px;padding:10px 12px;font-size:11px;color:var(--t2);line-height:1.7;"></div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn bs" onclick="cerrarMo('moMov')">Cancelar</button>
+      <button class="btn bp" onclick="guardarMov()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ MODAL PRODUCTO ═══════ -->
+<div class="mo" id="moProd">
+  <div class="md">
+    <div class="mh">
+      <span class="mt" id="moProdTit">Nuevo Producto</span>
+      <button class="mc" onclick="cerrarMo('moProd')">✕</button>
+    </div>
+    <div class="mb">
+      <div class="fg">
+        <div class="fm" style="grid-column:1/-1;">
+          <label>Nombre del Producto</label>
+          <input type="text" id="pNombre" placeholder="ej: Sal Mineral Vaquillas">
+        </div>
+        <div class="fm">
+          <label>Tipo</label>
+          <select id="pTipo">
+            <option value="SAL_MINERAL">Sal Mineral</option>
+            <option value="SUPLEMENTO">Suplemento</option>
+            <option value="VITAMINA">Vitamina/Mineral</option>
+            <option value="OTRO">Otro</option>
+          </select>
+        </div>
+        <div class="fm">
+          <label>Stock Mínimo Alerta (kg)</label>
+          <input type="number" id="pStockMin" min="0" step="1" value="50" placeholder="ej: 50">
+        </div>
+        <div class="fm" style="grid-column:1/-1;">
+          <label>Descripción</label>
+          <input type="text" id="pDesc" placeholder="opcional">
+        </div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn bd" id="btnBorrarProd" style="display:none;margin-right:auto;" onclick="borrarProd()">Eliminar</button>
+      <button class="btn bs" onclick="cerrarMo('moProd')">Cancelar</button>
+      <button class="btn bp" onclick="guardarProd()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════
+// FIREBASE
+// ═══════════════════════════════════
+const FB_INS = 'https://elprado1-153ef-default-rtdb.firebaseio.com/elprado1/insumos';
+const FB_HAC = 'https://elprado1-153ef-default-rtdb.firebaseio.com/elprado1/hacienda';
+
+async function fbGet(url){
+  try{const r=await fetch(url+'.json');return r.ok?await r.json():null;}catch(e){return null;}
+}
+async function fbSet(url,val){
+  try{const r=await fetch(url+'.json',{method:'PUT',body:JSON.stringify(val),headers:{'Content-Type':'application/json'}});return r.ok;}catch(e){return false;}
+}
+async function fbPush(url,val){
+  try{const r=await fetch(url+'.json',{method:'POST',body:JSON.stringify(val),headers:{'Content-Type':'application/json'}});return r.ok?await r.json():null;}catch(e){return null;}
+}
+
+// ═══════════════════════════════════
+// ESTADO
+// ═══════════════════════════════════
+let _prods = {};    // {id: {nombre, tipo, descripcion, stockMin}}
+let _movs  = {};    // {id: {tipo, productoId, fecha, cantidad, grupo, costo, obs, usuario}}
+let _grupos = [];   // desde grupos_resumen
+let _editProdId = null;
+
+const TIPO_LABELS = {SAL_MINERAL:'Sal Mineral', SUPLEMENTO:'Suplemento', VITAMINA:'Vitamina/Mineral', OTRO:'Otro'};
+
+// Productos por defecto
+const PRODS_DEFAULT = [
+  {nombre:'Sal Mineral Torillos',  tipo:'SAL_MINERAL', descripcion:'Sal mineral para grupo torillos', stockMin:50},
+  {nombre:'Sal Mineral Vaquillas', tipo:'SAL_MINERAL', descripcion:'Sal mineral para grupo vaquillas', stockMin:50},
+  {nombre:'Suplemento',            tipo:'SUPLEMENTO',  descripcion:'Suplemento nutricional', stockMin:30},
+  {nombre:'Producto Caballos',     tipo:'OTRO',        descripcion:'Insumo para caballos', stockMin:20},
+];
+
+// ═══════════════════════════════════
+// INIT
+// ═══════════════════════════════════
+window.addEventListener('load', async ()=>{
+  const u = sessionStorage.getItem('ep_usuario')||'—';
+  document.getElementById('ubadge').textContent = u;
+  await cargarTodo();
+  renderDash();
+  renderMovimientos();
+  renderConsumoDetalle();
+  renderProductos();
+});
+
+async function cargarTodo(){
+  const [pRaw, mRaw, gRaw] = await Promise.all([
+    fbGet(FB_INS+'/productos'),
+    fbGet(FB_INS+'/movimientos'),
+    fbGet(FB_HAC+'/grupos_resumen'),
+  ]);
+
+  // Productos
+  if(pRaw && typeof pRaw==='object' && !Array.isArray(pRaw)){
+    _prods = pRaw;
+  } else {
+    // Crear productos por defecto
+    _prods = {};
+    for(const p of PRODS_DEFAULT){
+      const r = await fbPush(FB_INS+'/productos', p);
+      if(r && r.name) _prods[r.name] = p;
+    }
+  }
+
+  // Movimientos
+  _movs = (mRaw && typeof mRaw==='object' && !Array.isArray(mRaw)) ? mRaw : {};
+
+  // Grupos desde Inventario
+  _grupos = [];
+  if(gRaw && typeof gRaw==='object'){
+    _grupos = Object.values(gRaw).filter(g=>g&&g.nombre&&g.cabezas>0);
+    _grupos.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  }
+
+  // Poblar selects filtros
+  poblarFiltrosProd();
+  poblarFiltroGrupos();
+}
+
+// ═══════════════════════════════════
+// NAVEGACIÓN
+// ═══════════════════════════════════
+function showPg(id){
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('pg-'+id).classList.add('active');
+  const tabs = document.querySelectorAll('.tab');
+  const names = ['dash','movimientos','consumo','productos'];
+  tabs[names.indexOf(id)]?.classList.add('active');
+  if(id==='dash') renderDash();
+  if(id==='movimientos') renderMovimientos();
+  if(id==='consumo') renderConsumoDetalle();
+  if(id==='productos') renderProductos();
+}
+
+// ═══════════════════════════════════
+// CÁLCULO DE CONSUMO
+// ═══════════════════════════════════
+function calcularConsumos(){
+  // Obtener todas las salidas ordenadas por fecha asc
+  const salidas = Object.entries(_movs)
+    .filter(([,m])=>m.tipo==='SALIDA' && m.productoId && m.grupo && m.fecha)
+    .map(([id,m])=>({id,...m}))
+    .sort((a,b)=>a.fecha.localeCompare(b.fecha));
+
+  // Agrupar por productoId + grupo
+  const porClave = {};
+  salidas.forEach(s=>{
+    const k = s.productoId+'__'+s.grupo;
+    if(!porClave[k]) porClave[k]=[];
+    porClave[k].push(s);
+  });
+
+  const hoy = new Date();
+  const resultados = [];
+
+  Object.entries(porClave).forEach(([clave, arr])=>{
+    arr.forEach((s, idx)=>{
+      const siguiente = arr[idx+1];
+      const fechaIni  = new Date(s.fecha+'T12:00:00');
+      const fechaFin  = siguiente ? new Date(siguiente.fecha+'T12:00:00') : hoy;
+      const dias      = Math.max(1, Math.round((fechaFin-fechaIni)/86400000));
+      const kg        = parseFloat(s.cantidad)||0;
+
+      // Datos del grupo desde Inventario
+      const gInfo = _grupos.find(g=>g.nombre===s.grupo)||null;
+      const cabezas = gInfo ? gInfo.cabezas : (s.cabezasSnap||0);
+      const peso    = gInfo ? (gInfo.pesoHoy||0) : (s.pesoSnap||0);
+
+      const kgDia       = kg / dias;
+      const gCabDia     = cabezas>0 ? (kgDia/cabezas*1000) : null;
+      const g100kgDia   = (cabezas>0 && peso>0) ? (kgDia/cabezas/peso*100*1000) : null;
+
+      // Estado
+      let estado = 'none';
+      if(g100kgDia!==null){
+        if(g100kgDia>=40)       estado='ok';
+        else if(g100kgDia>=30)  estado='warn';
+        else                    estado='low';
+      }
+
+      const esActual = !siguiente; // el período vigente (el último)
+
+      resultados.push({
+        movId:    s.id,
+        grupo:    s.grupo,
+        prodId:   s.productoId,
+        prodNom:  _prods[s.productoId]?.nombre||'—',
+        kg, dias,
+        fechaIni: s.fecha,
+        fechaFin: siguiente ? siguiente.fecha : 'Hoy',
+        cabezas, peso,
+        kgDia, gCabDia, g100kgDia,
+        estado, esActual,
+        stockId: s.id,
+      });
+    });
+  });
+
+  return resultados;
+}
+
+// Stock actual por producto
+function calcularStock(){
+  const stock = {};
+  Object.values(_prods).forEach((p,i)=>{
+    const id = Object.keys(_prods)[i];
+    stock[id] = 0;
+  });
+  // Inicializar con 0 para todos los productos
+  Object.keys(_prods).forEach(id=>{ stock[id]=0; });
+
+  Object.values(_movs).forEach(m=>{
+    if(!m.productoId) return;
+    const kg = parseFloat(m.cantidad)||0;
+    if(m.tipo==='ENTRADA') stock[m.productoId] = (stock[m.productoId]||0) + kg;
+    if(m.tipo==='SALIDA')  stock[m.productoId] = (stock[m.productoId]||0) - kg;
+  });
+  return stock;
+}
+
+// ═══════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════
+function renderDash(){
+  const stock = calcularStock();
+  const consumos = calcularConsumos().filter(c=>c.esActual);
+
+  const numProds   = Object.keys(_prods).length;
+  const numGrupos  = new Set(consumos.map(c=>c.grupo)).size;
+  const numAlertas = Object.entries(stock).filter(([id,kg])=>{
+    const min = _prods[id]?.stockMin||50;
+    return kg<min;
+  }).length;
+  const numBajo = consumos.filter(c=>c.estado==='low').length;
+
+  document.getElementById('st-productos').textContent = numProds;
+  document.getElementById('st-grupos').textContent    = numGrupos;
+  document.getElementById('st-alertas').textContent   = numAlertas;
+  document.getElementById('st-bajo').textContent      = numBajo;
+
+  // Stock cards
+  const sg = document.getElementById('stockGrid');
+  const prodIds = Object.keys(_prods);
+  if(!prodIds.length){ sg.innerHTML='<div class="emp"><div class="emp-ic">🧪</div>Sin productos configurados</div>'; }
+  else {
+    sg.innerHTML = prodIds.map(id=>{
+      const p   = _prods[id];
+      const kg  = stock[id]||0;
+      const min = p.stockMin||50;
+      const alerta = kg < min;
+      return `<div class="stock-card${alerta?' alerta':''}">
+        <div class="stock-prod">${p.nombre}</div>
+        <div class="stock-kg${alerta?' alerta':''}">${fmt(kg,1)}</div>
+        <div class="stock-unit">kg en stock</div>
+        ${alerta?`<div style="font-size:10px;color:var(--red);margin-top:4px;">⚠️ Stock bajo mínimo (${min} kg)</div>`:''}
+      </div>`;
+    }).join('');
+  }
+
+  // Consumo cards (solo períodos actuales)
+  const cg = document.getElementById('consGrid');
+  if(!consumos.length){
+    cg.innerHTML='<div class="emp"><div class="emp-ic">📊</div>Sin asignaciones registradas.<br>Registrá una salida de sal para comenzar a ver el consumo.</div>';
+    return;
+  }
+  cg.innerHTML = consumos.map(c=>{
+    const pct = c.g100kgDia ? Math.min(100, c.g100kgDia/50*100) : 0;
+    const diasRestantes = c.kgDia>0 ? Math.round((stock[c.prodId]||0)/c.kgDia) : null;
+    return `<div class="cons-card c-${c.estado}">
+      <div class="cons-grupo">${c.grupo}</div>
+      <div class="cons-prod">${c.prodNom}</div>
+      <div class="cons-row">
+        <span class="cons-lbl">g/cab/día</span>
+        <span class="cons-val ${c.estado}">${c.gCabDia!==null?fmt(c.gCabDia,1)+' g':'—'}</span>
+      </div>
+      <div class="cons-row">
+        <span class="cons-lbl">g/100kg PV/día</span>
+        <span class="cons-val ${c.estado}">${c.g100kgDia!==null?fmt(c.g100kgDia,1)+' g':'—'}</span>
+      </div>
+      <div class="cons-row">
+        <span class="cons-lbl">Kg/día total</span>
+        <span class="cons-val" style="color:var(--t2);">${fmt(c.kgDia,3)} kg</span>
+      </div>
+      <div class="cons-bar-wrap"><div class="cons-bar ${c.estado}" style="width:${pct}%"></div></div>
+      <div class="cons-dias">
+        📅 Desde: ${c.fechaIni} &nbsp;|&nbsp; ${c.cabezas} cab &nbsp;|&nbsp; ${c.peso} kg prom
+        ${diasRestantes!==null?`<br>⏳ Stock restante: ~${diasRestantes} días`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════
+// MOVIMIENTOS
+// ═══════════════════════════════════
+function renderMovimientos(){
+  const filtProd = document.getElementById('filtProd').value;
+  const filtTipo = document.getElementById('filtTipo').value;
+
+  let arr = Object.entries(_movs)
+    .map(([id,m])=>({id,...m}))
+    .filter(m=>(!filtProd||m.productoId===filtProd) && (!filtTipo||m.tipo===filtTipo))
+    .sort((a,b)=>b.fecha.localeCompare(a.fecha));
+
+  document.getElementById('movCount').textContent = arr.length+' registros';
+
+  const tbody = document.getElementById('movBody');
+  if(!arr.length){
+    tbody.innerHTML='<tr><td colspan="8"><div class="emp"><div class="emp-ic">📭</div>Sin movimientos</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = arr.map(m=>`<tr>
+    <td class="mn">${m.fecha||'—'}</td>
+    <td><span class="bg ${m.tipo==='ENTRADA'?'bg-ent':'bg-sal'}">${m.tipo}</span></td>
+    <td>${_prods[m.productoId]?.nombre||'—'}</td>
+    <td class="mn tg">${fmt(m.cantidad,1)} kg</td>
+    <td style="font-size:11px;">${m.grupo||'—'}</td>
+    <td style="font-size:11px;color:var(--t3);">${m.obs||'—'}</td>
+    <td style="font-size:11px;color:var(--t3);">${m.usuario||'—'}</td>
+    <td><button class="btn bd btn-sm" onclick="borrarMov('${m.id}')">✕</button></td>
+  </tr>`).join('');
+}
+
+// ═══════════════════════════════════
+// CONSUMO DETALLE
+// ═══════════════════════════════════
+function renderConsumoDetalle(){
+  const filtG = document.getElementById('filtConsGrupo').value;
+  const filtP = document.getElementById('filtConsProd').value;
+
+  const consumos = calcularConsumos()
+    .filter(c=>(!filtG||c.grupo===filtG)&&(!filtP||c.prodId===filtP))
+    .sort((a,b)=>b.fechaIni.localeCompare(a.fechaIni));
+
+  const tbody = document.getElementById('consumoBody');
+  if(!consumos.length){
+    tbody.innerHTML='<tr><td colspan="10"><div class="emp"><div class="emp-ic">📊</div>Sin datos de consumo</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = consumos.map(c=>{
+    const est = c.estado==='ok'?'<span class="bg bg-ok">Óptimo</span>':
+                c.estado==='warn'?'<span class="bg bg-warn">Aceptable</span>':
+                c.estado==='low'?'<span class="bg bg-low">Bajo mínimo</span>':
+                '<span class="bg" style="background:var(--card2);color:var(--t3);">Sin peso</span>';
+    const esHoy = !c.esActual?'':'<span style="font-size:9px;color:var(--gs);margin-left:4px;">● actual</span>';
+    return `<tr>
+      <td><strong>${c.grupo}</strong>${esHoy}</td>
+      <td style="font-size:11px;">${c.prodNom}</td>
+      <td class="mn tg">${fmt(c.kg,1)} kg</td>
+      <td class="mn" style="font-size:11px;">${c.fechaIni} → ${c.fechaFin}</td>
+      <td class="mn">${c.dias} d</td>
+      <td class="mn">${c.cabezas||'—'}</td>
+      <td class="mn">${c.peso?c.peso+' kg':'—'}</td>
+      <td class="mn ${c.estado==='ok'?'tg':c.estado==='warn'?'tgo':c.estado==='low'?'tr':''}">${c.gCabDia!==null?fmt(c.gCabDia,1)+' g':'—'}</td>
+      <td class="mn ${c.estado==='ok'?'tg':c.estado==='warn'?'tgo':c.estado==='low'?'tr':''}">${c.g100kgDia!==null?fmt(c.g100kgDia,1)+' g':'—'}</td>
+      <td>${est}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════
+// PRODUCTOS
+// ═══════════════════════════════════
+function renderProductos(){
+  const stock = calcularStock();
+  const tbody = document.getElementById('prodBody');
+  const ids   = Object.keys(_prods);
+  if(!ids.length){
+    tbody.innerHTML='<tr><td colspan="5"><div class="emp">Sin productos</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = ids.map(id=>{
+    const p = _prods[id];
+    const kg = stock[id]||0;
+    const alerta = kg < (p.stockMin||50);
+    return `<tr>
+      <td><strong>${p.nombre}</strong></td>
+      <td><span class="bg bg-ok" style="background:rgba(109,186,58,.1);">${TIPO_LABELS[p.tipo]||p.tipo}</span></td>
+      <td style="font-size:11px;color:var(--t3);">${p.descripcion||'—'}</td>
+      <td class="mn ${alerta?'tr':'tg'}">${fmt(kg,1)} kg &nbsp;<span style="font-size:10px;color:var(--t3);">(mín: ${p.stockMin||50} kg)</span></td>
+      <td><button class="btn bs btn-sm" onclick="abrirModalProd('${id}')">✏ Editar</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════
+// MODAL MOVIMIENTO
+// ═══════════════════════════════════
+function abrirModalMov(tipo='SALIDA'){
+  document.getElementById('mTipo').value = tipo;
+  document.getElementById('mFecha').value = hoyISO();
+  document.getElementById('mCantidad').value = '';
+  document.getElementById('mObs').value = '';
+  document.getElementById('mCosto').value = '';
+  document.getElementById('infoConsProyect').style.display='none';
+  poblarSelectProd('mProd');
+  poblarSelectGrupos('mGrupo');
+  onTipoChange();
+  document.getElementById('moMovTit').textContent = tipo==='ENTRADA'?'📥 Nueva Entrada (Compra)':'📤 Nueva Salida (Asignar a Grupo)';
+  abrirMo('moMov');
+}
+
+function onTipoChange(){
+  const t = document.getElementById('mTipo').value;
+  document.getElementById('rowGrupo').style.display = t==='SALIDA'?'':'none';
+  document.getElementById('rowCosto').style.display = t==='ENTRADA'?'':'none';
+  actualizarInfoConsProyect();
+}
+
+function actualizarInfoConsProyect(){
+  const tipo    = document.getElementById('mTipo').value;
+  const grupoNom = document.getElementById('mGrupo').value;
+  const kg      = parseFloat(document.getElementById('mCantidad').value)||0;
+  const infoEl  = document.getElementById('infoConsProyect');
+
+  if(tipo!=='SALIDA'||!grupoNom||kg<=0){ infoEl.style.display='none'; return; }
+
+  const gInfo = _grupos.find(g=>g.nombre===grupoNom);
+  if(!gInfo){ infoEl.style.display='none'; return; }
+
+  const cabezas = gInfo.cabezas||0;
+  const peso    = gInfo.pesoHoy||0;
+
+  // Calcular días hasta próxima asignación esperada (estimación simple: 30 días)
+  const diasEst = 30;
+  const kgDia   = kg/diasEst;
+  const gCab    = cabezas>0 ? kgDia/cabezas*1000 : null;
+  const g100kg  = (cabezas>0&&peso>0) ? kgDia/cabezas/peso*100*1000 : null;
+
+  const color = g100kg===null?'var(--t3)':g100kg>=40?'var(--gs)':g100kg>=30?'var(--gold2)':'var(--red)';
+
+  infoEl.style.display='block';
+  infoEl.innerHTML = `🔗 <strong style="color:var(--gs);">${grupoNom}</strong> — ${cabezas} cab · ${peso} kg prom (Inventario)<br>
+    Consumo estimado (30 días): <strong style="color:${color};">${g100kg!==null?fmt(g100kg,1)+' g/100kg PV/día':' —'}</strong>
+    &nbsp;·&nbsp; ${gCab!==null?fmt(gCab,1)+' g/cab/día':' —'}
+    <span style="color:var(--t3);font-size:10px;"> — referencia: min 30 · óptimo 40 g/100kg PV/día</span>`;
+}
+
+async function guardarMov(){
+  const tipo    = document.getElementById('mTipo').value;
+  const prodId  = document.getElementById('mProd').value;
+  const fecha   = document.getElementById('mFecha').value;
+  const cant    = parseFloat(document.getElementById('mCantidad').value)||0;
+  const grupo   = document.getElementById('mGrupo').value;
+  const obs     = document.getElementById('mObs').value.trim();
+  const costo   = parseFloat(document.getElementById('mCosto').value)||0;
+
+  if(!prodId)      return ntf('Seleccioná un producto','err');
+  if(!fecha)       return ntf('Ingresá la fecha','err');
+  if(cant<=0)      return ntf('Ingresá la cantidad','err');
+  if(tipo==='SALIDA'&&!grupo) return ntf('Seleccioná el grupo de animales','err');
+
+  const gInfo = tipo==='SALIDA' ? _grupos.find(g=>g.nombre===grupo) : null;
+
+  const mov = {
+    tipo, productoId: prodId, fecha, cantidad: cant,
+    grupo: grupo||null,
+    cabezasSnap: gInfo?.cabezas||null,
+    pesoSnap:    gInfo?.pesoHoy||null,
+    costo:       costo||null,
+    obs:         obs||null,
+    usuario:     sessionStorage.getItem('ep_usuario')||'—',
+    timestamp:   Date.now(),
+  };
+
+  const r = await fbPush(FB_INS+'/movimientos', mov);
+  if(!r){ return ntf('Error al guardar','err'); }
+  _movs[r.name] = mov;
+  cerrarMo('moMov');
+  ntf('Movimiento guardado ✓','ok');
+  renderDash();
+  renderMovimientos();
+  renderConsumoDetalle();
+}
+
+async function borrarMov(id){
+  if(!confirm('¿Eliminar este movimiento?')) return;
+  await fbSet(FB_INS+'/movimientos/'+id, null);
+  delete _movs[id];
+  ntf('Movimiento eliminado','ok');
+  renderDash();
+  renderMovimientos();
+  renderConsumoDetalle();
+}
+
+// ═══════════════════════════════════
+// MODAL PRODUCTO
+// ═══════════════════════════════════
+function abrirModalProd(id=null){
+  _editProdId = id;
+  const p = id ? _prods[id] : null;
+  document.getElementById('moProdTit').textContent = id?'✏ Editar Producto':'+ Nuevo Producto';
+  document.getElementById('pNombre').value   = p?.nombre||'';
+  document.getElementById('pTipo').value     = p?.tipo||'SAL_MINERAL';
+  document.getElementById('pDesc').value     = p?.descripcion||'';
+  document.getElementById('pStockMin').value = p?.stockMin||50;
+  document.getElementById('btnBorrarProd').style.display = id?'':'none';
+  abrirMo('moProd');
+}
+
+async function guardarProd(){
+  const nombre   = document.getElementById('pNombre').value.trim();
+  const tipo     = document.getElementById('pTipo').value;
+  const desc     = document.getElementById('pDesc').value.trim();
+  const stockMin = parseFloat(document.getElementById('pStockMin').value)||50;
+
+  if(!nombre) return ntf('Ingresá el nombre del producto','err');
+
+  const prod = {nombre, tipo, descripcion:desc||null, stockMin};
+
+  if(_editProdId){
+    await fbSet(FB_INS+'/productos/'+_editProdId, prod);
+    _prods[_editProdId] = prod;
+  } else {
+    const r = await fbPush(FB_INS+'/productos', prod);
+    if(!r) return ntf('Error al guardar','err');
+    _prods[r.name] = prod;
+  }
+
+  cerrarMo('moProd');
+  ntf('Producto guardado ✓','ok');
+  renderProductos();
+  poblarFiltrosProd();
+  poblarSelectProd('mProd');
+}
+
+async function borrarProd(){
+  if(!_editProdId) return;
+  // Verificar si tiene movimientos
+  const tieneMovs = Object.values(_movs).some(m=>m.productoId===_editProdId);
+  if(tieneMovs && !confirm('Este producto tiene movimientos registrados. ¿Eliminar de todas formas?')) return;
+  await fbSet(FB_INS+'/productos/'+_editProdId, null);
+  delete _prods[_editProdId];
+  cerrarMo('moProd');
+  ntf('Producto eliminado','ok');
+  renderProductos();
+  poblarFiltrosProd();
+}
+
+// ═══════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════
+function poblarSelectProd(selectId){
+  const sel = document.getElementById(selectId);
+  const ids = Object.keys(_prods);
+  sel.innerHTML = '<option value="">— Elegir producto —</option>' +
+    ids.map(id=>`<option value="${id}">${_prods[id].nombre}</option>`).join('');
+}
+
+function poblarSelectGrupos(selectId){
+  const sel = document.getElementById(selectId);
+  sel.innerHTML = '<option value="">— Elegir grupo —</option>' +
+    _grupos.map(g=>`<option value="${g.nombre}">${g.nombre} (${g.cabezas} cab · ${g.pesoHoy||'—'} kg)</option>`).join('');
+  sel.onchange = actualizarInfoConsProyect;
+}
+
+function poblarFiltrosProd(){
+  const ids = Object.keys(_prods);
+  const opts = '<option value="">— Todos los productos —</option>' +
+    ids.map(id=>`<option value="${id}">${_prods[id].nombre}</option>`).join('');
+  document.getElementById('filtProd').innerHTML   = opts;
+  document.getElementById('filtConsProd').innerHTML = opts;
+}
+
+function poblarFiltroGrupos(){
+  const opts = '<option value="">— Todos los grupos —</option>' +
+    _grupos.map(g=>`<option value="${g.nombre}">${g.nombre}</option>`).join('');
+  document.getElementById('filtConsGrupo').innerHTML = opts;
+}
+
+function abrirMo(id){ document.getElementById(id).classList.add('open'); }
+function cerrarMo(id){ document.getElementById(id).classList.remove('open'); }
+
+function hoyISO(){
+  const d = new Date();
+  return d.toISOString().split('T')[0];
+}
+
+function fmt(v,dec=0){
+  if(v===null||v===undefined||isNaN(v)) return '—';
+  return Number(v).toLocaleString('es-BO',{minimumFractionDigits:dec,maximumFractionDigits:dec});
+}
+
+let _ntfT;
+function ntf(msg,tipo='ok'){
+  const el = document.getElementById('ntf');
+  el.textContent = msg;
+  el.className = tipo;
+  el.style.display='block';
+  clearTimeout(_ntfT);
+  _ntfT = setTimeout(()=>el.style.display='none', 3000);
+}
+
+// Cerrar modal al hacer clic fuera
+document.querySelectorAll('.mo').forEach(mo=>{
+  mo.addEventListener('click', e=>{ if(e.target===mo) mo.classList.remove('open'); });
+});
+
+// ESC cierra modales
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape') document.querySelectorAll('.mo.open').forEach(m=>m.classList.remove('open'));
+});
+</script>
+</body>
+</html>

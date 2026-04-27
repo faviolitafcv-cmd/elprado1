@@ -162,6 +162,20 @@ html,body{height:100%;font-family:'Segoe UI',Arial,sans-serif;overflow:hidden}
         </div>
       </div>
 
+      <!-- MÓDULO INSUMOS -->
+      <div class="modulo-card mod-stock" onclick="abrirModulo('insumos')" style="border-color:rgba(201,162,39,.3);">
+        <div class="modulo-icono">🧂</div>
+        <div class="modulo-tag">NUTRICIÓN E INSUMOS</div>
+        <div class="modulo-nombre">Insumos & Nutrición</div>
+        <div class="modulo-desc">Sal mineral, suplementos, consumo diario por grupo</div>
+        <div class="modulo-submods">
+          <span class="submod">Stock</span>
+          <span class="submod">Movimientos</span>
+          <span class="submod">Consumo Diario</span>
+          <span class="submod">Productos</span>
+        </div>
+      </div>
+
     </div>
 
     <div class="footer-txt">Sistema de Gestión El Prado 1 &nbsp;|&nbsp; 2026</div>
@@ -209,6 +223,10 @@ const MODULOS = {
   stock: {
     nombre: 'Stock de Hacienda — Inventario',
     archivo: 'inventario_hacienda.html'
+  },
+  insumos: {
+    nombre: 'Insumos & Nutrición',
+    archivo: 'insumos_elprado1.html'
   }
 };
 
