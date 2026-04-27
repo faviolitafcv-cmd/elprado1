@@ -4501,11 +4501,10 @@ function verDetalleGrupo(grupo){
   const tb=document.getElementById('dGrupoDetalleBody');
   if(!animGrupo.length){tb.innerHTML='<tr><td colspan="8" class="emp">Sin animales</td></tr>';document.getElementById('dGrupoDetalle').style.display='';return;}
   tb.innerHTML=animGrupo.sort((a,b)=>String(a.ide).localeCompare(String(b.ide))).map(a=>{
-    const lpa=lp[a.ide];const gmd=lpa?.gmd;
+    const lpa=lp[a.ide]||( window._lastPes&&window._lastPes[a.ide]);const gmd=lpa?.gmd;
     let pp=a.pesoIngreso||0;
     if(lpa&&gmd!=null){const dias=Math.max(0,Math.round((hoy-new Date(lpa.fecha+'T12:00:00'))/86400000));pp=Math.round((lpa.peso+gmd*dias)*10)/10;}
-    // Datos del último pesaje
-    const lpa=window._lastPes&&window._lastPes[a.ide];
+    // Datos del último pesaje (usa lpa ya definido arriba)
     const ultPeso=lpa?lpa.peso:null;
     const ultFecha=lpa?lpa.fecha:null;
     const gmdUlt=lpa&&lpa.gmd!=null?Number(lpa.gmd).toFixed(3):null;
