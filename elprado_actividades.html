@@ -3270,6 +3270,13 @@ function limpiarForm() {
     }, 50);
   }
 
+// ── Helper: obtiene peso actual del grupo desde Inventario (para referencia histórica) ──
+function getPesoActualGrupo(nombre) {
+  if (!window._gruposInventario || !nombre) return null;
+  const g = window._gruposInventario.find(g => g.nombre === nombre);
+  return g ? { pesoHoy: g.pesoHoy, cabezas: g.cabezas, gmd: g.gmd, fecha: window._gruposInventarioFecha } : null;
+}
+
 // ═══════════════════════════════════════
 // RENDER TABLA ACTIVIDADES
 // ═══════════════════════════════════════
@@ -3295,13 +3302,25 @@ function renderTabla() {
   tbody.innerHTML = data.map(r => {
     const badgeCls = r.actividad==='MATERIA SECA'?'badge-ms':r.actividad==='INGRESO HDA'?'badge-ing':r.actividad==='SIEMBRA'?'badge-siembra':['DESBROZAR','ROLO','QUEMA'].includes(r.actividad)?'badge-maq':'badge-noc';
     const parcDisp = r.parcela==='__COMPLETO__'?'<em style="color:var(--text3)">Completo</em>':r.parcela||'—';
+    // ── Referencia histórica: peso actual del grupo según Inventario ──
+    let loteDisp = r.lote || '—';
+    if (r.lote && r.actividad === 'MATERIA SECA') {
+      const invG = getPesoActualGrupo(r.lote);
+      if (invG && invG.pesoHoy) {
+        const diff = r.pesoMedio ? invG.pesoHoy - r.pesoMedio : null;
+        const diffTxt = diff !== null
+          ? `<span style="color:${diff>=0?'var(--green-soft)':'var(--red)'};">${diff>=0?'+':''}${diff} kg</span>`
+          : '';
+        loteDisp = `${r.lote}<br><span style="font-size:9px;color:var(--text3);">🔗 hoy: <strong style="color:var(--gold2);">${invG.pesoHoy}kg</strong> ${diffTxt}</span>`;
+      }
+    }
     return `<tr style="cursor:pointer;" onclick="editarActividad('${r.id}')">
       <td class="td-mono">${r.fecha||'—'}</td>
       <td><strong>${r.potrero||'—'}</strong></td>
       <td>${parcDisp}</td>
       <td class="${r.variedad==='BRACHIARIA'?'td-gold':'td-green'}" style="font-size:10px;font-weight:600;">${r.variedad||'—'}</td>
       <td><span class="badge ${badgeCls}">${r.actividad}</span></td>
-      <td style="font-size:11px;">${r.lote||'—'}</td>
+      <td style="font-size:11px;line-height:1.6;">${loteDisp}</td>
       <td class="td-mono">${r.ha?fmt(r.ha,2):'—'}</td>
       <td class="td-mono td-green">${r.kgMsHa?fmt(r.kgMsHa,0):'—'}</td>
       <td class="td-mono">${r.pctMs?fmt(r.pctMs*100,1)+'%':'—'}</td>
@@ -3411,12 +3430,36 @@ function editarActividad(id) {
       if(r.largoM) document.getElementById('fLargoManual').value = r.largoM;
       document.getElementById('fNDVI').value = r.ndvi || '';
       document.getElementById('fComentario').value = r.comentario || '';
-      // Precargar lote
+      // Precargar lote — sin disparar onLoteChange para preservar datos históricos
       const selLote = document.getElementById('fLote');
       if(selLote && r.lote) {
         for(let i=0;i<selLote.options.length;i++) {
           if(selLote.options[i].value===r.lote) { selLote.selectedIndex=i; break; }
         }
+      }
+      // ── Referencia histórica: mostrar datos actuales de Inventario ──
+      const invG = r.lote ? getPesoActualGrupo(r.lote) : null;
+      let refEl = document.getElementById('_editInvRef');
+      if (!refEl) {
+        refEl = document.createElement('div');
+        refEl.id = '_editInvRef';
+        refEl.style.cssText = 'margin-top:12px;padding:10px 14px;background:rgba(109,186,58,.06);border:1px solid rgba(109,186,58,.2);border-radius:8px;font-size:11px;';
+        const secMS = document.getElementById('secMS');
+        if (secMS) secMS.insertBefore(refEl, secMS.firstChild);
+      }
+      if (invG && invG.pesoHoy) {
+        const diff = r.pesoMedio ? Math.round(invG.pesoHoy - r.pesoMedio) : null;
+        const diffTxt = diff !== null
+          ? ` · <span style="color:${diff>=0?'var(--green-soft)':'var(--red)'};">variación: ${diff>=0?'+':''}${diff} kg</span>`
+          : '';
+        refEl.innerHTML = `🔗 <strong style="color:var(--green-soft);">Inventario HOY</strong> — 
+          ${r.lote}: <strong style="color:var(--gold2);">${invG.pesoHoy} kg</strong> · 
+          ${invG.cabezas} cab · GMD: ${invG.gmd||'—'} kg/d${diffTxt}
+          <span style="color:var(--text3);"> · al ${invG.fecha||'—'}</span>
+          <span style="color:var(--text3);font-size:10px;"> — Peso registrado: ${r.pesoMedio||'—'} kg</span>`;
+        refEl.style.display = 'block';
+      } else {
+        refEl.style.display = 'none';
       }
       calcMS();
       if(r.anchoM) calcDim();
