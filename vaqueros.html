@@ -461,9 +461,21 @@ function fmtLargo(f) {
 // ══════════════════════════════════════════════
 // HELPERS
 // ══════════════════════════════════════════════
-function getRegDia(acts, lote, dia) {
+function getRegDia(acts, grupoObj, dia) {
+  // grupoObj puede ser objeto grupo o string lote key
+  let loteKey, loteNombre;
+  if(typeof grupoObj === 'string') {
+    loteKey = grupoObj;
+    // Si es formato tipo|cat|nombre, extraer nombre
+    const parts = grupoObj.split('|');
+    loteNombre = parts.length >= 3 ? parts[2] : grupoObj;
+  } else {
+    loteKey    = getLoteKey(grupoObj);
+    loteNombre = grupoObj?.grupo || grupoObj?.nombre || '';
+  }
   const cands = acts.filter(a =>
-    a.actividad==='MATERIA SECA' && a.lote===lote && a.fechaIng &&
+    a.actividad==='MATERIA SECA' && a.fechaIng &&
+    (a.lote===loteKey || a.lote===loteNombre) &&
     ((a.fechaSal && a.fechaIng<=dia && a.fechaSal>=dia)||(!a.fechaSal && a.fechaIng===dia))
   );
   return cands.length ? cands.reduce((b,a)=>a.fechaIng>=b.fechaIng?a:b) : null;
@@ -482,6 +494,14 @@ function getTipoGrupo(g) {
 }
 function getLoteKey(g) {
   return (g.tipo||'')+'|'+(g.categoria||'')+'|'+(g.grupo||g.nombre||'');
+}
+// Verifica si un lote de actividad coincide con un grupo
+function loteMatch(actLote, g) {
+  if(!actLote) return false;
+  const fullKey = getLoteKey(g);
+  const nombre  = g.grupo || g.nombre || '';
+  // Coincide si es la clave completa O si es solo el nombre
+  return actLote === fullKey || actLote === nombre;
 }
 
 // ══════════════════════════════════════════════
@@ -529,7 +549,7 @@ function renderVaqueros() {
     const tipo   = getTipoGrupo(g);
 
     const celdas = dias.map((d,i) => {
-      const reg   = getRegDia(acts, lote, d);
+      const reg   = getRegDia(acts, g, d);
       const esHoy = i===1;
       const ancho = reg?.anchoM ? reg.anchoM+'m' : null;
       const turno = reg?.horaSal==='MAÑANA'?'🌅 Mñ': reg?.horaSal==='TARDE'?'🌇 Td':'';
@@ -613,7 +633,7 @@ function renderArmadores(checkNuevas=true) {
   const hoy    = new Date().toISOString().split('T')[0];
   const fin    = sumarDias(hoy, 21);
   const acts   = getActs().filter(a =>
-    a.actividad==='MATERIA SECA' && a.fechaIng && a.lote &&
+    a.actividad==='MATERIA SECA' && a.fechaIng &&
     a.fechaIng >= hoy && a.fechaIng <= fin
   );
   const grupos = getGrupos();
@@ -648,7 +668,8 @@ function renderArmadores(checkNuevas=true) {
     const lote    = getLoteKey(g);
     const nombre  = getNombreGrupo(g);
     const tipo    = getTipoGrupo(g);
-    const actsG   = acts.filter(a => a.lote===lote);
+    const gNombre = g.grupo || g.nombre || '';
+    const actsG   = acts.filter(a => a.lote===lote || a.lote===gNombre);
     const total   = actsG.length;
     const ejec    = actsG.filter(a => ejs[armKey(a)]).length;
     const pend    = total - ejec;
@@ -695,8 +716,11 @@ function renderArmadoresGrupo(lote, recargar=false) {
   const ejs  = getEjecutados();
   const ultimaVisita = localStorage.getItem(ARM_ULTIMA_VISITA_KEY) || '0000-00-00';
 
+  const parts = lote.split('|');
+  const loteNombre = parts.length >= 3 ? parts[2] : lote;
   let acts = getActs().filter(a =>
-    a.actividad==='MATERIA SECA' && a.lote===lote && a.fechaIng &&
+    a.actividad==='MATERIA SECA' && a.fechaIng &&
+    (a.lote===lote || a.lote===loteNombre) &&
     a.fechaIng >= hoy && a.fechaIng <= fin
   ).sort((a,b) => (a.fechaIng||'').localeCompare(b.fechaIng||''));
 
@@ -778,7 +802,7 @@ function renderPublica() {
     const tipo   = getTipoGrupo(g);
 
     const celdas = dias.map((d,i) => {
-      const reg   = getRegDia(acts, lote, d);
+      const reg   = getRegDia(acts, g, d);
       const esHoy = i===1;
       const turno = reg?.horaSal==='MAÑANA'?'🌅 Mñ': reg?.horaSal==='TARDE'?'🌇 Td':'';
       return `<div class="pub-celda${esHoy?' hoy':''}">
