@@ -656,7 +656,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
   <div class="tab" onclick="showPage('pedidos')">📬 Pedidos</div>
   <div class="tab" onclick="showPage('config')">⚙ Configuración</div>
   <div class="tab" onclick="showPage('lluvia')">🌧 Lluvia</div>
-  <div class="tab" onclick="showPage('calidad')">🧪 Calidad</div>
+  <div class="tab" onclick="showPage('analisis')">🔬 Análisis</div>
   <div class="tab" onclick="showPage('campo')">📍 Campo</div>
 </div>
 
@@ -1308,15 +1308,27 @@ tr:hover td { background: rgba(255,255,255,.02); }
 
 </div>
 
-<!-- ════════════════ CALIDAD FORRAJERA ════════════════ -->
-<div class="page" id="page-calidad">
+<!-- ════════════════ ANÁLISIS ════════════════ -->
+<div class="page" id="page-analisis">
 
-  <!-- Upload + registro bromatológico -->
+  <!-- Upload + registro análisis -->
   <div class="card">
-    <div class="card-title"><span>🧪</span> Registrar Bromatológico
+    <div class="card-title"><span>🔬</span> Nuevo Análisis
       <span style="font-size:10px;color:var(--text3);font-weight:400;margin-left:8px;">Subí el PDF del laboratorio — los valores se cargan automáticamente</span>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px;">
+
+      <!-- Tipo de análisis -->
+      <div class="form-grid" style="max-width:900px;">
+        <div class="form-group">
+          <label>Tipo de Análisis</label>
+          <select id="bromTipo" onchange="onTipoAnalisisChange()">
+            <option value="BROMATOLOGICO">🌿 Bromatológico (Pasto)</option>
+            <option value="SUELO" disabled>🪨 Suelo (próximamente)</option>
+          </select>
+        </div>
+      </div>
+
       <!-- Upload PDF -->
       <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
         <label style="background:var(--card2);border:2px dashed var(--border2);border-radius:8px;padding:12px 20px;cursor:pointer;font-size:12px;color:var(--text2);display:flex;align-items:center;gap:8px;transition:all .2s;" onmouseover="this.style.borderColor='var(--green2)'" onmouseout="this.style.borderColor='var(--border2)'">
@@ -1325,7 +1337,11 @@ tr:hover td { background: rgba(255,255,255,.02); }
         </label>
         <div id="bromPDFNombre" style="font-size:11px;color:var(--text3);"></div>
       </div>
-      <!-- Variedad + Zona + Rango -->
+
+      <!-- Panel info auto-detectada -->
+      <div id="_bromInfoDetectada" style="display:none;padding:10px 14px;background:rgba(109,186,58,.07);border:1px solid rgba(109,186,58,.25);border-radius:6px;font-size:11px;color:var(--text2);line-height:2;"></div>
+
+      <!-- Variedad + Potrero detectado + Zona + Rango -->
       <div class="form-grid" style="max-width:900px;">
         <div class="form-group">
           <label>Variedad</label>
@@ -1333,6 +1349,18 @@ tr:hover td { background: rgba(255,255,255,.02); }
             <option value="BRACHIARIA">BRACHIARIA</option>
             <option value="PANICUM">PANICUM</option>
           </select>
+        </div>
+        <div class="form-group">
+          <label>Potrero detectado</label>
+          <input type="text" id="bromPotrero" placeholder="Auto-detectado del PDF" style="background:var(--card2);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:5px;font-size:13px;">
+        </div>
+        <div class="form-group">
+          <label>Fecha Colecta</label>
+          <input type="date" id="bromFechaColecta">
+        </div>
+        <div class="form-group">
+          <label>Días Descanso</label>
+          <input type="number" id="bromDiasDescanso" placeholder="Auto-calculado" min="0" style="background:var(--card2);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:5px;font-size:13px;">
         </div>
         <div class="form-group">
           <label>Zona (Pluviómetro)</label>
@@ -1349,6 +1377,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
           <input type="date" id="bromFechaFin" onchange="previewBromAsignados()">
         </div>
       </div>
+
       <!-- Parámetros -->
       <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px;">
         <div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;">Parámetros del Análisis (%)</div>
@@ -1379,19 +1408,32 @@ tr:hover td { background: rgba(255,255,255,.02); }
       </div>
       <div id="bromAsignados" style="font-size:12px;color:var(--text3);"></div>
       <div class="btn-row" style="justify-content:flex-start;">
-        <button class="btn btn-gold" onclick="guardarBromatologico()">💾 Guardar y Asignar a Registros</button>
+        <button class="btn btn-gold" onclick="guardarBromatologico()">💾 Guardar Análisis</button>
       </div>
     </div>
   </div>
 
-  <!-- Historial bromatológicos -->
+  <!-- Historial de Análisis -->
   <div class="card">
-    <div class="card-title"><span>📋</span> Historial de Bromatológicos
-      <div style="margin-left:auto;">
-        <button class="btn btn-gold btn-sm" onclick="abrirExportCalidad()">📊 Descargar Informe Gestión de Calidad</button>
+    <div class="card-title"><span>📋</span> Historial de Análisis
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+        <!-- Toggle vista -->
+        <div style="display:flex;gap:0;border:1px solid var(--border2);border-radius:6px;overflow:hidden;">
+          <button id="btnVistaTbl" onclick="setVistaAnalisis('tabla')" style="padding:5px 12px;font-size:11px;font-weight:600;background:var(--green2);color:#fff;border:none;cursor:pointer;">≡ Lista</button>
+          <button id="btnVistaGrp" onclick="setVistaAnalisis('grupo')" style="padding:5px 12px;font-size:11px;font-weight:600;background:var(--card2);color:var(--text2);border:none;cursor:pointer;">📍 Pluviómetro</button>
+        </div>
+        <!-- Filtros -->
+        <select id="filtAnalisisVariedad" onchange="renderMuestras()" style="font-size:11px;background:var(--card2);border:1px solid var(--border);color:var(--text2);padding:4px 8px;border-radius:5px;">
+          <option value="">Todas las variedades</option>
+          <option value="BRACHIARIA">BRACHIARIA</option>
+          <option value="PANICUM">PANICUM</option>
+        </select>
+        <!-- Botones exportar -->
+        <button class="btn btn-gold btn-sm" onclick="exportarMatrizAnalisis()">⬇ Excel Matriz</button>
+        <button class="btn btn-gold btn-sm" onclick="abrirExportCalidad()">📊 Informe Calidad</button>
       </div>
     </div>
-    <div id="listaBromatologicos"></div>
+    <div id="listaMuestras"></div>
   </div>
 </div>
 
@@ -1845,7 +1887,7 @@ async function fbSet(key, val) {
 }
 
 async function pushAllToFirebase() {
-  const keys = ['actividades','grupos','vaqueros','plan','pedidos','pluviometros','lluvia','bromatologicos','potreroAreas','potreroConfig','finVuelta','capAlerts'];
+  const keys = ['actividades','grupos','vaqueros','plan','pedidos','pluviometros','lluvia','bromatologicos','muestras_campo','potreroAreas','potreroConfig','finVuelta','capAlerts'];
   let count = 0;
   for(const key of keys) {
     const val = getData(key, null);
@@ -3874,6 +3916,20 @@ function autoDetectarDesdeNota(texto) {
   window._bromPotreroDetectado = potreroDetectado;
   window._bromFechaColecta     = fechaColecta;
 
+  // Llenar campos del formulario
+  if(potreroDetectado) {
+    const elPot = document.getElementById('bromPotrero');
+    if(elPot) { elPot.value = potreroDetectado; elPot.style.borderColor='var(--green2)'; }
+  }
+  if(fechaColecta) {
+    const elFc = document.getElementById('bromFechaColecta');
+    if(elFc) { elFc.value = fechaColecta; elFc.style.borderColor='var(--green2)'; }
+  }
+  if(diasDescanso) {
+    const elDd = document.getElementById('bromDiasDescanso');
+    if(elDd) { elDd.value = diasDescanso; elDd.style.borderColor='var(--green2)'; }
+  }
+
   let infoEl = document.getElementById('_bromInfoDetectada');
   if(!infoEl) {
     infoEl = document.createElement('div');
@@ -3985,47 +4041,259 @@ function guardarBromatologico() {
   const ini = document.getElementById('bromFechaIni').value;
   const fin = document.getElementById('bromFechaFin').value;
   const zona = document.getElementById('bromZona')?.value || '';
+  const potrero = (document.getElementById('bromPotrero')?.value || window._bromPotreroDetectado || '').trim();
+  const fechaColecta = document.getElementById('bromFechaColecta')?.value || window._bromFechaColecta || fin;
+  const diasDescanso = parseInt(document.getElementById('bromDiasDescanso')?.value) || null;
+  const tipo = document.getElementById('bromTipo')?.value || 'BROMATOLOGICO';
+
   if(!ini || !fin) { notif('Ingresá el rango de fechas', true); return; }
   if(ini > fin) { notif('La fecha inicio debe ser menor a la fecha fin', true); return; }
   const params = leerCamposBrom();
   if(!params.fdn) { notif('Ingresá al menos el valor de FDN', true); return; }
 
-  const broms = getBromatologicos();
-  // Reemplazar si ya existe para mismo variedad+zona+rango
-  const filtrado = broms.filter(b => !(b.variedad===variedad && b.zona===(zona||undefined||'') && b.fechaIni===ini && b.fechaFin===fin));
   const pluvios = getPluviometros();
   const pluvio = zona ? pluvios.find(p => (p.id||p.nombre) === zona) : null;
   const zonaNombre = pluvio ? pluvio.nombre : '';
+  const hoy = new Date().toISOString().split('T')[0];
+  const id_ = uuid();
+
+  // ── A: guardar en bromatologicos (para informe calidad — no se toca) ──
+  const broms = getBromatologicos();
+  const filtrado = broms.filter(b => !(b.variedad===variedad && b.zona===(zona||undefined||'') && b.fechaIni===ini && b.fechaFin===fin));
   filtrado.unshift({
-    id: uuid(),
-    fecha: new Date().toISOString().split('T')[0],
+    id: id_, fecha: hoy,
     variedad, zona: zona||'', zonaNombre,
     fechaIni: ini, fechaFin: fin,
-    // ── Datos detectados automáticamente del PDF ──
-    potrero:      window._bromPotreroDetectado || null,
-    fechaColecta: window._bromFechaColecta     || fin,
+    potrero, fechaColecta, diasDescanso, tipo,
     params,
     usuario: localStorage.getItem('elprado_usuario') || ''
   });
   setBromatologicos(filtrado);
-  renderBromatologicos();
 
-  // Contar registros asignados
+  // ── B: guardar en muestras_campo (matriz — para formulación y reportes) ──
+  const muestras = getMuestras();
+  // Verificar duplicado exacto por potrero + variedad + fechaColecta
+  const dupIdx = muestras.findIndex(m =>
+    m.potrero && potrero &&
+    normalizarCodigoPotrero(m.potrero) === normalizarCodigoPotrero(potrero) &&
+    (m.variedad||'').toUpperCase() === variedad &&
+    m.fechaColecta === fechaColecta
+  );
+  const muestra = {
+    id: id_, fecha: hoy, tipo,
+    variedad, potrero, fechaColecta, diasDescanso,
+    zona: zona||'', zonaNombre,
+    lluvia: getLluviaMM(potrero, ini, fin) || null,
+    params,
+    usuario: localStorage.getItem('elprado_usuario') || ''
+  };
+  if(dupIdx >= 0) {
+    muestras[dupIdx] = muestra; // reemplazar duplicado
+  } else {
+    muestras.unshift(muestra);
+  }
+  setMuestras(muestras);
+
+  renderMuestras();
   const acts = getActividades().filter(a =>
     a.actividad === 'MATERIA SECA' && a.fechaIng >= ini && a.fechaIng <= fin &&
     (a.variedad||'').toUpperCase() === variedad
   );
-  notif(`✅ Bromatológico guardado — asignado a ${acts.length} registros de ${variedad}`);
+  notif(`✅ Análisis guardado — asignado a ${acts.length} registros de ${variedad}`);
+
   // Limpiar form
   ['brom_pb','brom_fdn','brom_fda','brom_afdn','brom_lignina','brom_dfdn48','brom_ufdn',
    'brom_pida','brom_pidn','brom_pspb','brom_azucar','brom_almidon','brom_ee','brom_agt',
    'brom_cenizas','brom_ca','brom_p','brom_mg','brom_k','brom_s','brom_cl',
-   'bromFechaIni','bromFechaFin'].forEach(id => {
+   'bromFechaIni','bromFechaFin','bromPotrero','bromFechaColecta','bromDiasDescanso'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
   document.getElementById('bromPDFNombre').textContent = '';
   document.getElementById('bromAsignados').textContent = '';
+  const infoEl = document.getElementById('_bromInfoDetectada');
+  if(infoEl) { infoEl.innerHTML=''; infoEl.style.display='none'; }
+  window._bromPotreroDetectado = null;
+  window._bromFechaColecta = null;
 }
+
+// ═══════════════════════════════════════════════════════════
+// MUESTRAS DE CAMPO — MATRIZ ÚNICA DE ANÁLISIS
+// Fuente de verdad para Formulación, reportes y análisis
+// ═══════════════════════════════════════════════════════════
+function getMuestras() { return getData('muestras_campo', []); }
+function setMuestras(v) { setData('muestras_campo', v); fbSet('muestras_campo', v); }
+
+// Vista actual del historial
+let _vistaAnalisis = 'tabla';
+function setVistaAnalisis(v) {
+  _vistaAnalisis = v;
+  document.getElementById('btnVistaTbl').style.background = v==='tabla'?'var(--green2)':'var(--card2)';
+  document.getElementById('btnVistaTbl').style.color = v==='tabla'?'#fff':'var(--text2)';
+  document.getElementById('btnVistaGrp').style.background = v==='grupo'?'var(--green2)':'var(--card2)';
+  document.getElementById('btnVistaGrp').style.color = v==='grupo'?'#fff':'var(--text2)';
+  renderMuestras();
+}
+
+function onTipoAnalisisChange() {
+  // Preparado para tipos futuros (SUELO, AGUA)
+}
+
+function renderMuestras() {
+  // También mantener compatibilidad con listaBromatologicos si existe
+  renderBromatologicos();
+
+  const el = document.getElementById('listaMuestras');
+  if(!el) return;
+  const filtV = document.getElementById('filtAnalisisVariedad')?.value || '';
+
+  let muestras = getMuestras().filter(m => !filtV || (m.variedad||'').toUpperCase() === filtV);
+  muestras = muestras.sort((a,b) => (b.fechaColecta||b.fecha||'').localeCompare(a.fechaColecta||a.fecha||''));
+
+  if(!muestras.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">🔬</div>Sin análisis registrados</div>';
+    return;
+  }
+
+  if(_vistaAnalisis === 'tabla') {
+    el.innerHTML = `<div class="tbl-wrap"><table>
+      <thead><tr>
+        <th>Tipo</th><th>Variedad</th><th>Potrero</th><th>Colecta</th><th>Descanso</th>
+        <th>Pluviómetro</th><th>FDN</th><th>PB</th><th>Ca</th><th>P</th><th>Mg</th><th>Lluvia</th><th></th>
+      </tr></thead>
+      <tbody>
+      ${muestras.map(m => `<tr>
+        <td><span class="badge" style="background:rgba(109,186,58,.12);color:var(--green2);font-size:9px;">${m.tipo||'BROM'}</span></td>
+        <td><span class="badge ${(m.variedad||'')==='BRACHIARIA'?'badge-maq':'badge-ms'}">${m.variedad||'—'}</span></td>
+        <td style="font-weight:600;">${m.potrero||'—'}</td>
+        <td class="td-mono">${m.fechaColecta||m.fecha||'—'}</td>
+        <td class="td-mono" style="color:var(--text3);">${m.diasDescanso?m.diasDescanso+'d':'—'}</td>
+        <td style="font-size:11px;color:var(--text2);">${m.zonaNombre?'📍 '+m.zonaNombre:'<span style="color:var(--text3);">General</span>'}</td>
+        <td class="td-mono td-green" style="font-weight:700;">${m.params?.fdn??'—'}</td>
+        <td class="td-mono">${m.params?.pb??'—'}</td>
+        <td class="td-mono">${m.params?.ca??'—'}</td>
+        <td class="td-mono">${m.params?.p??'—'}</td>
+        <td class="td-mono">${m.params?.mg??'—'}</td>
+        <td class="td-mono" style="color:var(--blue);">${m.lluvia!=null?m.lluvia+'mm':'—'}</td>
+        <td><button class="btn btn-danger" style="padding:3px 8px;font-size:11px;" onclick="borrarMuestra('${m.id}')">✕</button></td>
+      </tr>`).join('')}
+      </tbody></table></div>`;
+  } else {
+    // Vista agrupada por pluviómetro
+    const grupos = {};
+    muestras.forEach(m => {
+      const k = m.zonaNombre || 'Sin pluviómetro';
+      if(!grupos[k]) grupos[k] = [];
+      grupos[k].push(m);
+    });
+    el.innerHTML = Object.entries(grupos).map(([zona, arr]) => `
+      <div style="margin-bottom:12px;">
+        <div onclick="toggleGrupoAnalisis('grp_${zona.replace(/\s/g,'_')}')"
+          style="background:var(--card2);border:1px solid var(--border2);border-radius:6px;padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-weight:700;font-size:12px;">📍 ${zona}</span>
+          <span style="font-size:11px;color:var(--text3);">${arr.length} muestra${arr.length>1?'s':''} &nbsp;▾</span>
+        </div>
+        <div id="grp_${zona.replace(/\s/g,'_')}" style="display:block;">
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>Variedad</th><th>Potrero</th><th>Colecta</th><th>Descanso</th><th>FDN</th><th>PB</th><th>Ca</th><th>P</th><th>Mg</th><th></th></tr></thead>
+            <tbody>
+            ${arr.map(m => `<tr>
+              <td><span class="badge ${(m.variedad||'')==='BRACHIARIA'?'badge-maq':'badge-ms'}">${m.variedad||'—'}</span></td>
+              <td style="font-weight:600;">${m.potrero||'—'}</td>
+              <td class="td-mono">${m.fechaColecta||m.fecha||'—'}</td>
+              <td class="td-mono" style="color:var(--text3);">${m.diasDescanso?m.diasDescanso+'d':'—'}</td>
+              <td class="td-mono td-green" style="font-weight:700;">${m.params?.fdn??'—'}</td>
+              <td class="td-mono">${m.params?.pb??'—'}</td>
+              <td class="td-mono">${m.params?.ca??'—'}</td>
+              <td class="td-mono">${m.params?.p??'—'}</td>
+              <td class="td-mono">${m.params?.mg??'—'}</td>
+              <td><button class="btn btn-danger" style="padding:3px 8px;font-size:11px;" onclick="borrarMuestra('${m.id}')">✕</button></td>
+            </tr>`).join('')}
+            </tbody>
+          </table></div>
+        </div>
+      </div>`).join('');
+  }
+}
+
+function toggleGrupoAnalisis(id) {
+  const el = document.getElementById(id);
+  if(el) el.style.display = el.style.display==='none'?'block':'none';
+}
+
+function borrarMuestra(id) {
+  if(!confirm('¿Eliminar esta muestra?')) return;
+  const muestras = getMuestras().filter(m => m.id !== id);
+  setMuestras(muestras);
+  // También borrar de bromatologicos para mantener consistencia
+  const broms = getBromatologicos().filter(b => b.id !== id);
+  setBromatologicos(broms);
+  renderMuestras();
+  notif('Muestra eliminada');
+}
+
+// ── Export Excel Matriz completa ──
+function exportarMatrizAnalisis() {
+  if(typeof XLSX === 'undefined') { notif('Librería Excel no disponible', true); return; }
+  const muestras = getMuestras().sort((a,b) => (a.fechaColecta||a.fecha||'').localeCompare(b.fechaColecta||b.fecha||''));
+  if(!muestras.length) { notif('Sin muestras para exportar', true); return; }
+
+  const headers = ['Tipo','Variedad','Potrero','Fecha Colecta','Días Descanso','Pluviómetro',
+    'PB','FDN','FDN Prom','FDA','aFDNmo','Lignina','DFDN48','uFDNmo240',
+    'PIDA','PIDN','PS_PB','Azúcar','Almidón','EE','AGT','Cenizas',
+    'Ca','P','Mg','K','S','Cl','Lluvia (mm)','Usuario','Fecha Registro'];
+  const rows = [headers];
+
+  muestras.forEach(m => {
+    const p = m.params || {};
+    rows.push([
+      m.tipo||'BROMATOLOGICO', m.variedad||'', m.potrero||'', m.fechaColecta||m.fecha||'',
+      m.diasDescanso||'', m.zonaNombre||'',
+      p.pb??'', p.fdn??'', p.fdnProm??'', p.fda??'', p.afdn??'', p.lignina??'',
+      p.dfdn48??'', p.ufdn??'', p.pida??'', p.pidn??'', p.pspb??'',
+      p.azucar??'', p.almidon??'', p.ee??'', p.agt??'', p.cenizas??'',
+      p.ca??'', p.p??'', p.mg??'', p.k??'', p.s??'', p.cl??'',
+      m.lluvia!=null?m.lluvia:'', m.usuario||'', m.fecha||''
+    ]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = headers.map(() => ({wch:14}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Matriz Análisis');
+  const hoy = new Date().toISOString().split('T')[0];
+  XLSX.writeFile(wb, `matriz_analisis_${hoy}.xlsx`);
+  notif(`✅ Excel generado con ${muestras.length} muestras`);
+}
+
+// ── Migrar bromatológicos históricos a muestras_campo ──
+function migrarBromsAMuestras() {
+  const broms = getBromatologicos();
+  const muestrasExist = getMuestras().map(m => m.id);
+  const nuevas = broms.filter(b => !muestrasExist.includes(b.id)).map(b => ({
+    id: b.id,
+    fecha: b.fecha,
+    tipo: b.tipo || 'BROMATOLOGICO',
+    variedad: b.variedad,
+    potrero: b.potrero || null,
+    fechaColecta: b.fechaColecta || b.fechaFin,
+    diasDescanso: b.diasDescanso || null,
+    zona: b.zona || '',
+    zonaNombre: b.zonaNombre || '',
+    lluvia: null,
+    params: b.params,
+    usuario: b.usuario || '',
+    _migrado: true
+  }));
+  if(nuevas.length) {
+    const todas = [...nuevas, ...getMuestras()];
+    setMuestras(todas);
+    notif(`✅ ${nuevas.length} análisis históricos migrados a la matriz`);
+    renderMuestras();
+  }
+}
+
+// ── Actualizar autoDetectarDesdeNota para llenar campos nuevos ──
+// (sobrescribe la versión anterior para rellenar bromPotrero, bromFechaColecta, bromDiasDescanso)
 
 function getBromForRecord(rec) {
   if(!rec || !rec.fechaIng) return null;
@@ -5421,7 +5689,7 @@ function showPage(id) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
-  const tabs = ['actividades','nueva','resumen','plan','pedidos','config','lluvia','calidad','campo'];
+  const tabs = ['actividades','nueva','resumen','plan','pedidos','config','lluvia','analisis','campo'];
   const idx = tabs.indexOf(id);
   document.querySelectorAll('.tab')[idx]?.classList.add('active');
   if(id==='resumen') { actualizarGestionesDisponibles(); renderResumen(); renderMetricasHA(); }
@@ -5430,7 +5698,11 @@ function showPage(id) {
   if(id==='actividades') { renderStats(); }
   if(id==='plan') { renderPlan(); }
   if(id==='pedidos') { renderPedidos(); }
-  if(id==='calidad') { renderBromatologicos(); poblarSelectorZonas(); preLlenarFechasBrom(); }
+  if(id==='analisis'||id==='calidad') {
+    renderMuestras(); poblarSelectorZonas(); preLlenarFechasBrom();
+    // Migrar bromatológicos históricos a la matriz si es la primera vez
+    if(!getMuestras().length && getBromatologicos().length) migrarBromsAMuestras();
+  }
   if(id==='campo') { campoIrHoy(); renderCapAlertasAdmin(); }
   if(id==='lluvia') {
     renderAnalisisGestion();
