@@ -1160,15 +1160,15 @@ function calcBloqueFormulacion(cat, pesoPromCat, gmdUsado, paramsPasto, bromsN, 
 }
 
 // Estado formulación
-let _formBroms = [];
+let _formBroms  = [];
 let _formGrupos = [];
+let _formCats   = {}; // { TORILLO: {peso, gmd, cabezas}, VAQUILLA: {...} }
 
 async function initFormulacion() {
-  // Detectar período automáticamente desde último pedido de sal
+  // Detectar período desde último pedido de sal
   const movArr = Object.values(_movs).filter(m => m.tipo === 'ENTRADA');
   movArr.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
   const ultimoPedido = movArr[0];
-
   const hoy = new Date().toISOString().split('T')[0];
   let desde = ultimoPedido ? ultimoPedido.fecha : (() => {
     const d = new Date(); d.setDate(d.getDate() - 45);
@@ -1177,21 +1177,147 @@ async function initFormulacion() {
 
   document.getElementById('fFormDesde').value = desde;
   document.getElementById('fFormHasta').value = hoy;
-
   const info = ultimoPedido
-    ? `Último pedido de sal: ${ultimoPedido.fecha} — período de ${Math.round((new Date(hoy) - new Date(desde)) / 86400000)} días`
+    ? `Último pedido de sal: ${ultimoPedido.fecha} — ${Math.round((new Date(hoy)-new Date(desde))/86400000)} días`
     : `Sin pedido previo — usando últimos 45 días`;
   document.getElementById('fFormPeriodoInfo').textContent = info;
 
-  // Cargar bromatológicos desde Firebase Pasturas
+  // Cargar bromatológicos
   try {
     const data = await fbGet(FB_ACT + '/bromatologicos');
     _formBroms = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
+  } catch(e) { _formBroms = []; }
+
+  // ── Cargar animales + pesajes individuales desde Firebase ──
+  document.getElementById('fFormPeriodoInfo').textContent += ' · Cargando animales...';
+  try {
+    const [animRaw, pesRaw] = await Promise.all([
+      fbGet(FB_ACT.replace('/elprado1','') + '/elprado1/hacienda/animales'),
+      fbGet(FB_ACT.replace('/elprado1','') + '/elprado1/hacienda/pesajes'),
+    ]);
+
+    const animales = animRaw ? (Array.isArray(animRaw) ? animRaw : Object.values(animRaw)) : [];
+    const pesajes  = pesRaw  ? (Array.isArray(pesRaw)  ? pesRaw  : Object.values(pesRaw))  : [];
+
+    // Índice de pesajes por animal (ordenados desc)
+    const byIde = {};
+    pesajes.forEach(p => {
+      const ide = String(p.ide);
+      if (!byIde[ide]) byIde[ide] = [];
+      byIde[ide].push(p);
+    });
+    Object.keys(byIde).forEach(ide => {
+      byIde[ide].sort((a,b) => (b.fecha||'').localeCompare(a.fecha||''));
+    });
+
+    const TODAY = new Date();
+
+    // Calcular GMD y peso individual por animal activo
+    const catData = { TORILLO: [], VAQUILLA: [] };
+
+    animales.forEach(a => {
+      if (a.estado !== 'ACTIVO') return;
+
+      // Determinar categoría
+      const cat = (a.categoria||'').toUpperCase().includes('TORILLO') ? 'TORILLO'
+                : (a.categoria||'').toUpperCase().includes('VAQUILLA') ? 'VAQUILLA'
+                : (a.nombre||a.grupo||'').toUpperCase().includes('TOR') ? 'TORILLO'
+                : (a.nombre||a.grupo||'').toUpperCase().includes('VAQ') ? 'VAQUILLA'
+                : null;
+      if (!cat) return;
+
+      const pess = byIde[String(a.ide)] || [];
+      if (!pess.length) return; // sin pesaje → excluir
+
+      const ultimo  = pess[0];
+      const previo  = pess[1] || null;
+
+      // GMD del último intervalo
+      let gmd = null;
+      if (previo && previo.peso && previo.fecha && ultimo.fecha && ultimo.peso) {
+        const dias = Math.round((new Date(ultimo.fecha+'T12:00:00') - new Date(previo.fecha+'T12:00:00')) / 86400000);
+        if (dias > 0) gmd = (ultimo.peso - previo.peso) / dias;
+      }
+      // Fallback: GMD acumulado desde ingreso
+      if (gmd === null && a.pesoIngreso && a.fechaIngreso) {
+        let fi = parseFechaFormul(a.fechaIngreso);
+        if (fi && fi < ultimo.fecha) {
+          const dias = Math.round((new Date(ultimo.fecha+'T12:00:00') - new Date(fi+'T12:00:00')) / 86400000);
+          if (dias > 0) gmd = (ultimo.peso - a.pesoIngreso) / dias;
+        }
+      }
+      if (gmd === null || gmd < 0) return;
+
+      // Peso proyectado a hoy
+      const diasDesde = Math.max(0, Math.round((TODAY - new Date(ultimo.fecha+'T12:00:00')) / 86400000));
+      const pesoHoy = ultimo.peso + gmd * diasDesde;
+
+      catData[cat].push({ gmd, pesoHoy });
+    });
+
+    // Promediar por categoría
+    _formCats = {};
+    Object.entries(catData).forEach(([cat, arr]) => {
+      if (!arr.length) return;
+      const avgGmd  = arr.reduce((s,a)=>s+a.gmd,0) / arr.length;
+      const avgPeso = arr.reduce((s,a)=>s+a.pesoHoy,0) / arr.length;
+      _formCats[cat] = {
+        gmd:     Math.round(avgGmd  * 1000) / 1000,
+        peso:    Math.round(avgPeso),
+        cabezas: arr.length,
+        n:       arr.length,
+      };
+    });
+
+    const resumen = Object.entries(_formCats)
+      .map(([c,d]) => `${c}: ${d.n} animales · GMD ${d.gmd} kg/día · ${d.peso} kg`)
+      .join(' | ');
+    document.getElementById('fFormPeriodoInfo').textContent =
+      (info) + ' · ' + resumen;
+
   } catch(e) {
-    _formBroms = [];
+    console.log('Error cargando animales individuales:', e);
+    // Fallback a grupos_resumen
+    _formCats = {};
+    (_grupos||[]).forEach(g => {
+      const cat = (g.categoria||'').toUpperCase().includes('TORILLO') ? 'TORILLO'
+                : (g.categoria||'').toUpperCase().includes('VAQUILLA') ? 'VAQUILLA'
+                : (g.nombre||'').toUpperCase().includes('TOR') ? 'TORILLO'
+                : (g.nombre||'').toUpperCase().includes('VAQ') ? 'VAQUILLA'
+                : null;
+      if (!cat) return;
+      if (!_formCats[cat]) _formCats[cat] = { gmd:0, peso:0, cabezas:0, n:0, _sum:0, _sumP:0 };
+      _formCats[cat]._sum  += (g.gmd||0) * (g.cabezas||1);
+      _formCats[cat]._sumP += (g.pesoHoy||300) * (g.cabezas||1);
+      _formCats[cat].cabezas += (g.cabezas||0);
+      _formCats[cat].n += (g.cabezas||0);
+    });
+    Object.values(_formCats).forEach(c => {
+      if (c.n > 0) { c.gmd = Math.round(c._sum/c.n*1000)/1000; c.peso = Math.round(c._sumP/c.n); }
+    });
   }
 
   calcularFormulacion();
+}
+
+// Parsear fecha para formulación
+function parseFechaFormul(v) {
+  if (!v) return null;
+  if (typeof v === 'string') {
+    v = v.trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(v)) return v.split('T')[0];
+    const p = v.split('/');
+    if (p.length === 3) {
+      let [a,b,c] = p.map(Number);
+      let d,m,y;
+      if (p[0].length===4){y=a;m=b;d=c;}
+      else if (b>12){d=b;m=a;y=c;}
+      else {d=a;m=b;y=c;}
+      if (y<100) y+=2000;
+      return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    }
+  }
+  return null;
 }
 
 function calcularFormulacion() {
@@ -1268,7 +1394,7 @@ function calcularFormulacion() {
     ee:  avg(Object.values(porVariedad).flatMap(d=>d.ee))  || 3,
   };
 
-  // ── Calcular por categoría ──
+  // ── Calcular por categoría usando GMD individual ──
   const cats = [
     { key:'TORILLO',  label:'🐂 Torillos',  color:'var(--blue)' },
     { key:'VAQUILLA', label:'🐄 Vaquillas', color:'var(--gs)'   },
@@ -1276,19 +1402,13 @@ function calcularFormulacion() {
 
   let html = '';
   cats.forEach(cat => {
-    const gruposCat = _grupos.filter(g =>
-      (g.categoria||'').toUpperCase().includes(cat.key) ||
-      (g.nombre||'').toUpperCase().includes(cat.key==='TORILLO'?'TOR':'VAQ')
-    );
-    if (!gruposCat.length) return;
+    const catInfo = _formCats[cat.key];
+    if (!catInfo || !catInfo.n) return;
 
-    const pesoPromCat = Math.round(
-      gruposCat.reduce((s,g)=>s+(g.pesoHoy||300),0) / gruposCat.length
-    );
-    const cabezasTot  = gruposCat.reduce((s,g)=>s+(g.cabezas||0),0);
-    const gmdActual   = Math.round(
-      gruposCat.reduce((s,g)=>s+(g.gmd||0),0) / gruposCat.length * 1000
-    ) / 1000;
+    const pesoPromCat = catInfo.peso;
+    const cabezasTot  = catInfo.cabezas || catInfo.n;
+    // GMD promedio ponderado individual
+    const gmdActual   = catInfo.gmd;
     const gmdObjetivo = GMD_OBJ[cat.key];
 
     // Calcular energía del pasto promedio
@@ -1373,9 +1493,10 @@ function calcularFormulacion() {
       <div class="ch">
         <div class="ct" style="color:${cat.color};">${cat.label}</div>
         <div style="font-size:11px;color:var(--t3);">
-          ${cabezasTot} cab · ${pesoPromCat} kg prom · GMD actual: <strong style="color:var(--gold2);">${gmdActual} kg/día</strong> ·
+          ${cabezasTot} cab · ${pesoPromCat} kg prom individual · 
+          GMD actual: <strong style="color:var(--gold2);">${gmdActual} kg/día</strong> ·
           GMD objetivo: <strong style="color:var(--gs);">${gmdObjetivo} kg/día</strong> ·
-          Bos indicus factor: ${BI_FACTOR}
+          <span style="color:var(--t3);">Bos indicus ${BI_FACTOR} · GMD calculado de ${catInfo.n} animales individuales</span>
         </div>
       </div>
       <div class="cb">
