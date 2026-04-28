@@ -1096,7 +1096,7 @@ function calcularFormulacion() {
     if (p.cu)  porVariedad[v].cu.push(parseFloat(p.cu));
     // consumo potencial MS% promedio
     const fdn = parseFloat(p.fdn) || 0;
-    if (fdn > 0) porVariedad[v].consumoMs.push(120 / fdn * 100); // fórmula NRC consumo pot
+    if (fdn > 0) porVariedad[v].consumoMs.push(120 / fdn); // % PV — NRC: DMI%BW = 1.2/(NDF/100)
   });
 
   // Mostrar resumen de bromatológicos
@@ -1151,23 +1151,25 @@ function calcularFormulacion() {
       const g = avg(d.consumoMs); if(g) prom.consumoMs.push(g);
     });
 
-    // Consumo MS kg/día = peso × consumo potencial %
-    const consPotPct = avg(prom.consumoMs) || 2.5; // % del PV
-    const consMsKgDia = pesoPromCat * consPotPct / 100;
+    // Consumo MS kg/día POR ANIMAL = peso × consumo potencial %BW
+    const consPotPct = avg(prom.consumoMs) || 2.5; // % del PV (ej: 2.36%)
+    const consMsKgDia = pesoPromCat * consPotPct / 100; // kg MS/animal/día
 
-    // Aporte del pasto por día (g/día para macrominerales, mg/día para Cu)
+    // Aporte del pasto POR ANIMAL por día
+    // Ca, P, Mg, Na: (% / 100) × kg_MS × 1000 = g/animal/día
+    // Cu: ppm × kg_MS = mg/animal/día
     const aportePasto = {
-      ca: avg(prom.ca) ? (avg(prom.ca)/100) * consMsKgDia * 1000 : null,  // % → g/kg × kg
+      ca: avg(prom.ca) ? (avg(prom.ca)/100) * consMsKgDia * 1000 : null,
       p:  avg(prom.p)  ? (avg(prom.p) /100) * consMsKgDia * 1000 : null,
       mg: avg(prom.mg) ? (avg(prom.mg)/100) * consMsKgDia * 1000 : null,
       na: avg(prom.na) ? (avg(prom.na)/100) * consMsKgDia * 1000 : null,
-      cu: avg(prom.cu) ? avg(prom.cu) * consMsKgDia : null,  // ppm × kg MS
+      cu: avg(prom.cu) ? avg(prom.cu) * consMsKgDia               : null,
     };
 
-    // Consumo sal diario estimado
-    const consSalGrDia = pesoPromCat * 35 / 100; // 35 g/100kg PV → objetivo
-    const consSalKgDia = consSalGrDia / 1000;
-    const consSalKgDiaTot = consSalKgDia * cabezasTot;
+    // Consumo sal objetivo POR ANIMAL
+    const consSalGrDia   = pesoPromCat * 35 / 100; // g/animal/día (35 g/100kg PV)
+    const consSalKgDia   = consSalGrDia / 1000;    // kg/animal/día
+    const consSalKgDiaTot = consSalKgDia * cabezasTot; // kg/día todo el grupo
 
     // Déficit = requerimiento - aporte pasto
     const deficit = {};
@@ -1220,7 +1222,7 @@ function calcularFormulacion() {
       <div class="ch">
         <div class="ct" style="color:${cat.color};">${cat.label}</div>
         <div style="font-size:11px;color:var(--t3);">
-          ${cabezasTot} cabezas · ${pesoPromCat} kg prom · ${consMsKgDia.toFixed(1)} kg MS/día
+          ${cabezasTot} cabezas · ${pesoPromCat} kg prom · ${consMsKgDia.toFixed(1)} kg MS/animal/día · ${consPotPct.toFixed(1)}% PV
         </div>
       </div>
       <div class="cb">
@@ -1228,9 +1230,9 @@ function calcularFormulacion() {
           <table>
             <thead><tr>
               <th>Mineral</th>
-              <th>Requerimiento NRC</th>
-              <th>Aporta el pasto</th>
-              <th>Déficit/día</th>
+              <th>Req. NRC/animal/día</th>
+              <th>Aporta pasto/animal/día</th>
+              <th>Déficit/animal/día</th>
               <th>Conc. en Sal ⭐</th>
             </tr></thead>
             <tbody>${filas}</tbody>
@@ -1257,6 +1259,7 @@ function calcularFormulacion() {
           <div style="font-size:10px;color:var(--t3);margin-top:6px;">
             Basado en ${bromsDelPeriodo.length} muestra${bromsDelPeriodo.length>1?'s':''} · NRC Beef Cattle 2016 · 
             ${desde} → ${hasta}
+            ${!avg(prom.na) && !avg(prom.cu) ? ' · <span style="color:var(--gold2);">⚠️ Na y Cu no reportados por Labnutris — agregalos manualmente si los tenés</span>' : ''}
           </div>
         </div>
       </div>
