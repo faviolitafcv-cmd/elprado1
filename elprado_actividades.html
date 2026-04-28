@@ -3823,27 +3823,49 @@ function parsearPDFBrom(input) {
 
 // ── INTELIGENCIA PDF: variedad, potrero, fecha colecta, pluviómetro, duplicado ──
 function autoDetectarDesdeNota(texto) {
-  const tLow = texto.toLowerCase();
+  // ── Extraer SOLO la sección "Nota:" del PDF ──
+  // El texto de Labnutris tiene: "... Nota: El prado 1 Brachiaria D9 S 23 días de reposo Colecta 30/03/26 ..."
+  const idxNota = texto.search(/nota\s*:/i);
+  const seccionNota = idxNota >= 0 ? texto.slice(idxNota, idxNota + 300) : texto.slice(0, 500);
 
-  // 1. VARIEDAD
-  if(tLow.includes('brachiaria') || tLow.includes('brachiar')) {
-    document.getElementById('bromVariedad').value = 'BRACHIARIA';
-  } else if(tLow.includes('panicum') || tLow.includes('panico') || tLow.includes('pánico')) {
-    document.getElementById('bromVariedad').value = 'PANICUM';
+  // 1. VARIEDAD — buscar en la Nota primero, luego en todo el texto
+  let varActual = document.getElementById('bromVariedad').value;
+  const notaLow = seccionNota.toLowerCase();
+  const textoLow = texto.toLowerCase();
+  if(notaLow.includes('brachiaria') || notaLow.includes('brachiar')) {
+    varActual = 'BRACHIARIA';
+  } else if(notaLow.includes('panicum') || notaLow.includes('pánico') || notaLow.includes('panico')) {
+    varActual = 'PANICUM';
+  } else if(textoLow.includes('brachiaria') || textoLow.includes('brachiar')) {
+    varActual = 'BRACHIARIA';
+  } else if(textoLow.includes('panicum')) {
+    varActual = 'PANICUM';
   }
-  const varActual = document.getElementById('bromVariedad').value;
+  document.getElementById('bromVariedad').value = varActual;
 
-  // 2. POTRERO — después de "Brachiaria" o "Panicum" en la Nota
+  // 2. POTRERO — buscar en la Nota: "[variedad] [código]"
   let potreroDetectado = null;
-  const mNota = texto.match(/(?:brachiaria|panicum|pánico)\s+([A-Z0-9]{1,5}[\s\-]?[A-Z0-9]{0,5})/i);
+  // Buscar patrón: Brachiaria/Panicum seguido del código de potrero
+  const mNota = seccionNota.match(/(?:brachiaria|panicum|pánico)\s+([A-Za-z0-9]{1,5}[\s\-]?[A-Za-z0-9]{0,5})/i);
   if(mNota) {
-    potreroDetectado = normalizarCodigoPotrero(mNota[1].trim());
+    const raw = mNota[1].trim();
+    // Excluir palabras comunes que no son potreros
+    const excluir = ['COLECTA','MUESTRE','DIAS','DIAS','CONSUL','MARCUS','EL','LA','DE'];
+    if(!excluir.some(e => raw.toUpperCase().startsWith(e))) {
+      potreroDetectado = normalizarCodigoPotrero(raw);
+    }
   }
 
-  // 3. FECHA COLECTA — "Colecta DD/MM/YY"
+  // 3. FECHA COLECTA — "Colecta\n30/03/26" o "Colecta 30/03/26"
   let fechaColecta = null;
-  const mFecha = texto.match(/colecta\s+(\d{1,2}[\\/\-]\d{1,2}[\\/\-]\d{2,4})/i);
+  // Buscar "Colecta" seguido de fecha (con o sin espacio/salto de línea)
+  const mFecha = seccionNota.match(/colecta[\s\S]{0,10}?(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i);
   if(mFecha) fechaColecta = parsearFechaLabnutris(mFecha[1]);
+  // Fallback en todo el texto
+  if(!fechaColecta) {
+    const mFecha2 = texto.match(/colecta[\s\S]{0,10}?(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i);
+    if(mFecha2) fechaColecta = parsearFechaLabnutris(mFecha2[1]);
+  }
 
   // 4. DÍAS DESCANSO desde actividades o desde PDF
   let diasDescanso = null;
@@ -3851,11 +3873,12 @@ function autoDetectarDesdeNota(texto) {
     diasDescanso = calcularDiasDescansoDesdeActividades(potreroDetectado, fechaColecta);
   }
   if(diasDescanso === null) {
-    const mDias = texto.match(/(\d+)\s+d[ií]as?\s+de\s+reposo/i);
+    const mDias = seccionNota.match(/(\d+)\s+d[ií]as?\s+de\s+reposo/i) ||
+                  texto.match(/(\d+)\s+d[ií]as?\s+de\s+reposo/i);
     if(mDias) diasDescanso = parseInt(mDias[1]);
   }
 
-  // 5. FECHAS PERÍODO
+  // 5. FECHAS PERÍODO — auto-completar
   if(fechaColecta) {
     const margen = diasDescanso || 30;
     const dIni = new Date(fechaColecta + 'T12:00:00');
@@ -3864,7 +3887,7 @@ function autoDetectarDesdeNota(texto) {
     document.getElementById('bromFechaFin').value = fechaColecta;
   }
 
-  // 6. PLUVIÓMETRO
+  // 6. PLUVIÓMETRO — buscar potrero en lista
   let pluvioEncontrado = null;
   if(potreroDetectado) {
     const pluvios = getPluviometros();
@@ -3884,8 +3907,7 @@ function autoDetectarDesdeNota(texto) {
       const sel = document.getElementById('bromZona');
       if(sel) {
         for(let i=0; i<sel.options.length; i++) {
-          const val = sel.options[i].value;
-          if(val === (pluvioEncontrado.id || pluvioEncontrado.nombre) ||
+          if(sel.options[i].value === (pluvioEncontrado.id || pluvioEncontrado.nombre) ||
              sel.options[i].text.includes(pluvioEncontrado.nombre)) {
             sel.selectedIndex = i;
             sel.dispatchEvent(new Event('change'));
@@ -3911,12 +3933,10 @@ function autoDetectarDesdeNota(texto) {
     }
   }
 
-  // 8. PANEL INFORMATIVO
-  // Guardar para que guardarBromatologico() los incluya en el registro
+  // 8. LLENAR CAMPOS DEL FORMULARIO
   window._bromPotreroDetectado = potreroDetectado;
-  window._bromFechaColecta     = fechaColecta;
+  window._bromFechaColecta = fechaColecta;
 
-  // Llenar campos del formulario
   if(potreroDetectado) {
     const elPot = document.getElementById('bromPotrero');
     if(elPot) { elPot.value = potreroDetectado; elPot.style.borderColor='var(--green2)'; }
@@ -3930,24 +3950,24 @@ function autoDetectarDesdeNota(texto) {
     if(elDd) { elDd.value = diasDescanso; elDd.style.borderColor='var(--green2)'; }
   }
 
-  let infoEl = document.getElementById('_bromInfoDetectada');
-  if(!infoEl) {
-    infoEl = document.createElement('div');
-    infoEl.id = '_bromInfoDetectada';
-    infoEl.style.cssText = 'margin-top:10px;padding:10px 14px;background:rgba(109,186,58,.07);border:1px solid rgba(109,186,58,.25);border-radius:6px;font-size:11px;color:var(--text2);line-height:2;';
-    const bromPDFNombre = document.getElementById('bromPDFNombre');
-    if(bromPDFNombre && bromPDFNombre.parentElement) {
-      bromPDFNombre.parentElement.appendChild(infoEl);
-    }
+  // 9. PANEL INFORMATIVO — siempre visible al subir PDF
+  const infoEl = document.getElementById('_bromInfoDetectada');
+  if(infoEl) {
+    const items = [];
+    items.push('🌿 <strong>Variedad:</strong> ' + varActual);
+    if(potreroDetectado) items.push('📍 <strong>Potrero:</strong> ' + potreroDetectado);
+    else items.push('⚠️ <strong>Potrero:</strong> no detectado — ingresalo manualmente');
+    if(fechaColecta) items.push('📅 <strong>Colecta:</strong> ' + fechaColecta);
+    else items.push('⚠️ <strong>Colecta:</strong> no detectada — ingresala manualmente');
+    if(diasDescanso) items.push('⏳ <strong>Descanso:</strong> ' + diasDescanso + ' días');
+    if(pluvioEncontrado) items.push('🌧️ <strong>Pluviómetro:</strong> ' + pluvioEncontrado.nombre + ' ✅');
+    else if(potreroDetectado) items.push('📍 Potrero <strong>' + potreroDetectado + '</strong> — asignale un pluviómetro en Configuración');
+    // DEBUG temporal: mostrar primeros 200 chars de la sección Nota
+    items.push('<span style="font-size:9px;color:var(--text3);">Nota leída: ' +
+      seccionNota.slice(0,120).replace(/</g,'&lt;') + '...</span>');
+    infoEl.innerHTML = items.join(' &nbsp;·&nbsp; ');
+    infoEl.style.display = 'block'; // ← FIX: mostrar siempre
   }
-  const items = [];
-  if(varActual)        items.push('🌿 <strong>Variedad:</strong> ' + varActual);
-  if(potreroDetectado) items.push('📍 <strong>Potrero:</strong> ' + potreroDetectado);
-  if(fechaColecta)     items.push('📅 <strong>Colecta:</strong> ' + fechaColecta);
-  if(diasDescanso)     items.push('⏳ <strong>Descanso:</strong> ' + diasDescanso + ' días');
-  if(pluvioEncontrado) items.push('🌧️ <strong>Pluviómetro:</strong> ' + pluvioEncontrado.nombre + ' ✅');
-  else if(potreroDetectado) items.push('⚠️ Potrero <strong>' + potreroDetectado + '</strong> no asignado a pluviómetro');
-  infoEl.innerHTML = items.join(' &nbsp;·&nbsp; ');
 
   previewBromAsignados();
 }
