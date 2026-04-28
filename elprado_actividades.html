@@ -3822,6 +3822,74 @@ function parsearPDFBrom(input) {
 }
 
 // ── INTELIGENCIA PDF: variedad, potrero, fecha colecta, pluviómetro, duplicado ──
+function extraerValoresBrom(texto) {
+  const t = texto.replace(/\r/g,'').replace(/\t/g,' ');
+  const idxRes = t.search(/result[a-z]*\s*:/i);
+  const textoRes = idxRes >= 0 ? t.slice(idxRes) : t;
+  const NUM = '(\\d+[\\.,]\\d+|\\d+)';
+  function buscar(patron, texto, maxVal) {
+    const re = new RegExp('(?:' + patron + ')[\\s\\S]{0,40}?' + NUM, 'i');
+    const m = texto.match(re);
+    if(!m) return null;
+    const val = parseFloat(m[1].replace(',','.'));
+    return (val >= 0 && val <= (maxVal||100)) ? val : null;
+  }
+  const campos = [
+    { patron: 'proteina\\s*bruta', id: 'brom_pb' },
+    { patron: 'fdn', id: 'brom_fdn' },
+    { patron: 'fda', id: 'brom_fda' },
+    { patron: 'afdn\\s*mo', id: 'brom_afdn' },
+    { patron: 'afdnmo', id: 'brom_afdn' },
+    { patron: 'lignina', id: 'brom_lignina' },
+    { patron: 'dfdn\\s*48', id: 'brom_dfdn48' },
+    { patron: 'ufdn\\s*mo\\s*240', id: 'brom_ufdn' },
+    { patron: 'ufdnmo240', id: 'brom_ufdn' },
+    { patron: 'pida', id: 'brom_pida' },
+    { patron: 'pidn', id: 'brom_pidn' },
+    { patron: 'ps_pb', id: 'brom_pspb' },
+    { patron: 'azuc', id: 'brom_azucar' },
+    { patron: 'almid', id: 'brom_almidon' },
+    { patron: 'extracto\\s*et', id: 'brom_ee' },
+    { patron: 'agt', id: 'brom_agt' },
+    { patron: 'material\\s*mineral|cenizas', id: 'brom_cenizas' },
+  ];
+  campos.forEach(({patron, id}) => {
+    const val = buscar(patron, t);
+    if(val !== null) { const el = document.getElementById(id); if(el) el.value = val; }
+  });
+  // Parsear Ca, P, Mg, K, S, Cl — después de "Material Mineral"
+  const palabras = t.split(/\s+/);
+  const mapaMinerales = {
+    'Ca':{id:'brom_ca',max:10},'P':{id:'brom_p',max:10},'Mg':{id:'brom_mg',max:10},
+    'K':{id:'brom_k',max:20},'S':{id:'brom_s',max:10},'Cl':{id:'brom_cl',max:10},
+  };
+  let enMinerales = false;
+  for(let i=0; i<palabras.length-1; i++) {
+    if(palabras[i].toLowerCase() === 'material') enMinerales = true;
+    if(!enMinerales) continue;
+    const mineral = mapaMinerales[palabras[i]];
+    if(mineral) {
+      const val = parseFloat(palabras[i+1].replace(',','.'));
+      if(!isNaN(val) && val >= 0 && val <= mineral.max) {
+        const el = document.getElementById(mineral.id);
+        if(el) { el.value = val; el.dispatchEvent(new Event('input', {bubbles:true})); }
+      }
+    }
+  }
+  setTimeout(function() {
+    const fdnEl2 = document.getElementById('brom_fdn');
+    const afdnEl2 = document.getElementById('brom_afdn');
+    const promEl = document.getElementById('brom_fdn_prom');
+    if(fdnEl2 && afdnEl2 && promEl) {
+      const fdn2 = parseFloat(fdnEl2.value)||0;
+      const afdn2 = parseFloat(afdnEl2.value)||0;
+      if(fdn2>0 && afdn2>0) { promEl.value=((fdn2+afdn2)/2).toFixed(2); promEl.style.borderColor='var(--gold2)'; }
+      else if(fdn2>0) { promEl.value=fdn2.toFixed(2); promEl.style.borderColor='var(--gold2)'; }
+    }
+    calcFDNPromedio(true);
+  }, 200);
+}
+
 function autoDetectarDesdeNota(texto) {
   // ── Extraer SOLO la sección "Nota:" del PDF ──
   // El texto de Labnutris tiene: "... Nota: El prado 1 Brachiaria D9 S 23 días de reposo Colecta 30/03/26 ..."
