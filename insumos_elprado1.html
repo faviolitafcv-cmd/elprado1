@@ -184,7 +184,8 @@ tr:hover td{background:rgba(109,186,58,.04);}
   <div class="tab active" onclick="showPg('dash')">📊 Dashboard</div>
   <div class="tab" onclick="showPg('movimientos')">📋 Movimientos</div>
   <div class="tab" onclick="showPg('consumo')">📈 Consumo Diario</div>
-  <div class="tab" onclick="showPg('productos')">🧪 Productos</div>
+  <div class="tab" onclick="showPg('formulacion')">🧪 Formulación</div>
+  <div class="tab" onclick="showPg('productos')">⚙️ Productos</div>
 </div>
 
 <!-- ═══════ DASHBOARD ═══════ -->
@@ -275,6 +276,58 @@ tr:hover td{background:rgba(109,186,58,.04);}
       </tr></thead>
       <tbody id="consumoBody"></tbody>
     </table></div>
+  </div>
+</div>
+
+<!-- ═══════ FORMULACIÓN ═══════ -->
+<div class="pg" id="pg-formulacion">
+  <div style="background:rgba(109,186,58,.06);border:1px solid rgba(109,186,58,.2);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:12px;color:var(--t2);line-height:1.8;">
+    🧬 El sistema calcula el déficit mineral comparando los <strong>requerimientos NRC</strong> del grupo con lo que <strong>aporta el pasto</strong> (promedio de bromatológicos del período actual).
+    El resultado es la concentración mínima que debe tener tu sal mineral para cubrir ese déficit.<br>
+    📌 <strong>Período:</strong> desde el último pedido de sal registrado hasta hoy.
+  </div>
+
+  <!-- Selector de período -->
+  <div class="card">
+    <div class="ch"><div class="ct">📅 Período de Análisis</div></div>
+    <div class="cb">
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+        <div class="fm" style="min-width:160px;">
+          <label>Desde</label>
+          <input type="date" id="fFormDesde" onchange="calcularFormulacion()">
+        </div>
+        <div class="fm" style="min-width:160px;">
+          <label>Hasta</label>
+          <input type="date" id="fFormHasta" onchange="calcularFormulacion()">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <label style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;">Detectado automáticamente</label>
+          <span id="fFormPeriodoInfo" style="font-size:11px;color:var(--t3);">—</span>
+        </div>
+        <button class="btn bp btn-sm" onclick="calcularFormulacion()">🔄 Recalcular</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bromatológicos del período -->
+  <div class="card">
+    <div class="ch">
+      <div class="ct">🌿 Bromatológicos del Período</div>
+      <span id="formBromCount" style="font-size:11px;color:var(--t3);">—</span>
+    </div>
+    <div class="cb">
+      <div id="formBromResumen" style="font-size:12px;color:var(--t2);">
+        <div class="emp"><div class="emp-ic">⏳</div>Cargando...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resultados por categoría -->
+  <div id="formResultados"></div>
+
+  <!-- Botón imprimir -->
+  <div style="text-align:center;margin-top:18px;">
+    <button class="btn bp" onclick="imprimirFormulacion()" id="btnImprimir" style="display:none;">🖨️ Imprimir Recomendación</button>
   </div>
 </div>
 
@@ -475,11 +528,12 @@ function showPg(id){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('pg-'+id).classList.add('active');
   const tabs = document.querySelectorAll('.tab');
-  const names = ['dash','movimientos','consumo','productos'];
+  const names = ['dash','movimientos','consumo','formulacion','productos'];
   tabs[names.indexOf(id)]?.classList.add('active');
   if(id==='dash') renderDash();
   if(id==='movimientos') renderMovimientos();
   if(id==='consumo') renderConsumoDetalle();
+  if(id==='formulacion') initFormulacion();
   if(id==='productos') renderProductos();
 }
 
@@ -941,6 +995,286 @@ function ntf(msg,tipo='ok'){
   clearTimeout(_ntfT);
   _ntfT = setTimeout(()=>el.style.display='none', 3000);
 }
+
+// ═══════════════════════════════════════════════════════════
+// FORMULACIÓN — NRC Bovinos Carne Invernada 300kg
+// ═══════════════════════════════════════════════════════════
+
+// Firebase Pasturas (bromatológicos)
+const FB_ACT = 'https://elprado1-153ef-default-rtdb.firebaseio.com/elprado1';
+
+// NRC requerimientos diarios bovino carne invernada 300kg
+// Fuente: NRC Beef Cattle 2016 — ganancia moderada 0.5-0.8 kg/día
+const NRC_BASE = {
+  ca:  { req: 18,   unidad: 'g/día',   label: 'Calcio (Ca)' },
+  p:   { req: 14,   unidad: 'g/día',   label: 'Fósforo (P)' },
+  mg:  { req: 5,    unidad: 'g/día',   label: 'Magnesio (Mg)' },
+  na:  { req: 7,    unidad: 'g/día',   label: 'Sodio (Na)' },
+  cu:  { req: 110,  unidad: 'mg/día',  label: 'Cobre (Cu)', ppm: true },
+};
+
+// Requerimientos ajustados por peso vivo (escala linear desde 300kg base)
+function ajustarNRC(pesoKg) {
+  const factor = Math.max(0.5, Math.min(2, pesoKg / 300));
+  const r = {};
+  Object.entries(NRC_BASE).forEach(([k, v]) => {
+    r[k] = { ...v, req: Math.round(v.req * factor * 10) / 10 };
+  });
+  return r;
+}
+
+// Estado formulación
+let _formBroms = [];
+let _formGrupos = [];
+
+async function initFormulacion() {
+  // Detectar período automáticamente desde último pedido de sal
+  const movArr = Object.values(_movs).filter(m => m.tipo === 'ENTRADA');
+  movArr.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  const ultimoPedido = movArr[0];
+
+  const hoy = new Date().toISOString().split('T')[0];
+  let desde = ultimoPedido ? ultimoPedido.fecha : (() => {
+    const d = new Date(); d.setDate(d.getDate() - 45);
+    return d.toISOString().split('T')[0];
+  })();
+
+  document.getElementById('fFormDesde').value = desde;
+  document.getElementById('fFormHasta').value = hoy;
+
+  const info = ultimoPedido
+    ? `Último pedido de sal: ${ultimoPedido.fecha} — período de ${Math.round((new Date(hoy) - new Date(desde)) / 86400000)} días`
+    : `Sin pedido previo — usando últimos 45 días`;
+  document.getElementById('fFormPeriodoInfo').textContent = info;
+
+  // Cargar bromatológicos desde Firebase Pasturas
+  try {
+    const data = await fbGet(FB_ACT + '/bromatologicos');
+    _formBroms = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
+  } catch(e) {
+    _formBroms = [];
+  }
+
+  calcularFormulacion();
+}
+
+function calcularFormulacion() {
+  const desde = document.getElementById('fFormDesde').value;
+  const hasta = document.getElementById('fFormHasta').value;
+  if (!desde || !hasta) return;
+
+  // Filtrar bromatológicos del período
+  const bromsDelPeriodo = _formBroms.filter(b => {
+    const fb = b.fechaFin || b.fecha || '';
+    const fi = b.fechaIni || b.fecha || '';
+    return fb >= desde && fi <= hasta;
+  });
+
+  document.getElementById('formBromCount').textContent =
+    bromsDelPeriodo.length + ' muestras en el período';
+
+  if (!bromsDelPeriodo.length) {
+    document.getElementById('formBromResumen').innerHTML =
+      '<div class="emp"><div class="emp-ic">🌿</div>Sin bromatológicos en este período.<br>' +
+      'Cargá muestras en el módulo de Pasturas primero.</div>';
+    document.getElementById('formResultados').innerHTML = '';
+    document.getElementById('btnImprimir').style.display = 'none';
+    return;
+  }
+
+  // Promediar por variedad
+  const porVariedad = {};
+  bromsDelPeriodo.forEach(b => {
+    const v = (b.variedad || 'SIN VARIEDAD').toUpperCase();
+    if (!porVariedad[v]) porVariedad[v] = { muestras: 0, ca: [], p: [], mg: [], na: [], cu: [], consumoMs: [] };
+    const p = b.params || {};
+    porVariedad[v].muestras++;
+    if (p.ca)  porVariedad[v].ca.push(parseFloat(p.ca));
+    if (p.p)   porVariedad[v].p.push(parseFloat(p.p));
+    if (p.mg)  porVariedad[v].mg.push(parseFloat(p.mg));
+    if (p.na || p.k) porVariedad[v].na.push(parseFloat(p.na || 0));
+    if (p.cu)  porVariedad[v].cu.push(parseFloat(p.cu));
+    // consumo potencial MS% promedio
+    const fdn = parseFloat(p.fdn) || 0;
+    if (fdn > 0) porVariedad[v].consumoMs.push(120 / fdn * 100); // fórmula NRC consumo pot
+  });
+
+  // Mostrar resumen de bromatológicos
+  const bromHtml = Object.entries(porVariedad).map(([v, d]) => {
+    const avg = arr => arr.length ? (arr.reduce((a,b)=>a+b,0)/arr.length) : null;
+    return `<div style="display:inline-block;background:var(--card2);border:1px solid var(--brd);border-radius:6px;padding:10px 16px;margin:0 8px 8px 0;min-width:220px;vertical-align:top;">
+      <div style="font-size:11px;font-weight:700;color:var(--gs);margin-bottom:6px;">${v} — ${d.muestras} muestra${d.muestras>1?'s':''}</div>
+      <div style="font-size:11px;color:var(--t2);line-height:1.8;">
+        Ca: <strong>${avg(d.ca)!==null?avg(d.ca).toFixed(2)+'%':'—'}</strong> &nbsp;
+        P: <strong>${avg(d.p)!==null?avg(d.p).toFixed(2)+'%':'—'}</strong> &nbsp;
+        Mg: <strong>${avg(d.mg)!==null?avg(d.mg).toFixed(2)+'%':'—'}</strong><br>
+        Na: <strong>${avg(d.na)!==null?avg(d.na).toFixed(3)+'%':'—'}</strong> &nbsp;
+        Cu: <strong>${avg(d.cu)!==null?avg(d.cu).toFixed(1)+' ppm':'—'}</strong>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('formBromResumen').innerHTML = bromHtml || '<em style="color:var(--t3);">Sin datos minerales en las muestras</em>';
+
+  // Calcular formulación por categoría
+  const cats = [
+    { key: 'TORILLO', label: '🐂 Torillos', color: 'var(--blue)' },
+    { key: 'VAQUILLA', label: '🐄 Vaquillas', color: 'var(--gs)' },
+  ];
+
+  let html = '';
+  cats.forEach(cat => {
+    // Grupos de esta categoría desde Inventario
+    const gruposCat = _grupos.filter(g =>
+      (g.categoria || '').toUpperCase().includes(cat.key) ||
+      (g.nombre || '').toUpperCase().includes(cat.key === 'TORILLO' ? 'TOR' : 'VAQ')
+    );
+
+    if (!gruposCat.length) return;
+
+    // Peso y cabezas promedio de la categoría
+    const pesoPromCat = Math.round(
+      gruposCat.reduce((s, g) => s + (g.pesoHoy || 300), 0) / gruposCat.length
+    );
+    const cabezasTot = gruposCat.reduce((s, g) => s + (g.cabezas || 0), 0);
+    const nrc = ajustarNRC(pesoPromCat);
+
+    // Determinar variedad predominante para esta categoría
+    // (usar promedio de todas las variedades disponibles ponderado)
+    const avg = arr => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null;
+    const prom = { ca: [], p: [], mg: [], na: [], cu: [], consumoMs: [] };
+    Object.values(porVariedad).forEach(d => {
+      const a = avg(d.ca); if(a) prom.ca.push(a);
+      const b = avg(d.p);  if(b) prom.p.push(b);
+      const c = avg(d.mg); if(c) prom.mg.push(c);
+      const e = avg(d.na); if(e) prom.na.push(e);
+      const f = avg(d.cu); if(f) prom.cu.push(f);
+      const g = avg(d.consumoMs); if(g) prom.consumoMs.push(g);
+    });
+
+    // Consumo MS kg/día = peso × consumo potencial %
+    const consPotPct = avg(prom.consumoMs) || 2.5; // % del PV
+    const consMsKgDia = pesoPromCat * consPotPct / 100;
+
+    // Aporte del pasto por día (g/día para macrominerales, mg/día para Cu)
+    const aportePasto = {
+      ca: avg(prom.ca) ? (avg(prom.ca)/100) * consMsKgDia * 1000 : null,  // % → g/kg × kg
+      p:  avg(prom.p)  ? (avg(prom.p) /100) * consMsKgDia * 1000 : null,
+      mg: avg(prom.mg) ? (avg(prom.mg)/100) * consMsKgDia * 1000 : null,
+      na: avg(prom.na) ? (avg(prom.na)/100) * consMsKgDia * 1000 : null,
+      cu: avg(prom.cu) ? avg(prom.cu) * consMsKgDia : null,  // ppm × kg MS
+    };
+
+    // Consumo sal diario estimado
+    const consSalGrDia = pesoPromCat * 35 / 100; // 35 g/100kg PV → objetivo
+    const consSalKgDia = consSalGrDia / 1000;
+    const consSalKgDiaTot = consSalKgDia * cabezasTot;
+
+    // Déficit = requerimiento - aporte pasto
+    const deficit = {};
+    const pctEnSal = {};
+    let hayDatos = false;
+
+    ['ca','p','mg','na','cu'].forEach(min => {
+      const req = nrc[min].req;
+      const ap  = aportePasto[min];
+      if (ap !== null) {
+        hayDatos = true;
+        deficit[min] = Math.max(0, req - ap);
+        // Concentración necesaria en la sal (g déficit / g sal consumida × 100)
+        if (min === 'cu') {
+          // Cu: mg/día déficit → mg/kg sal
+          pctEnSal[min] = consSalKgDia > 0 ? deficit[min] / consSalKgDia : 0;
+        } else {
+          // Macrominerales: g/día → %
+          pctEnSal[min] = consSalKgDia > 0 ? (deficit[min] / (consSalKgDia * 1000)) * 100 : 0;
+        }
+      } else {
+        deficit[min] = null;
+        pctEnSal[min] = null;
+      }
+    });
+
+    // Construir tabla de resultados
+    const filas = ['ca','p','mg','na','cu'].map(min => {
+      const n   = nrc[min];
+      const ap  = aportePasto[min];
+      const def = deficit[min];
+      const pct = pctEnSal[min];
+      const apStr  = ap!==null  ? (n.ppm ? ap.toFixed(0)+' mg' : ap.toFixed(1)+' g') : '—';
+      const defStr = def!==null ? (n.ppm ? def.toFixed(0)+' mg' : def.toFixed(1)+' g') : '—';
+      const pctStr = pct!==null ? (n.ppm ? pct.toFixed(0)+' mg/kg' : pct.toFixed(2)+'%') : '—';
+      const color  = def===null?'var(--t3)':def<=0?'var(--gs)':def<n.req*0.3?'var(--gold2)':'var(--red)';
+      return `<tr>
+        <td><strong>${n.label}</strong></td>
+        <td class="mn">${n.ppm?n.req+' mg':n.req+' g'}</td>
+        <td class="mn" style="color:var(--t2);">${apStr}</td>
+        <td class="mn" style="color:${color};">${defStr}</td>
+        <td class="mn" style="font-weight:700;color:${color};">${pctStr}</td>
+      </tr>`;
+    }).join('');
+
+    // Resumen sal 30 días
+    const sal30 = Math.round(consSalKgDiaTot * 30);
+
+    html += `<div class="card" style="border-left:3px solid ${cat.color};">
+      <div class="ch">
+        <div class="ct" style="color:${cat.color};">${cat.label}</div>
+        <div style="font-size:11px;color:var(--t3);">
+          ${cabezasTot} cabezas · ${pesoPromCat} kg prom · ${consMsKgDia.toFixed(1)} kg MS/día
+        </div>
+      </div>
+      <div class="cb">
+        <div class="tw">
+          <table>
+            <thead><tr>
+              <th>Mineral</th>
+              <th>Requerimiento NRC</th>
+              <th>Aporta el pasto</th>
+              <th>Déficit/día</th>
+              <th>Conc. en Sal ⭐</th>
+            </tr></thead>
+            <tbody>${filas}</tbody>
+          </table>
+        </div>
+
+        <!-- Recomendación -->
+        <div style="margin-top:14px;background:rgba(109,186,58,.06);border:1px solid rgba(109,186,58,.2);border-radius:8px;padding:14px 16px;">
+          <div style="font-size:11px;font-weight:700;color:var(--gs);margin-bottom:8px;letter-spacing:.5px;">
+            ✅ RECOMENDACIÓN SAL MINERAL — ${cat.label.replace(/🐂|🐄/,'').trim().toUpperCase()}
+          </div>
+          <div style="font-size:12px;color:var(--t2);line-height:2;">
+            ${pctEnSal.ca!==null?`<span style="color:var(--gs);">● Ca:</span> <strong>${pctEnSal.ca.toFixed(2)}%</strong> &nbsp;`:''}
+            ${pctEnSal.p!==null ?`<span style="color:var(--gold2);">● P:</span> <strong>${pctEnSal.p.toFixed(2)}%</strong> &nbsp;`:''}
+            ${pctEnSal.mg!==null?`<span style="color:var(--blue);">● Mg:</span> <strong>${pctEnSal.mg.toFixed(2)}%</strong> &nbsp;`:''}
+            ${pctEnSal.na!==null?`<span style="color:var(--purple);">● Na:</span> <strong>${pctEnSal.na.toFixed(2)}%</strong> &nbsp;`:''}
+            ${pctEnSal.cu!==null?`<span style="color:var(--red);">● Cu:</span> <strong>${pctEnSal.cu.toFixed(0)} mg/kg</strong>`:''}
+          </div>
+          <div style="font-size:11px;color:var(--t3);margin-top:8px;border-top:1px solid var(--brd);padding-top:8px;">
+            Consumo sal objetivo: <strong style="color:var(--t2);">${consSalGrDia.toFixed(0)} g/cab/día</strong> (35 g/100kg PV) &nbsp;·&nbsp;
+            Consumo total diario: <strong style="color:var(--t2);">${consSalKgDiaTot.toFixed(1)} kg/día</strong> &nbsp;·&nbsp;
+            Pedido estimado 30 días: <strong style="color:var(--gold2);">${sal30} kg</strong>
+          </div>
+          <div style="font-size:10px;color:var(--t3);margin-top:6px;">
+            Basado en ${bromsDelPeriodo.length} muestra${bromsDelPeriodo.length>1?'s':''} · NRC Beef Cattle 2016 · 
+            ${desde} → ${hasta}
+          </div>
+        </div>
+      </div>
+    </div>`;
+  });
+
+  document.getElementById('formResultados').innerHTML = html ||
+    '<div class="emp"><div class="emp-ic">🐄</div>No se encontraron grupos activos de Torillos o Vaquillas en Inventario.</div>';
+  document.getElementById('btnImprimir').style.display = html ? '' : 'none';
+}
+
+function imprimirFormulacion() {
+  window.print();
+}
+
+// ═══════════════════════════════════
+// FIN FORMULACIÓN
+// ═══════════════════════════════════
 
 // Cerrar modal al hacer clic fuera
 document.querySelectorAll('.mo').forEach(mo=>{
