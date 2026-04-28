@@ -997,31 +997,166 @@ function ntf(msg,tipo='ok'){
 }
 
 // ═══════════════════════════════════════════════════════════
-// FORMULACIÓN — NRC Bovinos Carne Invernada 300kg
+// FORMULACIÓN — NRC Beef Cattle 2016
+// Raza: Bos indicus Nelore 95% — Solo pasto + sal + agua
 // ═══════════════════════════════════════════════════════════
 
-// Firebase Pasturas (bromatológicos)
 const FB_ACT = 'https://elprado1-153ef-default-rtdb.firebaseio.com/elprado1';
 
-// NRC requerimientos diarios bovino carne invernada 300kg
-// Fuente: NRC Beef Cattle 2016 — ganancia moderada 0.5-0.8 kg/día
-// req = g/día o mg/día de mineral ABSORBIDO
-const NRC_BASE = {
-  ca: { req: 18,  unidad: 'g/día',  label: 'Calcio (Ca)',    absP: 0.30, absSal: 0.60 },
-  p:  { req: 14,  unidad: 'g/día',  label: 'Fósforo (P)',    absP: 0.55, absSal: 0.65 },
-  mg: { req: 5,   unidad: 'g/día',  label: 'Magnesio (Mg)',  absP: 0.16, absSal: 0.40 },
-  na: { req: 7,   unidad: 'g/día',  label: 'Sodio (Na)',     absP: 0.90, absSal: 0.90 },
-  cu: { req: 110, unidad: 'mg/día', label: 'Cobre (Cu)',     absP: 0.04, absSal: 0.05, ppm: true },
+// Factor Bos indicus (Nelore) vs Bos taurus NRC
+const BI_FACTOR = 0.87;
+
+// Objetivos GMD por categoría (kg/día)
+const GMD_OBJ = { TORILLO: 0.850, VAQUILLA: 0.750 };
+
+// Absorción NRC — pasto vs sal mineral
+const ABS = {
+  ca: { pasto: 0.28, sal: 0.60 },  // Bos indicus ajustado
+  p:  { pasto: 0.52, sal: 0.65 },
+  mg: { pasto: 0.14, sal: 0.40 },
+  na: { pasto: 0.90, sal: 0.90 },
+  cu: { pasto: 0.04, sal: 0.05, ppm: true },
 };
 
-// Requerimientos ajustados por peso vivo
-function ajustarNRC(pesoKg) {
-  const factor = Math.max(0.5, Math.min(2, pesoKg / 300));
-  const r = {};
-  Object.entries(NRC_BASE).forEach(([k, v]) => {
-    r[k] = { ...v, req: Math.round(v.req * factor * 10) / 10 };
+// Labels
+const MIN_LABELS = {
+  ca: 'Calcio (Ca)', p: 'Fósforo (P)', mg: 'Magnesio (Mg)',
+  na: 'Sodio (Na)',  cu: 'Cobre (Cu)',
+};
+
+// ── Calcular TDN y NE desde bromatológico ──
+function calcNE(fda, ee) {
+  // TDN NRC Beef (forages): TDN = 88.9 - 0.779 × FDA
+  const tdn = Math.max(40, 88.9 - 0.779 * (fda || 30));
+  // DE (Mcal/kg MS)
+  const de = tdn * 0.04409;
+  // NE_m y NE_g (Mcal/kg MS) — NRC 2016 ecuaciones
+  const nem = Math.max(0.8, 1.37*de - 0.138*de*de + 0.0105*de*de*de - 1.12);
+  const neg = Math.max(0.3, 1.42*de - 0.174*de*de + 0.0122*de*de*de - 1.65);
+  return { tdn: Math.round(tdn*10)/10, de: Math.round(de*100)/100,
+           nem: Math.round(nem*100)/100, neg: Math.round(neg*100)/100 };
+}
+
+// ── DMI NRC Bos indicus ──
+// NRC: DMI (kg/día) = SBW^0.75 × (0.2435×NE_m - 0.0466×NE_m² - 0.1128) / NE_m × BI_FACTOR
+function calcDMI(peso, nem) {
+  const sbw75 = Math.pow(peso, 0.75);
+  const dmi = sbw75 * (0.2435*nem - 0.0466*nem*nem - 0.1128) / nem * BI_FACTOR;
+  return Math.max(2, Math.round(dmi*100)/100);
+}
+
+// ── GMD máximo teórico con este pasto (NRC) ──
+// NE_g disponible = (DMI × NE_g_dieta) - NE_m_requerido
+// GMD (kg) = (NE_g_disp / (0.0635 × EBW^0.75)) ^ (1/0.6328)  — NRC ecuación
+function calcGMDMax(peso, nem, neg, dmi) {
+  // NE_m requerido por día
+  const neM_req = 0.077 * Math.pow(peso * 0.96, 0.75); // Mcal/día Bos indicus
+  const neG_disp = Math.max(0, dmi * neg - neM_req);
+  if (neG_disp <= 0) return 0;
+  const ebw75 = Math.pow(peso * 0.891, 0.75);
+  const gmd = Math.pow(neG_disp / (0.0635 * ebw75), 1/0.6328);
+  return Math.round(gmd * 1000) / 1000;
+}
+
+// ── Requerimientos minerales NRC (g o mg absorbidos/día) ──
+// NRC 2016: requirimientos varían con peso y GMD
+function calcReqMineral(peso, gmd) {
+  // Ca: mantenimiento + ganancia
+  // NRC: Ca mantenimiento = 0.0154 g/kg PV; Ca ganancia = 9.8 g/kg ganado × GMD
+  const caMant = 0.0154 * peso;
+  const caGain = 9.8 * gmd;
+  const ca = (caMant + caGain) / ABS.ca.sal; // g ingeridos necesarios de la sal
+  // Requerimiento absorbido total
+  const caReq = caMant + caGain; // g absorbidos/día
+
+  // P: NRC: 0.0143 g/kg PV mantenimiento; 4.8 g/kg ganado
+  const pMant = 0.0143 * peso;
+  const pGain = 4.8 * gmd;
+  const pReq  = pMant + pGain;
+
+  // Mg: NRC: 0.0045 g/kg PV
+  const mgReq = 0.0045 * peso;
+
+  // Na: NRC: 0.0006 × PV^1.0 + 0.2 × GMD × 1000 mg → g
+  const naReq = (0.0006 * peso + 0.2 * gmd);
+
+  // Cu: NRC: 10 mg/kg MS consumida — Bos indicus necesita más por menor absorción
+  // Usamos 110 mg/día base ajustado por peso
+  const cuReq = 110 * (peso / 300);
+
+  return {
+    ca: Math.round(caReq * 10) / 10,
+    p:  Math.round(pReq  * 10) / 10,
+    mg: Math.round(mgReq * 10) / 10,
+    na: Math.round(naReq * 10) / 10,
+    cu: Math.round(cuReq * 10) / 10,
+  };
+}
+
+// ── Aporte mineral del pasto (g o mg ingeridos/día) ──
+function calcAportePasto(params, dmi) {
+  return {
+    ca: params.ca ? (params.ca/100) * dmi * 1000 : null,
+    p:  params.p  ? (params.p /100) * dmi * 1000 : null,
+    mg: params.mg ? (params.mg/100) * dmi * 1000 : null,
+    na: params.na ? (params.na/100) * dmi * 1000 : null,
+    cu: params.cu ? params.cu * dmi               : null,
+  };
+}
+
+// ── Calcular concentración necesaria en sal ──
+// déficit_absorbido / absorción_sal / consumo_sal_kg = concentración
+function calcConcentracionSal(defAbsorbido, consSalKgDia, esPpm) {
+  if (consSalKgDia <= 0) return 0;
+  const necesarioIngerido = defAbsorbido / (esPpm ? ABS.cu.sal : ABS[Object.keys(ABS)[0]].sal);
+  // Retornar g/kg o mg/kg
+  return esPpm
+    ? defAbsorbido / ABS.cu.sal / consSalKgDia          // mg/kg sal
+    : (defAbsorbido / consSalKgDia / 10);               // % (g/100g)
+}
+
+// ── Bloque de formulación para una categoría y un modo (actual u objetivo) ──
+function calcBloqueFormulacion(cat, pesoPromCat, gmdUsado, paramsPasto, bromsN, label, colorCat) {
+  const { tdn, nem, neg } = calcNE(paramsPasto.fda, paramsPasto.ee);
+  const dmi     = calcDMI(pesoPromCat, nem);
+  const gmdMax  = calcGMDMax(pesoPromCat, nem, neg, dmi);
+  const req     = calcReqMineral(pesoPromCat, gmdUsado);
+  const aporte  = calcAportePasto(paramsPasto, dmi);
+
+  // Consumo sal objetivo: 35 g/100kg PV ajustado Bos indicus
+  const consSalGrDia  = pesoPromCat * 35 / 100 * BI_FACTOR;
+  const consSalKgDia  = consSalGrDia / 1000;
+
+  // Calcular déficit y concentración en sal
+  const minerales = ['ca','p','mg','na','cu'];
+  const resultado = {};
+  minerales.forEach(min => {
+    const ap    = aporte[min];
+    const isPpm = ABS[min].ppm;
+    const absP  = ABS[min].pasto;
+    const absSal= ABS[min].sal;
+    const reqAbs= req[min]; // ya es absorbido
+
+    if (ap !== null) {
+      const apAbs   = ap * absP;
+      const defAbs  = Math.max(0, reqAbs - apAbs);
+      // Concentración en sal
+      const concSal = consSalKgDia > 0
+        ? isPpm
+          ? (defAbs / absSal) / consSalKgDia          // mg/kg
+          : (defAbs / absSal) / (consSalKgDia * 10)   // %
+        : 0;
+      resultado[min] = { ap, apAbs, reqAbs, defAbs, concSal };
+    } else {
+      resultado[min] = { ap: null, apAbs: null, reqAbs: req[min], defAbs: null, concSal: null };
+    }
   });
-  return r;
+
+  // Alerta si GMD objetivo > GMD máximo del pasto
+  const alertaEnergia = gmdUsado > gmdMax + 0.05;
+
+  return { tdn, nem, neg, dmi, gmdMax, gmdUsado, req, aporte, resultado,
+           consSalGrDia, consSalKgDia, alertaEnergia };
 }
 
 // Estado formulación
@@ -1061,8 +1196,239 @@ async function initFormulacion() {
 
 function calcularFormulacion() {
   const desde = document.getElementById('fFormDesde').value;
-  const hasta = document.getElementById('fFormHasta').value;
+  const hasta  = document.getElementById('fFormHasta').value;
   if (!desde || !hasta) return;
+
+  // ── Filtrar bromatológicos del período ──
+  const bromsDelPeriodo = _formBroms.filter(b => {
+    const fb = b.fechaFin || b.fecha || '';
+    const fi = b.fechaIni || b.fecha || '';
+    return fb >= desde && fi <= hasta;
+  });
+
+  document.getElementById('formBromCount').textContent =
+    bromsDelPeriodo.length + ' muestras en el período';
+
+  if (!bromsDelPeriodo.length) {
+    document.getElementById('formBromResumen').innerHTML =
+      '<div class="emp"><div class="emp-ic">🌿</div>Sin bromatológicos en este período.<br>Cargá muestras en el módulo de Análisis primero.</div>';
+    document.getElementById('formResultados').innerHTML = '';
+    document.getElementById('btnImprimir').style.display = 'none';
+    return;
+  }
+
+  // ── Promediar parámetros por variedad ──
+  const avg = arr => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null;
+  const porVariedad = {};
+  bromsDelPeriodo.forEach(b => {
+    const v = (b.variedad || 'SIN VARIEDAD').toUpperCase();
+    if (!porVariedad[v]) porVariedad[v] = {
+      muestras:0, ca:[],p:[],mg:[],na:[],cu:[],fda:[],fdn:[],ee:[]
+    };
+    const p = b.params || {};
+    porVariedad[v].muestras++;
+    if(p.ca)  porVariedad[v].ca.push(parseFloat(p.ca));
+    if(p.p)   porVariedad[v].p.push(parseFloat(p.p));
+    if(p.mg)  porVariedad[v].mg.push(parseFloat(p.mg));
+    if(p.na)  porVariedad[v].na.push(parseFloat(p.na));
+    if(p.cu)  porVariedad[v].cu.push(parseFloat(p.cu));
+    if(p.fda) porVariedad[v].fda.push(parseFloat(p.fda));
+    if(p.fdn) porVariedad[v].fdn.push(parseFloat(p.fdn));
+    if(p.ee)  porVariedad[v].ee.push(parseFloat(p.ee));
+  });
+
+  // ── Resumen bromatológico + energía calculada ──
+  const bromHtml = Object.entries(porVariedad).map(([v, d]) => {
+    const fdaP = avg(d.fda) || 30;
+    const ne   = calcNE(fdaP, avg(d.ee));
+    return `<div style="display:inline-block;background:var(--card2);border:1px solid var(--brd);border-radius:6px;padding:10px 16px;margin:0 8px 8px 0;min-width:240px;vertical-align:top;">
+      <div style="font-size:11px;font-weight:700;color:var(--gs);margin-bottom:6px;">${v} — ${d.muestras} muestra${d.muestras>1?'s':''}</div>
+      <div style="font-size:11px;color:var(--t2);line-height:1.8;">
+        Ca: <strong>${avg(d.ca)!==null?avg(d.ca).toFixed(2)+'%':'—'}</strong> &nbsp;
+        P: <strong>${avg(d.p)!==null?avg(d.p).toFixed(2)+'%':'—'}</strong> &nbsp;
+        Mg: <strong>${avg(d.mg)!==null?avg(d.mg).toFixed(2)+'%':'—'}</strong><br>
+        FDA: <strong>${fdaP.toFixed(1)}%</strong> &nbsp;
+        TDN: <strong style="color:var(--gold2);">${ne.tdn}%</strong> &nbsp;
+        NE_m: <strong style="color:var(--gold2);">${ne.nem} Mcal/kg</strong> &nbsp;
+        NE_g: <strong style="color:var(--gold2);">${ne.neg} Mcal/kg</strong>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('formBromResumen').innerHTML =
+    bromHtml || '<em style="color:var(--t3);">Sin datos en las muestras</em>';
+
+  // ── Parámetros promedio de todas las variedades ──
+  const allParams = {
+    ca:  avg(Object.values(porVariedad).flatMap(d=>d.ca)),
+    p:   avg(Object.values(porVariedad).flatMap(d=>d.p)),
+    mg:  avg(Object.values(porVariedad).flatMap(d=>d.mg)),
+    na:  avg(Object.values(porVariedad).flatMap(d=>d.na)),
+    cu:  avg(Object.values(porVariedad).flatMap(d=>d.cu)),
+    fda: avg(Object.values(porVariedad).flatMap(d=>d.fda)) || 30,
+    ee:  avg(Object.values(porVariedad).flatMap(d=>d.ee))  || 3,
+  };
+
+  // ── Calcular por categoría ──
+  const cats = [
+    { key:'TORILLO',  label:'🐂 Torillos',  color:'var(--blue)' },
+    { key:'VAQUILLA', label:'🐄 Vaquillas', color:'var(--gs)'   },
+  ];
+
+  let html = '';
+  cats.forEach(cat => {
+    const gruposCat = _grupos.filter(g =>
+      (g.categoria||'').toUpperCase().includes(cat.key) ||
+      (g.nombre||'').toUpperCase().includes(cat.key==='TORILLO'?'TOR':'VAQ')
+    );
+    if (!gruposCat.length) return;
+
+    const pesoPromCat = Math.round(
+      gruposCat.reduce((s,g)=>s+(g.pesoHoy||300),0) / gruposCat.length
+    );
+    const cabezasTot  = gruposCat.reduce((s,g)=>s+(g.cabezas||0),0);
+    const gmdActual   = Math.round(
+      gruposCat.reduce((s,g)=>s+(g.gmd||0),0) / gruposCat.length * 1000
+    ) / 1000;
+    const gmdObjetivo = GMD_OBJ[cat.key];
+
+    // Calcular energía del pasto promedio
+    const ne = calcNE(allParams.fda, allParams.ee);
+
+    // ── MODO 1: Situación actual ──
+    const m1 = calcBloqueFormulacion(cat, pesoPromCat, gmdActual, allParams,
+                                      bromsDelPeriodo.length, 'actual', cat.color);
+
+    // ── MODO 2: Objetivo ──
+    const m2 = calcBloqueFormulacion(cat, pesoPromCat, gmdObjetivo, allParams,
+                                      bromsDelPeriodo.length, 'objetivo', cat.color);
+
+    // ── Renderizar tabla de un modo ──
+    function renderTablaFormul(modo, colorModo) {
+      return ['ca','p','mg','na','cu'].map(min => {
+        const res = modo.resultado[min];
+        const isPpm = ABS[min].ppm;
+        const fmt1 = v => v!==null ? (isPpm?v.toFixed(0):v.toFixed(1)) : '—';
+        const apStr = res.ap !== null
+          ? `${fmt1(res.ap)} ${isPpm?'mg':'g'}<span style="font-size:9px;color:var(--t3);"> (abs: ${fmt1(res.apAbs)})</span>`
+          : '<span style="color:var(--t3);">—</span>';
+        const defStr = res.defAbs !== null ? `${fmt1(res.defAbs)} ${isPpm?'mg':'g'}` : '—';
+        const concStr = res.concSal !== null
+          ? isPpm ? res.concSal.toFixed(0)+' mg/kg' : res.concSal.toFixed(2)+'%'
+          : '—';
+        const color = res.defAbs===null ? 'var(--t3)'
+                    : res.defAbs<=0    ? 'var(--gs)'
+                    : res.defAbs<res.reqAbs*0.3 ? 'var(--gold2)'
+                    : 'var(--red)';
+        return `<tr>
+          <td><strong>${MIN_LABELS[min]}</strong>
+            <div style="font-size:9px;color:var(--t3);">Abs. pasto ${Math.round(ABS[min].pasto*100)}% · Abs. sal ${Math.round(ABS[min].sal*100)}%</div>
+          </td>
+          <td class="mn">${isPpm?res.reqAbs.toFixed(0)+' mg':res.reqAbs.toFixed(1)+' g'}</td>
+          <td class="mn" style="color:var(--t2);">${apStr}</td>
+          <td class="mn" style="color:${color};font-weight:600;">${defStr}</td>
+          <td class="mn" style="font-weight:700;color:${color};">${concStr}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // ── Resumen recomendación ──
+    function renderRecomendacion(modo, tituloModo, colorModo, consSalTot) {
+      const r = modo.resultado;
+      const mins = ['ca','p','mg','na','cu'];
+      const colores = {'ca':'var(--gs)','p':'var(--gold2)','mg':'var(--blue)','na':'var(--purple)','cu':'var(--red)'};
+      const concStr = mins
+        .filter(m => r[m].concSal !== null)
+        .map(m => {
+          const v = r[m].concSal;
+          const isPpm = ABS[m].ppm;
+          return `<span style="color:${colores[m]};">● ${MIN_LABELS[m].split(' ')[0]}:</span> <strong>${isPpm?v.toFixed(0)+' mg/kg':v.toFixed(2)+'%'}</strong>`;
+        }).join(' &nbsp; ');
+      const sal30 = Math.round(consSalTot * 30);
+      const alertaHtml = modo.alertaEnergia
+        ? `<div style="margin-top:8px;padding:6px 10px;background:rgba(224,90,74,.1);border:1px solid rgba(224,90,74,.3);border-radius:5px;font-size:11px;color:var(--red);">
+            ⚠️ Con este pasto el GMD máximo teórico es <strong>${modo.gmdMax.toFixed(3)} kg/día</strong> (Nelore ${pesoPromCat} kg).
+            Tu objetivo (${modo.gmdUsado} kg/día) supera el potencial energético actual.<br>
+            → Mejorá el descanso del potrero para aumentar la calidad forrajera.
+           </div>` : '';
+      return `<div style="margin-top:10px;background:${colorModo==='actual'?'rgba(74,154,186,.08)':'rgba(109,186,58,.08)'};border:1px solid ${colorModo==='actual'?'rgba(74,154,186,.3)':'rgba(109,186,58,.3)'};border-radius:8px;padding:12px 16px;">
+        <div style="font-size:11px;font-weight:700;color:${colorModo==='actual'?'var(--blue)':'var(--gs)'};margin-bottom:6px;">
+          ${tituloModo}
+        </div>
+        <div style="font-size:12px;color:var(--t2);line-height:2.2;">${concStr}</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:6px;border-top:1px solid var(--brd);padding-top:6px;">
+          Consumo sal: <strong style="color:var(--t2);">${modo.consSalGrDia.toFixed(0)} g/cab/día</strong> ·
+          Total diario: <strong style="color:var(--t2);">${consSalTot.toFixed(1)} kg</strong> ·
+          <strong style="color:var(--gold2);">Pedido 30 días: ${sal30} kg</strong> ·
+          DMI: ${modo.dmi} kg MS/animal/día · NE_m: ${modo.nem} · NE_g: ${modo.neg} Mcal/kg ·
+          GMD máx pasto: <strong>${modo.gmdMax.toFixed(3)} kg/día</strong>
+        </div>
+        ${alertaHtml}
+      </div>`;
+    }
+
+    const consSalTotActual  = m1.consSalKgDia * cabezasTot;
+    const consSalTotObjetivo = m2.consSalKgDia * cabezasTot;
+
+    html += `<div class="card" style="border-left:3px solid ${cat.color};">
+      <div class="ch">
+        <div class="ct" style="color:${cat.color};">${cat.label}</div>
+        <div style="font-size:11px;color:var(--t3);">
+          ${cabezasTot} cab · ${pesoPromCat} kg prom · GMD actual: <strong style="color:var(--gold2);">${gmdActual} kg/día</strong> ·
+          GMD objetivo: <strong style="color:var(--gs);">${gmdObjetivo} kg/día</strong> ·
+          Bos indicus factor: ${BI_FACTOR}
+        </div>
+      </div>
+      <div class="cb">
+
+        <!-- MODO 1: ACTUAL -->
+        <div style="margin-bottom:16px;">
+          <div style="font-size:11px;font-weight:700;color:var(--blue);letter-spacing:.5px;margin-bottom:8px;padding:6px 10px;background:rgba(74,154,186,.08);border-radius:5px;">
+            📊 MODO 1 — SITUACIÓN ACTUAL &nbsp; GMD real: ${gmdActual} kg/día · ${m1.dmi} kg MS/día · ${(m1.dmi/pesoPromCat*100).toFixed(1)}% PV
+          </div>
+          <div class="tw"><table>
+            <thead><tr>
+              <th>Mineral</th><th>Req. NRC absorbido</th>
+              <th>Aporta pasto (ingerido/absorbido)</th>
+              <th>Déficit absorbido</th><th>Conc. en Sal ⭐</th>
+            </tr></thead>
+            <tbody>${renderTablaFormul(m1, 'actual')}</tbody>
+          </table></div>
+          ${renderRecomendacion(m1,'✅ RECOMENDACIÓN ACTUAL — '+cat.label.replace(/🐂|🐄/,'').trim().toUpperCase(),'actual',consSalTotActual)}
+        </div>
+
+        <div style="border-top:2px dashed var(--brd2);margin:14px 0;"></div>
+
+        <!-- MODO 2: OBJETIVO -->
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--gs);letter-spacing:.5px;margin-bottom:8px;padding:6px 10px;background:rgba(109,186,58,.08);border-radius:5px;">
+            🎯 MODO 2 — OBJETIVO &nbsp; GMD objetivo: ${gmdObjetivo} kg/día · ${m2.dmi} kg MS/día · ${(m2.dmi/pesoPromCat*100).toFixed(1)}% PV
+          </div>
+          <div class="tw"><table>
+            <thead><tr>
+              <th>Mineral</th><th>Req. NRC absorbido</th>
+              <th>Aporta pasto (ingerido/absorbido)</th>
+              <th>Déficit absorbido</th><th>Conc. en Sal ⭐</th>
+            </tr></thead>
+            <tbody>${renderTablaFormul(m2, 'objetivo')}</tbody>
+          </table></div>
+          ${renderRecomendacion(m2,'🎯 RECOMENDACIÓN OBJETIVO — '+cat.label.replace(/🐂|🐄/,'').trim().toUpperCase(),'objetivo',consSalTotObjetivo)}
+        </div>
+
+        <div style="font-size:10px;color:var(--t3);margin-top:10px;">
+          NRC Beef Cattle 2016 · Bos indicus Nelore 95% · Solo pasto + sal + agua ·
+          ${bromsDelPeriodo.length} muestras · período ${desde} → ${hasta}
+          ${!allParams.na&&!allParams.cu?' · <span style="color:var(--gold2);">⚠️ Na y Cu no reportados por Labnutris</span>':''}
+        </div>
+      </div>
+    </div>`;
+  });
+
+  document.getElementById('formResultados').innerHTML = html ||
+    '<div class="emp"><div class="emp-ic">🐄</div>No se encontraron grupos activos de Torillos o Vaquillas en Inventario.</div>';
+  document.getElementById('btnImprimir').style.display = html ? '' : 'none';
+}
+
+
 
   // Filtrar bromatológicos del período
   const bromsDelPeriodo = _formBroms.filter(b => {
