@@ -1005,15 +1005,16 @@ const FB_ACT = 'https://elprado1-153ef-default-rtdb.firebaseio.com/elprado1';
 
 // NRC requerimientos diarios bovino carne invernada 300kg
 // Fuente: NRC Beef Cattle 2016 — ganancia moderada 0.5-0.8 kg/día
+// req = g/día o mg/día de mineral ABSORBIDO
 const NRC_BASE = {
-  ca:  { req: 18,   unidad: 'g/día',   label: 'Calcio (Ca)' },
-  p:   { req: 14,   unidad: 'g/día',   label: 'Fósforo (P)' },
-  mg:  { req: 5,    unidad: 'g/día',   label: 'Magnesio (Mg)' },
-  na:  { req: 7,    unidad: 'g/día',   label: 'Sodio (Na)' },
-  cu:  { req: 110,  unidad: 'mg/día',  label: 'Cobre (Cu)', ppm: true },
+  ca: { req: 18,  unidad: 'g/día',  label: 'Calcio (Ca)',    absP: 0.30, absSal: 0.60 },
+  p:  { req: 14,  unidad: 'g/día',  label: 'Fósforo (P)',    absP: 0.55, absSal: 0.65 },
+  mg: { req: 5,   unidad: 'g/día',  label: 'Magnesio (Mg)',  absP: 0.16, absSal: 0.40 },
+  na: { req: 7,   unidad: 'g/día',  label: 'Sodio (Na)',     absP: 0.90, absSal: 0.90 },
+  cu: { req: 110, unidad: 'mg/día', label: 'Cobre (Cu)',     absP: 0.04, absSal: 0.05, ppm: true },
 };
 
-// Requerimientos ajustados por peso vivo (escala linear desde 300kg base)
+// Requerimientos ajustados por peso vivo
 function ajustarNRC(pesoKg) {
   const factor = Math.max(0.5, Math.min(2, pesoKg / 300));
   const r = {};
@@ -1171,24 +1172,35 @@ function calcularFormulacion() {
     const consSalKgDia   = consSalGrDia / 1000;    // kg/animal/día
     const consSalKgDiaTot = consSalKgDia * cabezasTot; // kg/día todo el grupo
 
-    // Déficit = requerimiento - aporte pasto
+    // Déficit = requerimiento absorbido - aporte absorbido del pasto
+    // Para cubrir el déficit con la sal:
+    //   g_sal_necesaria = déficit_absorbido / absorción_sal
+    //   concentración_sal% = g_sal_necesaria / (consSalKgDia × 1000) × 100
     const deficit = {};
     const pctEnSal = {};
     let hayDatos = false;
 
     ['ca','p','mg','na','cu'].forEach(min => {
-      const req = nrc[min].req;
+      const n   = NRC_BASE[min];
+      const req = nrc[min].req;              // requerimiento absorbido g/animal/día
       const ap  = aportePasto[min];
       if (ap !== null) {
         hayDatos = true;
-        deficit[min] = Math.max(0, req - ap);
-        // Concentración necesaria en la sal (g déficit / g sal consumida × 100)
+        // Mineral absorbido del pasto
+        const apAbs = ap * n.absP;
+        // Déficit de mineral absorbido
+        const defAbs = Math.max(0, req - apAbs);
+        deficit[min] = defAbs;
+        // Mineral ingerido de la sal necesario para cubrir el déficit
+        // defAbs = mg_sal_ingerido × absorción_sal → mg_sal = defAbs / absorción_sal
+        const mgSalNecesario = defAbs / n.absSal;
+        // Concentración en sal
         if (min === 'cu') {
-          // Cu: mg/día déficit → mg/kg sal
-          pctEnSal[min] = consSalKgDia > 0 ? deficit[min] / consSalKgDia : 0;
+          // Cu: mg_sal_necesario / kg_sal = mg/kg
+          pctEnSal[min] = consSalKgDia > 0 ? mgSalNecesario / consSalKgDia : 0;
         } else {
-          // Macrominerales: g/día → %
-          pctEnSal[min] = consSalKgDia > 0 ? (deficit[min] / (consSalKgDia * 1000)) * 100 : 0;
+          // Macro: g_sal_necesario / g_sal_total × 100 = %
+          pctEnSal[min] = consSalKgDia > 0 ? (mgSalNecesario / (consSalKgDia * 1000)) * 100 : 0;
         }
       } else {
         deficit[min] = null;
@@ -1196,21 +1208,34 @@ function calcularFormulacion() {
       }
     });
 
-    // Construir tabla de resultados
+    // Construir tabla — mostrar mineral ingerido, absorbido y déficit
     const filas = ['ca','p','mg','na','cu'].map(min => {
-      const n   = nrc[min];
+      const n   = NRC_BASE[min];
+      const nAdj = nrc[min];
       const ap  = aportePasto[min];
       const def = deficit[min];
       const pct = pctEnSal[min];
-      const apStr  = ap!==null  ? (n.ppm ? ap.toFixed(0)+' mg' : ap.toFixed(1)+' g') : '—';
-      const defStr = def!==null ? (n.ppm ? def.toFixed(0)+' mg' : def.toFixed(1)+' g') : '—';
-      const pctStr = pct!==null ? (n.ppm ? pct.toFixed(0)+' mg/kg' : pct.toFixed(2)+'%') : '—';
-      const color  = def===null?'var(--t3)':def<=0?'var(--gs)':def<n.req*0.3?'var(--gold2)':'var(--red)';
+      const apAbs = ap !== null ? ap * n.absP : null;
+      // Formato valores
+      const fmt1 = v => v !== null ? (n.ppm ? v.toFixed(0) : v.toFixed(1)) : '—';
+      const apStr  = ap !== null
+        ? `${fmt1(ap)} ${n.ppm?'mg':'g'} <span style="font-size:9px;color:var(--t3);">(abs: ${fmt1(apAbs)} ${n.ppm?'mg':'g'})</span>`
+        : '—';
+      const defStr = def !== null ? `${fmt1(def)} ${n.ppm?'mg':'g'}` : '—';
+      const pctStr = pct !== null
+        ? (n.ppm ? pct.toFixed(0)+' mg/kg' : pct.toFixed(2)+'%')
+        : '—';
+      const color = def===null ? 'var(--t3)'
+                  : def<=0    ? 'var(--gs)'
+                  : def<nAdj.req*0.3 ? 'var(--gold2)'
+                  : 'var(--red)';
       return `<tr>
-        <td><strong>${n.label}</strong></td>
-        <td class="mn">${n.ppm?n.req+' mg':n.req+' g'}</td>
+        <td><strong>${nAdj.label}</strong>
+          <div style="font-size:9px;color:var(--t3);">Abs. pasto: ${Math.round(n.absP*100)}% · Abs. sal: ${Math.round(n.absSal*100)}%</div>
+        </td>
+        <td class="mn">${n.ppm?nAdj.req+' mg':nAdj.req+' g'}</td>
         <td class="mn" style="color:var(--t2);">${apStr}</td>
-        <td class="mn" style="color:${color};">${defStr}</td>
+        <td class="mn" style="color:${color};font-weight:600;">${defStr}</td>
         <td class="mn" style="font-weight:700;color:${color};">${pctStr}</td>
       </tr>`;
     }).join('');
