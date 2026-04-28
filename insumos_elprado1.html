@@ -1006,8 +1006,8 @@ const FB_ACT = 'https://elprado1-153ef-default-rtdb.firebaseio.com/elprado1';
 // Factor Bos indicus (Nelore) vs Bos taurus NRC
 const BI_FACTOR = 0.87;
 
-// Objetivos GMD por categoría (kg/día)
-const GMD_OBJ = { TORILLO: 0.850, VAQUILLA: 0.750 };
+// Objetivos GMD por categoría (kg/día) — El Prado 1
+const GMD_OBJ = { TORILLO: 0.850, VAQUILLA: 0.700 };
 
 // Absorción NRC — pasto vs sal mineral
 const ABS = {
@@ -1037,24 +1037,20 @@ function calcNE(fda, ee) {
            nem: Math.round(nem*100)/100, neg: Math.round(neg*100)/100 };
 }
 
-// ── DMI NRC Bos indicus ──
-// NRC: DMI (kg/día) = SBW^0.75 × (0.2435×NE_m - 0.0466×NE_m² - 0.1128) / NE_m × BI_FACTOR
-function calcDMI(peso, nem) {
-  const sbw75 = Math.pow(peso, 0.75);
-  const dmi = sbw75 * (0.2435*nem - 0.0466*nem*nem - 0.1128) / nem * BI_FACTOR;
-  return Math.max(2, Math.round(dmi*100)/100);
+// ── DMI Nelore — 2.4% PV (consenso NRC + campo El Prado 1) ──
+const DMI_PCT = 0.024; // 2.4% del peso vivo
+
+function calcDMI(peso) {
+  return Math.round(peso * DMI_PCT * 100) / 100;
 }
 
-// ── GMD máximo teórico con este pasto (NRC) ──
-// NE_g disponible = (DMI × NE_g_dieta) - NE_m_requerido
-// GMD (kg) = (NE_g_disp / (0.0635 × EBW^0.75)) ^ (1/0.6328)  — NRC ecuación
+// ── GMD máximo teórico con este pasto y DMI 2.4% PV ──
 function calcGMDMax(peso, nem, neg, dmi) {
-  // NE_m requerido por día
-  const neM_req = 0.077 * Math.pow(peso * 0.96, 0.75); // Mcal/día Bos indicus
+  const neM_req  = 0.077 * Math.pow(peso, 0.75) * BI_FACTOR;
   const neG_disp = Math.max(0, dmi * neg - neM_req);
   if (neG_disp <= 0) return 0;
   const ebw75 = Math.pow(peso * 0.891, 0.75);
-  const gmd = Math.pow(neG_disp / (0.0635 * ebw75), 1/0.6328);
+  const gmd   = Math.pow(neG_disp / (0.0635 * ebw75), 1/0.6328);
   return Math.round(gmd * 1000) / 1000;
 }
 
@@ -1118,7 +1114,7 @@ function calcConcentracionSal(defAbsorbido, consSalKgDia, esPpm) {
 // ── Bloque de formulación para una categoría y un modo (actual u objetivo) ──
 function calcBloqueFormulacion(cat, pesoPromCat, gmdUsado, paramsPasto, bromsN, label, colorCat) {
   const { tdn, nem, neg } = calcNE(paramsPasto.fda, paramsPasto.ee);
-  const dmi     = calcDMI(pesoPromCat, nem);
+  const dmi = calcDMI(pesoPromCat);
   const gmdMax  = calcGMDMax(pesoPromCat, nem, neg, dmi);
   const req     = calcReqMineral(pesoPromCat, gmdUsado);
   const aporte  = calcAportePasto(paramsPasto, dmi);
@@ -1366,6 +1362,7 @@ function calcularFormulacion() {
   // ── Resumen bromatológico + energía calculada ──
   const bromHtml = Object.entries(porVariedad).map(([v, d]) => {
     const fdaP = avg(d.fda) || 30;
+    const fdnP = avg(d.fdn) || 65;
     const ne   = calcNE(fdaP, avg(d.ee));
     return `<div style="display:inline-block;background:var(--card2);border:1px solid var(--brd);border-radius:6px;padding:10px 16px;margin:0 8px 8px 0;min-width:240px;vertical-align:top;">
       <div style="font-size:11px;font-weight:700;color:var(--gs);margin-bottom:6px;">${v} — ${d.muestras} muestra${d.muestras>1?'s':''}</div>
@@ -1374,6 +1371,7 @@ function calcularFormulacion() {
         P: <strong>${avg(d.p)!==null?avg(d.p).toFixed(2)+'%':'—'}</strong> &nbsp;
         Mg: <strong>${avg(d.mg)!==null?avg(d.mg).toFixed(2)+'%':'—'}</strong><br>
         FDA: <strong>${fdaP.toFixed(1)}%</strong> &nbsp;
+        FDN: <strong style="color:${fdnP>65?'var(--gold2)':'var(--gs)'};">${fdnP.toFixed(1)}%</strong> &nbsp;
         TDN: <strong style="color:var(--gold2);">${ne.tdn}%</strong> &nbsp;
         NE_m: <strong style="color:var(--gold2);">${ne.nem} Mcal/kg</strong> &nbsp;
         NE_g: <strong style="color:var(--gold2);">${ne.neg} Mcal/kg</strong>
@@ -1391,6 +1389,7 @@ function calcularFormulacion() {
     na:  avg(Object.values(porVariedad).flatMap(d=>d.na)),
     cu:  avg(Object.values(porVariedad).flatMap(d=>d.cu)),
     fda: avg(Object.values(porVariedad).flatMap(d=>d.fda)) || 30,
+    fdn: avg(Object.values(porVariedad).flatMap(d=>d.fdn)) || 60,
     ee:  avg(Object.values(porVariedad).flatMap(d=>d.ee))  || 3,
   };
 
@@ -1504,7 +1503,7 @@ function calcularFormulacion() {
         <!-- MODO 1: ACTUAL -->
         <div style="margin-bottom:16px;">
           <div style="font-size:11px;font-weight:700;color:var(--blue);letter-spacing:.5px;margin-bottom:8px;padding:6px 10px;background:rgba(74,154,186,.08);border-radius:5px;">
-            📊 MODO 1 — SITUACIÓN ACTUAL &nbsp; GMD real: ${gmdActual} kg/día · ${m1.dmi} kg MS/día · ${(m1.dmi/pesoPromCat*100).toFixed(1)}% PV
+            📊 MODO 1 — SITUACIÓN ACTUAL &nbsp; GMD real: ${gmdActual} kg/día · ${m1.dmi} kg MS/día · 2.4% PV (Nelore)
           </div>
           <div class="tw"><table>
             <thead><tr>
@@ -1522,7 +1521,7 @@ function calcularFormulacion() {
         <!-- MODO 2: OBJETIVO -->
         <div>
           <div style="font-size:11px;font-weight:700;color:var(--gs);letter-spacing:.5px;margin-bottom:8px;padding:6px 10px;background:rgba(109,186,58,.08);border-radius:5px;">
-            🎯 MODO 2 — OBJETIVO &nbsp; GMD objetivo: ${gmdObjetivo} kg/día · ${m2.dmi} kg MS/día · ${(m2.dmi/pesoPromCat*100).toFixed(1)}% PV
+            🎯 MODO 2 — OBJETIVO &nbsp; GMD objetivo: ${gmdObjetivo} kg/día · ${m2.dmi} kg MS/día · 2.4% PV (Nelore)
           </div>
           <div class="tw"><table>
             <thead><tr>
