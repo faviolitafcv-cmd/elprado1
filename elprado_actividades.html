@@ -1981,27 +1981,19 @@ async function syncFromFirebase() {
         const lsKey = 'elprado_' + key;
         try {
           // Estrategia merge: LOCAL SIEMPRE GANA si tiene datos
-          // Firebase solo gana si local está vacío
           const localRaw = localStorage.getItem(lsKey);
           const localVal = localRaw ? JSON.parse(localRaw) : null;
-          const fbArr = Array.isArray(val) ? val
-            : (val && typeof val === 'object') ? Object.values(val) : null;
 
-          // Para objetos (potreroAreas, pluviometros, potreroConfig):
-          // local gana si tiene datos
-          if(localVal && typeof localVal === 'object' && !Array.isArray(localVal)
-             && Object.keys(localVal).length > 0) {
-            return; // conservar local
-          }
+          // Si local tiene datos → conservar siempre
+          const localLen = Array.isArray(localVal) ? localVal.length
+            : (localVal && typeof localVal === 'object') ? Object.keys(localVal).length : 0;
+          if(localLen > 0) return;
 
-          // Para arrays: conservar el que tenga MÁS registros
-          const localLen = Array.isArray(localVal) ? localVal.length : 0;
-          const fbLen = fbArr ? fbArr.length : 0;
-          if(localLen > 0 && localLen >= fbLen) {
-            return; // local tiene más o igual — conservar
-          }
-
-          _set.call(localStorage, lsKey, JSON.stringify(fbArr || val));
+          // Local vacío → bajar desde Firebase
+          // Para objetos (potreroAreas, pluviometros, etc): preservar como objeto, NO convertir a array
+          const isObj = !Array.isArray(val) && val && typeof val === 'object';
+          const fbVal = isObj ? val : (Array.isArray(val) ? val : Object.values(val));
+          _set.call(localStorage, lsKey, JSON.stringify(fbVal));
         } catch(e2) {
           const _set2 = window._lsOrig || Storage.prototype.setItem;
           _set2.call(localStorage, lsKey, JSON.stringify(val));
