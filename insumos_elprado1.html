@@ -1054,38 +1054,42 @@ function calcGMDMax(peso, nem, neg, dmi) {
   return Math.round(gmd * 1000) / 1000;
 }
 
-// ── Requerimientos minerales NRC (g o mg absorbidos/día) ──
-// NRC 2016: requirimientos varían con peso y GMD
+// ── Requerimientos minerales NRC — g o mg INGERIDOS/día ──
+// NRC 2016 Beef Cattle — Bos indicus ajustado
+// Retorna requerimiento INGERIDO (lo que el animal necesita comer)
+// El requerimiento ABSORBIDO = ingerido × absorción
 function calcReqMineral(peso, gmd) {
-  // Ca: mantenimiento + ganancia
-  // NRC: Ca mantenimiento = 0.0154 g/kg PV; Ca ganancia = 9.8 g/kg ganado × GMD
-  const caMant = 0.0154 * peso;
-  const caGain = 9.8 * gmd;
-  const ca = (caMant + caGain) / ABS.ca.sal; // g ingeridos necesarios de la sal
-  // Requerimiento absorbido total
-  const caReq = caMant + caGain; // g absorbidos/día
+  // ── CALCIO ──
+  // NRC: Ca mant = 0.0154 g/kg PV; Ca ganancia = 9.8 g/kg tejido
+  const caAbs  = (0.0154 * peso) + (9.8 * gmd);
+  const caIng  = caAbs / ABS.ca.sal; // ingerido necesario de la sal
 
-  // P: NRC: 0.0143 g/kg PV mantenimiento; 4.8 g/kg ganado
-  const pMant = 0.0143 * peso;
-  const pGain = 4.8 * gmd;
-  const pReq  = pMant + pGain;
+  // ── FÓSFORO ──
+  // NRC: P mant = 0.0143 g/kg PV; P ganancia = 4.8 g/kg tejido
+  const pAbs   = (0.0143 * peso) + (4.8 * gmd);
+  const pIng   = pAbs / ABS.p.sal;
 
-  // Mg: NRC: 0.0045 g/kg PV
-  const mgReq = 0.0045 * peso;
+  // ── MAGNESIO ──
+  // NRC: Mg mant = 0.0045 g/kg PV; Mg ganancia = 0.45 g/kg tejido
+  const mgAbs  = (0.0045 * peso) + (0.45 * gmd);
+  const mgIng  = mgAbs / ABS.mg.sal;
 
-  // Na: NRC: 0.0006 × PV^1.0 + 0.2 × GMD × 1000 mg → g
-  const naReq = (0.0006 * peso + 0.2 * gmd);
+  // ── SODIO ──
+  // NRC: Na = 1.5 g/100kg PV mantenimiento + 1.1 g/kg ganancia
+  const naAbs  = (1.5 * peso / 100) + (1.1 * gmd);
+  const naIng  = naAbs / ABS.na.sal;
 
-  // Cu: NRC: 10 mg/kg MS consumida — Bos indicus necesita más por menor absorción
-  // Usamos 110 mg/día base ajustado por peso
-  const cuReq = 110 * (peso / 300);
+  // ── COBRE ──
+  // NRC: 10 mg Cu/kg MS consumida — ajustado por peso
+  const cuAbs  = 10 * calcDMI(peso) * (peso / 300);
+  const cuIng  = cuAbs / ABS.cu.sal;
 
   return {
-    ca: Math.round(caReq * 10) / 10,
-    p:  Math.round(pReq  * 10) / 10,
-    mg: Math.round(mgReq * 10) / 10,
-    na: Math.round(naReq * 10) / 10,
-    cu: Math.round(cuReq * 10) / 10,
+    ca: { ing: Math.round(caIng*10)/10, abs: Math.round(caAbs*10)/10 },
+    p:  { ing: Math.round(pIng *10)/10, abs: Math.round(pAbs *10)/10 },
+    mg: { ing: Math.round(mgIng*10)/10, abs: Math.round(mgAbs*10)/10 },
+    na: { ing: Math.round(naIng*10)/10, abs: Math.round(naAbs*10)/10 },
+    cu: { ing: Math.round(cuIng*10)/10, abs: Math.round(cuAbs*10)/10 },
   };
 }
 
@@ -1119,32 +1123,32 @@ function calcBloqueFormulacion(cat, pesoPromCat, gmdUsado, paramsPasto, bromsN, 
   const req     = calcReqMineral(pesoPromCat, gmdUsado);
   const aporte  = calcAportePasto(paramsPasto, dmi);
 
-  // Consumo sal objetivo: 35 g/100kg PV ajustado Bos indicus
-  const consSalGrDia  = pesoPromCat * 35 / 100 * BI_FACTOR;
+  // Consumo sal objetivo × factor Nelore
+  const consSalGrDia  = pesoPromCat * 0.35 * BI_FACTOR;
   const consSalKgDia  = consSalGrDia / 1000;
 
-  // Calcular déficit y concentración en sal
+  // Calcular aporte pasto, déficit y concentración en sal
   const minerales = ['ca','p','mg','na','cu'];
   const resultado = {};
   minerales.forEach(min => {
-    const ap    = aporte[min];
-    const isPpm = ABS[min].ppm;
-    const absP  = ABS[min].pasto;
-    const absSal= ABS[min].sal;
-    const reqAbs= req[min]; // ya es absorbido
+    const ap     = aporte[min];
+    const isPpm  = ABS[min].ppm;
+    const absP   = ABS[min].pasto;
+    const absSal = ABS[min].sal;
+    const reqAbs = req[min].abs;
+    const reqIng = req[min].ing;
 
     if (ap !== null) {
-      const apAbs   = ap * absP;
-      const defAbs  = Math.max(0, reqAbs - apAbs);
-      // Concentración en sal
+      const apAbs  = ap * absP;
+      const defAbs = Math.max(0, reqAbs - apAbs);
       const concSal = consSalKgDia > 0
         ? isPpm
-          ? (defAbs / absSal) / consSalKgDia          // mg/kg
-          : (defAbs / absSal) / (consSalKgDia * 10)   // %
+          ? (defAbs / absSal) / consSalKgDia
+          : (defAbs / absSal) / (consSalKgDia * 10)
         : 0;
-      resultado[min] = { ap, apAbs, reqAbs, defAbs, concSal };
+      resultado[min] = { ap, apAbs, reqAbs, reqIng, defAbs, concSal };
     } else {
-      resultado[min] = { ap: null, apAbs: null, reqAbs: req[min], defAbs: null, concSal: null };
+      resultado[min] = { ap:null, apAbs:null, reqAbs:req[min].abs, reqIng:req[min].ing, defAbs:null, concSal:null };
     }
   });
 
@@ -1425,13 +1429,19 @@ function calcularFormulacion() {
     // ── Renderizar tabla de un modo ──
     function renderTablaFormul(modo, colorModo) {
       return ['ca','p','mg','na','cu'].map(min => {
-        const res = modo.resultado[min];
+        const res   = modo.resultado[min];
         const isPpm = ABS[min].ppm;
-        const fmt1 = v => v!==null ? (isPpm?v.toFixed(0):v.toFixed(1)) : '—';
+        const fmt1  = v => v!==null ? (isPpm?v.toFixed(0):v.toFixed(1)) : '—';
+        const fmt2  = v => v!==null ? (isPpm?v.toFixed(0):v.toFixed(1)) : '—';
+        // Requerimiento: ingerido (abs: X)
+        const reqStr = res.reqIng !== null
+          ? `${fmt1(res.reqIng)} ${isPpm?'mg':'g'} <span style="font-size:9px;color:var(--t3);">(abs: ${fmt2(res.reqAbs)} ${isPpm?'mg':'g'})</span>`
+          : `${fmt1(res.reqAbs)} ${isPpm?'mg':'g'}`;
+        // Aporte pasto: ingerido (abs: X)
         const apStr = res.ap !== null
-          ? `${fmt1(res.ap)} ${isPpm?'mg':'g'}<span style="font-size:9px;color:var(--t3);"> (abs: ${fmt1(res.apAbs)})</span>`
+          ? `${fmt1(res.ap)} ${isPpm?'mg':'g'} <span style="font-size:9px;color:var(--t3);">(abs: ${fmt2(res.apAbs)})</span>`
           : '<span style="color:var(--t3);">—</span>';
-        const defStr = res.defAbs !== null ? `${fmt1(res.defAbs)} ${isPpm?'mg':'g'}` : '—';
+        const defStr  = res.defAbs !== null ? `${fmt1(res.defAbs)} ${isPpm?'mg':'g'}` : '—';
         const concStr = res.concSal !== null
           ? isPpm ? res.concSal.toFixed(0)+' mg/kg' : res.concSal.toFixed(2)+'%'
           : '—';
@@ -1443,7 +1453,7 @@ function calcularFormulacion() {
           <td><strong>${MIN_LABELS[min]}</strong>
             <div style="font-size:9px;color:var(--t3);">Abs. pasto ${Math.round(ABS[min].pasto*100)}% · Abs. sal ${Math.round(ABS[min].sal*100)}%</div>
           </td>
-          <td class="mn">${isPpm?res.reqAbs.toFixed(0)+' mg':res.reqAbs.toFixed(1)+' g'}</td>
+          <td class="mn">${reqStr}</td>
           <td class="mn" style="color:var(--t2);">${apStr}</td>
           <td class="mn" style="color:${color};font-weight:600;">${defStr}</td>
           <td class="mn" style="font-weight:700;color:${color};">${concStr}</td>
