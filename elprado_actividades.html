@@ -4530,11 +4530,44 @@ function getLluviaMM(potrero, fechaIni, fechaSal) {
   return Math.round(total * 10) / 10;
 }
 
-function exportarInformeCalidad() {
+async function exportarInformeCalidad() {
   if(typeof XLSX === 'undefined') { notif('Librería Excel no disponible', true); return; }
   const ini = document.getElementById('expCalIni').value;
   const fin = document.getElementById('expCalFin').value;
   if(!ini || !fin) { notif('Ingresá el rango de fechas', true); return; }
+
+  // ── Asegurar que los bromatológicos estén cargados ──
+  // Si localStorage está vacío, intentar cargar desde Firebase
+  let bromsLocal = getBromatologicos();
+  if(!bromsLocal.length) {
+    try {
+      const r = await fetch(FB_URL + '/bromatologicos.json');
+      const data = await r.json();
+      if(data && typeof data === 'object' && !data.error) {
+        const arr = Array.isArray(data) ? data : Object.values(data);
+        if(arr.length) {
+          setBromatologicos(arr);
+          bromsLocal = arr;
+          notif('✅ Bromatológicos cargados desde Firebase (' + arr.length + ')');
+        }
+      }
+    } catch(e) {
+      console.log('No se pudo cargar bromatológicos desde Firebase:', e);
+    }
+  }
+  // También intentar con muestras_campo
+  let muestrasLocal = [];
+  try { muestrasLocal = getMuestras() || []; } catch(e){}
+  if(!muestrasLocal.length) {
+    try {
+      const r2 = await fetch(FB_URL + '/muestras_campo.json');
+      const d2 = await r2.json();
+      if(d2 && typeof d2==='object' && !d2.error) {
+        const arr2 = Array.isArray(d2) ? d2 : Object.values(d2);
+        if(arr2.length) { setMuestras(arr2); muestrasLocal = arr2; }
+      }
+    } catch(e){}
+  }
 
   const acts = getActividades().filter(a =>
     a.actividad === 'MATERIA SECA' && a.fechaIng && a.fechaIng >= ini && a.fechaIng <= fin
@@ -4557,6 +4590,20 @@ function exportarInformeCalidad() {
         fdn = Math.round((parseFloat(p.fdn) + parseFloat(p.afdn)) / 2 * 100) / 100;
       } else if (p.fdn) {
         fdn = p.fdn;
+      }
+    }
+    // Fallback: buscar en muestras_campo por potrero + variedad más cercano
+    if(!fdn && a.potrero && muestrasLocal.length) {
+      const muestra = muestrasLocal.find(m =>
+        m.potrero && normalizarCodigoPotrero(m.potrero) === normalizarCodigoPotrero(a.potrero) &&
+        (m.variedad||'').toUpperCase() === (a.variedad||'').toUpperCase() &&
+        m.fechaColecta && m.fechaColecta <= fin
+      );
+      if(muestra && muestra.params) {
+        const p = muestra.params;
+        if(p.fdnProm) fdn = p.fdnProm;
+        else if(p.fdn && p.afdn) fdn = Math.round((parseFloat(p.fdn)+parseFloat(p.afdn))/2*100)/100;
+        else if(p.fdn) fdn = p.fdn;
       }
     }
 
