@@ -1980,20 +1980,20 @@ async function syncFromFirebase() {
         if(val === null || val === undefined) return;
         const lsKey = 'elprado_' + key;
         try {
-          // Estrategia merge: LOCAL SIEMPRE GANA si tiene datos
+          // Estrategia merge para arrays: conservar el que tenga MAS registros
           const localRaw = localStorage.getItem(lsKey);
           const localVal = localRaw ? JSON.parse(localRaw) : null;
-
-          // Si local tiene datos → conservar siempre
-          const localLen = Array.isArray(localVal) ? localVal.length
-            : (localVal && typeof localVal === 'object') ? Object.keys(localVal).length : 0;
-          if(localLen > 0) return;
-
-          // Local vacío → bajar desde Firebase
-          // Para objetos (potreroAreas, pluviometros, etc): preservar como objeto, NO convertir a array
-          const isObj = !Array.isArray(val) && val && typeof val === 'object';
-          const fbVal = isObj ? val : (Array.isArray(val) ? val : Object.values(val));
-          _set.call(localStorage, lsKey, JSON.stringify(fbVal));
+          const fbArr = Array.isArray(val) ? val
+            : (val && typeof val === 'object') ? Object.values(val) : null;
+          if(fbArr && Array.isArray(localVal) && localVal.length > fbArr.length) {
+            // Para actividades: conservar local si tiene más registros
+            // Para lluvia/pluviómetros: Firebase siempre gana
+            if(key === 'actividades') {
+              console.log('[sync] conservando local actividades: local=' + localVal.length + ' fb=' + fbArr.length);
+              return;
+            }
+          }
+          _set.call(localStorage, lsKey, JSON.stringify(fbArr || val));
         } catch(e2) {
           const _set2 = window._lsOrig || Storage.prototype.setItem;
           _set2.call(localStorage, lsKey, JSON.stringify(val));
@@ -2092,7 +2092,7 @@ async function cargarGruposDesdeInventario() {
   }
 }
 function getPotreroAreas() { return getData('potreroAreas', {}); }
-function setPotreroAreas(v) { setData('potreroAreas', v); fbSet('potreroAreas', v); }
+function setPotreroAreas(v) { setData('potreroAreas', v); }
 function getPotreroArea(pot) { const a=getPotreroAreas(); return a[pot]?parseFloat(a[pot]):null; }
 
 // ═══════════════════════════════════════
@@ -5276,7 +5276,6 @@ function renderPluviometros() {
 function renderCamposLluvia() {
   const pluvios = getPluviometros();
   const el = document.getElementById('llCamposPluvio');
-  if(!el) return;
   if(!pluvios.length) {
     el.innerHTML = '<div style="font-size:12px;color:var(--text3);">Primero configurá al menos un pluviómetro en la sección de arriba.</div>';
     return;
@@ -6792,27 +6791,21 @@ function borrarSeleccionados() {
     } catch(e) {}
   };
 
-  // Al cargar: sincronizar datos desde Firebase con protección
+  // Al cargar: sincronizar solo datos PASTURAS desde Firebase
   window.addEventListener('load', function() {
+    
+    // Bajar datos PASTURAS (prefijo elprado_)
     fbRead('/elprado1', function(data) {
-      if(!data || typeof data !== 'object') return;
-      Object.keys(data).forEach(function(key) {
-        if(data[key] === null || key === 'usuario') return;
-        var lsKey = 'elprado_' + key;
-        var existing = localStorage.getItem(lsKey);
-        // Solo bajar si local está vacío
-        if(existing) {
-          try {
-            var parsed = JSON.parse(existing);
-            var len = Array.isArray(parsed) ? parsed.length
-              : (parsed && typeof parsed === 'object') ? Object.keys(parsed).length : 0;
-            if(len > 0) return; // local tiene datos — no sobreescribir
-          } catch(e) {}
-        }
-        // Local vacío → bajar desde Firebase preservando estructura
-        _orig.call(localStorage, lsKey, JSON.stringify(data[key]));
-      });
+      if(data && typeof data === 'object') {
+        Object.keys(data).forEach(function(key) {
+          if(data[key] !== null && key !== 'usuario') {
+            _orig.call(localStorage, 'elprado_' + key, JSON.stringify(data[key]));
+          }
+        });
+      }
     });
+
+    // Botón flotante eliminado — usar ⚙ Configuración → "Subir todos mis datos a Firebase"
   });
 })();
 </script>
