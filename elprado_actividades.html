@@ -1208,6 +1208,8 @@ tr:hover td { background: rgba(255,255,255,.02); }
     </div>
     <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;">
       <button class="btn btn-primary" onclick="subirAFirebase()" style="background:#e67e22;">☁ Subir todos mis datos a Firebase</button>
+      <button class="btn btn-primary" onclick="forzarActualizacion()" style="background:#2980b9;">🔄 Forzar actualización desde Firebase</button>
+      <button class="btn btn-primary" onclick="subirLluviaMerge()" style="background:#27ae60;">🌧 Sincronizar lluvia (merge seguro)</button>
       <button class="btn btn-secondary" onclick="limpiarDuplicados()">🧹 Limpiar registros duplicados</button>
     </div>
     <div style="margin-top:12px; font-size:11px; color:var(--text3);" id="storageInfo"></div>
@@ -1972,27 +1974,23 @@ async function syncFromFirebase() {
     const r = await fetch(FB_URL + '.json');
     const data = await r.json();
     if(data && typeof data === 'object' && !data.error) {
-      // *** FIX CRITICO: usar _lsOrig para NO disparar el interceptor.
-      // Con localStorage.setItem normal, el interceptor reescribia Firebase
-      // con datos locales viejos, borrando cambios de otros usuarios (ej: lluvia de abril). ***
       const _set = window._lsOrig || Storage.prototype.setItem;
       Object.entries(data).forEach(([key, val]) => {
         if(val === null || val === undefined) return;
         const lsKey = 'elprado_' + key;
         try {
-          // Estrategia merge para arrays: conservar el que tenga MAS registros
           const localRaw = localStorage.getItem(lsKey);
           const localVal = localRaw ? JSON.parse(localRaw) : null;
           const fbArr = Array.isArray(val) ? val
             : (val && typeof val === 'object') ? Object.values(val) : null;
-          if(fbArr && Array.isArray(localVal) && localVal.length > fbArr.length) {
-            // Para actividades: conservar local si tiene más registros
-            // Para lluvia/pluviómetros: Firebase siempre gana
-            if(key === 'actividades') {
-              console.log('[sync] conservando local actividades: local=' + localVal.length + ' fb=' + fbArr.length);
+          // actividades: conservar local si tiene MÁS registros (proteger datos de campo)
+          if(key === 'actividades') {
+            if(fbArr && Array.isArray(localVal) && localVal.length > fbArr.length) {
+              console.log('[sync] actividades: conservando local (' + localVal.length + ' > fb ' + fbArr.length + ')');
               return;
             }
           }
+          // lluvia y todo lo demás: Firebase SIEMPRE gana
           _set.call(localStorage, lsKey, JSON.stringify(fbArr || val));
         } catch(e2) {
           const _set2 = window._lsOrig || Storage.prototype.setItem;
@@ -2005,6 +2003,85 @@ async function syncFromFirebase() {
     console.log('Firebase load error, usando datos locales');
     return false;
   }
+}
+
+async function subirLluviaMerge() {
+  const btn = document.querySelector('[onclick="subirLluviaMerge()"]');
+  if(btn) { btn.textContent = '⏳ Combinando...'; btn.disabled = true; }
+  try {
+    // 1. Bajar lluvia actual de Firebase
+    const r = await fetch('https://elprado1-153ef-default-rtdb.firebaseio.com/elprado1/lluvia.json');
+    const fbRaw = await r.json();
+    const fbLluvia = fbRaw ? (Array.isArray(fbRaw) ? fbRaw : Object.values(fbRaw)) : [];
+
+    // 2. Lluvia local
+    const localLluvia = getLluvia();
+
+    // 3. Merge: unir ambas, sin duplicar por fecha+gestion
+    const mapa = {};
+    [...fbLluvia, ...localLluvia].forEach(rec => {
+      const clave = (rec.fecha || '') + '|' + (rec.gestion || '');
+      // Local gana sobre Firebase para el mismo día (más reciente)
+      mapa[clave] = rec;
+    });
+    const merged = Object.values(mapa).sort((a, b) => (a.fecha || '') > (b.fecha || '') ? 1 : -1);
+
+    // 4. Subir merged a Firebase
+    await fetch('https://elprado1-153ef-default-rtdb.firebaseio.com/elprado1/lluvia.json', {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(merged)
+    });
+
+    // 5. Actualizar local con el resultado
+    const _set = window._lsOrig || Storage.prototype.setItem;
+    _set.call(localStorage, 'elprado_lluvia', JSON.stringify(merged));
+
+    notif('✅ Lluvia sincronizada: ' + merged.length + ' registros en Firebase (local ' + localLluvia.length + ' + Firebase ' + fbLluvia.length + ')');
+    if(typeof renderCalendarioLluvia === 'function') try { renderCalendarioLluvia(); } catch(e) {}
+    if(typeof renderResumenLluvia === 'function') try { renderResumenLluvia(); } catch(e) {}
+    if(typeof renderAnalisisGestion === 'function') try { renderAnalisisGestion(); } catch(e) {}
+  } catch(e) {
+    notif('⚠️ Error: ' + e.message, true);
+  }
+  if(btn) { btn.textContent = '🌧 Sincronizar lluvia (merge seguro)'; btn.disabled = false; }
+}
+
+async function forzarActualizacion() {
+  const btn = document.querySelector('[onclick="forzarActualizacion()"]');
+  if(btn) { btn.textContent = '⏳ Descargando...'; btn.disabled = true; }
+  try {
+    const ok = await syncFromFirebase();
+    try { cargarLluviaHistoricaSilencioso(); } catch(e) {}
+    renderTabla(); renderStats();
+    if(typeof renderCalendarioLluvia === 'function') try { renderCalendarioLluvia(); } catch(e) {}
+    if(typeof renderResumenLluvia === 'function') try { renderResumenLluvia(); } catch(e) {}
+    if(typeof renderAnalisisGestion === 'function') try { renderAnalisisGestion(); } catch(e) {}
+    notif(ok ? '✅ Datos actualizados desde Firebase' : '⚠️ Error al conectar con Firebase');
+  } catch(e) { notif('⚠️ Error: ' + e.message, true); }
+  if(btn) { btn.textContent = '🔄 Forzar actualización desde Firebase'; btn.disabled = false; }
+}
+
+// Auto-refresh desde Firebase cada 5 minutos
+function iniciarAutoSync() {
+  setInterval(async () => {
+    try {
+      const _set = window._lsOrig || Storage.prototype.setItem;
+      const claves = ['lluvia', 'plan', 'pedidos'];
+      for(const key of claves) {
+        const r = await fetch(FB_URL + '/' + key + '.json');
+        const val = await r.json();
+        if(val === null || val === undefined) continue;
+        const fbArr = Array.isArray(val) ? val
+          : (val && typeof val === 'object') ? Object.values(val) : null;
+        if(fbArr) _set.call(localStorage, 'elprado_' + key, JSON.stringify(fbArr));
+      }
+      if(typeof renderCalendarioLluvia === 'function') try { renderCalendarioLluvia(); } catch(e) {}
+      if(typeof renderResumenLluvia === 'function') try { renderResumenLluvia(); } catch(e) {}
+      if(typeof renderAnalisisGestion === 'function') try { renderAnalisisGestion(); } catch(e) {}
+      console.log('[auto-sync] lluvia/plan/pedidos actualizados');
+    } catch(e) {}
+  }, 5 * 60 * 1000);
 }
 
 // ── Carga inicial de datos históricos de lluvia (silenciosa - sin disparar override) ──
@@ -6356,6 +6433,8 @@ window.onload = async () => {
   cargarHistoricoInicial();
   renderTabla();
   renderStats();
+  // Iniciar auto-sync silencioso cada 5 minutos
+  iniciarAutoSync();
 };
 
 function cargarHistoricoInicial() {
