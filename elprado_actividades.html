@@ -6802,15 +6802,35 @@ function borrarSeleccionados() {
   // Al cargar: sincronizar datos PASTURAS desde Firebase con protección
   window.addEventListener('load', function() {
     var PROTEGIDAS = ['potreroAreas', 'potreroConfig', 'pluviometros'];
+    // Claves donde Firebase siempre gana si tiene MÁS registros (datos nuevos desde campo)
+    var MERGE_MAS_REGISTROS = ['lluvia'];
     fbRead('/elprado1', function(data) {
       if(!data || typeof data !== 'object') return;
       Object.keys(data).forEach(function(key) {
         if(data[key] === null || key === 'usuario') return;
         // Nunca sobreescribir estas claves desde Firebase
         if(PROTEGIDAS.indexOf(key) >= 0) return;
-        // Para el resto: solo bajar si localStorage está vacío
         var lsKey = 'elprado_' + key;
         var existing = localStorage.getItem(lsKey);
+        // Para lluvia: comparar cantidad y usar el que tenga más registros
+        if(MERGE_MAS_REGISTROS.indexOf(key) >= 0) {
+          var fbVal = Array.isArray(data[key]) ? data[key]
+            : (data[key] && typeof data[key] === 'object') ? Object.values(data[key]) : null;
+          var fbLen = fbVal ? fbVal.length : 0;
+          var localLen = 0;
+          if(existing) {
+            try {
+              var localParsed = JSON.parse(existing);
+              localLen = Array.isArray(localParsed) ? localParsed.length : 0;
+            } catch(e) {}
+          }
+          if(fbLen > localLen) {
+            _orig.call(localStorage, lsKey, JSON.stringify(fbVal));
+            console.log('[sync] ' + key + ': Firebase (' + fbLen + ') > local (' + localLen + ') → usando Firebase');
+          }
+          return;
+        }
+        // Para el resto: solo bajar si localStorage está vacío
         if(existing) {
           try {
             var parsed = JSON.parse(existing);
