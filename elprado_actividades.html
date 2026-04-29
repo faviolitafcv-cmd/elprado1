@@ -4546,13 +4546,28 @@ function exportarInformeCalidad() {
 
   acts.forEach(a => {
     const brom = getBromForRecord(a);
-    const fdn = brom ? (brom.params.fdnProm ?? brom.params.fdn ?? '') : '';
-    const ms = a.pctMs ? Math.round(a.pctMs * 1000) / 10 : '';
-    const dias = a.retorno ?? '';
-    const esp = (a.variedad || '').toUpperCase();
-    const ndvi = a.ndvi || '';
+
+    // FDN: usar fdnProm primero, si no fdn, si no calcular promedio de fdn+afdn
+    let fdn = '';
+    if (brom) {
+      const p = brom.params;
+      if (p.fdnProm) {
+        fdn = p.fdnProm;
+      } else if (p.fdn && p.afdn) {
+        fdn = Math.round((parseFloat(p.fdn) + parseFloat(p.afdn)) / 2 * 100) / 100;
+      } else if (p.fdn) {
+        fdn = p.fdn;
+      }
+    }
+
+    // DIAS: días de retorno a la parcela (descanso entre pastoreos)
+    const dias = a.retorno != null ? a.retorno : '';
+
+    const ms     = a.pctMs ? Math.round(a.pctMs * 1000) / 10 : '';
+    const esp    = (a.variedad || '').toUpperCase();
+    const ndvi   = a.ndvi || '';
     const lluvia = getLluviaMM(a.potrero, a.fechaIng, a.fechaSal);
-    const kgMs = a.kgMsHa ? Math.round(a.kgMsHa) : '';
+    const kgMs   = a.kgMsHa ? Math.round(a.kgMsHa) : '';
     rows.push([
       a.fechaIng || '', a.potrero || '', a.parcela || '',
       fdn, ms, dias, esp, ndvi, lluvia, 'EL PRADO', kgMs
