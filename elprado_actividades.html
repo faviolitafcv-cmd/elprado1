@@ -6783,27 +6783,16 @@ function borrarSeleccionados() {
     _orig.call(this, key, value);
     try {
       var val = JSON.parse(value);
-      if(RRHH_KEYS.indexOf(key) >= 0) {
-        fbWrite('/rrhh/' + key, val);
-      } else if(key.indexOf('elprado_') === 0 && key !== 'elprado_usuario') {
+      // Solo sincronizar claves de Pasturas — no RRHH
+      if(key.indexOf('elprado_') === 0 && key !== 'elprado_usuario') {
         var subkey = key.replace('elprado_','');
         fbWrite('/elprado1/' + subkey, val);
       }
     } catch(e) {}
   };
 
-  // Al cargar: sincronizar desde Firebase
+  // Al cargar: sincronizar solo datos PASTURAS desde Firebase
   window.addEventListener('load', function() {
-    // Bajar datos RRHH
-    fbRead('/rrhh', function(data) {
-      if(data && typeof data === 'object') {
-        Object.keys(data).forEach(function(key) {
-          if(data[key] !== null) {
-            _orig.call(localStorage, key, JSON.stringify(data[key]));
-          }
-        });
-      }
-    });
     
     // Bajar datos PASTURAS (prefijo elprado_)
     fbRead('/elprado1', function(data) {
