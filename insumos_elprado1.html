@@ -1188,8 +1188,8 @@ async function initFormulacion() {
   document.getElementById('fFormPeriodoInfo').textContent += ' · Cargando animales...';
   try {
     const [animRaw, pesRaw] = await Promise.all([
-      fbGet(FB_ACT.replace('/elprado1','') + '/elprado1/hacienda/animales'),
-      fbGet(FB_ACT.replace('/elprado1','') + '/elprado1/hacienda/pesajes'),
+      fbGet(FB_HAC + '/animales'),
+      fbGet(FB_HAC + '/pesajes'),
     ]);
 
     const animales = animRaw ? (Array.isArray(animRaw) ? animRaw : Object.values(animRaw)) : [];
@@ -1214,11 +1214,10 @@ async function initFormulacion() {
     animales.forEach(a => {
       if (a.estado !== 'ACTIVO') return;
 
-      // Determinar categoría
-      const cat = (a.categoria||'').toUpperCase().includes('TORILLO') ? 'TORILLO'
-                : (a.categoria||'').toUpperCase().includes('VAQUILLA') ? 'VAQUILLA'
-                : (a.nombre||a.grupo||'').toUpperCase().includes('TOR') ? 'TORILLO'
-                : (a.nombre||a.grupo||'').toUpperCase().includes('VAQ') ? 'VAQUILLA'
+      // Determinar categoría — buscar en categoria, tipo y grupo
+      const catStr = ((a.categoria||'') + ' ' + (a.tipo||'') + ' ' + (a.grupo||'')).toUpperCase();
+      const cat = catStr.includes('TORILLO') || catStr.includes('TOR.') ? 'TORILLO'
+                : catStr.includes('VAQUILLA') || catStr.includes('VAQ.') ? 'VAQUILLA'
                 : null;
       if (!cat) return;
 
@@ -1272,24 +1271,26 @@ async function initFormulacion() {
       (info) + ' · ' + resumen;
 
   } catch(e) {
-    console.log('Error cargando animales individuales:', e);
-    // Fallback a grupos_resumen
+    // Fallback a grupos_resumen si falla la lectura de animales
+    console.log('Usando fallback grupos_resumen:', e.message||e);
     _formCats = {};
     (_grupos||[]).forEach(g => {
-      const cat = (g.categoria||'').toUpperCase().includes('TORILLO') ? 'TORILLO'
-                : (g.categoria||'').toUpperCase().includes('VAQUILLA') ? 'VAQUILLA'
-                : (g.nombre||'').toUpperCase().includes('TOR') ? 'TORILLO'
-                : (g.nombre||'').toUpperCase().includes('VAQ') ? 'VAQUILLA'
+      const gStr = ((g.categoria||'') + ' ' + (g.tipo||'') + ' ' + (g.nombre||'')).toUpperCase();
+      const cat = gStr.includes('TORILLO') || gStr.includes('TOR.') ? 'TORILLO'
+                : gStr.includes('VAQUILLA') || gStr.includes('VAQ.') ? 'VAQUILLA'
                 : null;
-      if (!cat) return;
-      if (!_formCats[cat]) _formCats[cat] = { gmd:0, peso:0, cabezas:0, n:0, _sum:0, _sumP:0 };
-      _formCats[cat]._sum  += (g.gmd||0) * (g.cabezas||1);
-      _formCats[cat]._sumP += (g.pesoHoy||300) * (g.cabezas||1);
-      _formCats[cat].cabezas += (g.cabezas||0);
-      _formCats[cat].n += (g.cabezas||0);
+      if (!cat || !g.cabezas) return;
+      if (!_formCats[cat]) _formCats[cat] = { gmd:0, peso:0, cabezas:0, n:0, _sumG:0, _sumP:0 };
+      _formCats[cat]._sumG  += (g.gmd||0) * g.cabezas;
+      _formCats[cat]._sumP  += (g.pesoHoy||300) * g.cabezas;
+      _formCats[cat].cabezas += g.cabezas;
+      _formCats[cat].n       += g.cabezas;
     });
     Object.values(_formCats).forEach(c => {
-      if (c.n > 0) { c.gmd = Math.round(c._sum/c.n*1000)/1000; c.peso = Math.round(c._sumP/c.n); }
+      if (c.n > 0) {
+        c.gmd  = Math.round(c._sumG / c.n * 1000) / 1000;
+        c.peso = Math.round(c._sumP / c.n);
+      }
     });
   }
 
