@@ -6799,21 +6799,29 @@ function borrarSeleccionados() {
     } catch(e) {}
   };
 
-  // Al cargar: sincronizar solo datos PASTURAS desde Firebase
+  // Al cargar: sincronizar datos PASTURAS desde Firebase con protección
   window.addEventListener('load', function() {
-    
-    // Bajar datos PASTURAS (prefijo elprado_)
+    var PROTEGIDAS = ['potreroAreas', 'potreroConfig', 'pluviometros'];
     fbRead('/elprado1', function(data) {
-      if(data && typeof data === 'object') {
-        Object.keys(data).forEach(function(key) {
-          if(data[key] !== null && key !== 'usuario') {
-            _orig.call(localStorage, 'elprado_' + key, JSON.stringify(data[key]));
-          }
-        });
-      }
+      if(!data || typeof data !== 'object') return;
+      Object.keys(data).forEach(function(key) {
+        if(data[key] === null || key === 'usuario') return;
+        // Nunca sobreescribir estas claves desde Firebase
+        if(PROTEGIDAS.indexOf(key) >= 0) return;
+        // Para el resto: solo bajar si localStorage está vacío
+        var lsKey = 'elprado_' + key;
+        var existing = localStorage.getItem(lsKey);
+        if(existing) {
+          try {
+            var parsed = JSON.parse(existing);
+            var len = Array.isArray(parsed) ? parsed.length
+              : (parsed && typeof parsed === 'object') ? Object.keys(parsed).length : 0;
+            if(len > 0) return;
+          } catch(e) {}
+        }
+        _orig.call(localStorage, lsKey, JSON.stringify(data[key]));
+      });
     });
-
-    // Botón flotante eliminado — usar ⚙ Configuración → "Subir todos mis datos a Firebase"
   });
 })();
 </script>
