@@ -5170,7 +5170,21 @@ function guardarLluviaDia() {
   notif('✅ Lluvia guardada para ' + fechaGuardada);
 }
 
-function getPluviometros() { return getData('pluviometros', []); }
+const PLUVIOS_DEFAULT = [
+  { nombre: 'Campamento Principal', potreros: [] },
+  { nombre: 'Campamento Represa',   potreros: [] },
+  { nombre: 'Sector D',             potreros: [] },
+];
+
+function getPluviometros() {
+  const data = getData('pluviometros', []);
+  // Si está vacío cargar los 3 por defecto y guardarlos
+  if (!data.length) {
+    setData('pluviometros', PLUVIOS_DEFAULT);
+    return PLUVIOS_DEFAULT;
+  }
+  return data;
+}
 function setPluviometros(v) { setData('pluviometros', v); fbSet('pluviometros', v); }
 function getLluvia() {
   const data = getData('lluvia', []);
@@ -5882,6 +5896,8 @@ function showPage(id) {
     renderAnalisisGestion();
     renderResumenLluvia();
     renderCalendarioLluvia();
+    renderPluviometros();
+    renderCamposLluvia();
   }
 }
 
