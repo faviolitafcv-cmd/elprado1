@@ -2091,7 +2091,15 @@ async function cargarGruposDesdeInventario() {
     console.log('⚠️ cargarGruposDesdeInventario:', e.message || e);
   }
 }
-function getPotreroAreas() { return getData('potreroAreas', {}); }
+function getPotreroAreas() {
+  const stored = getData('potreroAreas', null);
+  if(stored && typeof stored === 'object' && Object.keys(stored).length > 0) return stored;
+  // Datos por defecto — hectáreas reales de El Prado 1
+  const DEFAULT_AREAS = {"1NN":34.8,"1NP":34.6,"1SN":20.7,"1SP":37.6,"2NN":32.3,"2NP":16.7,"2SN":29.4,"2SP":28.9,"3NN":24.7,"3NP":34.5,"3SN":41.8,"3SP":42,"4NN":18.3,"4NP":27.4,"4SN":42.8,"4SP":52.9,"A1":25.8,"A2":24.9,"A3":24.5,"A4":25.1,"A5":27.4,"A6":24.9,"A7":25.2,"A8":27.3,"A9":16.5,"B1":30.4,"B2":23.3,"B3":20.4,"B4":23.5,"B5":27.1,"B6":25.1,"B7":27.1,"B8-A":12.1,"B8-B":9.8,"B9-A":12.2,"B9-B":10.4,"C1":22.2,"C10":8.9,"C11":20.2,"C2":15.4,"C3":13.4,"C4":13.3,"C5":4.2,"C6":14.7,"C7":18.5,"C8":12.8,"C9":11.4,"CABALLO":7.7,"D1":23.3,"D10":19.3,"D11-A":12.5,"D11-B":13.1,"D12":10.2,"D2":23.1,"D3":39.6,"D4":30.5,"D5":29.6,"D6-N":15.2,"D6-S":19.1,"D7-N":25.8,"D7-S":22.1,"D8-A":20.3,"D8-B":14.2,"D8-C":15.4,"D9-N":17.1,"D9-S":15.8,"ENTRADA":36.7,"RESERVA":14.64};
+  // Guardar en localStorage y Firebase para que persista
+  setData('potreroAreas', DEFAULT_AREAS);
+  return DEFAULT_AREAS;
+}
 function setPotreroAreas(v) { setData('potreroAreas', v); }
 function getPotreroArea(pot) { const a=getPotreroAreas(); return a[pot]?parseFloat(a[pot]):null; }
 
