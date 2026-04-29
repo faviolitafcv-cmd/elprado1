@@ -4391,20 +4391,25 @@ function getBromForRecord(rec) {
   // Buscar el pluviómetro asignado al potrero del registro
   const pluvios = getPluviometros();
   const pluvio = pluvios.find(p => (p.potreros||[]).includes(rec.potrero));
-  const zonaId = pluvio ? (pluvio.id || pluvio.nombre) : null;
+
+  // Posibles identificadores del pluviómetro (id, nombre, o ambos)
+  const zonaIds = pluvio
+    ? [pluvio.id, pluvio.nombre].filter(Boolean)
+    : [];
 
   // Prioridad 1: brom con zona + variedad + fecha
-  if(zonaId) {
+  // Compara contra id O nombre del pluviómetro
+  if(zonaIds.length) {
     const conZona = broms.find(b =>
       b.variedad === variedad &&
-      b.zona === zonaId &&
+      (zonaIds.includes(b.zona) || zonaIds.includes(b.zonaNombre)) &&
       rec.fechaIng >= b.fechaIni &&
       rec.fechaIng <= b.fechaFin
     );
     if(conZona) return conZona;
   }
 
-  // Prioridad 2: brom sin zona (aplica a toda la variedad) — compatibilidad con registros anteriores
+  // Prioridad 2: brom sin zona (aplica a toda la variedad)
   return broms.find(b =>
     b.variedad === variedad &&
     !b.zona &&
