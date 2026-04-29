@@ -4612,8 +4612,27 @@ async function exportarInformeCalidad() {
       }
     }
 
-    // DIAS: días de retorno a la parcela (descanso entre pastoreos)
-    const dias = a.retorno != null ? a.retorno : '';
+    // DIAS: retorno a la parcela
+    // Si retorno está guardado usarlo; si no, calcularlo desde el historial
+    let dias = '';
+    if (a.retorno != null && a.retorno !== undefined) {
+      dias = a.retorno;
+    } else if (a.fechaIng && a.potrero) {
+      const todasActs = getActividades();
+      const anteriores = todasActs.filter(prev =>
+        prev.id !== a.id &&
+        prev.potrero === a.potrero &&
+        prev.fechaSal && prev.fechaSal < a.fechaIng &&
+        ['MATERIA SECA','INGRESO HDA'].includes(prev.actividad)
+      );
+      if (anteriores.length) {
+        anteriores.sort((x,y) => y.fechaSal.localeCompare(x.fechaSal));
+        const diff = Math.round(
+          (new Date(a.fechaIng+'T12:00:00') - new Date(anteriores[0].fechaSal+'T12:00:00')) / 86400000
+        );
+        if (diff > 0) dias = diff;
+      }
+    }
 
     const ms     = a.pctMs ? Math.round(a.pctMs * 1000) / 10 : '';
     const esp    = (a.variedad || '').toUpperCase();
