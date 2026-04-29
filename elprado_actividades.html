@@ -2067,14 +2067,26 @@ function iniciarAutoSync() {
   setInterval(async () => {
     try {
       const _set = window._lsOrig || Storage.prototype.setItem;
-      const claves = ['lluvia', 'plan', 'pedidos'];
+      const claves = ['lluvia', 'plan', 'pedidos', 'pluviometros'];
       for(const key of claves) {
         const r = await fetch(FB_URL + '/' + key + '.json');
         const val = await r.json();
         if(val === null || val === undefined) continue;
         const fbArr = Array.isArray(val) ? val
           : (val && typeof val === 'object') ? Object.values(val) : null;
-        if(fbArr) _set.call(localStorage, 'elprado_' + key, JSON.stringify(fbArr));
+        if(!fbArr) continue;
+        // Nunca sobreescribir si local tiene MÁS datos (protege contra fallo de red)
+        const localRaw = localStorage.getItem('elprado_' + key);
+        if(localRaw) {
+          try {
+            const localArr = JSON.parse(localRaw);
+            if(Array.isArray(localArr) && localArr.length > fbArr.length) {
+              console.log('[auto-sync] ' + key + ': local (' + localArr.length + ') > Firebase (' + fbArr.length + ') → conservando local');
+              continue;
+            }
+          } catch(e) {}
+        }
+        _set.call(localStorage, 'elprado_' + key, JSON.stringify(fbArr));
       }
       if(typeof renderCalendarioLluvia === 'function') try { renderCalendarioLluvia(); } catch(e) {}
       if(typeof renderResumenLluvia === 'function') try { renderResumenLluvia(); } catch(e) {}
@@ -6880,28 +6892,28 @@ function borrarSeleccionados() {
 
   // Al cargar: sincronizar datos PASTURAS desde Firebase con protección
   window.addEventListener('load', function() {
-    var PROTEGIDAS = ['potreroAreas', 'potreroConfig', 'pluviometros'];
-    // Claves donde Firebase siempre gana si tiene MÁS registros (datos nuevos desde campo)
+    // Solo potreroAreas y potreroConfig son intocables (configuración física de la estancia)
+    var PROTEGIDAS = ['potreroAreas', 'potreroConfig'];
+    // Claves donde Firebase siempre gana si tiene MÁS datos
     var MERGE_MAS_REGISTROS = ['lluvia'];
+    // Claves de configuración: Firebase gana si tiene más potreros asignados
+    var MERGE_CONFIG = ['pluviometros'];
     fbRead('/elprado1', function(data) {
       if(!data || typeof data !== 'object') return;
       Object.keys(data).forEach(function(key) {
         if(data[key] === null || key === 'usuario') return;
-        // Nunca sobreescribir estas claves desde Firebase
         if(PROTEGIDAS.indexOf(key) >= 0) return;
         var lsKey = 'elprado_' + key;
         var existing = localStorage.getItem(lsKey);
-        // Para lluvia: comparar cantidad y usar el que tenga más registros
+
+        // lluvia: usar el que tenga más registros
         if(MERGE_MAS_REGISTROS.indexOf(key) >= 0) {
           var fbVal = Array.isArray(data[key]) ? data[key]
             : (data[key] && typeof data[key] === 'object') ? Object.values(data[key]) : null;
           var fbLen = fbVal ? fbVal.length : 0;
           var localLen = 0;
           if(existing) {
-            try {
-              var localParsed = JSON.parse(existing);
-              localLen = Array.isArray(localParsed) ? localParsed.length : 0;
-            } catch(e) {}
+            try { var lp = JSON.parse(existing); localLen = Array.isArray(lp) ? lp.length : 0; } catch(e) {}
           }
           if(fbLen > localLen) {
             _orig.call(localStorage, lsKey, JSON.stringify(fbVal));
@@ -6909,6 +6921,27 @@ function borrarSeleccionados() {
           }
           return;
         }
+
+        // pluviometros: Firebase gana si tiene más potreros asignados en total
+        if(MERGE_CONFIG.indexOf(key) >= 0) {
+          var fbArr = Array.isArray(data[key]) ? data[key]
+            : (data[key] && typeof data[key] === 'object') ? Object.values(data[key]) : null;
+          if(!fbArr) return;
+          var fbPotreros = fbArr.reduce(function(s, p) { return s + ((p.potreros||[]).length); }, 0);
+          var localPotreros = 0;
+          if(existing) {
+            try {
+              var lArr = JSON.parse(existing);
+              if(Array.isArray(lArr)) localPotreros = lArr.reduce(function(s, p) { return s + ((p.potreros||[]).length); }, 0);
+            } catch(e) {}
+          }
+          if(fbPotreros > localPotreros) {
+            _orig.call(localStorage, lsKey, JSON.stringify(fbArr));
+            console.log('[sync] pluviometros: Firebase (' + fbPotreros + ' potreros) > local (' + localPotreros + ') → usando Firebase');
+          }
+          return;
+        }
+
         // Para el resto: solo bajar si localStorage está vacío
         if(existing) {
           try {
