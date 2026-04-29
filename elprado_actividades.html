@@ -6792,8 +6792,28 @@ function borrarSeleccionados() {
     } catch(e) {}
   };
 
-  // Al cargar: la sincronización la maneja syncFromFirebase() en el script principal
-  // Este script solo maneja la escritura automática via interceptor de localStorage
+  // Al cargar: sincronizar datos desde Firebase con protección
+  window.addEventListener('load', function() {
+    fbRead('/elprado1', function(data) {
+      if(!data || typeof data !== 'object') return;
+      Object.keys(data).forEach(function(key) {
+        if(data[key] === null || key === 'usuario') return;
+        var lsKey = 'elprado_' + key;
+        var existing = localStorage.getItem(lsKey);
+        // Solo bajar si local está vacío
+        if(existing) {
+          try {
+            var parsed = JSON.parse(existing);
+            var len = Array.isArray(parsed) ? parsed.length
+              : (parsed && typeof parsed === 'object') ? Object.keys(parsed).length : 0;
+            if(len > 0) return; // local tiene datos — no sobreescribir
+          } catch(e) {}
+        }
+        // Local vacío → bajar desde Firebase preservando estructura
+        _orig.call(localStorage, lsKey, JSON.stringify(data[key]));
+      });
+    });
+  });
 })();
 </script>
 <script>
