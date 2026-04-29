@@ -6792,22 +6792,8 @@ function borrarSeleccionados() {
     } catch(e) {}
   };
 
-  // Al cargar: sincronizar solo datos PASTURAS desde Firebase
-  window.addEventListener('load', function() {
-    
-    // Bajar datos PASTURAS (prefijo elprado_)
-    fbRead('/elprado1', function(data) {
-      if(data && typeof data === 'object') {
-        Object.keys(data).forEach(function(key) {
-          if(data[key] !== null && key !== 'usuario') {
-            _orig.call(localStorage, 'elprado_' + key, JSON.stringify(data[key]));
-          }
-        });
-      }
-    });
-
-    // Botón flotante eliminado — usar ⚙ Configuración → "Subir todos mis datos a Firebase"
-  });
+  // Al cargar: la sincronización la maneja syncFromFirebase() en el script principal
+  // Este script solo maneja la escritura automática via interceptor de localStorage
 })();
 </script>
 <script>
