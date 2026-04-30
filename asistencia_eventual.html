@@ -751,7 +751,13 @@ function abrirLiquidacion() {
     function getJornalesTipo(ci, tipo) {
         var j=0, m=0;
         for(var d=dg.inicio; d<=dg.fin; d++) {
-            if(localStorage.getItem(kA(ci,dg.anio,dg.mes,d))==='P') {
+            var asistVal = localStorage.getItem(kA(ci,dg.anio,dg.mes,d));
+            var actVal   = localStorage.getItem(kAct(ci,dg.anio,dg.mes,d))||'';
+            var rolVal   = localStorage.getItem(kRol(ci,dg.anio,dg.mes,d))||'';
+            var dom      = esDom(dg.anio,dg.mes,d);
+            // Contar como P si está marcado P, o si tiene actividad y no es F/NL/domingo
+            var esP = asistVal==='P' || (!asistVal && (actVal||rolVal) && asistVal!=='F' && asistVal!=='NL' && !dom);
+            if(esP) {
                 var t = getTipoDia(ci,dg.anio,dg.mes,d);
                 if(t===tipo) {
                     j++;
@@ -1124,7 +1130,12 @@ function abrirLiquidacion() {
 // Helper: verificar si un trabajador hizo algo de cierto tipo en la quincena
 function tieneTipoDia(ci, dg, tipo) {
     for(var d=dg.inicio; d<=dg.fin; d++) {
-        if(localStorage.getItem(kA(ci,dg.anio,dg.mes,d))==='P') {
+        var asistVal = localStorage.getItem(kA(ci,dg.anio,dg.mes,d));
+        var actVal   = localStorage.getItem(kAct(ci,dg.anio,dg.mes,d))||'';
+        var rolVal   = localStorage.getItem(kRol(ci,dg.anio,dg.mes,d))||'';
+        var dom      = esDom(dg.anio,dg.mes,d);
+        var esP = asistVal==='P' || (!asistVal && (actVal||rolVal) && asistVal!=='F' && asistVal!=='NL' && !dom);
+        if(esP) {
             var t = getTipoDia(ci,dg.anio,dg.mes,d);
             if(t===tipo) return true;
         }
