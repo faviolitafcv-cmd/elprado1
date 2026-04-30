@@ -442,7 +442,11 @@ function renderTabla(inicio, fin, mes, anio) {
             var esDomSinG  = dom && !asistGuard;
             var asist      = asistGuard || (dom?'NL':'');
             var usaMoto    = localStorage.getItem(kMoto(p.ci,anio,mes,d))==='1';
-            if(asist==='P'){ totalJ++; if(usaMoto) totalM++; }
+            var valActJ    = localStorage.getItem(kAct(p.ci,anio,mes,d))||'';
+            var valRolJ    = localStorage.getItem(kRol(p.ci,anio,mes,d))||'';
+            // Contar jornal si P, o si tiene actividad asignada y no es F/NL/domingo
+            var esPresente = asist==='P' || (!asistGuard && (valActJ||valRolJ) && asist!=='F' && asist!=='NL' && !dom);
+            if(esPresente){ totalJ++; if(usaMoto) totalM++; }
 
             var contenido='';
 
