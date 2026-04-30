@@ -384,10 +384,26 @@ function kRol(ci,a,m,d) { return 'evRol_'+ci+'_'+a+'_'+m+'_'+d;   }
 function kMoto(ci,a,m,d){ return 'evMoto_'+ci+'_'+a+'_'+m+'_'+d;  }
 function esDom(a,m,d)   { return new Date(a,m,d).getDay()===0; }
 
+// Normaliza valores con comillas extra por doble codificación Firebase (ej: "P" -> P)
+function normVal(v) {
+    if(v === null || v === undefined) return null;
+    var s = String(v).trim();
+    while(s.length >= 2 && s.charAt(0) === '"' && s.charAt(s.length-1) === '"') {
+        s = s.slice(1,-1);
+    }
+    return s || null;
+}
+function getAsist(ci,a,m,d) {
+    var v = normVal(localStorage.getItem(kA(ci,a,m,d)));
+    return v ? v.toUpperCase() : null;
+}
+function getActNorm(ci,a,m,d) { return normVal(localStorage.getItem(kAct(ci,a,m,d))) || ''; }
+function getRolNorm(ci,a,m,d) { return normVal(localStorage.getItem(kRol(ci,a,m,d))) || ''; }
+
 // Detectar tipo de lo que hizo ese dia
 function getTipoDia(ci, anio, mes, d) {
-    var act = localStorage.getItem(kAct(ci,anio,mes,d));
-    var rol = localStorage.getItem(kRol(ci,anio,mes,d));
+    var act = getActNorm(ci,anio,mes,d);
+    var rol = getRolNorm(ci,anio,mes,d);
     if(rol)  return 'reemplazo';
     if(act && act!=='__escribir__') {
         var actividades = getActividades();
@@ -438,12 +454,12 @@ function renderTabla(inicio, fin, mes, anio) {
 
         for(var d=inicio; d<=fin; d++) {
             var dom        = esDom(anio,mes,d);
-            var asistGuard = localStorage.getItem(kA(p.ci,anio,mes,d));
+            var asistGuard = getAsist(p.ci,anio,mes,d);
             var esDomSinG  = dom && !asistGuard;
             var asist      = asistGuard || (dom?'NL':'');
             var usaMoto    = localStorage.getItem(kMoto(p.ci,anio,mes,d))==='1';
-            var valActJ    = localStorage.getItem(kAct(p.ci,anio,mes,d))||'';
-            var valRolJ    = localStorage.getItem(kRol(p.ci,anio,mes,d))||'';
+            var valActJ    = getActNorm(p.ci,anio,mes,d);
+            var valRolJ    = getRolNorm(p.ci,anio,mes,d);
             // Contar jornal si P, o si tiene actividad asignada y no es F/NL/domingo
             var esPresente = asist==='P' || (!asistGuard && (valActJ||valRolJ) && asist!=='F' && asist!=='NL' && !dom);
             if(esPresente){ totalJ++; if(usaMoto) totalM++; }
@@ -453,8 +469,8 @@ function renderTabla(inicio, fin, mes, anio) {
             if(asist==='F' || (asist==='NL' && !esDomSinG)) {
                 contenido = '<span class="badge-asist badge-'+asist+'" onclick="habilitarDia(\''+p.ci+'\','+anio+','+mes+','+d+')">'+(asist==='F'?'Falta':'NL')+'</span>';
             } else {
-                var valAct  = localStorage.getItem(kAct(p.ci,anio,mes,d))||'';
-                var valRol  = localStorage.getItem(kRol(p.ci,anio,mes,d))||'';
+                var valAct  = getActNorm(p.ci,anio,mes,d);
+                var valRol  = getRolNorm(p.ci,anio,mes,d);
                 var tipoDia = getTipoDia(p.ci,anio,mes,d);
                 var clsSel  = tipoDia ? 'tipo-'+tipoDia : 'sin-asignar';
                 var valSel  = '';
@@ -505,7 +521,7 @@ function renderTabla(inicio, fin, mes, anio) {
 // Elegir actividad/rol en el selector unificado
 function elegir(sel, ci, anio, mes, d) {
     var dg = getDias();
-    if(quinCerrada(anio, mes, quincenaActual)) { sel.value = localStorage.getItem(kAct(ci,anio,mes,d))||''; return; }
+    if(quinCerrada(anio, mes, quincenaActual)) { sel.value = getActNorm(ci,anio,mes,d); return; }
     var val = sel.value;
     localStorage.removeItem(kAct(ci,anio,mes,d));
     localStorage.removeItem(kRol(ci,anio,mes,d));
@@ -569,7 +585,7 @@ function marcarEstado(ci,anio,mes,d,estado) {
 }
 
 function ciclarEstado(ci,anio,mes,d) {
-    var actual = localStorage.getItem(kA(ci,anio,mes,d))||'P';
+    var actual = getAsist(ci,anio,mes,d)||'P';
     var nuevo  = actual==='P'?'F':actual==='F'?'NL':null;
     if(!nuevo) {
         localStorage.removeItem(kA(ci,anio,mes,d));
@@ -602,8 +618,8 @@ function contarJornalesTotales(nombreAct, fechaInicioStr) {
         var diaFin  = (anioAct===hoy.getFullYear()&&mesAct===hoy.getMonth()) ? hoy.getDate() : diasMes;
         personal.forEach(function(p) {
             for(var d=diaIni; d<=diaFin; d++) {
-                if(localStorage.getItem(kA(p.ci,anioAct,mesAct,d))==='P') {
-                    var act = localStorage.getItem(kAct(p.ci,anioAct,mesAct,d));
+                if(getAsist(p.ci,anioAct,mesAct,d)==='P') {
+                    var act = getActNorm(p.ci,anioAct,mesAct,d);
                     if(act===nombreAct) total++;
                 }
             }
@@ -622,8 +638,8 @@ function calcularCosto(nombreAct, mes, anio) {
         var jornal  = parseFloat(p.pagoJornal)||0;
         var bonoDia = parseFloat(p.bonoMovilidad)||0;
         for(var d=1; d<=diasMes; d++) {
-            if(localStorage.getItem(kA(p.ci,anio,mes,d))==='P') {
-                var act = localStorage.getItem(kAct(p.ci,anio,mes,d));
+            if(getAsist(p.ci,anio,mes,d)==='P') {
+                var act = getActNorm(p.ci,anio,mes,d);
                 if(act===nombreAct) {
                     totalJ++;
                     costoMO += jornal;
@@ -751,9 +767,9 @@ function abrirLiquidacion() {
     function getJornalesTipo(ci, tipo) {
         var j=0, m=0;
         for(var d=dg.inicio; d<=dg.fin; d++) {
-            var asistVal = localStorage.getItem(kA(ci,dg.anio,dg.mes,d));
-            var actVal   = localStorage.getItem(kAct(ci,dg.anio,dg.mes,d))||'';
-            var rolVal   = localStorage.getItem(kRol(ci,dg.anio,dg.mes,d))||'';
+            var asistVal = getAsist(ci,dg.anio,dg.mes,d);
+            var actVal   = getActNorm(ci,dg.anio,dg.mes,d);
+            var rolVal   = getRolNorm(ci,dg.anio,dg.mes,d);
             var dom      = esDom(dg.anio,dg.mes,d);
             // Contar como P si está marcado P, o si tiene actividad y no es F/NL/domingo
             var esP = asistVal==='P' || (!asistVal && (actVal||rolVal) && asistVal!=='F' && asistVal!=='NL' && !dom);
@@ -1130,9 +1146,9 @@ function abrirLiquidacion() {
 // Helper: verificar si un trabajador hizo algo de cierto tipo en la quincena
 function tieneTipoDia(ci, dg, tipo) {
     for(var d=dg.inicio; d<=dg.fin; d++) {
-        var asistVal = localStorage.getItem(kA(ci,dg.anio,dg.mes,d));
-        var actVal   = localStorage.getItem(kAct(ci,dg.anio,dg.mes,d))||'';
-        var rolVal   = localStorage.getItem(kRol(ci,dg.anio,dg.mes,d))||'';
+        var asistVal = getAsist(ci,dg.anio,dg.mes,d);
+        var actVal   = getActNorm(ci,dg.anio,dg.mes,d);
+        var rolVal   = getRolNorm(ci,dg.anio,dg.mes,d);
         var dom      = esDom(dg.anio,dg.mes,d);
         var esP = asistVal==='P' || (!asistVal && (actVal||rolVal) && asistVal!=='F' && asistVal!=='NL' && !dom);
         if(esP) {
