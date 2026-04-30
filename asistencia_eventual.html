@@ -134,7 +134,7 @@ localStorage.setItem = function(key, value) {
 // y un DELETE async puede llegar DESPUÉS del SET y borrar el dato.
 
 // Sincronizar al cargar — con indicador visible
-(async function() {
+document.addEventListener('DOMContentLoaded', async function() {
   const statusDiv = document.createElement('div');
   statusDiv.id = 'fb-sync-status';
   statusDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#1565c0;color:#fff;text-align:center;padding:6px;font-size:13px;z-index:9999;';
@@ -154,7 +154,7 @@ localStorage.setItem = function(key, value) {
     statusDiv.textContent = '🔴 No se pudo cargar Firebase — trabajando con datos locales del navegador';
     setTimeout(function(){ statusDiv.remove(); }, 6000);
   }
-})();
+});
 
 </script>
 </head>
