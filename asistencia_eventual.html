@@ -147,8 +147,8 @@ localStorage.setItem = function(key, value) {
     statusDiv.style.background = '#2e7d32';
     statusDiv.textContent = '✅ Datos sincronizados';
     setTimeout(function(){ statusDiv.remove(); }, 2000);
-    // renderTodo() NO se llama aquí intencionalmente.
-    // El sync solo carga datos faltantes; init() ya renderizó con datos locales correctos.
+    // Re-renderizar para mostrar los datos recién cargados desde Firebase
+    renderTodo();
   } else {
     statusDiv.style.background = '#b71c1c';
     statusDiv.textContent = '🔴 No se pudo cargar Firebase — trabajando con datos locales del navegador';
