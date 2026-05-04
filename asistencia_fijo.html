@@ -366,7 +366,11 @@ function setEstado(ci,y,m,d,val) {
 // =========================================================
 function aporte(estado, dow) {
     if (estado==='F')  return -3;
-    if (estado==='D')  return -1;
+    if (estado==='D') {
+        if (dow===0) return 0;   // Domingo: neutro (es su día que le corresponde)
+        if (dow===6) return 0;   // Sábado: +0.5 trabajado −0.5 tomado = neto 0
+        return -1;               // Lunes–Viernes: descuenta 1 día normal
+    }
     if (estado==='FT') return  2;
     if (estado==='FN' || estado==='PJ' || estado==='-' || estado==='VAC') return 0;
     // P, BM, CAP
@@ -396,7 +400,11 @@ function calcularDetalle(ci, desdeFecha, hastaFecha) {
         var est = getEstado(ci, d.getFullYear(), d.getMonth(), d.getDate(), esFer);
         var dow = d.getDay();
         if (est==='FT')  { r.ferTrab++; r.ganFT+=2; }
-        else if (est==='D')   { r.descTom++; }
+        else if (est==='D') {
+            if (dow===0) { /* Domingo: neutro, ni suma ni descuenta */ }
+            else if (dow===6) { r.ganSabDom += 0.5; r.descTom += 0.5; } // Sábado: medio día trabajado, medio tomado
+            else { r.descTom++; } // Lunes–Viernes: descuenta 1 día
+        }
         else if (est==='F')   { r.faltas++; }
         else if (est==='BM')  { r.bajaMed++;  if(dow===6) r.ganSabDom+=0.5; else if(dow===0) r.ganSabDom+=1; }
         else if (est==='CAP') { r.capacit++;  if(dow===6) r.ganSabDom+=0.5; else if(dow===0) r.ganSabDom+=1; }
@@ -425,7 +433,11 @@ function calcularMes(ci, anio, mes) {
         var est = getEstado(ci, anio, mes, i, esFer);
         var dow = f.getDay();
         if (est === 'FT') { r.ferTrab++; r.ganFT += 2; }
-        else if (est === 'D')  { r.descTom++; }
+        else if (est === 'D') {
+            if (dow===0) { /* Domingo: neutro */ }
+            else if (dow===6) { r.ganSabDom += 0.5; r.descTom += 0.5; } // Sábado: medio trabajado, medio tomado
+            else { r.descTom++; } // Lunes–Viernes: descuenta 1 día
+        }
         else if (est === 'F')  { r.faltas++; }
         else if (est === 'P' || est === 'BM' || est === 'CAP') {
             if (dow === 6) r.ganSabDom += 0.5;
