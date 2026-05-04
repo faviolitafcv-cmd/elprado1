@@ -367,9 +367,9 @@ function setEstado(ci,y,m,d,val) {
 function aporte(estado, dow) {
     if (estado==='F')  return -3;
     if (estado==='D') {
-        if (dow===0) return 0;   // Domingo: neutro (es su día que le corresponde)
-        if (dow===6) return 0;   // Sábado: +0.5 trabajado −0.5 tomado = neto 0
-        return -1;               // Lunes–Viernes: descuenta 1 día normal
+        if (dow===0) return  0;    // Domingo: descanso natural, no consume saldo
+        if (dow===6) return -0.5;  // Sábado: solo la mañana cuenta, media jornada
+        return -1;                 // Lunes–Viernes: día completo
     }
     if (estado==='FT') return  2;
     if (estado==='FN' || estado==='PJ' || estado==='-' || estado==='VAC') return 0;
@@ -401,9 +401,9 @@ function calcularDetalle(ci, desdeFecha, hastaFecha) {
         var dow = d.getDay();
         if (est==='FT')  { r.ferTrab++; r.ganFT+=2; }
         else if (est==='D') {
-            if (dow===0) { /* Domingo: neutro, ni suma ni descuenta */ }
-            else if (dow===6) { r.ganSabDom += 0.5; r.descTom += 0.5; } // Sábado: medio día trabajado, medio tomado
-            else { r.descTom++; } // Lunes–Viernes: descuenta 1 día
+            if (dow===0) { /* Domingo: descanso natural, no consume saldo */ }
+            else if (dow===6) { r.descTom += 0.5; } // Sábado: media jornada
+            else { r.descTom++; }                   // Lunes–Viernes: día completo
         }
         else if (est==='F')   { r.faltas++; }
         else if (est==='BM')  { r.bajaMed++;  if(dow===6) r.ganSabDom+=0.5; else if(dow===0) r.ganSabDom+=1; }
@@ -434,9 +434,9 @@ function calcularMes(ci, anio, mes) {
         var dow = f.getDay();
         if (est === 'FT') { r.ferTrab++; r.ganFT += 2; }
         else if (est === 'D') {
-            if (dow===0) { /* Domingo: neutro */ }
-            else if (dow===6) { r.ganSabDom += 0.5; r.descTom += 0.5; } // Sábado: medio trabajado, medio tomado
-            else { r.descTom++; } // Lunes–Viernes: descuenta 1 día
+            if (dow===0) { /* Domingo: descanso natural, no consume saldo */ }
+            else if (dow===6) { r.descTom += 0.5; } // Sábado: media jornada
+            else { r.descTom++; }                   // Lunes–Viernes: día completo
         }
         else if (est === 'F')  { r.faltas++; }
         else if (est === 'P' || est === 'BM' || est === 'CAP') {
