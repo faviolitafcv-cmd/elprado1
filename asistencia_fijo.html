@@ -718,7 +718,7 @@ function renderSaldo() {
     db = db.filter(function(p) { return ocultos.indexOf(p.ci) < 0; });
 
     db.forEach(function(p) {
-        var r = calcularDetalle(p.ci, perIni, hoy);
+        var r = calcularDetalle(p.ci, perIni, perFin);
         var sCls = r.saldo>0?'sb-pos':r.saldo<0?'sb-neg':'sb-cero';
         var sLbl = r.saldo>0 ? '⬆️ Le debemos: '+fmtDias(r.saldo)
                  : r.saldo<0 ? '⬇️ Debe: '+fmtDias(Math.abs(r.saldo))
@@ -763,16 +763,31 @@ function renderSaldo() {
 // =========================================================
 // CIERRE DE PERÍODO
 // =========================================================
-function abrirCierre() {
+function recalcularCierre() {
+    var d = document.getElementById('cierre-input-desde');
+    var h = document.getElementById('cierre-input-hasta');
+    if (!d || !h || !d.value || !h.value) { alert('Por favor, complete ambas fechas.'); return; }
+    if (d.value > h.value) { alert('La fecha de inicio no puede ser posterior a la fecha de fin.'); return; }
+    abrirCierre(d.value, h.value);
+}
+
+function abrirCierre(desdeISO, hastaISO) {
     var db = JSON.parse(localStorage.getItem('personalFijoDB')) || [];
     if (!db.length) { alert('No hay personal registrado.'); return; }
 
     var hoy = new Date(); hoy.setHours(0,0,0,0);
-    var perIni = parseISO(getPeriodoInicio());
     var hoyISO = toISO(hoy);
-    var iniISO = toISO(perIni);
 
-    draftCierre = { fecha:hoyISO, periodoLabel: fechaHumana(iniISO)+' — '+fechaHumana(hoyISO), periodoIni: iniISO, periodoFin: hoyISO, pagos:[] };
+    // Si no se pasan parámetros, usar defaults
+    if (!desdeISO) desdeISO = getPeriodoInicio();
+    if (!hastaISO) hastaISO = hoyISO;
+
+    var iniISO = desdeISO;
+    var finISO = hastaISO;
+    var perIni = parseISO(iniISO);
+    var perFin = parseISO(finISO);
+
+    draftCierre = { fecha:hoyISO, periodoLabel: fechaHumana(iniISO)+' — '+fechaHumana(finISO), periodoIni: iniISO, periodoFin: finISO, pagos:[] };
 
     // Filtrar personas ocultas del resumen
     var ocultos = getSaldoOcultos();
@@ -783,10 +798,7 @@ function abrirCierre() {
         return parseFloat((str+'').replace(/[^\d.]/g,'')) || 0;
     }
 
-    var html = '<div style="background:#e8f5e9;padding:10px 14px;border-radius:6px;margin-bottom:12px;font-size:13px;">'
-        +'📅 <strong>Período a cerrar:</strong> '+fechaHumana(iniISO)+' → '+fechaHumana(hoyISO)+'</div>'
-        +(ocultos.length ? '<div style="background:#fff3e0;padding:8px 14px;border-radius:6px;margin-bottom:12px;font-size:12px;color:#e65100;">ℹ️ '+ocultos.length+' persona(s) oculta(s) del resumen no aparecen en esta planilla.</div>' : '')
-        +'<p style="color:#555;font-size:13px;margin-bottom:14px;">Al confirmar se registra el pago y los saldos reinician desde el día siguiente.</p>'
+    var html = '<div style="background:#e3f2fd;padding:10px 14px;border-radius:6px;margin-bottom:14px;font-size:13px;border:1px solid #90caf9;">'        +'<strong>📅 Ajustar período del cierre:</strong><br>'        +'<div style="display:flex;gap:12px;align-items:center;margin-top:8px;flex-wrap:wrap;">'        +'<label style="font-size:12px;">Desde:&nbsp;<input type="date" id="cierre-input-desde" value="'+iniISO+'" style="padding:4px 8px;border:1px solid #90caf9;border-radius:4px;font-size:12px;"></label>'        +'<label style="font-size:12px;">Hasta:&nbsp;<input type="date" id="cierre-input-hasta" value="'+finISO+'" style="padding:4px 8px;border:1px solid #90caf9;border-radius:4px;font-size:12px;"></label>'        +'<button onclick="recalcularCierre()" style="background:#1565c0;color:white;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:12px;">🔄 Recalcular</button>'        +'</div></div>'        +'<div style="background:#e8f5e9;padding:10px 14px;border-radius:6px;margin-bottom:12px;font-size:13px;">'        +'📅 <strong>Período a cerrar:</strong> '+fechaHumana(iniISO)+' → '+fechaHumana(finISO)+'</div>'        +(ocultos.length ? '<div style="background:#fff3e0;padding:8px 14px;border-radius:6px;margin-bottom:12px;font-size:12px;color:#e65100;">ℹ️ '+ocultos.length+' persona(s) oculta(s) del resumen no aparecen en esta planilla.</div>' : '')        +'<p style="color:#555;font-size:13px;margin-bottom:14px;">Al confirmar se registra el pago y los saldos reinician desde el día siguiente al período.</p>'
         +'<table class="tc"><thead><tr>'
         +'<th>Nombre</th><th>Sáb/Dom</th><th>Feriados Trab.</th><th>Descansos Tom.</th><th>Faltas</th>'
         +'<th style="background:#1b5e20;">TOTAL A PAGAR</th>'
@@ -796,7 +808,7 @@ function abrirCierre() {
 
     var totalBs = 0;
     dbCierre.forEach(function(p) {
-        var r = calcularDetalle(p.ci, perIni, hoy);
+        var r = calcularDetalle(p.ci, perIni, perFin);
         var liq = parseLiquido(p.liquido);
         var factorDia = liq > 0 ? liq / 30 : 0;
         var bs = r.saldo > 0 ? Math.round(factorDia * r.saldo * 100) / 100 : 0;
@@ -831,10 +843,12 @@ function confirmarCierre() {
     var hist = JSON.parse(localStorage.getItem('asistFijoCierres')) || [];
     hist.push(draftCierre);
     localStorage.setItem('asistFijoCierres', JSON.stringify(hist));
-    // Nuevo período empieza mañana
-    var man = new Date(); man.setDate(man.getDate()+1);
-    localStorage.setItem('asistFijoPeriodoInicio', toISO(man));
-    alert('✅ Pago registrado. Nuevo período desde '+fechaHumana(toISO(man))+'.');
+    // Nuevo período empieza al día siguiente del período cerrado
+    var perFinDate = parseISO(draftCierre.periodoFin);
+    perFinDate.setDate(perFinDate.getDate()+1);
+    var nuevoIniISO = toISO(perFinDate);
+    localStorage.setItem('asistFijoPeriodoInicio', nuevoIniISO);
+    alert('✅ Pago registrado. Nuevo período desde '+fechaHumana(nuevoIniISO)+'.');
     cerrarModal('modal-cierre');
     renderTodo();
 }
