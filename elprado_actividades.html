@@ -1233,6 +1233,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
       <button class="btn btn-primary" onclick="subirLluviaMerge()" style="background:#27ae60;">🌧 Sincronizar lluvia (merge seguro)</button>
       <button class="btn btn-secondary" onclick="limpiarDuplicados()">🧹 Limpiar registros duplicados</button>
       <button class="btn btn-secondary" onclick="limpiarVueltasDuplicadas()">🧹 Limpiar vueltas duplicadas</button>
+      <button class="btn btn-secondary" onclick="recalcularRetornosHistoricos()" style="background:rgba(201,162,39,.2);border-color:var(--gold2);color:var(--gold2);">🔄 Recalcular retornos históricos</button>
     </div>
     <div style="margin-top:12px; font-size:11px; color:var(--text3);" id="storageInfo"></div>
   </div>
@@ -2893,6 +2894,27 @@ function getHAUsadaEnVuelta(potrero, lote, excludeId) {
 // Registrar inicio/fin de vuelta para un potrero
 function getVueltasData() { return getData('finVuelta', []); }
 function setVueltasData(v) { setData('finVuelta', v); fbSet('finVuelta', v); }
+function recalcularRetornosHistoricos() {
+  if(!confirm("¿Recalcular días de retorno en todos los registros históricos?\n\nEsto SOLO actualiza el campo \"retorno\" de registros de MATERIA SECA e INGRESO HDA que tienen fecha de ingreso.\nNo se modifica ningún otro dato.")) return;
+  const acts = getActividades();
+  let actualizados = 0;
+  const nuevas = acts.map(a => {
+    if(!["MATERIA SECA","INGRESO HDA"].includes(a.actividad)) return a;
+    const fi = a.fechaIng || null;
+    if(!fi) return a;
+    const r = calcRetornoAuto(a.potrero, a.parcela, a.id, fi);
+    if(r.dias === null) return a;
+    if(r.dias === a.retorno) return a;
+    actualizados++;
+    return Object.assign({}, a, { retorno: r.dias });
+  });
+  if(actualizados === 0) { notif("✅ Todos los retornos ya están correctos"); return; }
+  setData("actividades", nuevas);
+  fbSet("actividades", nuevas);
+  renderTabla();
+  renderStats();
+  notif(`✅ Se actualizaron ${actualizados} registros con retorno corregido`);
+}
 function limpiarVueltasDuplicadas() {
   const vueltas = getVueltasData();
   const vistas = new Set();
