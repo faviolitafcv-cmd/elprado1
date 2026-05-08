@@ -3064,6 +3064,8 @@ function guardarActividad() {
     let plan = getPlan().filter(p => p.autoDesdeMS && p.id !== editId);
     setPlan(plan);
     delete document.getElementById('formComun').dataset.editId;
+    delete document.getElementById('formComun').dataset.editRetorno;
+    delete document.getElementById('formComun').dataset.editDiasDescanso;
     // Restaurar botón
     const btnGuardar = document.querySelector('[onclick="guardarActividad()"]');
     if(btnGuardar) { btnGuardar.textContent = '💾 Guardar Registro'; btnGuardar.style.background = ''; }
@@ -3124,7 +3126,7 @@ function guardarActividad() {
       horaIng: document.getElementById('fHoraIng')?.value||null,
       horaSal: document.getElementById('fHoraSal')?.value||null,
       estadia: (fIngMs&&fSalMs&&fIngMs<fSalMs)?dateDiff(fIngMs,fSalMs):null,
-      retorno: retObj.dias||null,
+      retorno: retObj.dias != null ? retObj.dias : (document.getElementById('formComun').dataset.editRetorno ? parseInt(document.getElementById('formComun').dataset.editRetorno) : null),
       anchoM: parseFloat(document.getElementById('fAncho').value)||null,
       largoM: (function(){
         if(modoDim==='IRREGULAR') return parseFloat(document.getElementById('fLargoManual').value)||null;
@@ -3150,7 +3152,7 @@ function guardarActividad() {
       ha: parseFloat(document.getElementById('fHAIng').value)||null,
       fechaIng: fi, fechaSal: fs,
       estadia: dateDiff(fi, fs),
-      retorno: r.dias,
+      retorno: r.dias != null ? r.dias : (document.getElementById('formComun').dataset.editRetorno ? parseInt(document.getElementById('formComun').dataset.editRetorno) : null),
     });
   }
   else {
@@ -3566,6 +3568,9 @@ function editarActividad(id) {
       document.getElementById('fFechaIng').value = r.fechaIng || '';
       document.getElementById('fFechaSal').value = r.fechaSal || '';
       document.getElementById('fAncho').value = r.anchoM || '';
+      // ── FIX: preservar retorno y diasDescanso originales al editar ──
+      document.getElementById('formComun').dataset.editRetorno = r.retorno != null ? r.retorno : '';
+      document.getElementById('formComun').dataset.editDiasDescanso = r.diasDescanso != null ? r.diasDescanso : '';
       if(r.largoM) document.getElementById('fLargoManual').value = r.largoM;
       document.getElementById('fNDVI').value = r.ndvi || '';
       document.getElementById('fComentario').value = r.comentario || '';
@@ -3617,6 +3622,8 @@ function editarActividad(id) {
       document.getElementById('fHAIng').value = r.ha || '';
       document.getElementById('fFechaIngStd').value = r.fechaIng || '';
       document.getElementById('fFechaSalStd').value = r.fechaSal || '';
+      // ── FIX: preservar retorno original al editar ──
+      document.getElementById('formComun').dataset.editRetorno = r.retorno != null ? r.retorno : '';
       calcIngStd();
     }
 
