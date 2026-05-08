@@ -678,6 +678,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
   <div class="tab" onclick="showPage('lluvia')">🌧 Lluvia</div>
   <div class="tab" onclick="showPage('analisis')">🔬 Análisis</div>
   <div class="tab" onclick="showPage('campo')">📍 Campo</div>
+  <div class="tab" onclick="showPage('circuitos')">🔄 Circuitos</div>
 </div>
 
 <!-- ════════════════ ACTIVIDADES ════════════════ -->
@@ -1708,6 +1709,73 @@ tr:hover td { background: rgba(255,255,255,.02); }
 </div>
 
 <!-- NOTIFICACIÓN -->
+
+<!-- ═══════════════════════════════════════════════════
+     PÁGINA: CIRCUITOS
+════════════════════════════════════════════════════ -->
+<div class="page" id="page-circuitos">
+
+  <!-- HEADER con botón nuevo circuito -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+    <div>
+      <div style="font-size:18px;font-weight:700;color:var(--text);">🔄 Circuitos de Pastoreo</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:2px;">Estado en tiempo real · <span id="circ-fecha-hoy"></span></div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <input type="number" id="circDiasVuelta" min="1" max="60" placeholder="Días vuelta obj." 
+        style="width:130px;padding:7px 10px;border:1px solid var(--border2);border-radius:8px;background:var(--card2);color:var(--text);font-size:12px;"
+        oninput="renderCircuitos()" title="Días de vuelta objetivo para el cálculo de alcance">
+      <button class="btn btn-gold" onclick="abrirModalCircuito(null)">＋ Nuevo Circuito</button>
+    </div>
+  </div>
+
+  <!-- GRID de circuitos -->
+  <div id="circuitosGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px;"></div>
+  <div id="circuitosVacio" style="display:none;text-align:center;padding:60px 20px;color:var(--text3);">
+    <div style="font-size:40px;margin-bottom:12px;">🌿</div>
+    <div style="font-size:14px;">No hay circuitos creados todavía.</div>
+    <div style="font-size:12px;margin-top:6px;">Hacé clic en <strong>+ Nuevo Circuito</strong> para empezar.</div>
+  </div>
+</div>
+
+<!-- MODAL: Crear / Editar Circuito -->
+<div class="modal-bg" id="modalCircuito">
+  <div class="modal" style="max-width:540px;">
+    <div class="modal-title">
+      <span id="modalCircTitulo">Nuevo Circuito</span>
+      <button class="modal-close" onclick="cerrarModal('modalCircuito')">✕</button>
+    </div>
+
+    <div class="form-group" style="margin-bottom:14px;">
+      <label style="font-size:11px;color:var(--text3);font-weight:700;letter-spacing:1px;text-transform:uppercase;">Nombre del circuito</label>
+      <input type="text" id="circNombre" placeholder="ej: Vaquillas Cabeza" 
+        style="width:100%;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--card2);color:var(--text);font-size:13px;margin-top:6px;">
+    </div>
+
+    <div class="form-group" style="margin-bottom:14px;">
+      <label style="font-size:11px;color:var(--text3);font-weight:700;letter-spacing:1px;text-transform:uppercase;">Potreros del circuito</label>
+      <div style="font-size:11px;color:var(--text3);margin:4px 0 8px;">Buscá y agregá potreros uno por uno</div>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="circBuscaPotrero" placeholder="Buscar potrero..." 
+          style="flex:1;padding:8px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--card2);color:var(--text);font-size:12px;"
+          oninput="filtrarPotrerosModal()" autocomplete="off">
+        <button class="btn btn-secondary btn-sm" onclick="agregarPotreroCircuito()">＋ Agregar</button>
+      </div>
+      <div id="circPotrerosSugerencias" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;margin-top:4px;display:none;max-height:160px;overflow-y:auto;"></div>
+    </div>
+
+    <!-- Lista de potreros seleccionados -->
+    <div id="circPotrerosSelList" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;min-height:32px;padding:8px;background:var(--bg2);border-radius:8px;border:1px solid var(--border);"></div>
+
+    <div style="font-size:11px;color:var(--text3);margin-bottom:12px;" id="circResumenHa">Total: — ha</div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="cerrarModal('modalCircuito')">Cancelar</button>
+      <button class="btn btn-gold" onclick="guardarCircuito()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
 <div id="notif"></div>
 
 <script>
@@ -6050,7 +6118,7 @@ function showPage(id) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
-  const tabs = ['actividades','nueva','resumen','plan','pedidos','config','lluvia','analisis','campo'];
+  const tabs = ['actividades','nueva','resumen','plan','pedidos','config','lluvia','analisis','campo','circuitos'];
   const idx = tabs.indexOf(id);
   document.querySelectorAll('.tab')[idx]?.classList.add('active');
   if(id==='resumen') { actualizarGestionesDisponibles(); renderResumen(); renderMetricasHA(); }
@@ -6065,6 +6133,7 @@ function showPage(id) {
     if(!getMuestras().length && getBromatologicos().length) migrarBromsAMuestras();
   }
   if(id==='campo') { campoIrHoy(); renderCapAlertasAdmin(); }
+  if(id==='circuitos') { renderCircuitos(); }
   if(id==='lluvia') {
     renderAnalisisGestion();
     renderResumenLluvia();
@@ -6923,6 +6992,383 @@ function borrarSeleccionados() {
 
 
 </script>
+
+// ═══════════════════════════════════════════════════════════
+// MÓDULO CIRCUITOS DE PASTOREO
+// ═══════════════════════════════════════════════════════════
+
+function getCircuitos() { return getData('circuitos', []); }
+function setCircuitos(v) { setData('circuitos', v); fbSet('circuitos', v); }
+
+let _circEditId = null;
+let _circPotrerosTemp = []; // potreros en edición
+
+// ── Calcular días de descanso actual de un potrero (desde parcela 1 de última vuelta) ──
+function calcDescansoPotreroCircuito(potrero) {
+  const acts = getActividades();
+  const today = new Date().toISOString().split('T')[0];
+
+  // Buscar todos los registros del potrero con fecha de salida
+  const candidatos = acts.filter(a => {
+    if(a.potrero !== potrero) return false;
+    if(!['MATERIA SECA','INGRESO HDA','DESBROZAR','ROLO'].includes(a.actividad)) return false;
+    return true;
+  });
+
+  if(candidatos.length === 0) return null;
+
+  // Obtener fecha de salida de cada registro
+  function fSal(a) {
+    if(a.actividad === 'INGRESO HDA') return a.fechaSal || null;
+    if(a.actividad === 'DESBROZAR' || a.actividad === 'ROLO') return a.fechaSalMaq || null;
+    if(a.actividad === 'MATERIA SECA') return a.fechaSal || null;
+    return null;
+  }
+
+  // Determinar la vuelta actual: el ingreso más reciente al potrero
+  const ingresosOrdenados = candidatos
+    .filter(a => (a.fechaIng || a.fecha))
+    .sort((a,b) => {
+      const fa = a.fechaIng || a.fecha;
+      const fb = b.fechaIng || b.fecha;
+      return fb.localeCompare(fa);
+    });
+
+  if(ingresosOrdenados.length === 0) return null;
+
+  const fechaUltimoIngreso = ingresosOrdenados[0].fechaIng || ingresosOrdenados[0].fecha;
+
+  // Buscar la parcela 1 de la vuelta actual (ingresada en o después del último ingreso)
+  const parcela1Actual = candidatos.find(a =>
+    String(a.parcela) === '1' &&
+    (a.fechaIng || a.fecha) >= fechaUltimoIngreso
+  );
+
+  let fechaRef = null;
+
+  if(parcela1Actual) {
+    // Hay parcela 1 en vuelta actual — descanso = desde su salida hasta hoy
+    fechaRef = fSal(parcela1Actual);
+  } else {
+    // No hay parcela 1 aún — buscar la última salida de cualquier registro
+    let latest = null;
+    for(const a of candidatos) {
+      const f = fSal(a);
+      if(f && (!latest || f > latest)) latest = f;
+    }
+    fechaRef = latest;
+  }
+
+  if(!fechaRef) return null;
+  const dias = dateDiff(fechaRef, today);
+  return dias >= 0 ? dias : 0;
+}
+
+// ── Calcular promedio kg MS/ha de la vuelta anterior ──
+function calcPromedioMsVueltaAnterior(potrero) {
+  const acts = getActividades();
+  
+  const msActs = acts.filter(a =>
+    a.potrero === potrero &&
+    a.actividad === 'MATERIA SECA' &&
+    a.kgMsHa != null
+  ).sort((a,b) => (b.fechaIng||b.fecha||'').localeCompare(a.fechaIng||a.fecha||''));
+
+  if(msActs.length === 0) return null;
+
+  // Encontrar vueltas: agrupadas por bloques de ingreso continuo
+  // Vuelta = grupo de registros con ingresos consecutivos (diferencia ≤ 3 días entre parcelas)
+  const sorted = [...msActs].sort((a,b) => (a.fechaIng||a.fecha||'').localeCompare(b.fechaIng||b.fecha||''));
+  
+  // Dividir en vueltas: nueva vuelta cuando hay un gap > 10 días
+  const vueltas = [];
+  let vueltaActual = [sorted[0]];
+  for(let i=1; i<sorted.length; i++) {
+    const prev = sorted[i-1].fechaIng || sorted[i-1].fecha || '';
+    const curr = sorted[i].fechaIng || sorted[i].fecha || '';
+    if(prev && curr && dateDiff(prev, curr) > 10) {
+      vueltas.push(vueltaActual);
+      vueltaActual = [];
+    }
+    vueltaActual.push(sorted[i]);
+  }
+  vueltas.push(vueltaActual);
+
+  // Tomar la vuelta anterior (penúltima si hay 2+, última si hay 1)
+  const vueltaRef = vueltas.length >= 2 ? vueltas[vueltas.length - 2] : vueltas[vueltas.length - 1];
+  
+  if(!vueltaRef || vueltaRef.length === 0) return null;
+  const vals = vueltaRef.map(a => parseFloat(a.kgMsHa)).filter(v => !isNaN(v));
+  if(vals.length === 0) return null;
+  return Math.round(vals.reduce((s,v)=>s+v,0) / vals.length);
+}
+
+// ── Calcular alcance de un circuito en días ──
+// alcance = (suma kgMs disponible de todos los potreros) / consumo diario grupo
+// kgMs disponible ≈ promedio_kgMsHa × ha × factor_aprovechamiento (0.65)
+function calcAlcanceCircuito(potreros, cabezas, pesoMedio) {
+  if(!cabezas || !pesoMedio || cabezas === 0) return null;
+  
+  const FACTOR_APROVECH = 0.65; // 65% de aprovechamiento típico
+  const CONSUMO_PV = 0.03; // 3% del peso vivo en MS/día
+  
+  const consumoDiarioTotal = cabezas * pesoMedio * CONSUMO_PV; // kg MS/día del grupo
+  if(consumoDiarioTotal === 0) return null;
+
+  let msDisponibleTotal = 0;
+  for(const pot of potreros) {
+    const prom = calcPromedioMsVueltaAnterior(pot);
+    const ha = getPotreroArea(pot) || 0;
+    if(prom && ha) {
+      msDisponibleTotal += prom * ha * FACTOR_APROVECH;
+    }
+  }
+  if(msDisponibleTotal === 0) return null;
+  return Math.round(msDisponibleTotal / consumoDiarioTotal);
+}
+
+// ── Detectar potrero activo (donde están los animales hoy) ──
+function detectarPotreroActivo(circuito) {
+  const acts = getActividades();
+  const today = new Date().toISOString().split('T')[0];
+  
+  for(const pot of circuito.potreros) {
+    // Buscar un INGRESO HDA o MATERIA SECA con ingreso <= hoy y salida >= hoy
+    const activo = acts.find(a => {
+      if(a.potrero !== pot) return false;
+      if(!['INGRESO HDA','MATERIA SECA'].includes(a.actividad)) return false;
+      const fi = a.fechaIng || a.fecha;
+      const fs = a.fechaSal;
+      if(!fi) return false;
+      if(fi > today) return false;
+      if(fs && fs < today) return false;
+      return true;
+    });
+    if(activo) return pot;
+  }
+  return null;
+}
+
+// ── Render principal de circuitos ──
+function renderCircuitos() {
+  if(!document.getElementById('page-circuitos')?.classList.contains('active')) return;
+
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('circ-fecha-hoy').textContent = 
+    new Date().toLocaleDateString('es-BO', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+
+  const diasVueltaObj = parseInt(document.getElementById('circDiasVuelta')?.value) || null;
+  const circuitos = getCircuitos();
+  const grid = document.getElementById('circuitosGrid');
+  const vacio = document.getElementById('circuitosVacio');
+
+  if(circuitos.length === 0) {
+    grid.innerHTML = '';
+    vacio.style.display = 'block';
+    return;
+  }
+  vacio.style.display = 'none';
+
+  const grupos = getGrupos();
+
+  grid.innerHTML = circuitos.map(circ => {
+    const potreroActivo = detectarPotreroActivo(circ);
+    
+    // Buscar cabezas y peso del grupo asociado (si tiene)
+    const grupo = grupos.find(g => g.nombre === circ.grupo);
+    const cabezas = grupo?.cabezas || circ.cabezas || 0;
+    const peso = grupo?.pesoMedio || circ.peso || 0;
+    
+    const alcanceDias = calcAlcanceCircuito(circ.potreros, cabezas, peso);
+    
+    // Color de alcance
+    let alcanceColor = 'var(--text3)';
+    let alcanceIcon = '';
+    if(alcanceDias !== null && diasVueltaObj) {
+      if(alcanceDias >= diasVueltaObj * 1.2) { alcanceColor = 'var(--green)'; alcanceIcon = '✅'; }
+      else if(alcanceDias >= diasVueltaObj * 0.9) { alcanceColor = 'var(--gold)'; alcanceIcon = '⚠️'; }
+      else { alcanceColor = 'var(--red)'; alcanceIcon = '🔴'; }
+    }
+
+    // Total hectáreas del circuito
+    const totalHa = circ.potreros.reduce((s,p) => s + (getPotreroArea(p)||0), 0);
+
+    // Filas de potreros
+    const filasPotreros = circ.potreros.map(pot => {
+      const descanso = calcDescansoPotreroCircuito(pot);
+      const prom = calcPromedioMsVueltaAnterior(pot);
+      const ha = getPotreroArea(pot) || null;
+      const esActivo = pot === potreroActivo;
+
+      // Color de días de descanso
+      let descColor = 'var(--text2)';
+      if(descanso !== null && diasVueltaObj) {
+        if(descanso >= diasVueltaObj) descColor = 'var(--green)';
+        else if(descanso >= diasVueltaObj * 0.7) descColor = 'var(--gold)';
+        else descColor = 'var(--red)';
+      }
+
+      return `<tr style="background:${esActivo ? 'rgba(109,186,58,0.12)' : 'transparent'};border-bottom:1px solid var(--border);">
+        <td style="padding:8px 10px;font-weight:${esActivo?'700':'500'};color:${esActivo?'var(--green-soft)':'var(--text)'};white-space:nowrap;">
+          ${esActivo ? '▶ ' : ''}${pot}
+        </td>
+        <td style="padding:8px 10px;text-align:center;font-size:11px;color:var(--text3);">${ha !== null ? ha + ' ha' : '—'}</td>
+        <td style="padding:8px 10px;text-align:center;font-weight:700;color:${descColor};">
+          ${descanso !== null ? descanso + 'd' : '—'}
+        </td>
+        <td style="padding:8px 10px;text-align:center;font-size:12px;color:var(--green-soft);">
+          ${prom !== null ? prom + ' kg' : '—'}
+        </td>
+      </tr>`;
+    }).join('');
+
+    return `<div class="card" style="padding:0;overflow:hidden;">
+      <!-- Header del circuito -->
+      <div style="background:var(--bg2);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:var(--text);">${circ.nombre}</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:2px;">${circ.potreros.length} potrero${circ.potreros.length!==1?'s':''} · ${fmt(totalHa,1)} ha totales</div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-secondary btn-sm" onclick="abrirModalCircuito('${circ.id}')">✏</button>
+          <button class="btn btn-sm" style="background:rgba(224,90,74,.15);border-color:var(--red);color:var(--red);" onclick="eliminarCircuito('${circ.id}')">✕</button>
+        </div>
+      </div>
+
+      <!-- Alcance calculado -->
+      ${alcanceDias !== null ? `
+      <div style="padding:10px 16px;background:var(--card2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+        <div style="font-size:11px;color:var(--text3);">Alcance estimado del circuito</div>
+        <div style="font-size:15px;font-weight:700;color:${alcanceColor};">${alcanceIcon} ${alcanceDias} días</div>
+      </div>` : ''}
+
+      <!-- Tabla de potreros -->
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead>
+            <tr style="background:var(--bg2);">
+              <th style="padding:7px 10px;text-align:left;font-size:10px;color:var(--text3);font-weight:700;letter-spacing:1px;text-transform:uppercase;">Potrero</th>
+              <th style="padding:7px 10px;text-align:center;font-size:10px;color:var(--text3);font-weight:700;letter-spacing:1px;text-transform:uppercase;">HA</th>
+              <th style="padding:7px 10px;text-align:center;font-size:10px;color:var(--text3);font-weight:700;letter-spacing:1px;text-transform:uppercase;">Descanso</th>
+              <th style="padding:7px 10px;text-align:center;font-size:10px;color:var(--text3);font-weight:700;letter-spacing:1px;text-transform:uppercase;">Prom MS/ha</th>
+            </tr>
+          </thead>
+          <tbody>${filasPotreros}</tbody>
+        </table>
+      </div>
+
+      <!-- Potrero activo hoy -->
+      <div style="padding:8px 16px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);">
+        Hoy: <strong style="color:${potreroActivo ? 'var(--green-soft)' : 'var(--text3)'};">${potreroActivo ? '▶ ' + potreroActivo : 'Sin potrero activo detectado'}</strong>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Modal crear/editar circuito ──
+let _circPotrerosFiltrados = [];
+
+function abrirModalCircuito(id) {
+  _circEditId = id;
+  const circuitos = getCircuitos();
+  const circ = id ? circuitos.find(c => c.id === id) : null;
+
+  document.getElementById('modalCircTitulo').textContent = circ ? 'Editar Circuito' : 'Nuevo Circuito';
+  document.getElementById('circNombre').value = circ ? circ.nombre : '';
+  _circPotrerosTemp = circ ? [...circ.potreros] : [];
+  renderPotrerosSeleccionados();
+  document.getElementById('circBuscaPotrero').value = '';
+  document.getElementById('circPotrerosSugerencias').style.display = 'none';
+  abrirModal('modalCircuito');
+}
+
+function filtrarPotrerosModal() {
+  const q = document.getElementById('circBuscaPotrero').value.trim().toUpperCase();
+  const sugs = document.getElementById('circPotrerosSugerencias');
+  if(!q) { sugs.style.display = 'none'; return; }
+
+  const todos = getAllPotrerosList().map(p => p.nombre);
+  _circPotrerosFiltrados = todos.filter(p => p.toUpperCase().includes(q) && !_circPotrerosTemp.includes(p)).slice(0,8);
+
+  if(_circPotrerosFiltrados.length === 0) { sugs.style.display = 'none'; return; }
+
+  sugs.innerHTML = _circPotrerosFiltrados.map((p,i) => {
+    const ha = getPotreroArea(p);
+    return `<div onclick="selPotreroCircuito('${p}')" style="padding:8px 12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);font-size:12px;"
+      onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''">
+      <span style="color:var(--text);font-weight:600;">${p}</span>
+      <span style="color:var(--text3);font-size:11px;">${ha ? ha + ' ha' : ''}</span>
+    </div>`;
+  }).join('');
+  sugs.style.display = 'block';
+}
+
+function selPotreroCircuito(p) {
+  if(!_circPotrerosTemp.includes(p)) _circPotrerosTemp.push(p);
+  document.getElementById('circBuscaPotrero').value = '';
+  document.getElementById('circPotrerosSugerencias').style.display = 'none';
+  renderPotrerosSeleccionados();
+}
+
+function agregarPotreroCircuito() {
+  const val = document.getElementById('circBuscaPotrero').value.trim().toUpperCase();
+  if(!val) return;
+  if(!_circPotrerosTemp.includes(val)) _circPotrerosTemp.push(val);
+  document.getElementById('circBuscaPotrero').value = '';
+  document.getElementById('circPotrerosSugerencias').style.display = 'none';
+  renderPotrerosSeleccionados();
+}
+
+function renderPotrerosSeleccionados() {
+  const cont = document.getElementById('circPotrerosSelList');
+  if(_circPotrerosTemp.length === 0) {
+    cont.innerHTML = '<span style="font-size:11px;color:var(--text3);">Ningún potrero agregado aún</span>';
+    document.getElementById('circResumenHa').textContent = 'Total: — ha';
+    return;
+  }
+  const totalHa = _circPotrerosTemp.reduce((s,p) => s + (getPotreroArea(p)||0), 0);
+  cont.innerHTML = _circPotrerosTemp.map(p => {
+    const ha = getPotreroArea(p);
+    return `<div style="display:inline-flex;align-items:center;gap:5px;background:var(--card2);border:1px solid var(--border2);border-radius:6px;padding:4px 8px;font-size:11px;">
+      <span style="color:var(--text);font-weight:600;">${p}</span>
+      ${ha ? `<span style="color:var(--text3);">${ha}ha</span>` : ''}
+      <span onclick="quitarPotreroCircuito('${p}')" style="cursor:pointer;color:var(--red);font-size:13px;line-height:1;margin-left:2px;">✕</span>
+    </div>`;
+  }).join('');
+  document.getElementById('circResumenHa').textContent = `Total: ${fmt(totalHa,1)} ha · ${_circPotrerosTemp.length} potrero${_circPotrerosTemp.length!==1?'s':''}`;
+}
+
+function quitarPotreroCircuito(p) {
+  _circPotrerosTemp = _circPotrerosTemp.filter(x => x !== p);
+  renderPotrerosSeleccionados();
+}
+
+function guardarCircuito() {
+  const nombre = document.getElementById('circNombre').value.trim();
+  if(!nombre) { notif('Ingresá un nombre para el circuito', true); return; }
+  if(_circPotrerosTemp.length === 0) { notif('Agregá al menos un potrero', true); return; }
+
+  const circuitos = getCircuitos();
+  if(_circEditId) {
+    const idx = circuitos.findIndex(c => c.id === _circEditId);
+    if(idx >= 0) { circuitos[idx].nombre = nombre; circuitos[idx].potreros = [..._circPotrerosTemp]; }
+  } else {
+    circuitos.push({ id: uuid(), nombre, potreros: [..._circPotrerosTemp] });
+  }
+  setCircuitos(circuitos);
+  cerrarModal('modalCircuito');
+  renderCircuitos();
+  notif('✓ Circuito guardado');
+}
+
+function eliminarCircuito(id) {
+  if(!confirm('¿Eliminar este circuito? Los registros de aforo no se modifican.')) return;
+  const circuitos = getCircuitos().filter(c => c.id !== id);
+  setCircuitos(circuitos);
+  renderCircuitos();
+  notif('Circuito eliminado');
+}
+
 <script>
 (function() {
   var FB_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com';
