@@ -3076,7 +3076,7 @@ function aplicarFechaMinIngreso() {
     // Turno ingreso = turno salida del anterior; turno salida = mismo por defecto
     if(elHoraIng && turnoSuggerido) { elHoraIng.value = turnoSuggerido; }
     if(elHoraSal && turnoSuggerido) { elHoraSal.value = turnoSuggerido; }
-    // calcIng() NO se llama aquí — se dispara cuando el usuario confirma la fecha de ingreso
+    calcIng(); // recalcular estadía y retorno con la fecha autollenada
     const turnoLabel = turnoSuggerido === 'MAÑANA' ? '🌅 Mañana' : turnoSuggerido === 'TARDE' ? '🌇 Tarde' : '';
     notif(`📅 Ingreso ajustado a ${minFecha} ${turnoLabel} — última salida de ${lote}`);
   } else {
