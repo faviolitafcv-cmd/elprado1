@@ -3815,6 +3815,14 @@ function editarActividad(id) {
       calcIngStd();
     }
 
+    // MAQUINARIA (DESBROZAR, ROLO, SIEMBRA, FUMIGACION, QUEMA)
+    const ACTS_MAQ = ["DESBROZAR","ROLO","SIEMBRA","FUMIGACION HERB.","FUMIGACION INS.","QUEMA"];
+    if(ACTS_MAQ.includes(r.actividad)) {
+      document.getElementById("fHAMaq").value = r.ha || "";
+      document.getElementById("fFechaIngMaq").value = r.fechaIngMaq || "";
+      document.getElementById("fFechaSalMaq").value = r.fechaSalMaq || "";
+      document.getElementById("fComentario").value = r.comentario || "";
+    }
     // Marcar edición
     document.getElementById('formComun').dataset.editId = id;
     // Reset fin de vuelta checkbox (no aplica al editar)
