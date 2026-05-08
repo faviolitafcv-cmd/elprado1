@@ -1232,6 +1232,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
       <button class="btn btn-primary" onclick="forzarActualizacion()" style="background:#2980b9;">🔄 Forzar actualización desde Firebase</button>
       <button class="btn btn-primary" onclick="subirLluviaMerge()" style="background:#27ae60;">🌧 Sincronizar lluvia (merge seguro)</button>
       <button class="btn btn-secondary" onclick="limpiarDuplicados()">🧹 Limpiar registros duplicados</button>
+      <button class="btn btn-secondary" onclick="limpiarVueltasDuplicadas()">🧹 Limpiar vueltas duplicadas</button>
     </div>
     <div style="margin-top:12px; font-size:11px; color:var(--text3);" id="storageInfo"></div>
   </div>
@@ -2410,7 +2411,9 @@ function calcRetornoAuto(potrero, parcela, excludeId, fechaIngParam) {
     .filter(f => f.potrero === potrero && f.tipo === 'INICIO')
     .sort((a,b) => b.fecha.localeCompare(a.fecha));
   const inicioActual   = inicios[0] ? inicios[0].fecha : null;
-  const inicioAnterior = inicios[1] ? inicios[1].fecha : null;
+  // Si hay múltiples inicios en la misma fecha, buscar el primero con fecha diferente
+  const inicioAnterior = inicios.find(f => f.fecha < inicioActual)?.fecha || null;
+
 
   let lastDate = null;
   let lastEvt  = null;
@@ -2890,12 +2893,29 @@ function getHAUsadaEnVuelta(potrero, lote, excludeId) {
 // Registrar inicio/fin de vuelta para un potrero
 function getVueltasData() { return getData('finVuelta', []); }
 function setVueltasData(v) { setData('finVuelta', v); fbSet('finVuelta', v); }
+function limpiarVueltasDuplicadas() {
+  const vueltas = getVueltasData();
+  const vistas = new Set();
+  const limpias = vueltas.filter(f => {
+    const key = f.potrero + "_" + f.tipo + "_" + f.fecha;
+    if(vistas.has(key)) return false;
+    vistas.add(key); return true;
+  });
+  const eliminados = vueltas.length - limpias.length;
+  if(eliminados === 0) { notif("No hay duplicados de vueltas"); return; }
+  setVueltasData(limpias);
+  notif(`✅ Se eliminaron ${eliminados} vueltas duplicadas`);
+}
 
 function iniciarVuelta(potrero) {
   if(!potrero) { notif('Seleccioná un potrero', true); return; }
   const hoy = new Date().toISOString().split('T')[0];
   if(!confirm(`¿Iniciar nueva vuelta en ${potrero} hoy (${hoy})?\nEsto reiniciará el contador de hectáreas de este potrero.`)) return;
   const vueltas = getVueltasData();
+  // Evitar duplicados: si ya existe inicio para este potrero hoy, no crear otro
+  if(vueltas.find(f => f.potrero === potrero && f.tipo === 'INICIO' && f.fecha === hoy)) {
+    notif(`Ya hay una vuelta iniciada en ${potrero} hoy — no se creó duplicado`, true); return;
+  }
   vueltas.unshift({ id: uuid(), potrero, fecha: hoy, tipo: 'INICIO', usuario: localStorage.getItem('elprado_usuario')||'' });
   setVueltasData(vueltas);
   actualizarSaldoHA();
