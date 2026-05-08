@@ -7277,7 +7277,7 @@ function abrirModalCircuito(id) {
   renderPotrerosSeleccionados();
   document.getElementById('circBuscaPotrero').value = '';
   document.getElementById('circPotrerosSugerencias').style.display = 'none';
-  abrirModal('modalCircuito');
+  document.getElementById('modalCircuito').classList.add('open');
 }
 
 function filtrarPotrerosModal() {
