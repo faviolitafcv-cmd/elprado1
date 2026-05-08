@@ -2953,18 +2953,6 @@ function limpiarVueltasDuplicadas() {
   setVueltasData(limpias);
   notif("✅ Se eliminaron " + eliminados + " vueltas duplicadas");
 }
-  const vueltas = getVueltasData();
-  const vistas = new Set();
-  const limpias = vueltas.filter(f => {
-    const key = f.potrero + "_" + f.tipo + "_" + f.fecha;
-    if(vistas.has(key)) return false;
-    vistas.add(key); return true;
-  });
-  const eliminados = vueltas.length - limpias.length;
-  if(eliminados === 0) { notif("No hay duplicados de vueltas"); return; }
-  setVueltasData(limpias);
-  notif(`✅ Se eliminaron ${eliminados} vueltas duplicadas`);
-}
 
 function iniciarVuelta(potrero) {
   if(!potrero) { notif('Seleccioná un potrero', true); return; }
