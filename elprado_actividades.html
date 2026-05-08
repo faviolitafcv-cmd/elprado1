@@ -2243,27 +2243,34 @@ function notif(msg, err=false) {
 // ═══════════════════════════════════════
 function calcRetornoAuto(potrero, parcela, excludeId) {
   // ================================================================
-  // LOGICA POR NIVELES:
+  // LOGICA DE PRIORIDAD PARA CALCULAR RETORNO/DESCANSO:
   //
-  // NIVEL 1 (con vueltas iniciadas): buscar en la vuelta ANTERIOR
-  //   - Primero busca la misma parcela en esa vuelta
-  //   - Si no la encuentra, toma la fecha mas tardia de cualquier
-  //     actividad (INGRESO HDA, DESBROZAR, ROLO) en esa vuelta
+  // Para cualquier parcela nueva que se registra, el descanso se
+  // calcula buscando la referencia anterior en este orden:
   //
-  // NIVEL 2 (sin "Iniciar Vuelta" registrado): busca en TODO el
-  //   historial del potrero la ultima salida de cualquier actividad
-  //   que cuente, anterior a la fecha de ingreso actual
+  // PASO A — Buscar en la vuelta anterior (si hay vueltas iniciadas)
+  //   A1: Misma parcela en vuelta anterior → usar su fecha de salida
+  //   A2: Si esa parcela no tiene registro → usar la fecha de salida
+  //       MAS TARDIA de CUALQUIER parcela del mismo potrero en esa
+  //       vuelta (o en todo el historial si no hay vueltas)
+  //
+  // PASO B — Prioridad del implemento sobre el animal:
+  //   Si después de la salida del animal hubo DESBROZAR o ROLO en
+  //   esa parcela (o en el potrero completo), el descanso se cuenta
+  //   desde la salida del implemento, no del animal.
+  //
+  // PASO C — Sin vueltas registradas: busca en TODO el historial
+  //   la ultima salida de cualquier actividad anterior al ingreso.
   // ================================================================
 
   const acts  = getActividades();
   const today = new Date().toISOString().split('T')[0];
 
-  // Fecha de ingreso del registro que se esta haciendo ahora (para Nivel 2)
   const fechaIngresoActual = document.getElementById('fFechaIng')?.value ||
                              document.getElementById('fFechaIngStd')?.value ||
                              today;
 
-  // Funcion auxiliar: obtener fecha de salida de una actividad
+  // Fecha de salida de una actividad según su tipo
   function fechaSalidaActividad(a) {
     if(a.actividad === 'INGRESO HDA')                          return a.fechaSal || null;
     if(a.actividad === 'DESBROZAR' || a.actividad === 'ROLO') return a.fechaSalMaq || null;
@@ -2271,7 +2278,10 @@ function calcRetornoAuto(potrero, parcela, excludeId) {
     return null;
   }
 
-  // ── Determinar limites de vueltas ──
+  // Actividades que cuentan como "salida" para el descanso
+  const ACTS_VALIDAS = ['INGRESO HDA','DESBROZAR','ROLO','MATERIA SECA'];
+
+  // ── Determinar límites de vueltas ──
   const vueltas      = getVueltasData();
   const inicios      = vueltas
     .filter(f => f.potrero === potrero && f.tipo === 'INICIO')
@@ -2282,47 +2292,86 @@ function calcRetornoAuto(potrero, parcela, excludeId) {
   let lastDate = null;
   let lastEvt  = null;
 
+  // ── Función: dada una lista de candidatos, encontrar la mejor referencia ──
+  function buscarMejorReferencia(candidatos) {
+    // PASO A1: intentar misma parcela primero
+    const mismaParcela = candidatos.filter(a =>
+      String(a.parcela) === String(parcela) &&
+      ACTS_VALIDAS.includes(a.actividad)
+    );
+
+    // PASO A2: si no hay registro de esa parcela, tomar la última salida
+    // de cualquier parcela del potrero (la más tardía)
+    const fuente = mismaParcela.length > 0 ? mismaParcela : candidatos.filter(a =>
+      ACTS_VALIDAS.includes(a.actividad)
+    );
+
+    let refDate = null;
+    let refEvt  = null;
+    for(const a of fuente) {
+      const f = fechaSalidaActividad(a);
+      if(f && (!refDate || f > refDate)) { refDate = f; refEvt = a; }
+    }
+
+    if(!refDate) return { refDate: null, refEvt: null };
+
+    // PASO B: verificar si hubo implemento (DESBROZAR/ROLO) DESPUÉS
+    // de esa salida, en la misma parcela o en potrero completo
+    const implementosDespues = candidatos.filter(a => {
+      if(!['DESBROZAR','ROLO'].includes(a.actividad)) return false;
+      const fImpl = fechaSalidaActividad(a);
+      if(!fImpl || fImpl <= refDate) return false;
+      // misma parcela O potrero completo
+      return String(a.parcela) === String(parcela) ||
+             a.parcela === '__COMPLETO__' ||
+             String(a.parcela).includes(String(parcela));
+    });
+
+    if(implementosDespues.length > 0) {
+      // Tomar el implemento con salida más tardía
+      let implDate = null;
+      let implEvt  = null;
+      for(const a of implementosDespues) {
+        const f = fechaSalidaActividad(a);
+        if(f && (!implDate || f > implDate)) { implDate = f; implEvt = a; }
+      }
+      if(implDate) return { refDate: implDate, refEvt: implEvt };
+    }
+
+    return { refDate, refEvt };
+  }
+
   if(inicioActual) {
-    // ── NIVEL 1: Hay vueltas iniciadas ──
-    // Buscar en vuelta anterior (entre inicioAnterior y inicioActual)
+    // ── CON VUELTAS: buscar en vuelta anterior ──
     const candidatos = acts.filter(a => {
       if(a.potrero !== potrero) return false;
       if(excludeId && a.id === excludeId) return false;
       if(a.actividad === 'FIN_VUELTA') return false;
-      const fa = a.fechaIng || a.fecha;
+      const fa = a.fechaIng || a.fechaIngMaq || a.fecha;
       if(inicioAnterior && fa < inicioAnterior) return false;
       if(fa >= inicioActual) return false;
       return true;
     });
 
-    // Primero: buscar la misma parcela
-    const mismaParcela = candidatos.filter(a =>
-      String(a.parcela) === String(parcela) &&
-      ['INGRESO HDA','DESBROZAR','ROLO','MATERIA SECA'].includes(a.actividad)
-    );
-    const fuenteBusqueda = mismaParcela.length > 0 ? mismaParcela : candidatos;
-
-    for(const a of fuenteBusqueda) {
-      const f = fechaSalidaActividad(a);
-      if(f && (!lastDate || f > lastDate)) { lastDate = f; lastEvt = a; }
-    }
+    const { refDate, refEvt } = buscarMejorReferencia(candidatos);
+    lastDate = refDate;
+    lastEvt  = refEvt;
 
   } else {
-    // ── NIVEL 2: Sin "Iniciar Vuelta" — buscar en TODO el historial ──
-    // Tomar la ultima salida de cualquier actividad anterior al ingreso actual
+    // ── SIN VUELTAS: buscar en TODO el historial anterior al ingreso actual ──
     const candidatos = acts.filter(a => {
       if(a.potrero !== potrero) return false;
       if(excludeId && a.id === excludeId) return false;
       if(a.actividad === 'FIN_VUELTA') return false;
-      const fa = a.fechaIng || a.fecha;
-      return fa < fechaIngresoActual; // solo anteriores al ingreso actual
+      const fa = a.fechaIng || a.fechaIngMaq || a.fecha;
+      return fa < fechaIngresoActual;
     });
 
-    for(const a of candidatos) {
-      const f = fechaSalidaActividad(a);
-      if(f && f < fechaIngresoActual && (!lastDate || f > lastDate)) {
-        lastDate = f; lastEvt = a;
-      }
+    const { refDate, refEvt } = buscarMejorReferencia(candidatos);
+    // Solo usar si la referencia es anterior al ingreso actual
+    if(refDate && refDate < fechaIngresoActual) {
+      lastDate = refDate;
+      lastEvt  = refEvt;
     }
   }
 
