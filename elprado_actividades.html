@@ -2376,7 +2376,7 @@ function calcRetornoAuto(potrero, parcela, excludeId) {
   }
 
   if(!lastDate) return { dias: null, lastDate: null, lastEvt: null };
-  const dias = dateDiff(lastDate, today);
+  const dias = dateDiff(lastDate, fechaIngresoActual);
   return { dias, lastDate, lastEvt };
 }
 
