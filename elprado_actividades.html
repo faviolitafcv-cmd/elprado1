@@ -2499,6 +2499,7 @@ function calcRetornoAuto(potrero, parcela, excludeId, fechaIngParam) {
   }
 
   if(!lastDate) return { dias: null, lastDate: null, lastEvt: null };
+  console.log("[RETORNO DEBUG] potrero:", potrero, "parcela:", parcela, "fechaIngParam:", fechaIngParam, "fechaIngresoActual:", fechaIngresoActual, "lastDate:", lastDate, "lastEvt:", lastEvt ? lastEvt.actividad : null);
   const dias = dateDiff(lastDate, fechaIngresoActual);
   return { dias, lastDate, lastEvt };
 }
