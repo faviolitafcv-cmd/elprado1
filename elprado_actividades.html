@@ -3599,6 +3599,7 @@ function limpiarForm() {
         document.getElementById('fFechaIng').value = u.fechaSal;
         document.getElementById('fFechaSal').value = sumarUnDia(u.fechaSal);
       }
+      calcIng(); // calcular retorno con la fecha autollenada desde _ultimoReg
       calcMS();
     }, 50);
   }
