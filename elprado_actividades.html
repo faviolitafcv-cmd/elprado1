@@ -2895,27 +2895,64 @@ function getHAUsadaEnVuelta(potrero, lote, excludeId) {
 function getVueltasData() { return getData('finVuelta', []); }
 function setVueltasData(v) { setData('finVuelta', v); fbSet('finVuelta', v); }
 function recalcularRetornosHistoricos() {
-  if(!confirm("¿Recalcular días de retorno en todos los registros históricos?\n\nEsto SOLO actualiza el campo \"retorno\" de registros de MATERIA SECA e INGRESO HDA que tienen fecha de ingreso.\nNo se modifica ningún otro dato.")) return;
+  if(!confirm("¿Recalcular días de retorno en todos los registros históricos?\n\nEsto SOLO actualiza el campo retorno de MATERIA SECA e INGRESO HDA.\nNo se modifica ningún otro dato.")) return;
   const acts = getActividades();
+  // Ordenar por potrero + fechaIng para procesar en orden cronológico
+  const relevantes = acts.filter(a =>
+    ["MATERIA SECA","INGRESO HDA"].includes(a.actividad) && a.fechaIng
+  ).sort((a,b) => {
+    if(a.potrero !== b.potrero) return a.potrero.localeCompare(b.potrero);
+    return a.fechaIng.localeCompare(b.fechaIng);
+  });
+  // Para cada registro, buscar la última salida anterior del mismo potrero
+  const mapaUltimaSalida = {}; // potrero -> {fecha, parcela}
   let actualizados = 0;
+  const mapaRetornos = {};
+  for(const a of relevantes) {
+    const pot = a.potrero;
+    const fi = a.fechaIng;
+    const fs = a.fechaSal || null;
+    // Calcular retorno: última salida de ese potrero antes de este ingreso
+    const ref = mapaUltimaSalida[pot];
+    const nuevoDias = ref && ref.fecha < fi ? dateDiff(ref.fecha, fi) : null;
+    mapaRetornos[a.id] = nuevoDias;
+    if(fs) mapaUltimaSalida[pot] = { fecha: fs, parcela: a.parcela };
+  }
+  // También considerar DESBROZAR y ROLO
+  const maquinaria = acts.filter(a =>
+    ["DESBROZAR","ROLO"].includes(a.actividad) && a.fechaSalMaq
+  );
+  for(const a of maquinaria) {
+    const pot = a.potrero;
+    const fs = a.fechaSalMaq;
+    const ref = mapaUltimaSalida[pot];
+    if(!ref || fs > ref.fecha) mapaUltimaSalida[pot] = { fecha: fs, parcela: a.parcela };
+  }
   const nuevas = acts.map(a => {
-    if(!["MATERIA SECA","INGRESO HDA"].includes(a.actividad)) return a;
-    const fi = a.fechaIng || null;
-    if(!fi) return a;
-    const r = calcRetornoAuto(a.potrero, a.parcela, a.id, fi);
-    if(r.dias === null) return a;
-    if(r.dias === a.retorno) return a;
+    if(mapaRetornos[a.id] === undefined) return a;
+    if(mapaRetornos[a.id] === a.retorno) return a;
     actualizados++;
-    return Object.assign({}, a, { retorno: r.dias });
+    return Object.assign({}, a, { retorno: mapaRetornos[a.id] });
   });
   if(actualizados === 0) { notif("✅ Todos los retornos ya están correctos"); return; }
   setData("actividades", nuevas);
   fbSet("actividades", nuevas);
-  renderTabla();
-  renderStats();
-  notif(`✅ Se actualizaron ${actualizados} registros con retorno corregido`);
+  renderTabla(); renderStats();
+  notif("✅ Se actualizaron " + actualizados + " registros con retorno corregido");
 }
 function limpiarVueltasDuplicadas() {
+  const vueltas = getVueltasData();
+  const vistas = new Set();
+  const limpias = vueltas.filter(f => {
+    const key = f.potrero + "_" + f.tipo + "_" + f.fecha;
+    if(vistas.has(key)) return false;
+    vistas.add(key); return true;
+  });
+  const eliminados = vueltas.length - limpias.length;
+  if(eliminados === 0) { notif("No hay duplicados de vueltas"); return; }
+  setVueltasData(limpias);
+  notif("✅ Se eliminaron " + eliminados + " vueltas duplicadas");
+}
   const vueltas = getVueltasData();
   const vistas = new Set();
   const limpias = vueltas.filter(f => {
