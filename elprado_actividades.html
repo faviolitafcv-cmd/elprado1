@@ -2360,7 +2360,7 @@ function notif(msg, err=false) {
 // ═══════════════════════════════════════
 // RETORNO AUTOMÁTICO
 // ═══════════════════════════════════════
-function calcRetornoAuto(potrero, parcela, excludeId) {
+function calcRetornoAuto(potrero, parcela, excludeId, fechaIngParam) {
   // ================================================================
   // LOGICA DE PRIORIDAD PARA CALCULAR RETORNO/DESCANSO:
   //
@@ -2385,9 +2385,13 @@ function calcRetornoAuto(potrero, parcela, excludeId) {
   const acts  = getActividades();
   const today = new Date().toISOString().split('T')[0];
 
-  const fechaIngresoActual = document.getElementById('fFechaIng')?.value ||
-                             document.getElementById('fFechaIngStd')?.value ||
+  const fechaIngresoActual = fechaIngParam ||
+                             document.getElementById("fFechaIng")?.value ||
+                             document.getElementById("fFechaIngStd")?.value ||
                              today;
+
+
+
 
   // Fecha de salida de una actividad según su tipo
   function fechaSalidaActividad(a) {
@@ -3299,7 +3303,7 @@ function guardarActividad() {
 
     const kgMs = mv * pms;
     const ua = ha>0?(cab*peso)/(ha*450):0;
-    const retObj = (fIngMs||fSalMs) ? calcRetornoAuto(potrero, parcela) : {};
+    const retObj = (fIngMs||fSalMs) ? calcRetornoAuto(potrero, parcela, editId, fIngMs || fecha) : {};
     Object.assign(rec, {
       parcela, ha, lote,
       kgMvHa: mv, pctMs: pms, kgMsHa: kgMs,
@@ -3330,7 +3334,7 @@ function guardarActividad() {
     const fi = document.getElementById('fFechaIngStd').value;
     const fs = document.getElementById('fFechaSalStd').value;
     if(!fi||!fs) { notif('Ingresá fecha de ingreso y salida', true); return; }
-    const r = calcRetornoAuto(potrero, parcela);
+    const r = calcRetornoAuto(potrero, parcela, editId, fi || fecha);
     Object.assign(rec, {
       parcela,
       ha: parseFloat(document.getElementById('fHAIng').value)||null,
