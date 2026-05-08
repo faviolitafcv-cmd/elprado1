@@ -375,7 +375,23 @@ select option { background: var(--bg2); }
 .act-btn.selected-blue { border-color: var(--blue); background: rgba(74,154,186,.1); color: var(--blue); }
 
 /* ── TABLE ── */
-.tbl-wrap { overflow-x: auto; }
+.tbl-wrap {
+  overflow-x: auto;
+}
+/* Scrollbar arriba Y abajo solo en tabla principal */
+.tbl-wrap-outer .tbl-wrap {
+  transform: rotateX(180deg);
+}
+.tbl-wrap-outer .tbl-wrap > table {
+  transform: rotateX(180deg);
+}
+.tbl-wrap-outer {
+  max-height: 70vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-radius: 8px;
+  position: relative;
+}
 table {
   width: 100%;
   border-collapse: collapse;
@@ -392,6 +408,10 @@ th {
   text-align: left;
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
+  /* Cabecera pegada al hacer scroll vertical */
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 td {
   padding: 9px 12px;
@@ -702,7 +722,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
       <button class="btn btn-danger btn-sm" onclick="borrarSeleccionados()" id="btnBorrarSel" style="display:none;">🗑 Eliminar seleccionados</button>
       <span id="contSel" style="font-size:11px;color:var(--text3);display:none;"></span>
     </div>
-    <div class="tbl-wrap">
+    <div class="tbl-wrap-outer"><div class="tbl-wrap">
       <table id="tablaActividades" style="min-width:1200px;">
         <thead>
           <tr>
@@ -714,7 +734,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
         </thead>
         <tbody id="tablaBody"></tbody>
       </table>
-    </div>
+    </div></div>
   </div>
 </div>
 
