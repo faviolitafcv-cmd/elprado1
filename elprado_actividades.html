@@ -2499,7 +2499,6 @@ function calcRetornoAuto(potrero, parcela, excludeId, fechaIngParam) {
   }
 
   if(!lastDate) return { dias: null, lastDate: null, lastEvt: null };
-  console.log("[RETORNO DEBUG] potrero:", potrero, "parcela:", parcela, "fechaIngParam:", fechaIngParam, "fechaIngresoActual:", fechaIngresoActual, "lastDate:", lastDate, "lastEvt:", lastEvt ? lastEvt.actividad : null);
   const dias = dateDiff(lastDate, fechaIngresoActual);
   return { dias, lastDate, lastEvt };
 }
@@ -2663,7 +2662,35 @@ function selAct(tipo) {
   if(!showFinVuelta) document.getElementById('chkFinVuelta').checked = false;
 
   // Fecha hoy por defecto
-  if(!document.getElementById('fFecha').value)
+
+  // Restaurar último registro solo en MATERIA SECA
+  if(tipo === 'MATERIA SECA' && window._ultimoReg) {
+    const u = window._ultimoReg;
+    setTimeout(() => {
+      if(u.potrero) {
+        document.getElementById('fPotreroInput').value = u.potrero;
+        document.getElementById('fPotrero').value = u.potrero;
+        document.getElementById('fVariedad').value = u.variedad || '';
+        document.getElementById('grpVariedad').style.display = 'block';
+        mostrarPromedioMV(u.potrero);
+      }
+      if(u.lote) {
+        const sel = document.getElementById('fLote');
+        if(sel) for(let i=0;i<sel.options.length;i++) { if(sel.options[i].value===u.lote){sel.selectedIndex=i;break;} }
+      }
+      document.getElementById('fCabezas').value = u.cabezas || '';
+      document.getElementById('fPeso').value = u.pesoMedio || '';
+      document.getElementById('fConsumoPorc').value = u.consumoPorcReg || 3.0;
+      document.getElementById('fAncho').value = u.anchoM || '';
+      if(u.fechaSal) {
+        document.getElementById('fFechaIng').value = u.fechaSal;
+        document.getElementById('fFechaSal').value = sumarUnDia(u.fechaSal);
+      }
+      calcIng();
+      calcMS();
+    }, 150);
+  }
+  if(!document.getElementById("fFecha").value)
     document.getElementById('fFecha').value = new Date().toISOString().split('T')[0];
 }
 
@@ -3575,34 +3602,6 @@ function limpiarForm() {
   const grpFV = document.getElementById('grpFinVuelta');
   if(grpFV) grpFV.style.display = 'none';
 }
-
-  // Restaurar datos persistentes del registro anterior
-  if(window._ultimoReg) {
-    const u = window._ultimoReg;
-    setTimeout(() => {
-      if(u.potrero) {
-        document.getElementById('fPotreroInput').value = u.potrero;
-        document.getElementById('fPotrero').value = u.potrero;
-        document.getElementById('fVariedad').value = u.variedad || '';
-        document.getElementById('grpVariedad').style.display = 'block';
-        mostrarPromedioMV(u.potrero);
-      }
-      if(u.lote) {
-        const sel = document.getElementById('fLote');
-        if(sel) for(let i=0;i<sel.options.length;i++) { if(sel.options[i].value===u.lote){sel.selectedIndex=i;break;} }
-      }
-      document.getElementById('fCabezas').value = u.cabezas || '';
-      document.getElementById('fPeso').value = u.pesoMedio || '';
-      document.getElementById('fConsumoPorc').value = u.consumoPorcReg || 3.0;
-      document.getElementById('fAncho').value = u.anchoM || '';
-      if(u.fechaSal) {
-        document.getElementById('fFechaIng').value = u.fechaSal;
-        document.getElementById('fFechaSal').value = sumarUnDia(u.fechaSal);
-      }
-      calcIng(); // calcular retorno con la fecha autollenada desde _ultimoReg
-      calcMS();
-    }, 50);
-  }
 
 // ── Helper: obtiene peso actual del grupo desde Inventario (para referencia histórica) ──
 function getPesoActualGrupo(nombre) {
