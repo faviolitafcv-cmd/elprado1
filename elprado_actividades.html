@@ -2446,7 +2446,6 @@ function calcRetornoAuto(potrero, parcela, excludeId, fechaIngParam) {
       refPotFecha = bfi;
     }
   }
-  }
   if(refPotrero) {
     const dias = dateDiff(refPotrero, fechaIngresoActual);
     return { dias: dias > 0 ? dias : null, lastDate: refPotrero, lastEvt: null };
