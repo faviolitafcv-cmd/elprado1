@@ -3390,9 +3390,7 @@ function guardarActividad() {
   }
   // Recalcular retornos de registros posteriores del mismo potrero
   recalcularRetornoPotrero(potrero, rec.fechaSal || rec.fechaSalMaq || rec.fecha);
-
-  // ═══════════════════════════════════════
-// SINCRONIZAR PLAN DESDE REGISTROS EXISTENTES
+}
 // ═══════════════════════════════════════
 function recalcularRetornoPotrero(potrero, fechaRefSalida) {
   // Cuando se guarda una actividad, recalcular el retorno de todos los
