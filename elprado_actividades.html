@@ -689,6 +689,12 @@ tr:hover td { background: rgba(255,255,255,.02); }
     <div class="filters">
       <div>
         <label style="display:block;margin-bottom:4px;">Mes</label>
+      <div>
+        <label style="display:block;margin-bottom:4px;">Gestión</label>
+        <select id="filtroGestion" onchange="renderTabla()">
+          <option value="">Todas</option>
+        </select>
+      </div>
         <select id="filtroMes" onchange="renderTabla()">
           <option value="">Todos</option>
           <option>AGOSTO</option><option>SEPTIEMBRE</option><option>OCTUBRE</option>
@@ -2731,7 +2737,7 @@ function guardarPotreroAreas() {
   setPotreroConfig(cfg);
   setPotreroAreas(areas);
   refreshAllPotreros();
-  poblarSelectPotreros();
+  poblarSelectPotreros(); poblarSelectGestiones();
   notif('✅ Potreros guardados');
 }
 
@@ -2758,7 +2764,7 @@ function agregarNuevoPotrero() {
   }
 
   refreshAllPotreros();
-  poblarSelectPotreros();
+  poblarSelectPotreros(); poblarSelectGestiones();
   renderPotreroAreas();
   notif(`✅ Potrero ${nombre} (${variedad}) agregado`);
 }
@@ -2769,7 +2775,7 @@ function eliminarPotreroExtra(nombre) {
   delete cfg[nombre];
   setPotreroConfig(cfg);
   refreshAllPotreros();
-  poblarSelectPotreros();
+  poblarSelectPotreros(); poblarSelectGestiones();
   renderPotreroAreas();
   notif(`Potrero ${nombre} eliminado`);
 }
@@ -3579,6 +3585,7 @@ function sortTabla(col) {
 function renderTabla() {
   const mes = document.getElementById('filtroMes').value;
   const act = document.getElementById('filtroAct').value;
+  const gest = document.getElementById('filtroGestion')?.value || '';
   const pot = document.getElementById('filtroPotrero').value;
 
   let data = getActividades();
@@ -3586,6 +3593,7 @@ function renderTabla() {
   if(mes) data = data.filter(r => r.mes===mes);
   if(act) data = data.filter(r => r.actividad===act);
   if(pot) data = data.filter(r => r.potrero===pot);
+  if(gest) data = data.filter(r => r.gestion===gest);
 
   // Ordenar según columna seleccionada
   data.sort((a,b) => {
@@ -6059,6 +6067,14 @@ function poblarSelectPotreros() {
   ].join('');
   document.getElementById('filtroPotrero').innerHTML = allOpts;
 }
+function poblarSelectGestiones() {
+  const sel = document.getElementById('filtroGestion');
+  if(!sel) return;
+  const acts = getActividades();
+  const gestiones = [...new Set(acts.map(a=>a.gestion).filter(Boolean))].sort().reverse();
+  const todas = [...new Set(['2025-2026','2024-2025','2023-2024','2022-2023',...gestiones])].sort().reverse();
+  sel.innerHTML = '<option value="">Todas</option>' + todas.map(g=>`<option value="${g}">${g}</option>`).join('');
+}
 
 function filtrarPotreros(query) {
   const dd = document.getElementById('potreroDropdown');
@@ -6628,7 +6644,7 @@ window.onload = async () => {
     if(loader) loader.remove();
   }, 400);
 
-  poblarSelectPotreros();
+  poblarSelectPotreros(); poblarSelectGestiones();
   await cargarGruposDesdeInventario();
   poblarSelectGrupos();
   poblarSelectPlan();
