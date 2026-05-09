@@ -1233,7 +1233,6 @@ tr:hover td { background: rgba(255,255,255,.02); }
       <button class="btn btn-primary" onclick="subirLluviaMerge()" style="background:#27ae60;">🌧 Sincronizar lluvia (merge seguro)</button>
       <button class="btn btn-secondary" onclick="limpiarDuplicados()">🧹 Limpiar registros duplicados</button>
       <button class="btn btn-secondary" onclick="limpiarVueltasDuplicadas()">🧹 Limpiar vueltas duplicadas</button>
-      <button class="btn btn-secondary" onclick="recalcularRetornosHistoricos()" style="background:rgba(201,162,39,.2);border-color:var(--gold2);color:var(--gold2);">🔄 Recalcular retornos históricos</button>
     </div>
     <div style="margin-top:12px; font-size:11px; color:var(--text3);" id="storageInfo"></div>
   </div>
@@ -2415,7 +2414,6 @@ function calcRetornoAuto(potrero, parcela, excludeId, fechaIngParam) {
   // Si hay múltiples inicios en la misma fecha, buscar el primero con fecha diferente
   const inicioAnterior = inicios.find(f => f.fecha < inicioActual)?.fecha || null;
 
-
   let lastDate = null;
   let lastEvt  = null;
 
@@ -2666,7 +2664,7 @@ function selAct(tipo) {
   if(!showFinVuelta) document.getElementById('chkFinVuelta').checked = false;
 
   // Fecha hoy por defecto
-
+  if(!document.getElementById('fFecha').value)
   // Restaurar último registro solo en MATERIA SECA
   if(tipo === 'MATERIA SECA' && window._ultimoReg) {
     const u = window._ultimoReg;
@@ -2694,7 +2692,6 @@ function selAct(tipo) {
       calcMS();
     }, 150);
   }
-  if(!document.getElementById("fFecha").value)
     document.getElementById('fFecha').value = new Date().toISOString().split('T')[0];
 }
 
@@ -2894,44 +2891,6 @@ function getHAUsadaEnVuelta(potrero, lote, excludeId) {
 // Registrar inicio/fin de vuelta para un potrero
 function getVueltasData() { return getData('finVuelta', []); }
 function setVueltasData(v) { setData('finVuelta', v); fbSet('finVuelta', v); }
-function recalcularRetornosHistoricos() {
-  if(!confirm("¿Recalcular días de retorno en todos los registros históricos?\n\nEsto SOLO actualiza registros donde encuentra una referencia válida.\nNo borra valores existentes si no hay referencia.")) return;
-  const acts = getActividades();
-  // Construir mapa completo de todas las salidas por potrero (animales + maquinaria)
-  // ordenado cronológicamente
-  const todasActividades = acts.filter(a => {
-    if(["MATERIA SECA","INGRESO HDA"].includes(a.actividad)) return a.fechaSal;
-    if(["DESBROZAR","ROLO"].includes(a.actividad)) return a.fechaSalMaq;
-    return false;
-  }).map(a => ({
-    id: a.id,
-    potrero: a.potrero,
-    parcela: a.parcela,
-    fechaSal: a.fechaSal || a.fechaSalMaq,
-    esReferencia: true
-  })).sort((a,b) => a.fechaSal.localeCompare(b.fechaSal));
-  // Para cada registro MS/INGRESO con fechaIng, buscar la última salida anterior
-  let actualizados = 0;
-  const nuevas = acts.map(a => {
-    if(!["MATERIA SECA","INGRESO HDA"].includes(a.actividad)) return a;
-    if(!a.fechaIng) return a;
-    // Buscar la última salida del mismo potrero anterior a este ingreso
-    const refs = todasActividades.filter(r =>
-      r.potrero === a.potrero && r.fechaSal < a.fechaIng && r.id !== a.id
-    );
-    if(!refs.length) return a; // sin referencia: no tocar
-    const ultima = refs[refs.length - 1];
-    const nuevoDias = dateDiff(ultima.fechaSal, a.fechaIng);
-    if(nuevoDias === a.retorno) return a;
-    actualizados++;
-    return Object.assign({}, a, { retorno: nuevoDias });
-  });
-  if(actualizados === 0) { notif("✅ Todos los retornos ya están correctos"); return; }
-  setData("actividades", nuevas);
-  fbSet("actividades", nuevas);
-  renderTabla(); renderStats();
-  notif("✅ Se actualizaron " + actualizados + " registros");
-}
 function limpiarVueltasDuplicadas() {
   const vueltas = getVueltasData();
   const vistas = new Set();
@@ -3163,7 +3122,7 @@ function aplicarFechaMinIngreso() {
     // Turno ingreso = turno salida del anterior; turno salida = mismo por defecto
     if(elHoraIng && turnoSuggerido) { elHoraIng.value = turnoSuggerido; }
     if(elHoraSal && turnoSuggerido) { elHoraSal.value = turnoSuggerido; }
-    calcIng(); // recalcular estadía y retorno con la fecha autollenada
+    // calcIng() NO se llama aquí — se dispara cuando el usuario confirma la fecha de ingreso
     const turnoLabel = turnoSuggerido === 'MAÑANA' ? '🌅 Mañana' : turnoSuggerido === 'TARDE' ? '🌇 Tarde' : '';
     notif(`📅 Ingreso ajustado a ${minFecha} ${turnoLabel} — última salida de ${lote}`);
   } else {
