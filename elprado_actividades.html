@@ -2380,6 +2380,7 @@ function notif(msg, err=false) {
 // ═══════════════════════════════════════
 function calcRetornoAuto(potrero, parcela, excludeId, fechaIngParam) {
   // ================================================================
+  console.log("[calcRetorno] pot:", potrero, "parc:", parcela, "fi:", fechaIngParam, "excl:", excludeId);
   // LÓGICA CORRECTA DE RETORNO:
   //
   // Para potrero X, parcela N, con fecha de ingreso HOY:
@@ -2451,6 +2452,7 @@ function calcRetornoAuto(potrero, parcela, excludeId, fechaIngParam) {
     return { dias: dias > 0 ? dias : null, lastDate: refPotrero, lastEvt: null };
   }
 
+  console.log("[calcRetorno RESULT] null - no ref found");
   return { dias: null, lastDate: null, lastEvt: null };
 }
 
