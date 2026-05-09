@@ -2380,7 +2380,6 @@ function notif(msg, err=false) {
 // ═══════════════════════════════════════
 function calcRetornoAuto(potrero, parcela, excludeId, fechaIngParam) {
   // ================================================================
-  console.log("[calcRetorno] pot:", potrero, "parc:", parcela, "fi:", fechaIngParam, "excl:", excludeId);
   // LÓGICA CORRECTA DE RETORNO:
   //
   // Para potrero X, parcela N, con fecha de ingreso HOY:
@@ -2429,7 +2428,7 @@ function calcRetornoAuto(potrero, parcela, excludeId, fechaIngParam) {
   }
   if(refParcela) {
     const dias = dateDiff(refParcela, fechaIngresoActual);
-    return { dias: dias > 0 ? dias : null, lastDate: refParcela, lastEvt: null };
+    return { dias: dias >= 0 ? dias : null, lastDate: refParcela, lastEvt: null };
   }
 
   // PASO 2: no existe esa parcela → buscar la última salida del potrero
@@ -2442,6 +2441,7 @@ function calcRetornoAuto(potrero, parcela, excludeId, fechaIngParam) {
     const bfs = fSal(b);
     if(!bfs) continue;
     // Tomar la que tiene la salida más tardía (última actividad del potrero)
+    if(bfs >= fechaIngresoActual) continue; // ignorar salidas de la misma fecha o posterior
     if(!refPotrero || bfs > refPotrero) {
       refPotrero = bfs;
       refPotFecha = bfi;
@@ -2449,10 +2449,9 @@ function calcRetornoAuto(potrero, parcela, excludeId, fechaIngParam) {
   }
   if(refPotrero) {
     const dias = dateDiff(refPotrero, fechaIngresoActual);
-    return { dias: dias > 0 ? dias : null, lastDate: refPotrero, lastEvt: null };
+    return { dias: dias >= 0 ? dias : null, lastDate: refPotrero, lastEvt: null };
   }
 
-  console.log("[calcRetorno RESULT] null - no ref found");
   return { dias: null, lastDate: null, lastEvt: null };
 }
 
