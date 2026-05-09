@@ -3312,7 +3312,7 @@ function guardarActividad() {
       horaIng: document.getElementById('fHoraIng')?.value||null,
       horaSal: document.getElementById('fHoraSal')?.value||null,
       estadia: (fIngMs&&fSalMs&&fIngMs<fSalMs)?dateDiff(fIngMs,fSalMs):null,
-      retorno: retObj.dias != null ? retObj.dias : (document.getElementById('formComun').dataset.editRetorno ? parseInt(document.getElementById('formComun').dataset.editRetorno) : null),
+      retorno: retObj.dias != null ? retObj.dias : (fIngMs ? null : (document.getElementById("formComun").dataset.editRetorno ? parseInt(document.getElementById("formComun").dataset.editRetorno) : null)),
       anchoM: parseFloat(document.getElementById('fAncho').value)||null,
       largoM: (function(){
         if(modoDim==='IRREGULAR') return parseFloat(document.getElementById('fLargoManual').value)||null;
@@ -3338,7 +3338,7 @@ function guardarActividad() {
       ha: parseFloat(document.getElementById('fHAIng').value)||null,
       fechaIng: fi, fechaSal: fs,
       estadia: dateDiff(fi, fs),
-      retorno: r.dias != null ? r.dias : (document.getElementById('formComun').dataset.editRetorno ? parseInt(document.getElementById('formComun').dataset.editRetorno) : null),
+      retorno: r.dias != null ? r.dias : null,
     });
   }
   else {
