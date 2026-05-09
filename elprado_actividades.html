@@ -3181,7 +3181,7 @@ function calcIngStd() {
     const infoEl = document.getElementById('retornoInfoStd');
     if(r.dias !== null) {
       infoEl.style.display='flex';
-      document.getElementById('retornoLastEvtStd').textContent = r.lastDate+' ('+r.lastEvt.actividad+')';
+      document.getElementById('retornoLastEvtStd').textContent = r.lastDate + (r.lastEvt ? ' (' + r.lastEvt.actividad + ')' : '');
       const dEl = document.getElementById('retornoDaysStd');
       dEl.textContent = r.dias;
       dEl.className = 'retorno-days '+(r.dias>=28?'ok':r.dias>=21?'warn':'low');
@@ -3210,7 +3210,7 @@ function calcIng() {
     const infoEl = document.getElementById('retornoInfo');
     if(r.dias !== null) {
       infoEl.style.display = 'flex';
-      document.getElementById('retornoLastEvt').textContent = r.lastDate + ' (' + r.lastEvt.actividad + ')';
+      document.getElementById('retornoLastEvt').textContent = r.lastDate + (r.lastEvt ? ' (' + r.lastEvt.actividad + ')' : '');
       const dEl = document.getElementById('retornoDays');
       dEl.textContent = r.dias;
       dEl.className = 'retorno-days ' + (r.dias>=28?'ok':r.dias>=21?'warn':'low');
