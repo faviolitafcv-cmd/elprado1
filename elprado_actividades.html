@@ -727,13 +727,24 @@ tr:hover td { background: rgba(255,255,255,.02); }
       <table id="tablaActividades" style="min-width:1200px;">
         <thead>
           <tr>
-            <th>Fecha</th><th>Potrero</th><th>Parcela</th><th>Variedad</th>
+            <th onclick="sortTabla('fecha')" style="cursor:pointer;" title="Ordenar">Fecha ⇅</th>
+            <th onclick="sortTabla('potrero')" style="cursor:pointer;" title="Ordenar">Potrero ⇅</th>
+            <th onclick="sortTabla('parcela')" style="cursor:pointer;" title="Ordenar">Parcela ⇅</th>
+            <th>Variedad</th>
             <th>Actividad</th><th>Lote / Grupo</th>
-            <th>HA</th><th>KG/MS/HA</th><th>% MS</th>
-            <th>F. Ingreso</th><th>F. Salida</th><th>Días MS</th><th>Estadía</th><th>Retorno</th><th>Usuario</th><th>Acc</th>
+            <th onclick="sortTabla('ha')" style="cursor:pointer;" title="Ordenar">HA ⇅</th>
+            <th onclick="sortTabla('kgMsHa')" style="cursor:pointer;" title="Ordenar">KG/MS/HA ⇅</th>
+            <th onclick="sortTabla('pctMs')" style="cursor:pointer;" title="Ordenar">% MS ⇅</th>
+            <th onclick="sortTabla('fechaIng')" style="cursor:pointer;" title="Ordenar">F. Ingreso ⇅</th>
+            <th onclick="sortTabla('fechaSal')" style="cursor:pointer;" title="Ordenar">F. Salida ⇅</th>
+            <th onclick="sortTabla('diasMs')" style="cursor:pointer;" title="Ordenar">Días MS ⇅</th>
+            <th onclick="sortTabla('estadia')" style="cursor:pointer;" title="Ordenar">Estadía ⇅</th>
+            <th onclick="sortTabla('retorno')" style="cursor:pointer;color:var(--gold2);" title="Ordenar por retorno">Retorno ⇅</th>
+            <th>Usuario</th><th>Acc</th>
           </tr>
         </thead>
         <tbody id="tablaBody"></tbody>
+      </table>
       </table>
     </div></div>
   </div>
@@ -2363,146 +2374,72 @@ function notif(msg, err=false) {
 // ═══════════════════════════════════════
 function calcRetornoAuto(potrero, parcela, excludeId, fechaIngParam) {
   // ================================================================
-  // LOGICA DE PRIORIDAD PARA CALCULAR RETORNO/DESCANSO:
+  // LÓGICA CORRECTA DE RETORNO:
   //
-  // Para cualquier parcela nueva que se registra, el descanso se
-  // calcula buscando la referencia anterior en este orden:
+  // Para potrero X, parcela N, con fecha de ingreso HOY:
   //
-  // PASO A — Buscar en la vuelta anterior (si hay vueltas iniciadas)
-  //   A1: Misma parcela en vuelta anterior → usar su fecha de salida
-  //   A2: Si esa parcela no tiene registro → usar la fecha de salida
-  //       MAS TARDIA de CUALQUIER parcela del mismo potrero en esa
-  //       vuelta (o en todo el historial si no hay vueltas)
+  // PASO 1: Buscar la última salida de la MISMA parcela N del potrero X
+  //         cuyo ingreso sea anterior al ingreso actual.
+  //         (Toma la más reciente entre animales, desbrozadora o rolo)
   //
-  // PASO B — Prioridad del implemento sobre el animal:
-  //   Si después de la salida del animal hubo DESBROZAR o ROLO en
-  //   esa parcela (o en el potrero completo), el descanso se cuenta
-  //   desde la salida del implemento, no del animal.
+  // PASO 2: Si no existe esa parcela en el historial,
+  //         buscar la última salida de CUALQUIER actividad del potrero X
+  //         cuyo ingreso sea anterior al ingreso actual.
   //
-  // PASO C — Sin vueltas registradas: busca en TODO el historial
-  //   la ultima salida de cualquier actividad anterior al ingreso.
+  // Retorno = fechaIngreso - fecha de referencia encontrada
   // ================================================================
 
-  const acts  = getActividades();
+  const acts = getActividades();
   const today = new Date().toISOString().split('T')[0];
 
   const fechaIngresoActual = fechaIngParam ||
-                             document.getElementById("fFechaIng")?.value ||
-                             document.getElementById("fFechaIngStd")?.value ||
+                             document.getElementById('fFechaIng')?.value ||
+                             document.getElementById('fFechaIngStd')?.value ||
                              today;
 
+  // Actividades del mismo potrero
+  const actsPot = acts.filter(a =>
+    a.potrero === potrero &&
+    ['MATERIA SECA','INGRESO HDA','DESBROZAR','ROLO'].includes(a.actividad) &&
+    (!excludeId || a.id !== excludeId)
+  );
 
-
-
-  // Fecha de salida de una actividad según su tipo
-  function fechaSalidaActividad(a) {
-    if(a.actividad === 'INGRESO HDA')                          return a.fechaSal || null;
+  // Fecha de salida de una actividad
+  function fSal(a) {
     if(a.actividad === 'DESBROZAR' || a.actividad === 'ROLO') return a.fechaSalMaq || null;
-    if(a.actividad === 'MATERIA SECA' && a.fechaSal)          return a.fechaSal;
-    return null;
+    return a.fechaSal || null;
   }
 
-  // Actividades que cuentan como "salida" para el descanso
-  const ACTS_VALIDAS = ['INGRESO HDA','DESBROZAR','ROLO','MATERIA SECA'];
-
-  // ── Determinar límites de vueltas ──
-  const vueltas      = getVueltasData();
-  const inicios      = vueltas
-    .filter(f => f.potrero === potrero && f.tipo === 'INICIO')
-    .sort((a,b) => b.fecha.localeCompare(a.fecha));
-  const inicioActual   = inicios[0] ? inicios[0].fecha : null;
-  // Si hay múltiples inicios en la misma fecha, buscar el primero con fecha diferente
-  const inicioAnterior = inicios.find(f => f.fecha < inicioActual)?.fecha || null;
-
-  let lastDate = null;
-  let lastEvt  = null;
-
-  // ── Función: dada una lista de candidatos, encontrar la mejor referencia ──
-  function buscarMejorReferencia(candidatos) {
-    // PASO A1: intentar misma parcela primero
-    const mismaParcela = candidatos.filter(a =>
-      String(a.parcela) === String(parcela) &&
-      ACTS_VALIDAS.includes(a.actividad)
-    );
-
-    // PASO A2: si no hay registro de esa parcela, tomar la última salida
-    // de cualquier parcela del potrero (la más tardía)
-    const fuente = mismaParcela.length > 0 ? mismaParcela : candidatos.filter(a =>
-      ACTS_VALIDAS.includes(a.actividad)
-    );
-
-    let refDate = null;
-    let refEvt  = null;
-    for(const a of fuente) {
-      const f = fechaSalidaActividad(a);
-      if(f && (!refDate || f > refDate)) { refDate = f; refEvt = a; }
-    }
-
-    if(!refDate) return { refDate: null, refEvt: null };
-
-    // PASO B: verificar si hubo implemento (DESBROZAR/ROLO) DESPUÉS
-    // de esa salida, en la misma parcela o en potrero completo
-    const implementosDespues = candidatos.filter(a => {
-      if(!['DESBROZAR','ROLO'].includes(a.actividad)) return false;
-      const fImpl = fechaSalidaActividad(a);
-      if(!fImpl || fImpl <= refDate) return false;
-      // misma parcela O potrero completo
-      return String(a.parcela) === String(parcela) ||
-             a.parcela === '__COMPLETO__' ||
-             String(a.parcela).includes(String(parcela));
-    });
-
-    if(implementosDespues.length > 0) {
-      // Tomar el implemento con salida más tardía
-      let implDate = null;
-      let implEvt  = null;
-      for(const a of implementosDespues) {
-        const f = fechaSalidaActividad(a);
-        if(f && (!implDate || f > implDate)) { implDate = f; implEvt = a; }
-      }
-      if(implDate) return { refDate: implDate, refEvt: implEvt };
-    }
-
-    return { refDate, refEvt };
+  // PASO 1: misma parcela, ingreso anterior al actual
+  let refParcela = null;
+  for(const b of actsPot) {
+    if(String(b.parcela) !== String(parcela)) continue;
+    const bfi = b.fechaIng || b.fechaIngMaq || b.fecha || '';
+    if(bfi >= fechaIngresoActual) continue;
+    const bfs = fSal(b);
+    if(!bfs) continue;
+    if(!refParcela || bfs > refParcela) refParcela = bfs;
+  }
+  if(refParcela) {
+    const dias = dateDiff(refParcela, fechaIngresoActual);
+    return { dias: dias > 0 ? dias : null, lastDate: refParcela, lastEvt: null };
   }
 
-  if(inicioActual) {
-    // ── CON VUELTAS: buscar en vuelta anterior ──
-    const candidatos = acts.filter(a => {
-      if(a.potrero !== potrero) return false;
-      if(excludeId && a.id === excludeId) return false;
-      if(a.actividad === 'FIN_VUELTA') return false;
-      const fa = a.fechaIng || a.fechaIngMaq || a.fecha;
-      if(inicioAnterior && fa < inicioAnterior) return false;
-      if(fa >= inicioActual) return false;
-      return true;
-    });
-
-    const { refDate, refEvt } = buscarMejorReferencia(candidatos);
-    lastDate = refDate;
-    lastEvt  = refEvt;
-
-  } else {
-    // ── SIN VUELTAS: buscar en TODO el historial anterior al ingreso actual ──
-    const candidatos = acts.filter(a => {
-      if(a.potrero !== potrero) return false;
-      if(excludeId && a.id === excludeId) return false;
-      if(a.actividad === 'FIN_VUELTA') return false;
-      const fa = a.fechaIng || a.fechaIngMaq || a.fecha;
-      return fa < fechaIngresoActual;
-    });
-
-    const { refDate, refEvt } = buscarMejorReferencia(candidatos);
-    // Solo usar si la referencia es anterior al ingreso actual
-    if(refDate && refDate < fechaIngresoActual) {
-      lastDate = refDate;
-      lastEvt  = refEvt;
-    }
+  // PASO 2: cualquier parcela del potrero, ingreso anterior al actual
+  let refPotrero = null;
+  for(const b of actsPot) {
+    const bfi = b.fechaIng || b.fechaIngMaq || b.fecha || '';
+    if(bfi >= fechaIngresoActual) continue;
+    const bfs = fSal(b);
+    if(!bfs) continue;
+    if(!refPotrero || bfs > refPotrero) refPotrero = bfs;
+  }
+  if(refPotrero) {
+    const dias = dateDiff(refPotrero, fechaIngresoActual);
+    return { dias: dias > 0 ? dias : null, lastDate: refPotrero, lastEvt: null };
   }
 
-  if(!lastDate) return { dias: null, lastDate: null, lastEvt: null };
-  const dias = dateDiff(lastDate, fechaIngresoActual);
-  return { dias, lastDate, lastEvt };
+  return { dias: null, lastDate: null, lastEvt: null };
 }
 
 // ═══════════════════════════════════════
@@ -3631,6 +3568,14 @@ function getPesoActualGrupo(nombre) {
 // ═══════════════════════════════════════
 // RENDER TABLA ACTIVIDADES
 // ═══════════════════════════════════════
+let _sortCol = 'fecha';
+let _sortDir = -1; // -1 = desc, 1 = asc
+
+function sortTabla(col) {
+  if(_sortCol === col) _sortDir *= -1;
+  else { _sortCol = col; _sortDir = -1; }
+  renderTabla();
+}
 function renderTabla() {
   const mes = document.getElementById('filtroMes').value;
   const act = document.getElementById('filtroAct').value;
@@ -3642,6 +3587,25 @@ function renderTabla() {
   if(act) data = data.filter(r => r.actividad===act);
   if(pot) data = data.filter(r => r.potrero===pot);
 
+  // Ordenar según columna seleccionada
+  data.sort((a,b) => {
+    let va, vb;
+    if(_sortCol==='fecha')      { va=a.fecha||''; vb=b.fecha||''; }
+    else if(_sortCol==='potrero')   { va=a.potrero||''; vb=b.potrero||''; }
+    else if(_sortCol==='parcela')   { va=parseFloat(a.parcela)||0; vb=parseFloat(b.parcela)||0; return _sortDir*(va-vb); }
+    else if(_sortCol==='ha')        { va=parseFloat(a.ha)||0; vb=parseFloat(b.ha)||0; return _sortDir*(va-vb); }
+    else if(_sortCol==='kgMsHa')   { va=parseFloat(a.kgMsHa)||0; vb=parseFloat(b.kgMsHa)||0; return _sortDir*(va-vb); }
+    else if(_sortCol==='pctMs')    { va=parseFloat(a.pctMs)||0; vb=parseFloat(b.pctMs)||0; return _sortDir*(va-vb); }
+    else if(_sortCol==='fechaIng') { va=a.fechaIng||''; vb=b.fechaIng||''; }
+    else if(_sortCol==='fechaSal') { va=a.fechaSal||''; vb=b.fechaSal||''; }
+    else if(_sortCol==='diasMs')   { va=parseFloat(a.diasMs)||0; vb=parseFloat(b.diasMs)||0; return _sortDir*(va-vb); }
+    else if(_sortCol==='estadia')  { va=parseFloat(a.estadia)||0; vb=parseFloat(b.estadia)||0; return _sortDir*(va-vb); }
+    else if(_sortCol==='retorno')  { va=parseFloat(a.retorno)||0; vb=parseFloat(b.retorno)||0; return _sortDir*(va-vb); }
+    else { va=a.fecha||''; vb=b.fecha||''; }
+    if(va<vb) return _sortDir*-1;
+    if(va>vb) return _sortDir*1;
+    return 0;
+  });
   const tbody = document.getElementById('tablaBody');
   if(!data.length) {
     tbody.innerHTML = '<tr><td colspan="13"><div class="empty"><div class="empty-icon">📭</div>No hay registros</div></td></tr>';
