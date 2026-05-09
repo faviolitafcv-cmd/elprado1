@@ -2431,14 +2431,21 @@ function calcRetornoAuto(potrero, parcela, excludeId, fechaIngParam) {
     return { dias: dias > 0 ? dias : null, lastDate: refParcela, lastEvt: null };
   }
 
-  // PASO 2: cualquier parcela del potrero, ingreso anterior al actual
+  // PASO 2: no existe esa parcela → buscar la última salida del potrero
+  // (la parcela que tuvo la actividad más reciente antes del ingreso actual)
   let refPotrero = null;
+  let refPotFecha = null; // fecha de ingreso de la actividad de referencia
   for(const b of actsPot) {
     const bfi = b.fechaIng || b.fechaIngMaq || b.fecha || '';
     if(bfi >= fechaIngresoActual) continue;
     const bfs = fSal(b);
     if(!bfs) continue;
-    if(!refPotrero || bfs > refPotrero) refPotrero = bfs;
+    // Tomar la que tiene la salida más tardía (última actividad del potrero)
+    if(!refPotrero || bfs > refPotrero) {
+      refPotrero = bfs;
+      refPotFecha = bfi;
+    }
+  }
   }
   if(refPotrero) {
     const dias = dateDiff(refPotrero, fechaIngresoActual);
@@ -3382,10 +3389,35 @@ function guardarActividad() {
     chkFV.checked = false;
     notif('🔚 Fin de vuelta registrado para ' + potrero);
   }
+  // Recalcular retornos de registros posteriores del mismo potrero
+  recalcularRetornoPotrero(potrero, rec.fechaSal || rec.fechaSalMaq || rec.fecha);
 
   // ═══════════════════════════════════════
 // SINCRONIZAR PLAN DESDE REGISTROS EXISTENTES
 // ═══════════════════════════════════════
+function recalcularRetornoPotrero(potrero, fechaRefSalida) {
+  // Cuando se guarda una actividad, recalcular el retorno de todos los
+  // registros posteriores del mismo potrero que puedan verse afectados
+  if(!potrero || !fechaRefSalida) return;
+  const acts = getActividades();
+  let cambios = 0;
+  const nuevas = acts.map(a => {
+    if(a.potrero !== potrero) return a;
+    if(!["MATERIA SECA","INGRESO HDA"].includes(a.actividad)) return a;
+    if(!a.fechaIng) return a;
+    // Solo recalcular registros que ingresaron DESPUÉS de la fecha de referencia
+    if(a.fechaIng <= fechaRefSalida) return a;
+    const r = calcRetornoAuto(a.potrero, a.parcela, a.id, a.fechaIng);
+    if(r.dias === a.retorno) return a;
+    cambios++;
+    return Object.assign({}, a, { retorno: r.dias });
+  });
+  if(cambios === 0) return;
+  setData("actividades", nuevas);
+  fbSet("actividades", nuevas);
+  console.log("[retorno] Recalculados " + cambios + " registros del potrero " + potrero);
+}
+
 function limpiarDuplicados() {
   let acts = getActividades();
   const total_antes = acts.length;
