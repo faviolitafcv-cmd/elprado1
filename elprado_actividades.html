@@ -2409,6 +2409,14 @@ function calcRetornoAuto(potrero, parcela, excludeId, fechaIngParam) {
     ['MATERIA SECA','INGRESO HDA','DESBROZAR','ROLO'].includes(a.actividad) &&
     (!excludeId || a.id !== excludeId)
   );
+  // Buscar el FIN_VUELTA más reciente anterior al ingreso actual
+  const finVueltas = acts.filter(a =>
+    a.potrero === potrero &&
+    a.actividad === 'FIN_VUELTA' &&
+    a.fecha < fechaIngresoActual
+  ).sort((a,b) => b.fecha.localeCompare(a.fecha));
+  const ultimoFinVuelta = finVueltas[0] ? finVueltas[0].fecha : null;
+  const penultimoFinVuelta = finVueltas[1] ? finVueltas[1].fecha : null;
 
   // Fecha de salida de una actividad
   function fSal(a) {
@@ -2423,6 +2431,7 @@ function calcRetornoAuto(potrero, parcela, excludeId, fechaIngParam) {
     const bfi = b.fechaIng || b.fechaIngMaq || b.fecha || '';
     if(bfi >= fechaIngresoActual) continue;
     const bfs = fSal(b);
+    if(penultimoFinVuelta && bfi <= penultimoFinVuelta) continue;
     if(!bfs) continue;
     if(!refParcela || bfs > refParcela) refParcela = bfs;
   }
@@ -2444,19 +2453,18 @@ function calcRetornoAuto(potrero, parcela, excludeId, fechaIngParam) {
   for(const b of actsPot) {
     const bfi = b.fechaIng || b.fechaIngMaq || b.fecha || '';
     if(bfi >= fechaIngresoActual) continue;
-    // Excluir registros de la vuelta actual
-    if(inicioActual && bfi >= inicioActual) continue;
+    // Solo buscar en la vuelta anterior (entre penúltimo y último fin de vuelta)
+    if(penultimoFinVuelta && bfi <= penultimoFinVuelta) continue;
+    if(ultimoFinVuelta && bfi > ultimoFinVuelta) continue;
     const bfs = fSal(b);
     if(!bfs) continue;
-    if(bfs > fechaIngresoActual) continue;
     if(!refPotrero || bfs > refPotrero) refPotrero = bfs;
   }
   if(refPotrero) {
     const dias = dateDiff(refPotrero, fechaIngresoActual);
-    return { dias: dias >= 0 ? dias : null, lastDate: refPotrero, lastEvt: null };
+    return { dias: dias > 0 ? dias : null, lastDate: refPotrero, lastEvt: null };
   }
   return { dias: null, lastDate: null, lastEvt: null };
-// ═══════════════════════════════════════
 }
 let actActual = null;
 let modoDesb = 'PARCELA';
