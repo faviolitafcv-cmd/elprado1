@@ -806,7 +806,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
           <input type="text" id="fVariedad" readonly>
         </div>
       </div>
-      <div id="grpSaldoHA" style="display:none;margin-top:10px;"><div style="background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:12px 16px;display:flex;gap:16px;flex-wrap:wrap;align-items:center;"><div style="font-size:11px;color:var(--text3);font-weight:700;">📐 Potrero</div><div><div style="font-size:10px;color:var(--text3);">Total</div><div id="saldoHATotal" style="font-size:14px;font-weight:700;color:var(--text2);">—</div></div><div><div style="font-size:10px;color:var(--text3);">Usado esta vuelta</div><div id="saldoHAUsado" style="font-size:14px;font-weight:700;color:var(--blue);">—</div></div><div><div style="font-size:10px;color:var(--text3);">Saldo</div><div id="saldoHAResta" style="font-size:16px;font-weight:800;">—</div></div><div><div style="font-size:10px;color:var(--text3);">Próxima parcela</div><div id="saldoHAProxParcela" style="font-size:14px;font-weight:700;color:var(--gold2);">—</div></div><div><div style="font-size:10px;color:var(--text3);">Inicio de vuelta</div><div id="saldoHAInicioVuelta" style="font-size:11px;color:var(--text3);">—</div></div><div><button onclick="iniciarVuelta(document.getElementById('fPotrero').value)" style="background:var(--green2);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;">🔄 Iniciar Vuelta</button></div></div></div>
+      <div id="grpSaldoHA" style="display:none;margin-top:10px;"><div style="background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:12px 16px;display:flex;gap:16px;flex-wrap:wrap;align-items:center;"><div style="font-size:11px;color:var(--text3);font-weight:700;">📐 Potrero</div><div><div style="font-size:10px;color:var(--text3);">Total</div><div id="saldoHATotal" style="font-size:14px;font-weight:700;color:var(--text2);">—</div></div><div><div style="font-size:10px;color:var(--text3);">Usado esta vuelta</div><div id="saldoHAUsado" style="font-size:14px;font-weight:700;color:var(--blue);">—</div></div><div><div style="font-size:10px;color:var(--text3);">Saldo</div><div id="saldoHAResta" style="font-size:16px;font-weight:800;">—</div></div><div><div style="font-size:10px;color:var(--text3);">Próxima parcela</div><div id="saldoHAProxParcela" style="font-size:14px;font-weight:700;color:var(--gold2);">—</div></div><div><div style="font-size:10px;color:var(--text3);">Inicio de vuelta</div><div id="saldoHAInicioVuelta" style="font-size:11px;color:var(--text3);">—</div></div><div id="grpProyeccionParcelas" style="display:none;padding:6px 10px;border-radius:6px;border:1px solid var(--border2);"><div style="font-size:10px;color:var(--text3);margin-bottom:2px;">Proyección</div><div id="txtProyeccionParcelas" style="font-size:12px;font-weight:700;">—</div></div><div><button onclick="iniciarVuelta(document.getElementById('fPotrero').value)" style="background:var(--green2);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;">🔄 Iniciar Vuelta</button></div></div></div>
 
       <!-- Modo desbrozadora -->
       <div id="grpModoDesb" style="display:none; margin-top:12px;">
@@ -2385,14 +2385,21 @@ function calcRetornoAuto(potrero, parcela, excludeId, fechaIngParam) {
   // Para potrero X, parcela N, con fecha de ingreso HOY:
   //
   // PASO 1: Buscar la última salida de la MISMA parcela N del potrero X
-  //         limitada a la vuelta inmediatamente anterior:
-  //         → actividades cuyo ingreso esté ENTRE el penúltimo FIN_VUELTA
-  //           (exclusive) y el último FIN_VUELTA (inclusive) anterior al
-  //           ingreso actual. Si no hay FIN_VUELTA, sin límite inferior.
+  //         en la vuelta inmediatamente anterior (entre limInf y limSup).
   //
-  // PASO 2: Si no existe esa parcela en el historial,
-  //         ídem pero para CUALQUIER actividad del potrero X,
-  //         con la misma restricción de vuelta inmediatamente anterior.
+  // PASO 2: Si la parcela N no existió en esa vuelta,
+  //         tomar la última salida de CUALQUIER actividad del potrero
+  //         en esa misma vuelta inmediatamente anterior.
+  //
+  // La "vuelta inmediatamente anterior" se delimita así:
+  //   limSup = fecha del último FIN_VUELTA anterior al ingreso actual
+  //   limInf = fecha del penúltimo FIN_VUELTA anterior al ingreso actual
+  //
+  // Si limSup existe pero limInf no (solo hay un FIN_VUELTA registrado),
+  // el límite inferior se infiere como el inicio del bloque de actividades
+  // que terminó en limSup: se toma la fecha de ingreso de la actividad
+  // más antigua dentro de ese bloque contiguo (actividades ordenadas por
+  // ingreso desc desde limSup, cortando cuando hay un salto > 60 días).
   //
   // Retorno = fechaIngresoActual − fecha de salida de referencia
   // ================================================================
@@ -2419,22 +2426,42 @@ function calcRetornoAuto(potrero, parcela, excludeId, fechaIngParam) {
     a.fecha < fechaIngresoActual
   ).sort((a,b) => b.fecha.localeCompare(a.fecha));
 
-  // Límites de la vuelta inmediatamente anterior:
-  //   limSup = último FIN_VUELTA antes del ingreso actual (puede ser null)
-  //   limInf = penúltimo FIN_VUELTA antes del ingreso actual (puede ser null)
   const limSup = finVueltas[0] ? finVueltas[0].fecha : null;
-  const limInf = finVueltas[1] ? finVueltas[1].fecha : null;
+  let limInf   = finVueltas[1] ? finVueltas[1].fecha : null;
+
+  // Si solo hay un FIN_VUELTA (limInf null), inferir el inicio del bloque
+  // de actividades que terminó en limSup, buscando el primer salto > 60 días
+  // entre actividades contiguas (ordenadas desc por ingreso) dentro de ≤ limSup.
+  if(limSup && !limInf) {
+    const enBloque = actsPot
+      .map(a => a.fechaIng || a.fechaIngMaq || a.fecha || '')
+      .filter(f => f && f <= limSup)
+      .sort((a,b) => b.localeCompare(a)); // desc
+
+    if(enBloque.length > 0) {
+      let inicioBloque = enBloque[0];
+      for(let i = 0; i < enBloque.length - 1; i++) {
+        const diff = dateDiff(enBloque[i+1], enBloque[i]);
+        if(diff > 20) {
+          // salto grande: el bloque empieza en enBloque[i]
+          inicioBloque = enBloque[i];
+          break;
+        }
+        inicioBloque = enBloque[i+1];
+      }
+      // limInf inferido = día anterior al inicio del bloque
+      const d = new Date(inicioBloque);
+      d.setDate(d.getDate() - 1);
+      limInf = d.toISOString().split('T')[0];
+    }
+  }
 
   // Determina si una actividad pertenece a la vuelta inmediatamente anterior.
-  // Su fecha de ingreso debe:
-  //   - ser estrictamente anterior al ingreso actual
-  //   - si existe limSup: ser ≤ limSup  (dentro o antes del cierre de esa vuelta)
-  //   - si existe limInf: ser > limInf  (posterior al cierre de la vuelta anterior)
   function enVueltaAnterior(bfi) {
     if(!bfi) return false;
     if(bfi >= fechaIngresoActual) return false;
-    if(limSup && bfi > limSup) return false;   // ingreso posterior al cierre → es vuelta actual, no anterior
-    if(limInf && bfi <= limInf) return false;  // ingreso antes del penúltimo cierre → vuelta más antigua
+    if(limSup && bfi > limSup) return false;  // es de la vuelta actual
+    if(limInf && bfi <= limInf) return false; // es de una vuelta más antigua
     return true;
   }
 
@@ -2459,8 +2486,7 @@ function calcRetornoAuto(potrero, parcela, excludeId, fechaIngParam) {
     return { dias: dias >= 0 ? dias : null, lastDate: refParcela, lastEvt: null };
   }
 
-  // PASO 2: parcela no encontrada → cualquier actividad del potrero,
-  //         también limitada a la vuelta inmediatamente anterior
+  // PASO 2: parcela no encontrada en esa vuelta → última salida del potrero
   let refPotrero = null;
   for(const b of actsPot) {
     const bfi = b.fechaIng || b.fechaIngMaq || b.fecha || '';
@@ -2914,6 +2940,69 @@ function getMetricasHAMes(anio, mes) {
 }
 
 
+// ── Proyección de parcelas restantes ──────────────────────────────────────
+// Devuelve { estimadoTotal, yaVan, faltan, fuente }
+function calcProyeccionParcelas(potrero, editId) {
+  const acts = getActividades();
+  const areaTotal = getPotreroArea(potrero);
+  if(!areaTotal) return null;
+
+  // Determinar inicio de vuelta actual
+  const vueltas = getVueltasData();
+  const ultV = vueltas.filter(f => f.potrero === potrero && f.tipo === 'INICIO')
+                      .sort((a,b) => b.fecha.localeCompare(a.fecha))[0];
+  const desdeActual = ultV ? ultV.fecha : '0000-00-00';
+
+  // Parcelas de la vuelta actual (excluir registro en edición)
+  const parcelasActual = acts.filter(a =>
+    a.actividad === 'MATERIA SECA' &&
+    a.potrero === potrero &&
+    (!editId || a.id !== editId) &&
+    a.fechaIng >= desdeActual &&
+    a.ha && parseFloat(a.ha) > 0
+  );
+
+  const yaVan = parcelasActual.length;
+
+  // CASO A: ya hay 2+ parcelas en la vuelta actual → usar promedio propio
+  if(yaVan >= 2) {
+    const haUsada = parcelasActual.reduce((s,a) => s + parseFloat(a.ha), 0);
+    const promHA  = haUsada / yaVan;
+    const estimadoTotal = Math.round(areaTotal / promHA);
+    const faltan = Math.max(0, estimadoTotal - yaVan);
+    return { estimadoTotal, yaVan, faltan, fuente: 'actual' };
+  }
+
+  // CASO B: 0 o 1 parcela en vuelta actual → usar promedio de vueltas anteriores
+  // Buscar los FIN_VUELTA anteriores para delimitar vueltas pasadas
+  const finVueltas = acts.filter(a =>
+    a.potrero === potrero && a.actividad === 'FIN_VUELTA'
+  ).sort((a,b) => b.fecha.localeCompare(a.fecha));
+
+  if(!finVueltas.length) return null; // sin historial
+
+  // Tomar hasta las últimas 3 vueltas cerradas
+  const maxVueltas = 3;
+  const conteos = [];
+  for(let i = 0; i < Math.min(finVueltas.length, maxVueltas); i++) {
+    const fvSup = finVueltas[i].fecha;
+    const fvInf = finVueltas[i+1] ? finVueltas[i+1].fecha : '0000-00-00';
+    const count = acts.filter(a =>
+      a.actividad === 'MATERIA SECA' &&
+      a.potrero === potrero &&
+      a.fechaIng > fvInf &&
+      a.fechaIng <= fvSup &&
+      a.ha && parseFloat(a.ha) > 0
+    ).length;
+    if(count > 0) conteos.push(count);
+  }
+  if(!conteos.length) return null;
+
+  const promParcelas = Math.round(conteos.reduce((s,n) => s+n, 0) / conteos.length);
+  const faltan = Math.max(0, promParcelas - yaVan);
+  return { estimadoTotal: promParcelas, yaVan, faltan, fuente: 'historial' };
+}
+
 function actualizarSaldoHA() {
   if(actActual !== 'MATERIA SECA') return;
   const potrero = document.getElementById('fPotrero').value;
@@ -2941,7 +3030,7 @@ function actualizarSaldoHA() {
     if(areaTotal) {
       const saldo = areaTotal - haUsada;
       elResta.textContent = saldo.toFixed(1) + ' ha';
-      elResta.style.color = saldo >= 0 ? 'var(--green-soft)' : 'var(--red)';
+      elResta.style.color = saldo <= 0 ? 'var(--red)' : saldo < areaTotal * 0.3 ? 'var(--gold2)' : 'var(--green-soft)';
     } else {
       elResta.textContent = '— ha';
       elResta.style.color = 'var(--text3)';
@@ -2969,6 +3058,46 @@ function actualizarSaldoHA() {
     const ultV = vueltas.filter(f => f.potrero === potrero && f.tipo === 'INICIO')
                         .sort((a,b) => a.fecha > b.fecha ? -1 : 1)[0];
     elInicio.textContent = ultV ? ultV.fecha : 'Sin inicio registrado';
+  }
+
+  // ── Proyección de parcelas restantes ──
+  const grpProy = document.getElementById('grpProyeccionParcelas');
+  const txtProy = document.getElementById('txtProyeccionParcelas');
+  if(grpProy && txtProy) {
+    const saldoHA = areaTotal ? (areaTotal - haUsada) : null;
+
+    // Si potrero agotado → mostrar mensaje de fin de vuelta
+    if(saldoHA !== null && saldoHA <= 0) {
+      grpProy.style.display = 'block';
+      grpProy.style.borderColor = 'var(--red)';
+      grpProy.style.background = 'rgba(224,90,74,0.08)';
+      txtProy.textContent = '🔚 Potrero agotado';
+      txtProy.style.color = 'var(--red)';
+    } else {
+      const proy = calcProyeccionParcelas(potrero, editId);
+      if(proy) {
+        grpProy.style.display = 'block';
+        const etiqueta = proy.fuente === 'historial' ? '(historial)' : '(esta vuelta)';
+        if(proy.faltan === 0) {
+          grpProy.style.borderColor = 'var(--gold2)';
+          grpProy.style.background = 'rgba(201,162,39,0.08)';
+          txtProy.textContent = '⚠️ Última parcela estimada ' + etiqueta;
+          txtProy.style.color = 'var(--gold2)';
+        } else if(proy.faltan === 1) {
+          grpProy.style.borderColor = 'var(--gold2)';
+          grpProy.style.background = 'rgba(201,162,39,0.06)';
+          txtProy.textContent = '📍 Te queda ~1 parcela ' + etiqueta;
+          txtProy.style.color = 'var(--gold2)';
+        } else {
+          grpProy.style.borderColor = 'var(--border2)';
+          grpProy.style.background = '';
+          txtProy.textContent = '📊 Te quedan ~' + proy.faltan + ' parcelas ' + etiqueta;
+          txtProy.style.color = 'var(--text2)';
+        }
+      } else {
+        grpProy.style.display = 'none';
+      }
+    }
   }
 }
 
@@ -3405,6 +3534,39 @@ function guardarActividad() {
     setData('actividades', actsFiltered);
     chkFV.checked = false;
     notif('🔚 Fin de vuelta registrado para ' + potrero);
+  }
+
+  // ── POPUP FIN DE VUELTA: si el potrero se agotó y no se marcó manualmente ──
+  if(actActual === 'MATERIA SECA' && potrero && !(chkFV && chkFV.checked)) {
+    const _areaTotal = getPotreroArea(potrero);
+    if(_areaTotal) {
+      const _haUsada = getHAUsadaEnVuelta(potrero, null, null);
+      if(_haUsada >= _areaTotal) {
+        const _fechaSalida = document.getElementById('fFechaSal')?.value || fecha;
+        setTimeout(function() {
+          if(confirm('🔚 Se agotaron las hectáreas de ' + potrero + '.\n¿Marcar Fin de Vuelta ahora?')) {
+            const _recFV = {
+              id: uuid(),
+              fecha: _fechaSalida,
+              mes: mesDeDate(_fechaSalida),
+              trimestre: TRIMESTRES[mesDeDate(_fechaSalida)] || '',
+              gestion: '2025-2026',
+              potrero,
+              variedad: getVariedad(potrero),
+              actividad: 'FIN_VUELTA',
+              comentario: 'Fin de vuelta automático',
+              usuario: localStorage.getItem('elprado_usuario') || '',
+              fechaMod: new Date().toISOString()
+            };
+            const _actsPost = getActividades();
+            const _actsFiltered = _actsPost.filter(a => !(a.actividad === 'FIN_VUELTA' && a.potrero === potrero));
+            _actsFiltered.unshift(_recFV);
+            setData('actividades', _actsFiltered);
+            notif('🔚 Fin de vuelta registrado para ' + potrero);
+          }
+        }, 300);
+      }
+    }
   }
   // Recalcular retornos de registros posteriores del mismo potrero
   recalcularRetornoPotrero(potrero, rec.fechaSal || rec.fechaSalMaq || rec.fecha);
