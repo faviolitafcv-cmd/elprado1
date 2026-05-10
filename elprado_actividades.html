@@ -3855,8 +3855,8 @@ function renderTabla() {
       <td class="td-mono">${r.ha?fmt(r.ha,2):'—'}</td>
       <td class="td-mono td-green">${r.kgMsHa?fmt(r.kgMsHa,0):'—'}</td>
       <td class="td-mono">${r.pctMs?fmt(r.pctMs*100,1)+'%':'—'}</td>
-      <td class="td-mono" style="font-size:11px;">${r.fechaIng||'—'}</td>
-      <td class="td-mono" style="font-size:11px;">${r.fechaSal||'—'}</td>
+      <td class="td-mono" style="font-size:11px;">${r.fechaIng||r.fechaIngMaq||'—'}</td>
+      <td class="td-mono" style="font-size:11px;">${r.fechaSal||r.fechaSalMaq||'—'}</td>
       <td class="td-mono">${r.diasMs?fmt(r.diasMs,1):'—'}</td>
       <td class="td-mono">${r.estadia!=null?r.estadia+'d':'—'}</td>
       <td class="td-mono ${r.retorno>=28?'td-green':r.retorno!=null&&r.retorno<21?'td-red':''}">${r.retorno!=null?r.retorno+'d':'—'}</td>
