@@ -2385,14 +2385,16 @@ function calcRetornoAuto(potrero, parcela, excludeId, fechaIngParam) {
   // Para potrero X, parcela N, con fecha de ingreso HOY:
   //
   // PASO 1: Buscar la última salida de la MISMA parcela N del potrero X
-  //         cuyo ingreso sea anterior al ingreso actual.
-  //         (Toma la más reciente entre animales, desbrozadora o rolo)
+  //         limitada a la vuelta inmediatamente anterior:
+  //         → actividades cuyo ingreso esté ENTRE el penúltimo FIN_VUELTA
+  //           (exclusive) y el último FIN_VUELTA (inclusive) anterior al
+  //           ingreso actual. Si no hay FIN_VUELTA, sin límite inferior.
   //
   // PASO 2: Si no existe esa parcela en el historial,
-  //         buscar la última salida de CUALQUIER actividad del potrero X
-  //         cuyo ingreso sea anterior al ingreso actual.
+  //         ídem pero para CUALQUIER actividad del potrero X,
+  //         con la misma restricción de vuelta inmediatamente anterior.
   //
-  // Retorno = fechaIngreso - fecha de referencia encontrada
+  // Retorno = fechaIngresoActual − fecha de salida de referencia
   // ================================================================
 
   const acts = getActividades();
@@ -2403,20 +2405,38 @@ function calcRetornoAuto(potrero, parcela, excludeId, fechaIngParam) {
                              document.getElementById('fFechaIngStd')?.value ||
                              today;
 
-  // Actividades del mismo potrero
+  // Actividades del mismo potrero (excluir el registro en edición)
   const actsPot = acts.filter(a =>
     a.potrero === potrero &&
     ['MATERIA SECA','INGRESO HDA','DESBROZAR','ROLO'].includes(a.actividad) &&
     (!excludeId || a.id !== excludeId)
   );
-  // Buscar el FIN_VUELTA más reciente anterior al ingreso actual
+
+  // FIN_VUELTA del potrero anteriores al ingreso actual, ordenados desc
   const finVueltas = acts.filter(a =>
     a.potrero === potrero &&
     a.actividad === 'FIN_VUELTA' &&
     a.fecha < fechaIngresoActual
   ).sort((a,b) => b.fecha.localeCompare(a.fecha));
-  const ultimoFinVuelta = finVueltas[0] ? finVueltas[0].fecha : null;
-  const penultimoFinVuelta = finVueltas[1] ? finVueltas[1].fecha : null;
+
+  // Límites de la vuelta inmediatamente anterior:
+  //   limSup = último FIN_VUELTA antes del ingreso actual (puede ser null)
+  //   limInf = penúltimo FIN_VUELTA antes del ingreso actual (puede ser null)
+  const limSup = finVueltas[0] ? finVueltas[0].fecha : null;
+  const limInf = finVueltas[1] ? finVueltas[1].fecha : null;
+
+  // Determina si una actividad pertenece a la vuelta inmediatamente anterior.
+  // Su fecha de ingreso debe:
+  //   - ser estrictamente anterior al ingreso actual
+  //   - si existe limSup: ser ≤ limSup  (dentro o antes del cierre de esa vuelta)
+  //   - si existe limInf: ser > limInf  (posterior al cierre de la vuelta anterior)
+  function enVueltaAnterior(bfi) {
+    if(!bfi) return false;
+    if(bfi >= fechaIngresoActual) return false;
+    if(limSup && bfi > limSup) return false;   // ingreso posterior al cierre → es vuelta actual, no anterior
+    if(limInf && bfi <= limInf) return false;  // ingreso antes del penúltimo cierre → vuelta más antigua
+    return true;
+  }
 
   // Fecha de salida de una actividad
   function fSal(a) {
@@ -2424,14 +2444,13 @@ function calcRetornoAuto(potrero, parcela, excludeId, fechaIngParam) {
     return a.fechaSal || null;
   }
 
-  // PASO 1: misma parcela, ingreso anterior al actual
+  // PASO 1: misma parcela, vuelta inmediatamente anterior
   let refParcela = null;
   for(const b of actsPot) {
     if(String(b.parcela) !== String(parcela)) continue;
     const bfi = b.fechaIng || b.fechaIngMaq || b.fecha || '';
-    if(bfi >= fechaIngresoActual) continue;
+    if(!enVueltaAnterior(bfi)) continue;
     const bfs = fSal(b);
-    if(penultimoFinVuelta && bfi <= penultimoFinVuelta) continue;
     if(!bfs) continue;
     if(!refParcela || bfs > refParcela) refParcela = bfs;
   }
@@ -2440,29 +2459,19 @@ function calcRetornoAuto(potrero, parcela, excludeId, fechaIngParam) {
     return { dias: dias >= 0 ? dias : null, lastDate: refParcela, lastEvt: null };
   }
 
-  // PASO 2: no existe esa parcela → buscar la última salida del potrero
-  // Determinar inicio de vuelta actual para filtrar PASO 2
-  const vueltas = getVueltasData();
-  const inicios = vueltas
-    .filter(f => f.potrero === potrero && f.tipo === 'INICIO')
-    .sort((a,b) => b.fecha.localeCompare(a.fecha));
-  const inicioActual = inicios[0] ? inicios[0].fecha : null;
-  const inicioAnterior = inicios.find(f => f.fecha < inicioActual)?.fecha || null;
-  // cuya salida sea ESTRICTAMENTE anterior al ingreso actual
+  // PASO 2: parcela no encontrada → cualquier actividad del potrero,
+  //         también limitada a la vuelta inmediatamente anterior
   let refPotrero = null;
   for(const b of actsPot) {
     const bfi = b.fechaIng || b.fechaIngMaq || b.fecha || '';
-    if(bfi >= fechaIngresoActual) continue;
-    // Solo buscar en la vuelta anterior (entre penúltimo y último fin de vuelta)
-    if(penultimoFinVuelta && bfi <= penultimoFinVuelta) continue;
-    if(ultimoFinVuelta && bfi > ultimoFinVuelta) continue;
+    if(!enVueltaAnterior(bfi)) continue;
     const bfs = fSal(b);
     if(!bfs) continue;
     if(!refPotrero || bfs > refPotrero) refPotrero = bfs;
   }
   if(refPotrero) {
     const dias = dateDiff(refPotrero, fechaIngresoActual);
-    return { dias: dias > 0 ? dias : null, lastDate: refPotrero, lastEvt: null };
+    return { dias: dias >= 0 ? dias : null, lastDate: refPotrero, lastEvt: null };
   }
   return { dias: null, lastDate: null, lastEvt: null };
 }
