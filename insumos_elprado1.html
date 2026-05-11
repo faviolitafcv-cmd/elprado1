@@ -319,45 +319,6 @@ tr:hover td{background:rgba(109,186,58,.04);}
       <div id="formBromResumen" style="font-size:12px;color:var(--t2);">
         <div class="emp"><div class="emp-ic">⏳</div>Cargando...</div>
       </div>
-      <!-- Ajuste manual de parámetros -->
-      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--brd);">
-        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">
-          ✏️ Ajuste Manual de Parámetros — dejá vacío para usar el promedio automático
-        </div>
-        <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
-          <div class="fm" style="min-width:120px;">
-            <label>Ca override (%)</label>
-            <input type="number" id="ovCa" min="0" max="5" step="0.01" placeholder="auto"
-              oninput="calcularFormulacion()" style="font-size:12px;">
-          </div>
-          <div class="fm" style="min-width:120px;">
-            <label>P override (%)</label>
-            <input type="number" id="ovP" min="0" max="5" step="0.01" placeholder="auto"
-              oninput="calcularFormulacion()" style="font-size:12px;">
-          </div>
-          <div class="fm" style="min-width:120px;">
-            <label>Mg override (%)</label>
-            <input type="number" id="ovMg" min="0" max="5" step="0.01" placeholder="auto"
-              oninput="calcularFormulacion()" style="font-size:12px;">
-          </div>
-          <div class="fm" style="min-width:120px;">
-            <label>Na override (%)</label>
-            <input type="number" id="ovNa" min="0" max="5" step="0.01" placeholder="auto"
-              oninput="calcularFormulacion()" style="font-size:12px;">
-          </div>
-          <div class="fm" style="min-width:120px;">
-            <label>FDA override (%)</label>
-            <input type="number" id="ovFda" min="0" max="80" step="0.1" placeholder="auto"
-              oninput="calcularFormulacion()" style="font-size:12px;">
-          </div>
-          <div style="display:flex;align-items:flex-end;">
-            <button class="btn bs btn-sm" onclick="limpiarOverrides()" title="Volver a promedios automáticos">
-              ↺ Limpiar ajustes
-            </button>
-          </div>
-        </div>
-        <div id="ovAvisos" style="margin-top:8px;font-size:11px;color:var(--gold2);"></div>
-      </div>
     </div>
   </div>
 
@@ -1403,51 +1364,118 @@ function calcularFormulacion() {
     if(p.ee)  porVariedad[v].ee.push(parseFloat(p.ee));
   });
 
-  // ── Resumen bromatológico + energía calculada ──
+  // ── Resumen bromatológico por variedad + campos editables ──
   const bromHtml = Object.entries(porVariedad).map(([v, d]) => {
-    const fdaP = avg(d.fda) || 30;
-    const fdnP = avg(d.fdn) || 65;
-    const ne   = calcNE(fdaP, avg(d.ee));
-    return `<div style="display:inline-block;background:var(--card2);border:1px solid var(--brd);border-radius:6px;padding:10px 16px;margin:0 8px 8px 0;min-width:240px;vertical-align:top;">
-      <div style="font-size:11px;font-weight:700;color:var(--gs);margin-bottom:6px;">${v} — ${d.muestras} muestra${d.muestras>1?'s':''}</div>
-      <div style="font-size:11px;color:var(--t2);line-height:1.8;">
-        Ca: <strong>${avg(d.ca)!==null?avg(d.ca).toFixed(2)+'%':'—'}</strong> &nbsp;
-        P: <strong>${avg(d.p)!==null?avg(d.p).toFixed(2)+'%':'—'}</strong> &nbsp;
-        Mg: <strong>${avg(d.mg)!==null?avg(d.mg).toFixed(2)+'%':'—'}</strong><br>
-        FDA: <strong>${fdaP.toFixed(1)}%</strong> &nbsp;
-        FDN: <strong style="color:${fdnP>65?'var(--gold2)':'var(--gs)'};">${fdnP.toFixed(1)}%</strong> &nbsp;
-        TDN: <strong style="color:var(--gold2);">${ne.tdn}%</strong> &nbsp;
-        NE_m: <strong style="color:var(--gold2);">${ne.nem} Mcal/kg</strong> &nbsp;
-        NE_g: <strong style="color:var(--gold2);">${ne.neg} Mcal/kg</strong>
+    const fdaAuto = avg(d.fda) || 30;
+    const fdnAuto = avg(d.fdn) || 65;
+    const caAuto  = avg(d.ca);
+    const pAuto   = avg(d.p);
+    const mgAuto  = avg(d.mg);
+    const ne      = calcNE(fdaAuto, avg(d.ee));
+    const vid     = v.replace(/[^A-Z0-9]/g,'_');
+    return `
+    <div style="display:inline-block;background:var(--card2);border:1px solid var(--brd2);border-radius:8px;padding:12px 16px;margin:0 10px 12px 0;min-width:280px;vertical-align:top;">
+      <div style="font-size:12px;font-weight:700;color:var(--gs);margin-bottom:8px;border-bottom:1px solid var(--brd);padding-bottom:6px;">
+        🌿 ${v} — ${d.muestras} muestra${d.muestras>1?'s':''}
       </div>
+      <!-- Valores laboratorio (solo lectura) -->
+      <div style="font-size:11px;color:var(--t3);margin-bottom:8px;line-height:1.9;">
+        <span style="color:var(--t2);">Lab promedio:</span><br>
+        FDN <strong style="color:${fdnAuto>65?'var(--gold2)':'var(--gs)'};">${fdnAuto.toFixed(1)}%</strong> &nbsp;·&nbsp;
+        TDN <strong style="color:var(--gold2);">${ne.tdn}%</strong> &nbsp;·&nbsp;
+        NE_m <strong style="color:var(--gold2);">${ne.nem}</strong> &nbsp;·&nbsp;
+        NE_g <strong style="color:var(--gold2);">${ne.neg}</strong>
+      </div>
+      <!-- Campos editables Ca / P / Mg / FDA -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div>
+          <label style="font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--t3);">Ca (%)</label>
+          <input type="number" id="ov_${vid}_ca" min="0" max="5" step="0.001"
+            value="${caAuto!==null?caAuto.toFixed(3):''}"
+            placeholder="${caAuto!==null?caAuto.toFixed(3):'sin dato'}"
+            data-auto="${caAuto!==null?caAuto.toFixed(3):''}"
+            oninput="onOvChange(this,'${vid}')"
+            style="width:100%;background:var(--card3);border:1px solid var(--brd);color:var(--text);padding:5px 7px;border-radius:4px;font-size:12px;outline:none;">
+        </div>
+        <div>
+          <label style="font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--t3);">P (%)</label>
+          <input type="number" id="ov_${vid}_p" min="0" max="5" step="0.001"
+            value="${pAuto!==null?pAuto.toFixed(3):''}"
+            placeholder="${pAuto!==null?pAuto.toFixed(3):'sin dato'}"
+            data-auto="${pAuto!==null?pAuto.toFixed(3):''}"
+            oninput="onOvChange(this,'${vid}')"
+            style="width:100%;background:var(--card3);border:1px solid var(--brd);color:var(--text);padding:5px 7px;border-radius:4px;font-size:12px;outline:none;">
+        </div>
+        <div>
+          <label style="font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--t3);">Mg (%)</label>
+          <input type="number" id="ov_${vid}_mg" min="0" max="5" step="0.001"
+            value="${mgAuto!==null?mgAuto.toFixed(3):''}"
+            placeholder="${mgAuto!==null?mgAuto.toFixed(3):'sin dato'}"
+            data-auto="${mgAuto!==null?mgAuto.toFixed(3):''}"
+            oninput="onOvChange(this,'${vid}')"
+            style="width:100%;background:var(--card3);border:1px solid var(--brd);color:var(--text);padding:5px 7px;border-radius:4px;font-size:12px;outline:none;">
+        </div>
+        <div>
+          <label style="font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--t3);">FDA (%)</label>
+          <input type="number" id="ov_${vid}_fda" min="0" max="80" step="0.1"
+            value="${fdaAuto.toFixed(1)}"
+            placeholder="${fdaAuto.toFixed(1)}"
+            data-auto="${fdaAuto.toFixed(1)}"
+            oninput="onOvChange(this,'${vid}')"
+            style="width:100%;background:var(--card3);border:1px solid var(--brd);color:var(--text);padding:5px 7px;border-radius:4px;font-size:12px;outline:none;">
+        </div>
+      </div>
+      <div id="ov_${vid}_aviso" style="font-size:10px;color:var(--gold2);margin-top:6px;min-height:14px;"></div>
+      <button onclick="resetOvVariedad('${vid}','${v}')" style="margin-top:6px;font-size:10px;background:none;border:1px solid var(--brd);color:var(--t3);padding:3px 9px;border-radius:4px;cursor:pointer;">↺ Restaurar lab</button>
     </div>`;
   }).join('');
   document.getElementById('formBromResumen').innerHTML =
     bromHtml || '<em style="color:var(--t3);">Sin datos en las muestras</em>';
 
-  // ── Parámetros promedio de todas las variedades ──
-  const autoParams = {
-    ca:  avg(Object.values(porVariedad).flatMap(d=>d.ca)),
-    p:   avg(Object.values(porVariedad).flatMap(d=>d.p)),
-    mg:  avg(Object.values(porVariedad).flatMap(d=>d.mg)),
-    na:  avg(Object.values(porVariedad).flatMap(d=>d.na)),
-    cu:  avg(Object.values(porVariedad).flatMap(d=>d.cu)),
-    fda: avg(Object.values(porVariedad).flatMap(d=>d.fda)) || 30,
-    fdn: avg(Object.values(porVariedad).flatMap(d=>d.fdn)) || 60,
-    ee:  avg(Object.values(porVariedad).flatMap(d=>d.ee))  || 3,
+  // Guardar referencia a porVariedad para uso en overrides
+  window._porVariedad = porVariedad;
+
+  // ── Leer parámetros por variedad (campo editable o valor lab) ──
+  const getField = (vid, param) => {
+    const el = document.getElementById('ov_' + vid + '_' + param);
+    if(!el) return null;
+    const v = parseFloat(el.value);
+    return isNaN(v) ? null : v;
   };
 
-  // ── Aplicar overrides manuales si están cargados ──
-  const getOv = id => { const v = parseFloat(document.getElementById(id)?.value); return isNaN(v) ? null : v; };
-  const avisos = [];
-  const allParams = { ...autoParams };
-  const ovCa = getOv('ovCa'); if(ovCa  !== null) { allParams.ca  = ovCa;  avisos.push('Ca=' + ovCa + '%'); }
-  const ovP  = getOv('ovP');  if(ovP   !== null) { allParams.p   = ovP;   avisos.push('P=' + ovP + '%'); }
-  const ovMg = getOv('ovMg'); if(ovMg  !== null) { allParams.mg  = ovMg;  avisos.push('Mg=' + ovMg + '%'); }
-  const ovNa = getOv('ovNa'); if(ovNa  !== null) { allParams.na  = ovNa;  avisos.push('Na=' + ovNa + '%'); }
-  const ovFda= getOv('ovFda');if(ovFda !== null) { allParams.fda = ovFda; avisos.push('FDA=' + ovFda + '%'); }
+  // Promediar entre variedades ponderado por cantidad de muestras, usando valores editados
+  let sumCa=[], sumP=[], sumMg=[], sumNa=[], sumCu=[], sumFda=[], sumFdn=[], sumEe=[];
+  Object.entries(porVariedad).forEach(([v, d]) => {
+    const vid = v.replace(/[^A-Z0-9]/g,'_');
+    const n = d.muestras;
+    const ca  = getField(vid,'ca')  ?? avg(d.ca);
+    const p   = getField(vid,'p')   ?? avg(d.p);
+    const mg  = getField(vid,'mg')  ?? avg(d.mg);
+    const fda = getField(vid,'fda') ?? avg(d.fda) ?? 30;
+    if(ca  !== null) for(let i=0;i<n;i++) sumCa.push(ca);
+    if(p   !== null) for(let i=0;i<n;i++) sumP.push(p);
+    if(mg  !== null) for(let i=0;i<n;i++) sumMg.push(mg);
+    if(avg(d.na) !== null) for(let i=0;i<n;i++) sumNa.push(avg(d.na));
+    if(avg(d.cu) !== null) for(let i=0;i<n;i++) sumCu.push(avg(d.cu));
+    for(let i=0;i<n;i++) sumFda.push(fda);
+    if(avg(d.fdn) !== null) for(let i=0;i<n;i++) sumFdn.push(avg(d.fdn));
+    if(avg(d.ee)  !== null) for(let i=0;i<n;i++) sumEe.push(avg(d.ee));
+  });
+
+  const allParams = {
+    ca:  avg(sumCa),
+    p:   avg(sumP),
+    mg:  avg(sumMg),
+    na:  avg(sumNa),
+    cu:  avg(sumCu),
+    fda: avg(sumFda) || 30,
+    fdn: avg(sumFdn) || 60,
+    ee:  avg(sumEe)  || 3,
+  };
+
+  // Limpiar aviso global de overrides (ya se muestra por variedad)
   const ovEl = document.getElementById('ovAvisos');
-  if(ovEl) ovEl.textContent = avisos.length ? '⚠️ Usando valores manuales para: ' + avisos.join(' · ') : '';
+  if(ovEl) ovEl.textContent = '';
 
   // ── Calcular por categoría usando GMD individual ──
   const cats = [
@@ -1618,16 +1646,35 @@ function imprimirFormulacion() {
 // FIN FORMULACIÓN
 // ═══════════════════════════════════
 
-// ── Limpiar ajustes manuales de parámetros ──
-function limpiarOverrides() {
-  ['ovCa','ovP','ovMg','ovNa','ovFda'].forEach(id => {
-    const el = document.getElementById(id);
-    if(el) el.value = '';
-  });
-  const ovEl = document.getElementById('ovAvisos');
-  if(ovEl) ovEl.textContent = '';
+// ── Handlers de ajuste manual por variedad ──
+function onOvChange(input, vid) {
+  const auto = parseFloat(input.dataset.auto);
+  const val  = parseFloat(input.value);
+  const aviso = document.getElementById('ov_' + vid + '_aviso');
+  if(!isNaN(val) && !isNaN(auto) && Math.abs(val - auto) > 0.0001) {
+    input.style.borderColor = 'var(--gold2)';
+    input.style.color = 'var(--gold2)';
+    if(aviso) aviso.textContent = '⚠️ Valor ajustado manualmente';
+  } else {
+    input.style.borderColor = '';
+    input.style.color = '';
+    if(aviso) aviso.textContent = '';
+  }
   calcularFormulacion();
-  ntf('↺ Volviendo a promedios automáticos', 'ok');
+}
+
+function resetOvVariedad(vid, varNombre) {
+  ['ca','p','mg','fda'].forEach(param => {
+    const el = document.getElementById('ov_' + vid + '_' + param);
+    if(!el) return;
+    el.value = el.dataset.auto || '';
+    el.style.borderColor = '';
+    el.style.color = '';
+  });
+  const aviso = document.getElementById('ov_' + vid + '_aviso');
+  if(aviso) aviso.textContent = '';
+  calcularFormulacion();
+  ntf('↺ ' + varNombre + ' restaurado a valores de laboratorio', 'ok');
 }
 
 // Cerrar modal al hacer clic fuera
