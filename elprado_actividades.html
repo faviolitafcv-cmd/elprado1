@@ -3604,21 +3604,6 @@ function recalcularRetornoPotrero(potrero, fechaRefSalida) {
   console.log("[retorno] Recalculados " + cambios + " registros del potrero " + potrero);
 }
 
-function limpiarCorruptos() {
-  const _setOrig = window._lsOrig || Storage.prototype.setItem;
-  let acts = getActividades();
-  const antes = acts.length;
-  acts = acts.filter(a =>
-    a.potrero && a.potrero.trim() !== '' && a.potrero !== '—' &&
-    a.actividad && a.actividad !== 'UNDEFINED' && a.actividad !== 'undefined'
-  );
-  const eliminados = antes - acts.length;
-  if(eliminados === 0) { notif('✓ No hay registros corruptos'); return; }
-  _setOrig.call(localStorage, 'elprado_actividades', JSON.stringify(acts));
-  renderTabla(); renderStats();
-  notif('🧹 ' + eliminados + ' registro' + (eliminados>1?'s':'') + ' corrupto' + (eliminados>1?'s':'') + ' eliminado' + (eliminados>1?'s':'') + ' (solo local)');
-}
-
 function limpiarDuplicados() {
   let acts = getActividades();
   const total_antes = acts.length;
@@ -3740,6 +3725,22 @@ function sincronizarPlanDesdeMS() {
   showPage('actividades');
   renderTabla();
   renderStats();
+}
+
+// ── Limpieza de registros corruptos — scope global ──
+function limpiarCorruptos() {
+  const _setOrig = window._lsOrig || Storage.prototype.setItem;
+  let acts = getActividades();
+  const antes = acts.length;
+  acts = acts.filter(function(a) {
+    return a.potrero && a.potrero.trim() !== '' && a.potrero !== '—' &&
+           a.actividad && a.actividad !== 'UNDEFINED' && a.actividad !== 'undefined';
+  });
+  const eliminados = antes - acts.length;
+  if(eliminados === 0) { notif('✓ No hay registros corruptos'); return; }
+  _setOrig.call(localStorage, 'elprado_actividades', JSON.stringify(acts));
+  renderTabla(); renderStats();
+  notif('🧹 ' + eliminados + ' registro' + (eliminados>1?'s':'') + ' corrupto' + (eliminados>1?'s':'') + ' eliminado' + (eliminados>1?'s':'') + ' (solo local)');
 }
 
 function limpiarForm() {
