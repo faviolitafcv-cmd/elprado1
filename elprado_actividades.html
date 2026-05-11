@@ -1248,6 +1248,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
       <button class="btn btn-primary" onclick="forzarActualizacion()" style="background:#2980b9;">🔄 Forzar actualización desde Firebase</button>
       <button class="btn btn-primary" onclick="subirLluviaMerge()" style="background:#27ae60;">🌧 Sincronizar lluvia (merge seguro)</button>
       <button class="btn btn-secondary" onclick="limpiarDuplicados()">🧹 Limpiar registros duplicados</button>
+      <button class="btn btn-secondary" style="border-color:var(--red);color:var(--red);" onclick="limpiarCorruptos()">🗑 Eliminar registros corruptos (sin potrero / UNDEFINED)</button>
       <button class="btn btn-secondary" onclick="limpiarVueltasDuplicadas()">🧹 Limpiar vueltas duplicadas</button>
     </div>
     <div style="margin-top:12px; font-size:11px; color:var(--text3);" id="storageInfo"></div>
@@ -2631,6 +2632,7 @@ function validarHAManual() {
 }
 
 function selAct(tipo) {
+  if(!tipo) return; // guard: no procesar si tipo es undefined/null
   actActual = tipo;
   // Highlight buttons
   document.querySelectorAll('.act-btn').forEach(b => {
@@ -3599,6 +3601,28 @@ function recalcularRetornoPotrero(potrero, fechaRefSalida) {
   console.log("[retorno] Recalculados " + cambios + " registros del potrero " + potrero);
 }
 
+function limpiarCorruptos() {
+  // Elimina SOLO del localStorage registros con potrero vacío o actividad UNDEFINED
+  // NO toca Firebase
+  const _setOrig = window._lsOrig || Storage.prototype.setItem;
+  let acts = getActividades();
+  const antes = acts.length;
+  acts = acts.filter(a =>
+    a.potrero && a.potrero.trim() !== '' && a.potrero !== '—' &&
+    a.actividad && a.actividad !== 'UNDEFINED' && a.actividad !== 'undefined'
+  );
+  const eliminados = antes - acts.length;
+  if(eliminados === 0) {
+    notif('✓ No hay registros corruptos');
+    return;
+  }
+  // Guardar SOLO en localStorage, sin disparar sync a Firebase
+  _setOrig.call(localStorage, 'elprado_actividades', JSON.stringify(acts));
+  renderTabla();
+  renderStats();
+  notif('🧹 ' + eliminados + ' registro' + (eliminados>1?'s':'') + ' corrupto' + (eliminados>1?'s':'') + ' eliminado' + (eliminados>1?'s':'') + ' (solo local)');
+}
+
 function limpiarDuplicados() {
   let acts = getActividades();
   const total_antes = acts.length;
@@ -3935,6 +3959,13 @@ function editarActividad(id) {
   const acts = getActividades();
   const r = acts.find(a => a.id === id);
   if(!r) return;
+
+  // Guard: registro corrupto sin potrero o actividad válida
+  const ACTIVIDADES_VALIDAS = ['MATERIA SECA','INGRESO HDA','DESBROZAR','ROLO','SIEMBRA','FUMIGACION HERB.','FUMIGACION INS.','QUEMA'];
+  if(!r.actividad || !ACTIVIDADES_VALIDAS.includes(r.actividad)) {
+    notif('⚠️ Registro corrupto — usá el botón 🗑 en Configuración para eliminarlo', true);
+    return;
+  }
 
   showPage('nueva');
   selAct(r.actividad);
