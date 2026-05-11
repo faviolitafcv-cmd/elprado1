@@ -319,6 +319,45 @@ tr:hover td{background:rgba(109,186,58,.04);}
       <div id="formBromResumen" style="font-size:12px;color:var(--t2);">
         <div class="emp"><div class="emp-ic">⏳</div>Cargando...</div>
       </div>
+      <!-- Ajuste manual de parámetros -->
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--brd);">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">
+          ✏️ Ajuste Manual de Parámetros — dejá vacío para usar el promedio automático
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+          <div class="fm" style="min-width:120px;">
+            <label>Ca override (%)</label>
+            <input type="number" id="ovCa" min="0" max="5" step="0.01" placeholder="auto"
+              oninput="calcularFormulacion()" style="font-size:12px;">
+          </div>
+          <div class="fm" style="min-width:120px;">
+            <label>P override (%)</label>
+            <input type="number" id="ovP" min="0" max="5" step="0.01" placeholder="auto"
+              oninput="calcularFormulacion()" style="font-size:12px;">
+          </div>
+          <div class="fm" style="min-width:120px;">
+            <label>Mg override (%)</label>
+            <input type="number" id="ovMg" min="0" max="5" step="0.01" placeholder="auto"
+              oninput="calcularFormulacion()" style="font-size:12px;">
+          </div>
+          <div class="fm" style="min-width:120px;">
+            <label>Na override (%)</label>
+            <input type="number" id="ovNa" min="0" max="5" step="0.01" placeholder="auto"
+              oninput="calcularFormulacion()" style="font-size:12px;">
+          </div>
+          <div class="fm" style="min-width:120px;">
+            <label>FDA override (%)</label>
+            <input type="number" id="ovFda" min="0" max="80" step="0.1" placeholder="auto"
+              oninput="calcularFormulacion()" style="font-size:12px;">
+          </div>
+          <div style="display:flex;align-items:flex-end;">
+            <button class="btn bs btn-sm" onclick="limpiarOverrides()" title="Volver a promedios automáticos">
+              ↺ Limpiar ajustes
+            </button>
+          </div>
+        </div>
+        <div id="ovAvisos" style="margin-top:8px;font-size:11px;color:var(--gold2);"></div>
+      </div>
     </div>
   </div>
 
@@ -1387,7 +1426,7 @@ function calcularFormulacion() {
     bromHtml || '<em style="color:var(--t3);">Sin datos en las muestras</em>';
 
   // ── Parámetros promedio de todas las variedades ──
-  const allParams = {
+  const autoParams = {
     ca:  avg(Object.values(porVariedad).flatMap(d=>d.ca)),
     p:   avg(Object.values(porVariedad).flatMap(d=>d.p)),
     mg:  avg(Object.values(porVariedad).flatMap(d=>d.mg)),
@@ -1397,6 +1436,18 @@ function calcularFormulacion() {
     fdn: avg(Object.values(porVariedad).flatMap(d=>d.fdn)) || 60,
     ee:  avg(Object.values(porVariedad).flatMap(d=>d.ee))  || 3,
   };
+
+  // ── Aplicar overrides manuales si están cargados ──
+  const getOv = id => { const v = parseFloat(document.getElementById(id)?.value); return isNaN(v) ? null : v; };
+  const avisos = [];
+  const allParams = { ...autoParams };
+  const ovCa = getOv('ovCa'); if(ovCa  !== null) { allParams.ca  = ovCa;  avisos.push('Ca=' + ovCa + '%'); }
+  const ovP  = getOv('ovP');  if(ovP   !== null) { allParams.p   = ovP;   avisos.push('P=' + ovP + '%'); }
+  const ovMg = getOv('ovMg'); if(ovMg  !== null) { allParams.mg  = ovMg;  avisos.push('Mg=' + ovMg + '%'); }
+  const ovNa = getOv('ovNa'); if(ovNa  !== null) { allParams.na  = ovNa;  avisos.push('Na=' + ovNa + '%'); }
+  const ovFda= getOv('ovFda');if(ovFda !== null) { allParams.fda = ovFda; avisos.push('FDA=' + ovFda + '%'); }
+  const ovEl = document.getElementById('ovAvisos');
+  if(ovEl) ovEl.textContent = avisos.length ? '⚠️ Usando valores manuales para: ' + avisos.join(' · ') : '';
 
   // ── Calcular por categoría usando GMD individual ──
   const cats = [
@@ -1566,6 +1617,18 @@ function imprimirFormulacion() {
 // ═══════════════════════════════════
 // FIN FORMULACIÓN
 // ═══════════════════════════════════
+
+// ── Limpiar ajustes manuales de parámetros ──
+function limpiarOverrides() {
+  ['ovCa','ovP','ovMg','ovNa','ovFda'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.value = '';
+  });
+  const ovEl = document.getElementById('ovAvisos');
+  if(ovEl) ovEl.textContent = '';
+  calcularFormulacion();
+  ntf('↺ Volviendo a promedios automáticos', 'ok');
+}
 
 // Cerrar modal al hacer clic fuera
 document.querySelectorAll('.mo').forEach(mo=>{
