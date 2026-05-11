@@ -751,7 +751,6 @@ tr:hover td { background: rgba(255,255,255,.02); }
         </thead>
         <tbody id="tablaBody"></tbody>
       </table>
-      </table>
     </div></div>
   </div>
 </div>
@@ -2028,6 +2027,14 @@ const NO_CUENTA_DESCANSO = ['SIEMBRA'];
 // ═══════════════════════════════════════
 const FB_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com/elprado1';
 
+// ── Gestión dinámica: corre de agosto(1) a julio(31) ──
+function getGestionActual() {
+  const hoy = new Date();
+  const anio = hoy.getFullYear();
+  const mes  = hoy.getMonth() + 1; // 1-12
+  return mes >= 8 ? (anio + '-' + (anio + 1)) : ((anio - 1) + '-' + anio);
+}
+
 async function fbGet(key) {
   try {
     const r = await fetch(FB_URL + '/' + key + '.json');
@@ -2657,7 +2664,9 @@ function selAct(tipo) {
   if(!showFinVuelta) document.getElementById('chkFinVuelta').checked = false;
 
   // Fecha hoy por defecto
-  if(!document.getElementById('fFecha').value)
+  if(!document.getElementById('fFecha').value) {
+    document.getElementById('fFecha').value = new Date().toISOString().split('T')[0];
+  }
   // Restaurar último registro solo en MATERIA SECA
   if(tipo === 'MATERIA SECA' && window._ultimoReg) {
     const u = window._ultimoReg;
@@ -3416,10 +3425,7 @@ function guardarActividad() {
     id: uuid(),
     fecha, mes,
     trimestre: TRIMESTRES[mes] || '',
-    gestion: '2025-2026',
-    potrero,
-    variedad,
-    actividad: actActual,
+    gestion: getGestionActual(),
     comentario: document.getElementById('fComentario')?.value || '',
     usuario: usuario,
     fechaMod: new Date().toISOString()
@@ -3519,7 +3525,7 @@ function guardarActividad() {
       fecha: fechaFV,
       mes: mesDeDate(fechaFV),
       trimestre: TRIMESTRES[mesDeDate(fechaFV)] || '',
-      gestion: '2025-2026',
+      gestion: getGestionActual(),
       potrero,
       variedad: getVariedad(potrero),
       actividad: 'FIN_VUELTA',
@@ -3550,7 +3556,7 @@ function guardarActividad() {
               fecha: _fechaSalida,
               mes: mesDeDate(_fechaSalida),
               trimestre: TRIMESTRES[mesDeDate(_fechaSalida)] || '',
-              gestion: '2025-2026',
+              gestion: getGestionActual(),
               potrero,
               variedad: getVariedad(potrero),
               actividad: 'FIN_VUELTA',
@@ -3589,8 +3595,7 @@ function recalcularRetornoPotrero(potrero, fechaRefSalida) {
     return Object.assign({}, a, { retorno: r.dias });
   });
   if(cambios === 0) return;
-  setData("actividades", nuevas);
-  fbSet("actividades", nuevas);
+  setData("actividades", nuevas); // setData ya llama fbSet internamente
   console.log("[retorno] Recalculados " + cambios + " registros del potrero " + potrero);
 }
 
@@ -4069,7 +4074,7 @@ function renderStats() {
 // ═══════════════════════════════════════
 function renderResumen() {
   const filtVar = document.getElementById('filtroResVar').value;
-  const filtGestion = document.getElementById('filtroResGestion')?.value || '2025-2026';
+  const filtGestion = document.getElementById('filtroResGestion')?.value || getGestionActual();
   // Update card title
   const titleEl = document.querySelector('#page-resumen .card-title');
   if(titleEl) titleEl.innerHTML = '<span>📊</span> Resumen por Mes — Gestión ' + filtGestion;
@@ -4171,7 +4176,7 @@ function renderResumen() {
 }
 
 function renderRanking(filtVar) {
-  const filtGestion = document.getElementById('filtroResGestion')?.value || '2025-2026';
+  const filtGestion = document.getElementById('filtroResGestion')?.value || getGestionActual();
   let acts = getActividades().filter(a=>a.actividad==='MATERIA SECA'&&a.gestion===filtGestion);
   if(filtVar) acts = acts.filter(a=>a.variedad===filtVar);
 
@@ -4294,26 +4299,6 @@ function parsearPDFBrom(input) {
           extraerValoresBrom(textoTotal);
           autoDetectarDesdeNota(textoTotal);
           notif('✅ PDF leído — verificá los valores');
-          setTimeout(function() {
-            const ca  = document.getElementById('brom_ca')?.value  || '?';
-            const p   = document.getElementById('brom_p')?.value   || '?';
-            const mg  = document.getElementById('brom_mg')?.value  || '?';
-            const fdn = document.getElementById('brom_fdn')?.value || '?';
-            const afdn= document.getElementById('brom_afdn')?.value|| '?';
-            const prom= document.getElementById('brom_fdn_prom')?.value || '?';
-            let panel = document.getElementById('_bromDebug');
-            if(!panel) {
-              panel = document.createElement('div');
-              panel.id = '_bromDebug';
-              panel.style.cssText = 'position:fixed;top:60px;right:10px;background:#1f3019;border:2px solid #4ab63a;border-radius:8px;padding:12px 16px;z-index:99999;font-size:12px;color:#7de06a;font-family:monospace;max-width:340px;';
-              document.body.appendChild(panel);
-            }
-            panel.innerHTML = '<strong style="color:#fff">🔬 VALORES EXTRAÍDOS DEL PDF:</strong><br>' +
-              'FDN: ' + fdn + ' | aFDNmo: ' + afdn + ' | FDN Prom: ' + prom + '<br>' +
-              'Ca: ' + ca + ' | P: ' + p + ' | Mg: ' + mg + '<br>' +
-              '<span style="font-size:10px;color:#aaa">Clic para cerrar</span>';
-            panel.onclick = function() { panel.remove(); };
-          }, 500);
         });
       }).catch(() => notif('No se pudo leer el PDF automáticamente — ingresá los valores manualmente', true));
     } else {
@@ -4532,9 +4517,6 @@ function autoDetectarDesdeNota(texto) {
     if(diasDescanso) items.push('⏳ <strong>Descanso:</strong> ' + diasDescanso + ' días');
     if(pluvioEncontrado) items.push('🌧️ <strong>Pluviómetro:</strong> ' + pluvioEncontrado.nombre + ' ✅');
     else if(potreroDetectado) items.push('📍 Potrero <strong>' + potreroDetectado + '</strong> — asignale un pluviómetro en Configuración');
-    // DEBUG temporal: mostrar primeros 200 chars de la sección Nota
-    items.push('<span style="font-size:9px;color:var(--text3);">Nota leída: ' +
-      seccionNota.slice(0,120).replace(/</g,'&lt;') + '...</span>');
     infoEl.innerHTML = items.join(' &nbsp;·&nbsp; ');
     infoEl.style.display = 'block'; // ← FIX: mostrar siempre
   }
@@ -5548,7 +5530,7 @@ function renderCalendarioLluvia() {
 
   titulo.textContent = MESES_NOMBRES[llCalMes] + ' ' + llCalAnio;
 
-  const lluvia = getLluvia().filter(r => r.gestion === '2025-2026');
+  const lluvia = getLluvia().filter(r => r.gestion === getGestionActual());
   // Índice rápido por fecha
   const porFecha = {};
   lluvia.forEach(r => { porFecha[r.fecha] = r; });
@@ -5609,7 +5591,7 @@ function abrirModalLluviaDia(fecha) {
   llDiaActual = fecha;
   const pluvios = getPluviometros();
   const lluvia = getLluvia();
-  const reg = lluvia.find(r => r.fecha === fecha && r.gestion === '2025-2026');
+  const reg = lluvia.find(r => r.fecha === fecha && r.gestion === getGestionActual());
 
   const partes = fecha.split('-');
   const label = partes[2] + ' de ' + MESES_NOMBRES[parseInt(partes[1])-1] + ' ' + partes[0];
@@ -5646,14 +5628,14 @@ function guardarLluviaDia() {
   }));
 
   const lluvia = getLluvia();
-  const filtrado = lluvia.filter(r => !(r.fecha === llDiaActual && r.gestion === '2025-2026'));
+  const filtrado = lluvia.filter(r => !(r.fecha === llDiaActual && r.gestion === getGestionActual()));
   const partes = llDiaActual.split('-');
   const mesNum = parseInt(partes[1]);
   const MESES_MAP = {8:'AGOSTO',9:'SEPTIEMBRE',10:'OCTUBRE',11:'NOVIEMBRE',12:'DICIEMBRE',1:'ENERO',2:'FEBRERO',3:'MARZO',4:'ABRIL',5:'MAYO',6:'JUNIO',7:'JULIO'};
   filtrado.unshift({
     fecha: llDiaActual,
     mes: MESES_MAP[mesNum] || '',
-    gestion: '2025-2026',
+    gestion: getGestionActual(),
     tipo: 'diario',
     lecturas,
     usuario: localStorage.getItem('elprado_usuario') || ''
@@ -5928,8 +5910,8 @@ function renderAnalisisGestion() {
 
 function renderResumenLluvia() {
   const pluvios = getPluviometros();
-  const gestion = '2025-2026';
-  let data = getLluvia().filter(r => r.gestion === '2025-2026');
+  const gestion = getGestionActual();
+  let data = getLluvia().filter(r => r.gestion === getGestionActual());
 
   const thead = document.getElementById('tablaResumenLluviaHead');
   const tbody = document.getElementById('tablaResumenLluviaBody');
@@ -6432,8 +6414,7 @@ function importarExcelHistorico() {
         console.error(err);
       }
     };
-    reader.readAsArrayBuffer(ev.target.files[0]);
-    reader.onload = ev => procesarExcelHistorico(ev.target.result);
+    reader.readAsArrayBuffer(file);
   };
   inp.click();
 }
