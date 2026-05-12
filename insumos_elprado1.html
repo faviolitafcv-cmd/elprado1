@@ -1321,7 +1321,7 @@ function parseFechaFormul(v) {
   return null;
 }
 
-function calcularFormulacion() {
+function calcularFormulacion(skipCards) {
   const desde = document.getElementById('fFormDesde').value;
   const hasta  = document.getElementById('fFormHasta').value;
   if (!desde || !hasta) return;
@@ -1365,6 +1365,8 @@ function calcularFormulacion() {
   });
 
   // ── Resumen bromatológico por variedad + campos editables ──
+  // Solo re-renderizar cuando cambia el período, NO cuando el usuario edita un campo
+  if (!skipCards) {
   const bromHtml = Object.entries(porVariedad).map(([v, d]) => {
     const fdaAuto = avg(d.fda) || 30;
     const fdnAuto = avg(d.fdn) || 65;
@@ -1394,7 +1396,6 @@ function calcularFormulacion() {
             value="${caAuto!==null?caAuto.toFixed(3):''}"
             placeholder="${caAuto!==null?caAuto.toFixed(3):'sin dato'}"
             data-auto="${caAuto!==null?caAuto.toFixed(3):''}"
-            oninput="onOvChange(this,'${vid}')"
             style="width:100%;background:var(--card3);border:1px solid var(--brd);color:var(--text);padding:5px 7px;border-radius:4px;font-size:12px;outline:none;">
         </div>
         <div>
@@ -1403,7 +1404,6 @@ function calcularFormulacion() {
             value="${pAuto!==null?pAuto.toFixed(3):''}"
             placeholder="${pAuto!==null?pAuto.toFixed(3):'sin dato'}"
             data-auto="${pAuto!==null?pAuto.toFixed(3):''}"
-            oninput="onOvChange(this,'${vid}')"
             style="width:100%;background:var(--card3);border:1px solid var(--brd);color:var(--text);padding:5px 7px;border-radius:4px;font-size:12px;outline:none;">
         </div>
         <div>
@@ -1412,7 +1412,6 @@ function calcularFormulacion() {
             value="${mgAuto!==null?mgAuto.toFixed(3):''}"
             placeholder="${mgAuto!==null?mgAuto.toFixed(3):'sin dato'}"
             data-auto="${mgAuto!==null?mgAuto.toFixed(3):''}"
-            oninput="onOvChange(this,'${vid}')"
             style="width:100%;background:var(--card3);border:1px solid var(--brd);color:var(--text);padding:5px 7px;border-radius:4px;font-size:12px;outline:none;">
         </div>
         <div>
@@ -1421,12 +1420,20 @@ function calcularFormulacion() {
             value="${fdaAuto.toFixed(1)}"
             placeholder="${fdaAuto.toFixed(1)}"
             data-auto="${fdaAuto.toFixed(1)}"
-            oninput="onOvChange(this,'${vid}')"
             style="width:100%;background:var(--card3);border:1px solid var(--brd);color:var(--text);padding:5px 7px;border-radius:4px;font-size:12px;outline:none;">
         </div>
       </div>
       <div id="ov_${vid}_aviso" style="font-size:10px;color:var(--gold2);margin-top:6px;min-height:14px;"></div>
-      <button onclick="resetOvVariedad('${vid}','${v}')" style="margin-top:6px;font-size:10px;background:none;border:1px solid var(--brd);color:var(--t3);padding:3px 9px;border-radius:4px;cursor:pointer;">↺ Restaurar lab</button>
+      <div style="display:flex;gap:6px;margin-top:8px;">
+        <button onclick="aplicarOv('${vid}')"
+          style="flex:1;font-size:11px;font-weight:600;background:var(--green2);color:#fff;border:none;padding:5px 10px;border-radius:4px;cursor:pointer;">
+          ✔ Aplicar ajustes
+        </button>
+        <button onclick="resetOvVariedad('${vid}','${v}')"
+          style="font-size:11px;background:none;border:1px solid var(--brd);color:var(--t3);padding:5px 10px;border-radius:4px;cursor:pointer;">
+          ↺ Restaurar lab
+        </button>
+      </div>
     </div>`;
   }).join('');
   document.getElementById('formBromResumen').innerHTML =
@@ -1434,6 +1441,7 @@ function calcularFormulacion() {
 
   // Guardar referencia a porVariedad para uso en overrides
   window._porVariedad = porVariedad;
+  } // fin !skipCards
 
   // ── Leer parámetros por variedad (campo editable o valor lab) ──
   const getField = (vid, param) => {
@@ -1647,20 +1655,32 @@ function imprimirFormulacion() {
 // ═══════════════════════════════════
 
 // ── Handlers de ajuste manual por variedad ──
-function onOvChange(input, vid) {
-  const auto = parseFloat(input.dataset.auto);
-  const val  = parseFloat(input.value);
+function aplicarOv(vid) {
+  let ajustados = [];
+  ['ca','p','mg','fda'].forEach(param => {
+    const el = document.getElementById('ov_' + vid + '_' + param);
+    if(!el) return;
+    const auto = parseFloat(el.dataset.auto);
+    const val  = parseFloat(el.value);
+    if(!isNaN(val) && !isNaN(auto) && Math.abs(val - auto) > 0.0001) {
+      el.style.borderColor = 'var(--gold2)';
+      el.style.color = 'var(--gold2)';
+      ajustados.push(param.toUpperCase() + '=' + val.toFixed(3) + '%');
+    } else {
+      el.style.borderColor = '';
+      el.style.color = '';
+    }
+  });
   const aviso = document.getElementById('ov_' + vid + '_aviso');
-  if(!isNaN(val) && !isNaN(auto) && Math.abs(val - auto) > 0.0001) {
-    input.style.borderColor = 'var(--gold2)';
-    input.style.color = 'var(--gold2)';
-    if(aviso) aviso.textContent = '⚠️ Valor ajustado manualmente';
-  } else {
-    input.style.borderColor = '';
-    input.style.color = '';
-    if(aviso) aviso.textContent = '';
-  }
-  calcularFormulacion();
+  if(aviso) aviso.textContent = ajustados.length
+    ? '⚠️ Ajustado: ' + ajustados.join(' · ')
+    : '✓ Usando valores de laboratorio';
+  calcularFormulacion(true);
+  ntf('✔ Ajustes aplicados — formulación recalculada', 'ok');
+}
+
+function onOvChange(input, vid) {
+  // Reservado para compatibilidad — ahora se usa aplicarOv
 }
 
 function resetOvVariedad(vid, varNombre) {
@@ -1673,7 +1693,7 @@ function resetOvVariedad(vid, varNombre) {
   });
   const aviso = document.getElementById('ov_' + vid + '_aviso');
   if(aviso) aviso.textContent = '';
-  calcularFormulacion();
+  calcularFormulacion(true);
   ntf('↺ ' + varNombre + ' restaurado a valores de laboratorio', 'ok');
 }
 
