@@ -75,11 +75,18 @@ table.eval tr:hover td{background:#f3e5f5!important}
 .ev-person{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #fff3cd}
 .ev-person input[type=checkbox]{accent-color:#e65100;width:16px;height:16px}
 
-/* Print */
-@media print{
-  .barra-top,.no-print,.overlay{display:none!important}
-  body{background:white;padding:0}
-  .card{box-shadow:none;border:1px solid #ddd;page-break-inside:avoid}
+/* Print — solo muestra la planilla de firma */
+@media print {
+  body * { visibility: hidden !important; }
+  #planilla-print, #planilla-print * { visibility: visible !important; }
+  #planilla-print {
+    position: fixed !important;
+    top: 0; left: 0;
+    width: 100%;
+    background: white !important;
+    padding: 20px !important;
+  }
+  .no-print { display: none !important; }
 }
 </style>
 </head>
@@ -543,86 +550,87 @@ function guardarEvaluacion() {
 // PLANILLA FINAL
 // ═══════════════════════════════════════════════════════
 function abrirPlanilla() {
-  var bonoBase = (parseFloat(document.getElementById('inputSMN').value)||2362) * 0.10 * 3;
+  var smnVal = parseFloat(document.getElementById('inputSMN').value) || 2362;
+  var bonoBase = smnVal * 0.10 * 3;
   var trimKey = getTrimKey();
-  var html = '<div style="background:#f3e5f5;padding:10px 14px;border-radius:6px;margin-bottom:12px;font-size:13px;">'
-    +'<b>📅 Período:</b> '+periodoDesde+' → '+periodoHasta+'&nbsp;|&nbsp;'
-    +'<b>Trimestre:</b> '+trimKey+'&nbsp;|&nbsp;'
-    +'<b>SMN:</b> Bs. '+(parseFloat(document.getElementById('inputSMN').value)||2362).toFixed(2)+'&nbsp;|&nbsp;'
-    +'<b>Bono base:</b> Bs. '+bonoBase.toFixed(2)
-    +'</div>';
+  var trim = document.getElementById('selTrimestre');
+  var trimLabel = trim.options[trim.selectedIndex].text;
+  var anio = document.getElementById('selAnio').value;
 
-  html += '<table class="tc"><thead><tr>'
-    +'<th class="td-l">Nombre</th><th>Cargo/Rol</th>'
-    +'<th>Asistencia</th><th>Puntualidad</th><th>Respeto</th>'
-    +'<th>Iniciativa</th><th>Específico 1</th><th>Específico 2</th>'
-    +'<th>% Obtenido</th><th style="background:#880e4f">💰 Bono Bs.</th>'
-    +'</tr></thead><tbody>';
-
-  var total = 0;
+  // Armar filas solo de personas que cobran
+  var filas = [];
   personasSeleccionadas.forEach(function(p) {
     var ci = p.ci;
-    var rol = detectarRol(p.cargo);
-    var R = ROLES[rol] || ROLES.DEFAULT;
     var edata = evalData[ci] || {};
-    var excluir = !!edata.excluir;
-    if (excluir) return;
-
+    if (edata.excluir) return;
     var faltas = calcFaltas(ci, parseISO(periodoDesde), parseISO(periodoHasta));
-    var puntAsist = faltas===0 ? 5 : 0;
-    var pPunt  = edata.puntualidad !== undefined ? edata.puntualidad : 3;
-    var pResp  = edata.respeto     !== undefined ? edata.respeto     : 3;
-    var pInic  = edata.iniciativa  !== undefined ? edata.iniciativa  : 3;
-    var pEsp1  = edata.esp1        !== undefined ? edata.esp1        : 3;
-    var pEsp2  = edata.esp2        !== undefined ? edata.esp2        : 3;
+    var puntAsist = faltas === 0 ? 5 : 0;
+    var pPunt = edata.puntualidad !== undefined ? edata.puntualidad : 3;
+    var pResp = edata.respeto     !== undefined ? edata.respeto     : 3;
+    var pInic = edata.iniciativa  !== undefined ? edata.iniciativa  : 3;
+    var pEsp1 = edata.esp1        !== undefined ? edata.esp1        : 3;
+    var pEsp2 = edata.esp2        !== undefined ? edata.esp2        : 3;
     var pct = (puntAsist/5)*30 + (pPunt/5)*15 + (pResp/5)*15 + (pInic/5)*10 + (pEsp1/5)*20 + (pEsp2/5)*10;
-    var bono = bonoBase * (pct/100);
-    total += bono;
-
-    var pctColor = pct>=80?'#2e7d32':pct>=60?'#e65100':'#b71c1c';
-    html += '<tr>'
-      +'<td class="td-l">'+p.nombreCompleto+(p.tipo==='EVENTUAL'?' <small style="color:#e65100">(Eventual)</small>':'')+'</td>'
-      +'<td><span class="tag-rol '+R.cls+'">'+R.label+'</span></td>'
-      +'<td>'+(faltas===0?'✅ 0 faltas':'⚠️ '+faltas+' falta(s)')+'</td>'
-      +'<td>'+pPunt+'/5</td>'
-      +'<td>'+pResp+'/5</td>'
-      +'<td>'+pInic+'/5</td>'
-      +'<td title="'+R.esp1+'">'+pEsp1+'/5<br><small>'+R.esp1+'</small></td>'
-      +'<td title="'+R.esp2+'">'+pEsp2+'/5<br><small>'+R.esp2+'</small></td>'
-      +'<td style="font-weight:bold;color:'+pctColor+'">'+pct.toFixed(1)+'%</td>'
-      +'<td style="font-weight:bold;color:#880e4f;background:#fce4ec">Bs. '+bono.toFixed(2)+'</td>'
-      +'</tr>';
+    var bono = bonoBase * (pct / 100);
+    if (bono <= 0) return;
+    filas.push({ nombre: p.nombreCompleto, cargo: p.cargo || '—', pct: pct, bono: bono });
   });
 
-  html += '<tr style="background:#4a148c;color:white;font-weight:bold;">'
-    +'<td colspan="9" style="text-align:right;padding:10px;color:white">💰 TOTAL A PAGAR:</td>'
-    +'<td style="font-size:16px;color:#f8bbd0;padding:10px;text-align:center">Bs. '+total.toFixed(2)+'</td>'
-    +'</tr></tbody></table>';
+  var total = filas.reduce(function(s, f){ return s + f.bono; }, 0);
 
-  // Firma
-  html += '<div style="margin-top:20px;border-top:2px solid #eee;padding-top:16px;">'
-    +'<b style="color:#4a148c;font-size:13px">✍️ Firmas de conformidad:</b>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:20px">';
+  // HTML de la planilla imprimible
+  var html = '<div id="planilla-print">'
+    // Encabezado
+    + '<div style="text-align:center;margin-bottom:18px;">'
+    +   '<div style="font-size:11px;color:#555;letter-spacing:1px;text-transform:uppercase">Hacienda El Prado 1 — Gestión de Talentos</div>'
+    +   '<div style="font-size:20px;font-weight:bold;color:#4a148c;margin:4px 0">🎁 Planilla de Bono Trimestral</div>'
+    +   '<div style="font-size:13px;color:#444">'+(trimLabel !== undefined ? trimLabel : trimKey)+' &nbsp;·&nbsp; '+anio+'</div>'
+    +   '<div style="font-size:12px;color:#777;margin-top:3px">Período: '+periodoDesde+' → '+periodoHasta+'&nbsp;&nbsp;|&nbsp;&nbsp;'
+    +     'SMN: Bs. '+smnVal.toFixed(2)+'&nbsp;&nbsp;|&nbsp;&nbsp;'
+    +     'Bono base: Bs. '+bonoBase.toFixed(2)+'</div>'
+    + '</div>'
 
-  personasSeleccionadas.filter(function(p){ return !(evalData[p.ci]||{}).excluir; }).forEach(function(p){
-    var edata = evalData[p.ci]||{};
-    var faltas = calcFaltas(p.ci, parseISO(periodoDesde), parseISO(periodoHasta));
-    var puntAsist = faltas===0?5:0;
-    var pPunt=edata.puntualidad!==undefined?edata.puntualidad:3;
-    var pResp=edata.respeto!==undefined?edata.respeto:3;
-    var pInic=edata.iniciativa!==undefined?edata.iniciativa:3;
-    var pEsp1=edata.esp1!==undefined?edata.esp1:3;
-    var pEsp2=edata.esp2!==undefined?edata.esp2:3;
-    var pct=(puntAsist/5)*30+(pPunt/5)*15+(pResp/5)*15+(pInic/5)*10+(pEsp1/5)*20+(pEsp2/5)*10;
-    var bono=((parseFloat(document.getElementById('inputSMN').value)||2362)*0.10*3)*(pct/100);
-    html += '<div style="border:1px solid #ddd;border-radius:5px;padding:10px;font-size:12px">'
-      +'<b>'+p.nombreCompleto+'</b><br>'
-      +'<small style="color:#888">'+(p.cargo||'—')+'</small><br>'
-      +'<span style="color:#4a148c;font-weight:bold">Bs. '+bono.toFixed(2)+'</span>'
-      +'<div style="margin-top:20px;border-top:1px solid #999;padding-top:4px;text-align:center;font-size:10px;color:#aaa">Firma y fecha</div>'
-      +'</div>';
+    // Tabla limpia
+    + '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+    +   '<thead><tr>'
+    +     '<th style="background:#4a148c;color:white;padding:9px 12px;text-align:left;width:35%">Nombre</th>'
+    +     '<th style="background:#4a148c;color:white;padding:9px 12px;text-align:left;width:25%">Cargo</th>'
+    +     '<th style="background:#4a148c;color:white;padding:9px 12px;text-align:center;width:10%">% Eval.</th>'
+    +     '<th style="background:#880e4f;color:white;padding:9px 12px;text-align:center;width:15%">Monto Bs.</th>'
+    +     '<th style="background:#4a148c;color:white;padding:9px 12px;text-align:center;width:15%">Firma</th>'
+    +   '</tr></thead><tbody>';
+
+  filas.forEach(function(f, i) {
+    var bg = i % 2 === 0 ? 'white' : '#f9f4fd';
+    html += '<tr style="background:'+bg+'">'
+      + '<td style="padding:12px;border-bottom:1px solid #ddd;font-weight:bold">'+f.nombre+'</td>'
+      + '<td style="padding:12px;border-bottom:1px solid #ddd;color:#555">'+f.cargo+'</td>'
+      + '<td style="padding:12px;border-bottom:1px solid #ddd;text-align:center;color:#4a148c;font-weight:bold">'+f.pct.toFixed(1)+'%</td>'
+      + '<td style="padding:12px;border-bottom:1px solid #ddd;text-align:center;font-weight:bold;color:#880e4f;font-size:15px">'+f.bono.toFixed(2)+'</td>'
+      + '<td style="padding:12px;border-bottom:1px solid #ddd;">&nbsp;</td>'
+      + '</tr>';
   });
-  html += '</div></div>';
+
+  html += '<tr style="background:#4a148c;">'
+    + '<td colspan="3" style="padding:10px 12px;color:white;font-weight:bold;font-size:13px;text-align:right">TOTAL A PAGAR:</td>'
+    + '<td style="padding:10px 12px;color:#f8bbd0;font-weight:bold;font-size:16px;text-align:center">'+total.toFixed(2)+' Bs.</td>'
+    + '<td></td>'
+    + '</tr>';
+
+  html += '</tbody></table>'
+
+    // Pie de firma del responsable
+    + '<div style="margin-top:40px;display:flex;justify-content:space-between;align-items:flex-end;">'
+    +   '<div style="text-align:center;width:220px">'
+    +     '<div style="border-top:1px solid #555;padding-top:5px;font-size:11px;color:#555">Elaborado por</div>'
+    +   '</div>'
+    +   '<div style="text-align:center;font-size:11px;color:#888">'+toISO(new Date())+'</div>'
+    +   '<div style="text-align:center;width:220px">'
+    +     '<div style="border-top:1px solid #555;padding-top:5px;font-size:11px;color:#555">Autorizado por</div>'
+    +   '</div>'
+    + '</div>'
+
+    + '</div>'; // fin planilla-print
 
   document.getElementById('planillaContenido').innerHTML = html;
   document.getElementById('modalPlanilla').classList.add('on');
