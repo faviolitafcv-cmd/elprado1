@@ -132,6 +132,10 @@ html,body{height:100%;font-family:'Segoe UI',Arial,sans-serif;overflow:hidden}
           <span class="submod">Reportes</span>
           <span class="submod">Labor Social</span>
           <span class="submod">Talento Humano</span>
+          <span class="submod" onclick="event.stopPropagation(); abrirModulo('bono')"
+            style="background:rgba(156,39,176,.35);border-color:rgba(206,147,216,.6);color:#f3e5f5;cursor:pointer;font-weight:bold;">
+            🎁 Bono Trimestral
+          </span>
         </div>
       </div>
 
@@ -215,6 +219,10 @@ const MODULOS = {
   rrhh: {
     nombre: 'Gestión de Talentos — RRHH Cloud',
     archivo: 'index.html'
+  },
+  bono: {
+    nombre: '🎁 Bono Trimestral — El Prado 1',
+    archivo: 'bono_trimestral.html'
   },
   pasturas: {
     nombre: 'Gestión de Pasturas — Historia de Lote',
