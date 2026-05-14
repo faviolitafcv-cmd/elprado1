@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bono Trimestral — El Prado 1</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f0f2f5;padding:12px;font-size:13px}
+.barra-top{display:flex;justify-content:space-between;align-items:center;max-width:1400px;margin:0 auto 12px;flex-wrap:wrap;gap:8px}
+.btn{padding:9px 16px;border:none;border-radius:5px;cursor:pointer;font-weight:bold;color:white;font-size:13px;transition:opacity .15s}
+.btn:hover{opacity:.85}
+header{background:linear-gradient(135deg,#4a148c 0%,#6a1b9a 100%);color:white;padding:13px 22px;border-radius:8px;text-align:center;margin:0 auto 12px;max-width:1400px}
+header h2{font-size:19px}
+header .subh{font-size:12px;opacity:.8;margin-top:4px}
+.card{background:white;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,.1);padding:16px;max-width:1400px;margin:0 auto 14px}
+.card h3{font-size:15px;color:#4a148c;border-bottom:2px solid #ab47bc;padding-bottom:7px;margin-bottom:14px}
+.grid-config{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;align-items:end}
+.fld label{display:block;font-size:11px;font-weight:bold;color:#555;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
+.fld input,.fld select{width:100%;padding:8px 10px;border:1px solid #ccc;border-radius:5px;font-size:13px}
+.fld input:focus,.fld select:focus{outline:none;border-color:#7b1fa2;box-shadow:0 0 0 2px #ce93d840}
+.info-box{background:#f3e5f5;border-left:4px solid #7b1fa2;padding:10px 14px;border-radius:5px;font-size:12px;color:#4a148c;margin-top:12px}
+.info-box b{font-size:14px}
+
+/* TABLA EVALUACIÓN */
+.wrap-tabla{overflow-x:auto;margin-top:14px}
+table.eval{border-collapse:collapse;width:100%;min-width:900px;font-size:12px}
+table.eval th{background:#4a148c;color:white;padding:8px 6px;text-align:center;font-size:11px;white-space:nowrap}
+table.eval th.th-nom{text-align:left;min-width:200px;position:sticky;left:0;z-index:2}
+table.eval td{border:1px solid #e0e0e0;padding:6px 4px;text-align:center;vertical-align:middle}
+table.eval td.td-nom{text-align:left;font-weight:bold;min-width:200px;position:sticky;left:0;background:white;z-index:1;padding:6px 8px}
+table.eval td.td-nom .cargo{font-size:10px;color:#888;font-weight:normal}
+table.eval tr:nth-child(even) td{background:#fafafa}
+table.eval tr:nth-child(even) td.td-nom{background:#fafafa}
+table.eval tr:hover td{background:#f3e5f5!important}
+
+/* Score inputs */
+.score-wrap{display:flex;align-items:center;gap:4px;justify-content:center}
+.score-wrap input[type=range]{width:70px;accent-color:#7b1fa2}
+.score-val{font-weight:bold;color:#4a148c;min-width:16px;font-size:13px}
+.asist-badge{display:inline-block;padding:3px 8px;border-radius:10px;font-size:11px;font-weight:bold}
+.ab-ok{background:#e8f5e9;color:#2e7d32}
+.ab-bad{background:#ffebee;color:#b71c1c}
+.pct-badge{display:inline-block;padding:4px 10px;border-radius:12px;font-weight:bold;font-size:13px}
+.bono-badge{font-weight:bold;font-size:14px;color:#4a148c}
+.excl-check{accent-color:#b71c1c;width:16px;height:16px;cursor:pointer}
+
+/* Puntaje barras */
+.bar-wrap{height:6px;background:#e0e0e0;border-radius:3px;margin-top:3px;min-width:60px}
+.bar-fill{height:6px;background:#7b1fa2;border-radius:3px;transition:width .3s}
+
+/* MODAL */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:900;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto}
+.overlay.on{display:flex}
+.modal{background:white;border-radius:10px;padding:24px;max-width:900px;width:100%;margin:auto}
+.modal h3{border-bottom:2px solid #7b1fa2;padding-bottom:8px;margin-bottom:14px;color:#4a148c}
+.modal-btns{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+.tc{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+.tc th{background:#4a148c;color:white;padding:9px 8px;text-align:center}
+.tc td{border:1px solid #ddd;padding:8px;text-align:center}
+.tc .td-l{text-align:left;font-weight:bold}
+
+/* TAG de rol */
+.tag-rol{display:inline-block;font-size:9px;padding:2px 6px;border-radius:3px;font-weight:bold;text-transform:uppercase}
+.rol-vaq{background:#e8f5e9;color:#1b5e20}
+.rol-tra{background:#e3f2fd;color:#0d47a1}
+.rol-man{background:#fff3e0;color:#e65100}
+.rol-coc{background:#fce4ec;color:#880e4f}
+.rol-adm{background:#f3e5f5;color:#4a148c}
+.rol-def{background:#f5f5f5;color:#555}
+
+/* Eventual section */
+.ev-section{background:#fff8e1;border:1px solid #ffe082;border-radius:6px;padding:12px;margin-top:12px}
+.ev-section h4{color:#e65100;margin-bottom:8px;font-size:13px}
+.ev-person{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #fff3cd}
+.ev-person input[type=checkbox]{accent-color:#e65100;width:16px;height:16px}
+
+/* Print */
+@media print{
+  .barra-top,.no-print,.overlay{display:none!important}
+  body{background:white;padding:0}
+  .card{box-shadow:none;border:1px solid #ddd;page-break-inside:avoid}
+}
+</style>
+</head>
+<body>
+
+<div class="barra-top">
+  <button class="btn" style="background:#616161" onclick="location.href='index.html'">⬅ Menú</button>
+  <div style="font-size:12px;color:#555;font-weight:bold">🎁 BONO TRIMESTRAL — EL PRADO 1</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn no-print" style="background:#2e7d32" onclick="guardarEvaluacion()">💾 Guardar Evaluación</button>
+    <button class="btn no-print" style="background:#1565c0" onclick="abrirPlanilla()">📋 Ver Planilla Final</button>
+    <button class="btn no-print" style="background:#546e7a" onclick="window.print()">🖨️ Imprimir</button>
+  </div>
+</div>
+
+<header>
+  <h2>🎁 Bono Trimestral — El Prado 1</h2>
+  <div class="subh">Evaluación y cálculo de bono por desempeño · Salario Mínimo Nacional × 10% × 3</div>
+</header>
+
+<!-- CONFIGURACIÓN -->
+<div class="card">
+  <h3>⚙️ Configuración del Trimestre</h3>
+  <div class="grid-config">
+    <div class="fld">
+      <label>Trimestre</label>
+      <select id="selTrimestre" onchange="onTrimChange()">
+        <option value="Q1">1er Trimestre (Ene–Mar)</option>
+        <option value="Q2">2do Trimestre (Abr–Jun)</option>
+        <option value="Q3">3er Trimestre (Jul–Sep)</option>
+        <option value="Q4">4to Trimestre (Oct–Dic)</option>
+        <option value="CUSTOM">Personalizado...</option>
+      </select>
+    </div>
+    <div class="fld">
+      <label>Año</label>
+      <select id="selAnio" onchange="onTrimChange()"></select>
+    </div>
+    <div class="fld" id="fldDesde" style="display:none">
+      <label>Desde</label>
+      <input type="date" id="inputDesde" onchange="recalcular()">
+    </div>
+    <div class="fld" id="fldHasta" style="display:none">
+      <label>Hasta</label>
+      <input type="date" id="inputHasta" onchange="recalcular()">
+    </div>
+    <div class="fld">
+      <label>Salario Mínimo Nacional (Bs.)</label>
+      <input type="number" id="inputSMN" value="2362" min="1000" step="1" onchange="recalcular()">
+    </div>
+  </div>
+  <div class="info-box" id="infoBox">
+    <b id="infoMonto">Bono base: Bs. 0.00</b><br>
+    <span id="infoFormula">SMN × 10% × 3 meses = Bs. 0.00</span><br>
+    <small>El monto final de cada persona se multiplica por su porcentaje de evaluación.</small>
+  </div>
+</div>
+
+<!-- EVENTUALES OPCIONALES -->
+<div class="card">
+  <h3>👥 Personal Eventual a incluir (opcional)</h3>
+  <p style="font-size:12px;color:#777;margin-bottom:10px">El personal fijo se carga automáticamente. Aquí podés agregar eventuales que también recibirán bono este trimestre.</p>
+  <div id="listaEventuales" class="ev-section">
+    <h4>📋 Personal Eventual disponible</h4>
+    <div id="eventualesWrap"><em style="color:#aaa;font-size:12px">Cargando...</em></div>
+  </div>
+</div>
+
+<!-- TABLA DE EVALUACIÓN -->
+<div class="card">
+  <h3>📊 Evaluación de Desempeño</h3>
+  <div style="font-size:12px;color:#666;margin-bottom:8px">
+    <b>Asistencia</b> se calcula automáticamente del período seleccionado.
+    Los demás parámetros se evalúan del 1 al 5. 
+    <span style="color:#b71c1c">☑ = excluir del bono.</span>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;font-size:11px">
+    <span style="background:#e8f5e9;color:#1b5e20;padding:3px 8px;border-radius:10px;font-weight:bold">PESOS: Asistencia 30%</span>
+    <span style="background:#e3f2fd;color:#0d47a1;padding:3px 8px;border-radius:10px;font-weight:bold">Puntualidad 15%</span>
+    <span style="background:#f3e5f5;color:#4a148c;padding:3px 8px;border-radius:10px;font-weight:bold">Respeto/Conducta 15%</span>
+    <span style="background:#fff3e0;color:#e65100;padding:3px 8px;border-radius:10px;font-weight:bold">Iniciativa 10%</span>
+    <span style="background:#fce4ec;color:#880e4f;padding:3px 8px;border-radius:10px;font-weight:bold">Específico×2 30%</span>
+  </div>
+  <div class="wrap-tabla">
+    <table class="eval" id="tablaEval">
+      <thead>
+        <tr>
+          <th class="th-nom">Nombre / Cargo</th>
+          <th>Asistencia<br><small style="font-weight:normal">(auto) 30%</small></th>
+          <th>Puntualidad<br><small style="font-weight:normal">15%</small></th>
+          <th>Respeto/<br>Conducta<br><small style="font-weight:normal">15%</small></th>
+          <th>Iniciativa<br><small style="font-weight:normal">10%</small></th>
+          <th>Específico 1<br><small style="font-weight:normal">20%</small></th>
+          <th>Específico 2<br><small style="font-weight:normal">10%</small></th>
+          <th>% Obtenido</th>
+          <th>💰 Bono Bs.</th>
+          <th>Excluir</th>
+        </tr>
+      </thead>
+      <tbody id="bodyEval"></tbody>
+    </table>
+  </div>
+  <div id="totalWrap" style="margin-top:14px;text-align:right;font-size:15px;font-weight:bold;color:#4a148c"></div>
+</div>
+
+<!-- MODAL PLANILLA FINAL -->
+<div class="overlay" id="modalPlanilla">
+  <div class="modal">
+    <h3>💰 Planilla Final de Bono Trimestral</h3>
+    <div id="planillaContenido"></div>
+    <div class="modal-btns">
+      <button onclick="imprimirPlanilla()" style="background:#1565c0;color:white;border:none;padding:10px 20px;border-radius:5px;font-weight:bold;cursor:pointer">🖨️ Imprimir Planilla</button>
+      <button onclick="guardarCierre()" style="background:#2e7d32;color:white;border:none;padding:10px 20px;border-radius:5px;font-weight:bold;cursor:pointer">✅ Confirmar y Guardar</button>
+      <button onclick="cerrarModal()" style="background:#757575;color:white;border:none;padding:10px 20px;border-radius:5px;font-weight:bold;cursor:pointer">✖ Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// FIREBASE RRHH
+// ═══════════════════════════════════════════════════════
+const FB_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com/rrhh';
+
+async function fbGet(key) {
+  try { const r = await fetch(FB_URL+'/'+key+'.json'); return await r.json(); } catch(e) { return null; }
+}
+async function fbSet(key, val) {
+  try { await fetch(FB_URL+'/'+key+'.json',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(val)}); } catch(e){}
+}
+
+// ═══════════════════════════════════════════════════════
+// PARÁMETROS DE EVALUACIÓN POR ROL
+// ═══════════════════════════════════════════════════════
+const ROLES = {
+  VAQUERO:   { label:'Vaquero',        cls:'rol-vaq', esp1:'Cuidado del ganado',       esp2:'Manejo de pasturas/cercos' },
+  ARMADOR:   { label:'Armador parcela',cls:'rol-vaq', esp1:'Cuidado del ganado',       esp2:'Manejo de pasturas/cercos' },
+  TRACTORISTA:{ label:'Tractorista',   cls:'rol-tra', esp1:'Cuidado de maquinaria',    esp2:'Cumplimiento de labores' },
+  MANTENIMIENTO:{ label:'Mantenimiento',cls:'rol-man', esp1:'Cuidado de maquinaria',   esp2:'Cumplimiento de labores' },
+  COCINERA:  { label:'Cocinera',       cls:'rol-coc', esp1:'Calidad de alimentación',  esp2:'Higiene y orden' },
+  ADMINISTRATIVO:{ label:'Administrativo',cls:'rol-adm',esp1:'Control de inventario', esp2:'Organización y registros' },
+  DEFAULT:   { label:'General',        cls:'rol-def', esp1:'Calidad del trabajo',      esp2:'Responsabilidad' }
+};
+
+function detectarRol(cargo) {
+  if (!cargo) return 'DEFAULT';
+  var c = cargo.toUpperCase();
+  if (c.includes('VAQUERO') || c.includes('VAQUERA')) return 'VAQUERO';
+  if (c.includes('ARMADOR') || c.includes('PARCELA')) return 'ARMADOR';
+  if (c.includes('TRACTOR')) return 'TRACTORISTA';
+  if (c.includes('MANTENIMIENTO') || c.includes('MECANICO') || c.includes('MECÁNICO')) return 'MANTENIMIENTO';
+  if (c.includes('COCIN')) return 'COCINERA';
+  if (c.includes('ALMAC') || c.includes('ADMIN') || c.includes('BODEGA') || c.includes('ENCARGADO')) return 'ADMINISTRATIVO';
+  return 'DEFAULT';
+}
+
+// ═══════════════════════════════════════════════════════
+// ASISTENCIA — leer del localStorage (mismas keys que asistencia_fijo)
+// ═══════════════════════════════════════════════════════
+function kA(ci, y, m, d) { return 'asistF_'+ci+'_'+y+'_'+m+'_'+d; }
+
+var FERIADOS = {
+  '2026-01-01':1,'2026-01-22':1,'2026-02-12':1,'2026-02-13':1,
+  '2026-04-03':1,'2026-05-01':1,'2026-06-11':1,'2026-06-21':1,
+  '2026-07-16':1,'2026-08-02':1,'2026-08-06':1,'2026-11-02':1,
+  '2026-12-25':1,'2025-01-01':1,'2025-01-22':1,'2025-02-24':1,
+  '2025-02-25':1,'2025-04-18':1,'2025-05-01':1,'2025-06-11':1,
+  '2025-06-21':1,'2025-07-16':1,'2025-08-06':1,'2025-11-02':1,'2025-12-25':1
+};
+
+function toISO(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function parseISO(s){ var p=s.split('-'); return new Date(+p[0],+p[1]-1,+p[2]); }
+
+function getEst(ci,y,m,d,esFer){
+  var v = localStorage.getItem(kA(ci,y,m,d));
+  if (v) return v;
+  return esFer ? 'FN' : '-';
+}
+
+function calcFaltas(ci, desde, hasta) {
+  var faltas = 0;
+  var d = new Date(desde); d.setHours(0,0,0,0);
+  var h = new Date(hasta); h.setHours(0,0,0,0);
+  var hoy = new Date(); hoy.setHours(0,0,0,0);
+  while (d <= h && d <= hoy) {
+    var iso = toISO(d);
+    var esFer = !!FERIADOS[iso];
+    var est = getEst(ci, d.getFullYear(), d.getMonth(), d.getDate(), esFer);
+    if (est === 'F') faltas++;
+    d.setDate(d.getDate()+1);
+  }
+  return faltas;
+}
+
+// ═══════════════════════════════════════════════════════
+// ESTADO GLOBAL
+// ═══════════════════════════════════════════════════════
+var personalFijo = [];
+var personalEventual = [];
+var personasSeleccionadas = []; // fijos + eventuales seleccionados
+var evalData = {}; // { ci: { puntualidad, respeto, iniciativa, esp1, esp2, excluir } }
+var periodoDesde = '';
+var periodoHasta = '';
+var smn = 2362;
+
+// ═══════════════════════════════════════════════════════
+// INICIALIZACIÓN
+// ═══════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', async function() {
+  // Poblar años
+  var anioSel = document.getElementById('selAnio');
+  var hoyAnio = new Date().getFullYear();
+  for (var a = hoyAnio; a >= hoyAnio-3; a--) {
+    var o = document.createElement('option');
+    o.value = a; o.textContent = a;
+    anioSel.appendChild(o);
+  }
+  // Detectar trimestre actual
+  var mesActual = new Date().getMonth();
+  var qActual = mesActual < 3 ? 'Q1' : mesActual < 6 ? 'Q2' : mesActual < 9 ? 'Q3' : 'Q4';
+  document.getElementById('selTrimestre').value = qActual;
+
+  // Cargar SMN desde Firebase/localStorage
+  var smnGuardado = await fbGet('smn_prado') || localStorage.getItem('smn_prado');
+  if (smnGuardado) {
+    var v = parseFloat(smnGuardado);
+    if (!isNaN(v) && v > 0) { smn = v; document.getElementById('inputSMN').value = v; }
+  }
+
+  // Sincronizar Firebase
+  try {
+    var fb = await fetch(FB_URL+'.json');
+    var data = await fb.json();
+    if (data) {
+      Object.entries(data).forEach(function(e){
+        if (e[1] !== null) {
+          var stored = (typeof e[1]==='object') ? JSON.stringify(e[1]) : String(e[1]);
+          localStorage.setItem(e[0], stored);
+        }
+      });
+    }
+  } catch(err) {}
+
+  // Cargar personal
+  personalFijo = JSON.parse(localStorage.getItem('personalFijoDB') || '[]')
+    .filter(function(p){ return !p.excluirAsistencia; });
+  personalEventual = JSON.parse(localStorage.getItem('personalEventualDB') || '[]');
+
+  onTrimChange();
+  renderEventuales();
+});
+
+// ═══════════════════════════════════════════════════════
+// CAMBIO DE TRIMESTRE / AÑO
+// ═══════════════════════════════════════════════════════
+function onTrimChange() {
+  var trim = document.getElementById('selTrimestre').value;
+  var anio = parseInt(document.getElementById('selAnio').value);
+  var fldD = document.getElementById('fldDesde');
+  var fldH = document.getElementById('fldHasta');
+  if (trim === 'CUSTOM') {
+    fldD.style.display = fldH.style.display = '';
+    periodoDesde = document.getElementById('inputDesde').value;
+    periodoHasta = document.getElementById('inputHasta').value;
+    if (!periodoDesde || !periodoHasta) return;
+  } else {
+    fldD.style.display = fldH.style.display = 'none';
+    var rangos = { Q1:[0,2], Q2:[3,5], Q3:[6,8], Q4:[9,11] };
+    var r = rangos[trim];
+    periodoDesde = toISO(new Date(anio, r[0], 1));
+    var lastDay = new Date(anio, r[1]+1, 0);
+    periodoHasta = toISO(lastDay);
+    document.getElementById('inputDesde').value = periodoDesde;
+    document.getElementById('inputHasta').value = periodoHasta;
+  }
+  recalcular();
+}
+
+// ═══════════════════════════════════════════════════════
+// RECALCULAR TODO
+// ═══════════════════════════════════════════════════════
+function recalcular() {
+  smn = parseFloat(document.getElementById('inputSMN').value) || 2362;
+  var bonoBase = smn * 0.10 * 3;
+  document.getElementById('infoMonto').textContent = 'Bono base: Bs. '+bonoBase.toFixed(2);
+  document.getElementById('infoFormula').textContent =
+    smn.toFixed(2)+' × 10% × 3 meses = Bs. '+bonoBase.toFixed(2);
+
+  // Cargar evaluación guardada para este trimestre
+  var trimKey = getTrimKey();
+  var guardado = JSON.parse(localStorage.getItem('bonoEval_'+trimKey) || '{}');
+  evalData = guardado;
+
+  armarPersonasSeleccionadas();
+  renderTabla();
+}
+
+function getTrimKey() {
+  var trim = document.getElementById('selTrimestre').value;
+  var anio = document.getElementById('selAnio').value;
+  if (trim === 'CUSTOM') return anio+'-CUSTOM-'+periodoDesde;
+  return anio+'-'+trim;
+}
+
+// ═══════════════════════════════════════════════════════
+// ARMAR LISTA PERSONAS
+// ═══════════════════════════════════════════════════════
+function armarPersonasSeleccionadas() {
+  var sel = [];
+  personalFijo.forEach(function(p){ sel.push({...p, tipo:'FIJO'}); });
+  // Agregar eventuales marcados
+  var checkboxes = document.querySelectorAll('.ev-check');
+  checkboxes.forEach(function(cb){
+    if (cb.checked) {
+      var ci = cb.dataset.ci;
+      var ev = personalEventual.find(function(p){ return p.ci===ci; });
+      if (ev) sel.push({...ev, tipo:'EVENTUAL'});
+    }
+  });
+  personasSeleccionadas = sel;
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDERIZAR EVENTUALES
+// ═══════════════════════════════════════════════════════
+function renderEventuales() {
+  var wrap = document.getElementById('eventualesWrap');
+  if (!personalEventual.length) {
+    wrap.innerHTML = '<em style="color:#aaa;font-size:12px">No hay personal eventual registrado.</em>';
+    return;
+  }
+  var html = '';
+  personalEventual.forEach(function(p) {
+    html += '<div class="ev-person">'
+      +'<input type="checkbox" class="ev-check" data-ci="'+p.ci+'" onchange="recalcular()">'
+      +'<span><b>'+p.nombreCompleto+'</b> <span style="color:#888;font-size:11px">'+(p.cargo||'—')+'</span></span>'
+      +'</div>';
+  });
+  wrap.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDERIZAR TABLA
+// ═══════════════════════════════════════════════════════
+function renderTabla() {
+  var tbody = document.getElementById('bodyEval');
+  if (!personasSeleccionadas.length || !periodoDesde || !periodoHasta) {
+    tbody.innerHTML = '<tr><td colspan="10" style="padding:20px;color:#aaa;text-align:center">Sin personal o período no definido.</td></tr>';
+    return;
+  }
+
+  var html = '';
+  var bonoBase = (parseFloat(document.getElementById('inputSMN').value)||2362) * 0.10 * 3;
+  var totalBono = 0;
+
+  personasSeleccionadas.forEach(function(p) {
+    var ci = p.ci;
+    var rol = detectarRol(p.cargo);
+    var R = ROLES[rol] || ROLES.DEFAULT;
+    var edata = evalData[ci] || {};
+    var excluir = !!edata.excluir;
+
+    // Asistencia automática
+    var faltas = calcFaltas(ci, parseISO(periodoDesde), parseISO(periodoHasta));
+    var puntAsist = faltas === 0 ? 5 : 0; // 1 falta = 0 puntos en asistencia
+
+    // Puntajes manuales (1-5, default 3)
+    var pPunt   = edata.puntualidad !== undefined ? edata.puntualidad : 3;
+    var pResp   = edata.respeto     !== undefined ? edata.respeto     : 3;
+    var pInic   = edata.iniciativa  !== undefined ? edata.iniciativa  : 3;
+    var pEsp1   = edata.esp1        !== undefined ? edata.esp1        : 3;
+    var pEsp2   = edata.esp2        !== undefined ? edata.esp2        : 3;
+
+    // Cálculo ponderado (sobre 100)
+    var pct = (puntAsist/5)*30 + (pPunt/5)*15 + (pResp/5)*15 + (pInic/5)*10 + (pEsp1/5)*20 + (pEsp2/5)*10;
+    var bonoPagar = excluir ? 0 : bonoBase * (pct/100);
+    if (!excluir) totalBono += bonoPagar;
+
+    var asistBadge = faltas===0
+      ? '<span class="asist-badge ab-ok">✅ 0 faltas → 5/5</span>'
+      : '<span class="asist-badge ab-bad">⚠️ '+faltas+' falta(s) → 0/5</span>';
+
+    var pctColor = pct>=80?'#2e7d32':pct>=60?'#e65100':'#b71c1c';
+    var pctBadge = '<span class="pct-badge" style="background:'+(excluir?'#eee':'#f3e5f5')+';color:'+(excluir?'#aaa':pctColor)+';font-size:15px;">'
+      +(excluir ? '—' : pct.toFixed(1)+'%')+'</span>';
+
+    var bonoHtml = excluir
+      ? '<span style="color:#bbb">Excluido</span>'
+      : '<span class="bono-badge">Bs. '+bonoPagar.toFixed(2)+'</span>';
+
+    var tipoTag = p.tipo==='EVENTUAL'
+      ? '<span style="background:#fff3e0;color:#e65100;font-size:9px;padding:1px 5px;border-radius:3px;font-weight:bold;margin-left:4px">EVENTUAL</span>'
+      : '';
+
+    html += '<tr id="row-'+safeCi(ci)+'" style="'+(excluir?'opacity:.45':'')+'"">'
+      +'<td class="td-nom"><div>'+p.nombreCompleto+tipoTag+'</div>'
+        +'<div class="cargo">'+(p.cargo||'—')+'&nbsp;<span class="tag-rol '+R.cls+'">'+R.label+'</span></div></td>'
+      +'<td>'+asistBadge+'</td>'
+      +mkScore(ci,'puntualidad',pPunt)
+      +mkScore(ci,'respeto',pResp)
+      +mkScore(ci,'iniciativa',pInic)
+      +'<td title="'+R.esp1+'">'+mkScoreInner(ci,'esp1',pEsp1,R.esp1)+'</td>'
+      +'<td title="'+R.esp2+'">'+mkScoreInner(ci,'esp2',pEsp2,R.esp2)+'</td>'
+      +'<td>'+pctBadge
+        +'<div class="bar-wrap"><div class="bar-fill" style="width:'+Math.min(pct,100).toFixed(0)+'%"></div></div></td>'
+      +'<td>'+bonoHtml+'</td>'
+      +'<td><input type="checkbox" class="excl-check" data-ci="'+ci+'" '+(excluir?'checked':'')
+        +' onchange="onExcluir(this)" title="Excluir del bono"></td>'
+      +'</tr>';
+  });
+
+  tbody.innerHTML = html;
+  document.getElementById('totalWrap').innerHTML =
+    '💰 Total a pagar: <span style="font-size:18px;color:#880e4f">Bs. '+totalBono.toFixed(2)+'</span>';
+}
+
+function mkScore(ci, param, val) {
+  return '<td>'+mkScoreInner(ci, param, val, '')+'</td>';
+}
+function mkScoreInner(ci, param, val, label) {
+  return (label ? '<div style="font-size:9px;color:#888;margin-bottom:3px">'+label+'</div>' : '')
+    +'<div class="score-wrap">'
+    +'<input type="range" min="1" max="5" step="1" value="'+val+'"'
+    +' data-ci="'+ci+'" data-param="'+param+'"'
+    +' oninput="onScore(this)" style="cursor:pointer">'
+    +'<span class="score-val" id="sv-'+safeCi(ci)+'-'+param+'">'+val+'</span>'
+    +'</div>';
+}
+
+function safeCi(ci){ return ci.replace(/[^a-zA-Z0-9]/g,'_'); }
+
+function onScore(input) {
+  var ci = input.dataset.ci;
+  var param = input.dataset.param;
+  var val = parseInt(input.value);
+  if (!evalData[ci]) evalData[ci] = {};
+  evalData[ci][param] = val;
+  var lbl = document.getElementById('sv-'+safeCi(ci)+'-'+param);
+  if (lbl) lbl.textContent = val;
+  renderTabla(); // recalcular totales
+}
+
+function onExcluir(cb) {
+  var ci = cb.dataset.ci;
+  if (!evalData[ci]) evalData[ci] = {};
+  evalData[ci].excluir = cb.checked;
+  renderTabla();
+}
+
+// ═══════════════════════════════════════════════════════
+// GUARDAR EVALUACIÓN
+// ═══════════════════════════════════════════════════════
+function guardarEvaluacion() {
+  var key = 'bonoEval_'+getTrimKey();
+  localStorage.setItem(key, JSON.stringify(evalData));
+  fbSet(key, evalData);
+  alert('✅ Evaluación guardada correctamente.');
+}
+
+// ═══════════════════════════════════════════════════════
+// PLANILLA FINAL
+// ═══════════════════════════════════════════════════════
+function abrirPlanilla() {
+  var bonoBase = (parseFloat(document.getElementById('inputSMN').value)||2362) * 0.10 * 3;
+  var trimKey = getTrimKey();
+  var html = '<div style="background:#f3e5f5;padding:10px 14px;border-radius:6px;margin-bottom:12px;font-size:13px;">'
+    +'<b>📅 Período:</b> '+periodoDesde+' → '+periodoHasta+'&nbsp;|&nbsp;'
+    +'<b>Trimestre:</b> '+trimKey+'&nbsp;|&nbsp;'
+    +'<b>SMN:</b> Bs. '+(parseFloat(document.getElementById('inputSMN').value)||2362).toFixed(2)+'&nbsp;|&nbsp;'
+    +'<b>Bono base:</b> Bs. '+bonoBase.toFixed(2)
+    +'</div>';
+
+  html += '<table class="tc"><thead><tr>'
+    +'<th class="td-l">Nombre</th><th>Cargo/Rol</th>'
+    +'<th>Asistencia</th><th>Puntualidad</th><th>Respeto</th>'
+    +'<th>Iniciativa</th><th>Específico 1</th><th>Específico 2</th>'
+    +'<th>% Obtenido</th><th style="background:#880e4f">💰 Bono Bs.</th>'
+    +'</tr></thead><tbody>';
+
+  var total = 0;
+  personasSeleccionadas.forEach(function(p) {
+    var ci = p.ci;
+    var rol = detectarRol(p.cargo);
+    var R = ROLES[rol] || ROLES.DEFAULT;
+    var edata = evalData[ci] || {};
+    var excluir = !!edata.excluir;
+    if (excluir) return;
+
+    var faltas = calcFaltas(ci, parseISO(periodoDesde), parseISO(periodoHasta));
+    var puntAsist = faltas===0 ? 5 : 0;
+    var pPunt  = edata.puntualidad !== undefined ? edata.puntualidad : 3;
+    var pResp  = edata.respeto     !== undefined ? edata.respeto     : 3;
+    var pInic  = edata.iniciativa  !== undefined ? edata.iniciativa  : 3;
+    var pEsp1  = edata.esp1        !== undefined ? edata.esp1        : 3;
+    var pEsp2  = edata.esp2        !== undefined ? edata.esp2        : 3;
+    var pct = (puntAsist/5)*30 + (pPunt/5)*15 + (pResp/5)*15 + (pInic/5)*10 + (pEsp1/5)*20 + (pEsp2/5)*10;
+    var bono = bonoBase * (pct/100);
+    total += bono;
+
+    var pctColor = pct>=80?'#2e7d32':pct>=60?'#e65100':'#b71c1c';
+    html += '<tr>'
+      +'<td class="td-l">'+p.nombreCompleto+(p.tipo==='EVENTUAL'?' <small style="color:#e65100">(Eventual)</small>':'')+'</td>'
+      +'<td><span class="tag-rol '+R.cls+'">'+R.label+'</span></td>'
+      +'<td>'+(faltas===0?'✅ 0 faltas':'⚠️ '+faltas+' falta(s)')+'</td>'
+      +'<td>'+pPunt+'/5</td>'
+      +'<td>'+pResp+'/5</td>'
+      +'<td>'+pInic+'/5</td>'
+      +'<td title="'+R.esp1+'">'+pEsp1+'/5<br><small>'+R.esp1+'</small></td>'
+      +'<td title="'+R.esp2+'">'+pEsp2+'/5<br><small>'+R.esp2+'</small></td>'
+      +'<td style="font-weight:bold;color:'+pctColor+'">'+pct.toFixed(1)+'%</td>'
+      +'<td style="font-weight:bold;color:#880e4f;background:#fce4ec">Bs. '+bono.toFixed(2)+'</td>'
+      +'</tr>';
+  });
+
+  html += '<tr style="background:#4a148c;color:white;font-weight:bold;">'
+    +'<td colspan="9" style="text-align:right;padding:10px;color:white">💰 TOTAL A PAGAR:</td>'
+    +'<td style="font-size:16px;color:#f8bbd0;padding:10px;text-align:center">Bs. '+total.toFixed(2)+'</td>'
+    +'</tr></tbody></table>';
+
+  // Firma
+  html += '<div style="margin-top:20px;border-top:2px solid #eee;padding-top:16px;">'
+    +'<b style="color:#4a148c;font-size:13px">✍️ Firmas de conformidad:</b>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:20px">';
+
+  personasSeleccionadas.filter(function(p){ return !(evalData[p.ci]||{}).excluir; }).forEach(function(p){
+    var edata = evalData[p.ci]||{};
+    var faltas = calcFaltas(p.ci, parseISO(periodoDesde), parseISO(periodoHasta));
+    var puntAsist = faltas===0?5:0;
+    var pPunt=edata.puntualidad!==undefined?edata.puntualidad:3;
+    var pResp=edata.respeto!==undefined?edata.respeto:3;
+    var pInic=edata.iniciativa!==undefined?edata.iniciativa:3;
+    var pEsp1=edata.esp1!==undefined?edata.esp1:3;
+    var pEsp2=edata.esp2!==undefined?edata.esp2:3;
+    var pct=(puntAsist/5)*30+(pPunt/5)*15+(pResp/5)*15+(pInic/5)*10+(pEsp1/5)*20+(pEsp2/5)*10;
+    var bono=((parseFloat(document.getElementById('inputSMN').value)||2362)*0.10*3)*(pct/100);
+    html += '<div style="border:1px solid #ddd;border-radius:5px;padding:10px;font-size:12px">'
+      +'<b>'+p.nombreCompleto+'</b><br>'
+      +'<small style="color:#888">'+(p.cargo||'—')+'</small><br>'
+      +'<span style="color:#4a148c;font-weight:bold">Bs. '+bono.toFixed(2)+'</span>'
+      +'<div style="margin-top:20px;border-top:1px solid #999;padding-top:4px;text-align:center;font-size:10px;color:#aaa">Firma y fecha</div>'
+      +'</div>';
+  });
+  html += '</div></div>';
+
+  document.getElementById('planillaContenido').innerHTML = html;
+  document.getElementById('modalPlanilla').classList.add('on');
+}
+
+function imprimirPlanilla() {
+  window.print();
+}
+
+function guardarCierre() {
+  var cierres = JSON.parse(localStorage.getItem('bonoCierres') || '[]');
+  var registro = {
+    trimKey: getTrimKey(),
+    desde: periodoDesde,
+    hasta: periodoHasta,
+    smn: parseFloat(document.getElementById('inputSMN').value)||2362,
+    eval: JSON.parse(JSON.stringify(evalData)),
+    fecha: toISO(new Date())
+  };
+  cierres.unshift(registro);
+  localStorage.setItem('bonoCierres', JSON.stringify(cierres));
+  fbSet('bonoCierres', cierres);
+  alert('✅ Bono guardado en el historial.');
+  cerrarModal();
+}
+
+function cerrarModal() {
+  document.getElementById('modalPlanilla').classList.remove('on');
+}
+
+document.getElementById('modalPlanilla').addEventListener('click', function(e){
+  if (e.target === this) cerrarModal();
+});
+</script>
+</body>
+</html>
