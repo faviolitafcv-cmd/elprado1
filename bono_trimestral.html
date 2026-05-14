@@ -192,6 +192,12 @@ table.eval tr:hover td{background:#f3e5f5!important}
   <div id="totalWrap" style="margin-top:14px;text-align:right;font-size:15px;font-weight:bold;color:#4a148c"></div>
 </div>
 
+<!-- HISTORIAL DE BONOS PAGADOS -->
+<div class="card" id="cardHistorial">
+  <h3>📋 Historial de Bonos Confirmados</h3>
+  <div id="historialWrap"><em style="color:#aaa;font-size:12px">Sin registros todavía.</em></div>
+</div>
+
 <!-- MODAL PLANILLA FINAL -->
 <div class="overlay" id="modalPlanilla">
   <div class="modal">
@@ -316,7 +322,7 @@ window.addEventListener('DOMContentLoaded', async function() {
     if (!isNaN(v) && v > 0) { smn = v; document.getElementById('inputSMN').value = v; }
   }
 
-  // Sincronizar Firebase
+  // Sincronizar Firebase — ESPERAR antes de cargar evaluación
   try {
     var fb = await fetch(FB_URL+'.json');
     var data = await fb.json();
@@ -328,15 +334,18 @@ window.addEventListener('DOMContentLoaded', async function() {
         }
       });
     }
-  } catch(err) {}
+  } catch(err) {
+    console.log('Firebase offline — usando datos locales');
+  }
 
-  // Cargar personal
+  // Cargar personal DESPUÉS del sync
   personalFijo = JSON.parse(localStorage.getItem('personalFijoDB') || '[]')
     .filter(function(p){ return !p.excluirAsistencia; });
   personalEventual = JSON.parse(localStorage.getItem('personalEventualDB') || '[]');
 
   onTrimChange();
   renderEventuales();
+  renderHistorial();
 });
 
 // ═══════════════════════════════════════════════════════
@@ -540,10 +549,28 @@ function onExcluir(cb) {
 // GUARDAR EVALUACIÓN
 // ═══════════════════════════════════════════════════════
 function guardarEvaluacion() {
+  // Capturar TODOS los sliders del DOM — no solo los modificados
+  document.querySelectorAll('input[type=range][data-ci]').forEach(function(inp) {
+    var ci = inp.dataset.ci;
+    var param = inp.dataset.param;
+    if (!evalData[ci]) evalData[ci] = {};
+    evalData[ci][param] = parseInt(inp.value);
+  });
+  // Capturar exclusiones
+  document.querySelectorAll('.excl-check').forEach(function(cb) {
+    var ci = cb.dataset.ci;
+    if (!evalData[ci]) evalData[ci] = {};
+    evalData[ci].excluir = cb.checked;
+  });
+
   var key = 'bonoEval_'+getTrimKey();
   localStorage.setItem(key, JSON.stringify(evalData));
   fbSet(key, evalData);
-  alert('✅ Evaluación guardada correctamente.');
+
+  // Feedback visual
+  var btn = document.querySelector('[onclick="guardarEvaluacion()"]');
+  if (btn) { var orig = btn.textContent; btn.textContent = '✅ Guardado!'; btn.style.background='#1b5e20'; setTimeout(function(){ btn.textContent=orig; btn.style.background='#2e7d32'; }, 2000); }
+  renderHistorial();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -641,20 +668,107 @@ function imprimirPlanilla() {
 }
 
 function guardarCierre() {
+  var smnVal = parseFloat(document.getElementById('inputSMN').value) || 2362;
+  var bonoBase = smnVal * 0.10 * 3;
+  var pagos = [];
+  personasSeleccionadas.forEach(function(p) {
+    var ci = p.ci;
+    var edata = evalData[ci] || {};
+    if (edata.excluir) return;
+    var faltas = calcFaltas(ci, parseISO(periodoDesde), parseISO(periodoHasta));
+    var puntAsist = faltas===0 ? 5 : 0;
+    var pPunt = edata.puntualidad !== undefined ? edata.puntualidad : 3;
+    var pResp = edata.respeto     !== undefined ? edata.respeto     : 3;
+    var pInic = edata.iniciativa  !== undefined ? edata.iniciativa  : 3;
+    var pEsp1 = edata.esp1        !== undefined ? edata.esp1        : 3;
+    var pEsp2 = edata.esp2        !== undefined ? edata.esp2        : 3;
+    var pct = (puntAsist/5)*30 + (pPunt/5)*15 + (pResp/5)*15 + (pInic/5)*10 + (pEsp1/5)*20 + (pEsp2/5)*10;
+    var bono = bonoBase * (pct/100);
+    if (bono <= 0) return;
+    pagos.push({ ci:ci, nombre:p.nombreCompleto, cargo:p.cargo||'', tipo:p.tipo, pct:pct, bono:bono });
+  });
+
   var cierres = JSON.parse(localStorage.getItem('bonoCierres') || '[]');
   var registro = {
+    id: Date.now(),
     trimKey: getTrimKey(),
     desde: periodoDesde,
     hasta: periodoHasta,
-    smn: parseFloat(document.getElementById('inputSMN').value)||2362,
-    eval: JSON.parse(JSON.stringify(evalData)),
+    smn: smnVal,
+    bonoBase: bonoBase,
+    pagos: pagos,
+    total: pagos.reduce(function(s,p){ return s+p.bono; }, 0),
     fecha: toISO(new Date())
   };
   cierres.unshift(registro);
   localStorage.setItem('bonoCierres', JSON.stringify(cierres));
   fbSet('bonoCierres', cierres);
-  alert('✅ Bono guardado en el historial.');
+  renderHistorial();
   cerrarModal();
+  alert('✅ Bono guardado en el historial.');
+}
+
+// ═══════════════════════════════════════════════════════
+// HISTORIAL
+// ═══════════════════════════════════════════════════════
+function renderHistorial() {
+  var wrap = document.getElementById('historialWrap');
+  var cierres = JSON.parse(localStorage.getItem('bonoCierres') || '[]');
+  if (!cierres.length) {
+    wrap.innerHTML = '<em style="color:#aaa;font-size:12px">Sin bonos confirmados todavía. Usá "Ver Planilla Final" → "Confirmar y Guardar".</em>';
+    return;
+  }
+
+  var html = '';
+  cierres.forEach(function(c) {
+    var totalPagado = c.total || c.pagos.reduce(function(s,p){ return s+p.bono; }, 0);
+    html += '<div style="border:1px solid #e1bee7;border-radius:8px;margin-bottom:10px;overflow:hidden;">'
+      // Header del cierre
+      + '<div style="background:#f3e5f5;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;cursor:pointer" onclick="toggleHist(\'hist-'+c.id+'\')">'
+      +   '<div>'
+      +     '<span style="font-weight:bold;color:#4a148c;font-size:14px">🎁 '+c.trimKey+'</span>'
+      +     '&nbsp;<span style="color:#777;font-size:12px">'+c.desde+' → '+c.hasta+'</span>'
+      +   '</div>'
+      +   '<div style="display:flex;gap:16px;align-items:center">'
+      +     '<span style="font-size:12px;color:#555">SMN: Bs. '+c.smn.toFixed(2)+'</span>'
+      +     '<span style="font-size:12px;color:#555">'+c.pagos.length+' persona(s)</span>'
+      +     '<span style="font-weight:bold;color:#880e4f;font-size:15px">TOTAL: Bs. '+totalPagado.toFixed(2)+'</span>'
+      +     '<span style="font-size:11px;color:#aaa">Confirmado: '+c.fecha+'</span>'
+      +     '<span style="font-size:12px;color:#7b1fa2">▼</span>'
+      +   '</div>'
+      + '</div>'
+      // Detalle por persona (colapsable)
+      + '<div id="hist-'+c.id+'" style="display:none;padding:10px 14px;">'
+      + '<table style="width:100%;border-collapse:collapse;font-size:12px">'
+      + '<thead><tr style="background:#ede7f6">'
+      +   '<th style="padding:6px 8px;text-align:left">Nombre</th>'
+      +   '<th style="padding:6px 8px">Cargo</th>'
+      +   '<th style="padding:6px 8px">% Eval.</th>'
+      +   '<th style="padding:6px 8px;color:#880e4f">Bono Bs.</th>'
+      + '</tr></thead><tbody>';
+
+    c.pagos.forEach(function(pago, i) {
+      var bg = i%2===0?'white':'#fdf8ff';
+      var pctColor = pago.pct>=80?'#2e7d32':pago.pct>=60?'#e65100':'#b71c1c';
+      html += '<tr style="background:'+bg+'">'
+        +'<td style="padding:7px 8px;font-weight:bold">'+pago.nombre
+        +  (pago.tipo==='EVENTUAL'?' <span style="font-size:9px;color:#e65100;font-weight:normal">(Eventual)</span>':'')+'</td>'
+        +'<td style="padding:7px 8px;color:#555">'+pago.cargo+'</td>'
+        +'<td style="padding:7px 8px;text-align:center;font-weight:bold;color:'+pctColor+'">'+pago.pct.toFixed(1)+'%</td>'
+        +'<td style="padding:7px 8px;text-align:center;font-weight:bold;color:#880e4f">'+pago.bono.toFixed(2)+'</td>'
+        +'</tr>';
+    });
+
+    html += '</tbody></table></div></div>';
+  });
+
+  wrap.innerHTML = html;
+}
+
+function toggleHist(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
 function cerrarModal() {
