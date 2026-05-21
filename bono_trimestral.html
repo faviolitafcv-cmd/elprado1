@@ -268,7 +268,13 @@ function parseISO(s){ var p=s.split('-'); return new Date(+p[0],+p[1]-1,+p[2]); 
 
 function getEst(ci,y,m,d,esFer){
   var v = localStorage.getItem(kA(ci,y,m,d));
-  if (v) return v;
+  if (v) {
+    // Limpiar doble encoding: '"F"' -> 'F'
+    if (v.charAt(0) === '"' && v.charAt(v.length-1) === '"') {
+      try { v = JSON.parse(v); } catch(e) {}
+    }
+    return v;
+  }
   return esFer ? 'FN' : '-';
 }
 
