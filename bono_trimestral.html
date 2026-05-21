@@ -431,7 +431,7 @@ function renderEventuales() {
   personalEventual.forEach(function(p) {
     html += '<div class="ev-person">'
       +'<input type="checkbox" class="ev-check" data-ci="'+p.ci+'" onchange="recalcular()">'
-      +'<span><b>'+p.nombreCompleto+'</b> <span style="color:#888;font-size:11px">'+(p.cargo||'—')+'</span></span>'
+      +'<span><b>'+(p.nombreCompleto||p.nombre||'Sin nombre')+'</b> <span style="color:#888;font-size:11px">'+(p.cargo||'—')+'</span></span>'
       +'</div>';
   });
   wrap.innerHTML = html;
@@ -491,7 +491,7 @@ function renderTabla() {
       : '';
 
     html += '<tr id="row-'+safeCi(ci)+'" style="'+(excluir?'opacity:.45':'')+'"">'
-      +'<td class="td-nom"><div>'+p.nombreCompleto+tipoTag+'</div>'
+      +'<td class="td-nom"><div>'+(p.nombreCompleto||p.nombre||'Sin nombre')+tipoTag+'</div>'
         +'<div class="cargo">'+(p.cargo||'—')+'&nbsp;<span class="tag-rol '+R.cls+'">'+R.label+'</span></div></td>'
       +'<td>'+asistBadge+'</td>'
       +mkScore(ci,'puntualidad',pPunt)
@@ -600,7 +600,7 @@ function abrirPlanilla() {
     var pct = (puntAsist/5)*30 + (pPunt/5)*15 + (pResp/5)*15 + (pInic/5)*10 + (pEsp1/5)*20 + (pEsp2/5)*10;
     var bono = bonoBase * (pct / 100);
     if (bono <= 0) return;
-    filas.push({ nombre: p.nombreCompleto, cargo: p.cargo || '—', pct: pct, bono: bono });
+    filas.push({ nombre: (p.nombreCompleto||p.nombre||'Sin nombre'), cargo: p.cargo || '—', pct: pct, bono: bono });
   });
 
   var total = filas.reduce(function(s, f){ return s + f.bono; }, 0);
@@ -685,7 +685,7 @@ function guardarCierre() {
     var pct = (puntAsist/5)*30 + (pPunt/5)*15 + (pResp/5)*15 + (pInic/5)*10 + (pEsp1/5)*20 + (pEsp2/5)*10;
     var bono = bonoBase * (pct/100);
     if (bono <= 0) return;
-    pagos.push({ ci:ci, nombre:p.nombreCompleto, cargo:p.cargo||'', tipo:p.tipo, pct:pct, bono:bono });
+    pagos.push({ ci:ci, nombre:(p.nombreCompleto||p.nombre||'Sin nombre'), cargo:p.cargo||'', tipo:p.tipo, pct:pct, bono:bono });
   });
 
   var cierres = JSON.parse(localStorage.getItem('bonoCierres') || '[]');
