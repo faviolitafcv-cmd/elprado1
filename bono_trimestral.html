@@ -114,10 +114,10 @@ table.eval tr:hover td{background:#f3e5f5!important}
     <div class="fld">
       <label>Trimestre</label>
       <select id="selTrimestre" onchange="onTrimChange()">
-        <option value="Q1">1er Trimestre (Ene–Mar)</option>
-        <option value="Q2">2do Trimestre (Abr–Jun)</option>
-        <option value="Q3">3er Trimestre (Jul–Sep)</option>
-        <option value="Q4">4to Trimestre (Oct–Dic)</option>
+        <option value="Q1">1er Trimestre (Ago–Sep–Oct)</option>
+        <option value="Q2">2do Trimestre (Nov–Dic–Ene)</option>
+        <option value="Q3">3er Trimestre (Feb–Mar–Abr)</option>
+        <option value="Q4">4to Trimestre (May–Jun–Jul)</option>
         <option value="CUSTOM">Personalizado...</option>
       </select>
     </div>
@@ -318,7 +318,9 @@ window.addEventListener('DOMContentLoaded', async function() {
   }
   // Detectar trimestre actual
   var mesActual = new Date().getMonth();
-  var qActual = mesActual < 3 ? 'Q1' : mesActual < 6 ? 'Q2' : mesActual < 9 ? 'Q3' : 'Q4';
+  // Detectar trimestre actual según año agrícola El Prado 1
+  // Q3: Feb-Abr | Q4: May-Jul | Q1: Ago-Oct | Q2: Nov-Ene
+  var qActual = (mesActual >= 1 && mesActual <= 3) ? 'Q3' : (mesActual >= 4 && mesActual <= 6) ? 'Q4' : (mesActual >= 7 && mesActual <= 9) ? 'Q1' : 'Q2';
   document.getElementById('selTrimestre').value = qActual;
 
   // Cargar SMN desde Firebase/localStorage
@@ -369,11 +371,24 @@ function onTrimChange() {
     if (!periodoDesde || !periodoHasta) return;
   } else {
     fldD.style.display = fldH.style.display = 'none';
-    var rangos = { Q1:[0,2], Q2:[3,5], Q3:[6,8], Q4:[9,11] };
-    var r = rangos[trim];
-    periodoDesde = toISO(new Date(anio, r[0], 1));
-    var lastDay = new Date(anio, r[1]+1, 0);
-    periodoHasta = toISO(lastDay);
+    // Trimestres año agrícola El Prado 1
+    // Q1: Ago–Oct | Q2: Nov–Ene | Q3: Feb–Abr | Q4: May–Jul
+    var desde, hasta;
+    if (trim === 'Q1') {
+      desde = new Date(anio, 7, 1);   // 1 Agosto
+      hasta = new Date(anio, 10, 0);  // 31 Octubre
+    } else if (trim === 'Q2') {
+      desde = new Date(anio, 10, 1);  // 1 Noviembre
+      hasta = new Date(anio+1, 1, 0); // 31 Enero año siguiente
+    } else if (trim === 'Q3') {
+      desde = new Date(anio, 1, 1);   // 1 Febrero
+      hasta = new Date(anio, 4, 0);   // 30 Abril
+    } else { // Q4
+      desde = new Date(anio, 4, 1);   // 1 Mayo
+      hasta = new Date(anio, 7, 0);   // 31 Julio
+    }
+    periodoDesde = toISO(desde);
+    periodoHasta = toISO(hasta);
     document.getElementById('inputDesde').value = periodoDesde;
     document.getElementById('inputHasta').value = periodoHasta;
   }
@@ -727,7 +742,7 @@ function renderHistorial() {
 
   var html = '';
   cierres.forEach(function(c) {
-    var totalPagado = c.total || c.pagos.reduce(function(s,p){ return s+p.bono; }, 0);
+    var totalPagado = c.total || (c.pagos && c.pagos.reduce ? c.pagos.reduce(function(s,p){ return s+(p.bono||0); }, 0) : 0);
     html += '<div style="border:1px solid #e1bee7;border-radius:8px;margin-bottom:10px;overflow:hidden;">'
       // Header del cierre
       + '<div style="background:#f3e5f5;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;cursor:pointer" onclick="toggleHist(\'hist-'+c.id+'\')">'
@@ -737,7 +752,7 @@ function renderHistorial() {
       +   '</div>'
       +   '<div style="display:flex;gap:16px;align-items:center">'
       +     '<span style="font-size:12px;color:#555">SMN: Bs. '+c.smn.toFixed(2)+'</span>'
-      +     '<span style="font-size:12px;color:#555">'+c.pagos.length+' persona(s)</span>'
+      +     '<span style="font-size:12px;color:#555">'+((c.pagos&&c.pagos.length)||0)+' persona(s)</span>'
       +     '<span style="font-weight:bold;color:#880e4f;font-size:15px">TOTAL: Bs. '+totalPagado.toFixed(2)+'</span>'
       +     '<span style="font-size:11px;color:#aaa">Confirmado: '+c.fecha+'</span>'
       +     '<span style="font-size:12px;color:#7b1fa2">▼</span>'
@@ -753,7 +768,7 @@ function renderHistorial() {
       +   '<th style="padding:6px 8px;color:#880e4f">Bono Bs.</th>'
       + '</tr></thead><tbody>';
 
-    c.pagos.forEach(function(pago, i) {
+    (c.pagos||[]).forEach(function(pago, i) {
       var bg = i%2===0?'white':'#fdf8ff';
       var pctColor = pago.pct>=80?'#2e7d32':pago.pct>=60?'#e65100':'#b71c1c';
       html += '<tr style="background:'+bg+'">'
