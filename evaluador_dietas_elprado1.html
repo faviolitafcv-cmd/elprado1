@@ -189,7 +189,13 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
   <!-- PASO 2 -->
   <div class="sec-title">② Definir Dietas (A, B, C)</div>
   <div class="card">
-    <div class="ch"><div class="ct">🌾 Configuración de Dietas</div></div>
+    <div class="ch">
+      <div class="ct">🌾 Configuración de Dietas</div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span id="savedInfo" style="display:none;font-size:10px;color:var(--teal);font-style:italic;"></span>
+        <button class="btn bp btn-sm" id="btnGuardar" onclick="guardarDietas()">💾 Guardar Dietas</button>
+      </div>
+    </div>
     <div class="cb">
       <div class="dieta-tabs">
         <div class="dtab A active" onclick="showDieta('A')">⬡ Dieta A</div>
@@ -292,16 +298,97 @@ let preciosVenta={};
 async function fbGet(path){
   try{const r=await fetch(FB+'/'+path+'.json');return r.ok?await r.json():null;}catch(e){return null;}
 }
+async function fbSet(path,val){
+  try{const r=await fetch(FB+'/'+path+'.json',{method:'PUT',body:JSON.stringify(val),headers:{'Content-Type':'application/json'}});return r.ok;}catch(e){return false;}
+}
 
 async function init(){
   setStatus('Cargando...','var(--gold2)');
-  const [rA,rP]=await Promise.all([fbGet('animales'),fbGet('pesajes')]);
+  const [rA,rP,rD]=await Promise.all([fbGet('animales'),fbGet('pesajes'),fbGet('evaluador_dietas')]);
   if(!rA){setStatus('Sin conexión','var(--red)');ntf('No se pudo conectar con Firebase','err');return;}
   animalesData=rA||{};
   pesajesData=rP?Object.values(rP):[];
   setStatus('Conectado','var(--green)');
   buildTropas();
   ['A','B','C'].forEach(d=>addIngr(d));
+  if(rD){
+    cargarDietas(rD);
+    const fecha=rD.fechaGuardado?new Date(rD.fechaGuardado).toLocaleDateString('es-BO',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+    document.getElementById('savedInfo').textContent=fecha?`Última vez guardado: ${fecha}`:'';
+    document.getElementById('savedInfo').style.display='block';
+    ntf('✓ Dietas cargadas desde Firebase','ok');
+  }
+}
+
+// ══════ GUARDAR / CARGAR ══════
+async function guardarDietas(){
+  const data={
+    fechaGuardado: new Date().toISOString(),
+    preciosVenta,
+    dietas:{}
+  };
+  ['A','B','C'].forEach(d=>{
+    const rows=document.querySelectorAll(`#ingr-${d} tr`);
+    const ingredientes=[];
+    rows.forEach(tr=>{
+      const id=tr.id.split('-').pop();
+      const nom=document.getElementById(`in-${d}-${id}-nom`)?.value||'';
+      const prc=parseFloat(document.getElementById(`in-${d}-${id}-prc`)?.value)||0;
+      const con=parseFloat(document.getElementById(`in-${d}-${id}-con`)?.value)||0;
+      if(nom||prc||con) ingredientes.push({nom,prc,con});
+    });
+    data.dietas[d]={
+      nombre:document.getElementById(`d${d}-nombre`).value||`Dieta ${d}`,
+      gmd:parseFloat(document.getElementById(`d${d}-gmd`).value)||0,
+      ingredientes
+    };
+  });
+  const btn=document.getElementById('btnGuardar');
+  btn.textContent='⏳ Guardando...';btn.disabled=true;
+  const ok=await fbSet('evaluador_dietas',data);
+  btn.textContent='💾 Guardar Dietas';btn.disabled=false;
+  if(ok){
+    ntf('✓ Dietas guardadas en Firebase','ok');
+    const fecha=new Date().toLocaleDateString('es-BO',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    document.getElementById('savedInfo').textContent=`Última vez guardado: ${fecha}`;
+    document.getElementById('savedInfo').style.display='block';
+  } else {
+    ntf('Error al guardar. Revisá la conexión.','err');
+  }
+}
+
+function cargarDietas(data){
+  // Precios de venta
+  if(data.preciosVenta) preciosVenta=data.preciosVenta;
+  // Dietas
+  ['A','B','C'].forEach(d=>{
+    const dd=data.dietas?.[d];
+    if(!dd) return;
+    document.getElementById(`d${d}-nombre`).value=dd.nombre||`Dieta ${d}`;
+    document.getElementById(`d${d}-gmd`).value=dd.gmd||'';
+    // Limpiar ingredientes existentes y cargar guardados
+    document.getElementById(`ingr-${d}`).innerHTML='';
+    ingrCounter[d]=0;
+    if(dd.ingredientes&&dd.ingredientes.length){
+      dd.ingredientes.forEach(i=>{
+        const id=++ingrCounter[d];
+        const tbody=document.getElementById('ingr-'+d);
+        const tr=document.createElement('tr');
+        tr.id=`ingr-${d}-${id}`;
+        tr.innerHTML=`
+          <td><input type="text" placeholder="Ej: Afrechillo de trigo" id="in-${d}-${id}-nom" value="${i.nom||''}"></td>
+          <td><input type="number" placeholder="Ej: 1800" min="0" step="10" id="in-${d}-${id}-prc" value="${i.prc||''}" oninput="calcResumen('${d}')"></td>
+          <td><input type="number" placeholder="Ej: 5.0" min="0" step="0.1" id="in-${d}-${id}-con" value="${i.con||''}" oninput="calcResumen('${d}')"></td>
+          <td><button class="ingr-del" onclick="delIngr('${d}',${id})">✕</button></td>`;
+        tbody.appendChild(tr);
+      });
+    } else {
+      addIngr(d);
+    }
+    calcResumen(d);
+  });
+  // Re-render tropas para mostrar precios guardados
+  if(tropasResumen.length) renderTropas();
 }
 
 function setStatus(txt,color){
