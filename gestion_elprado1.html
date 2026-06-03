@@ -177,6 +177,7 @@ html,body{height:100%;font-family:'Segoe UI',Arial,sans-serif;overflow:hidden}
           <span class="submod">Movimientos</span>
           <span class="submod">Consumo Diario</span>
           <span class="submod">Productos</span>
+          <span class="submod" onclick="event.stopPropagation();abrirModulo('dietas')" style="background:rgba(109,186,58,.15);color:#8de05a;border-color:rgba(109,186,58,.3);cursor:pointer;">🧪 Evaluador de Dietas</span>
         </div>
       </div>
 
@@ -235,6 +236,10 @@ const MODULOS = {
   insumos: {
     nombre: 'Insumos & Nutrición',
     archivo: 'insumos_elprado1.html'
+  },
+  dietas: {
+    nombre: 'Evaluador de Dietas',
+    archivo: 'evaluador_dietas_elprado1.html'
   }
 };
 
