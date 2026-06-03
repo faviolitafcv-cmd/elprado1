@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Evaluador de Dietas — El Prado 1</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Exo+2:wght@300;400;600;700&display=swap');
+
+:root{
+  --bg:#0a1a0a;--card:#111f11;--card2:#172217;--card3:#1c281c;
+  --green:#6dba3a;--green2:#4a9a2a;--green3:#2a7a0a;--gs:#8de05a;
+  --gold:#c9a227;--gold2:#e8b830;--red:#e05a4a;--blue:#4ab8da;
+  --purple:#9a7adb;--teal:#3abaaa;
+  --text:#e8ffe8;--t2:#b8d4b8;--t3:#7a9a7a;--t4:#4a6a4a;
+  --brd:#2a4a2a;--brd2:#3a5a3a;
+  --A:#4ab8da;--B:#e8b830;--C:#e05a4a;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Exo 2',sans-serif;min-height:100vh;}
+
+/* SCAN LINE EFFECT */
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03) 2px,rgba(0,0,0,.03) 4px);pointer-events:none;z-index:9999;}
+
+/* HEADER */
+.hdr{background:linear-gradient(135deg,#0d1f0d,#152515);border-bottom:2px solid var(--green3);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 4px 20px rgba(0,0,0,.5);}
+.hdr-logo{display:flex;align-items:center;gap:12px;}
+.hdr-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--green3),var(--green2));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;}
+.hdr-t{font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;color:var(--gs);letter-spacing:2px;text-transform:uppercase;}
+.hdr-s{font-size:10px;color:var(--t3);letter-spacing:1px;margin-top:2px;}
+.hdr-r{display:flex;align-items:center;gap:10px;}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+.btn-back{background:none;border:1px solid var(--brd2);color:var(--t2);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;text-decoration:none;font-family:'Exo 2',sans-serif;font-weight:600;letter-spacing:.5px;transition:all .2s;}
+.btn-back:hover{border-color:var(--green2);color:var(--gs);}
+
+/* MAIN */
+.main{max-width:1400px;margin:0 auto;padding:20px;}
+
+/* SECTION TITLE */
+.sec-title{font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.sec-title::after{content:'';flex:1;height:1px;background:var(--brd);}
+
+/* CARD */
+.card{background:var(--card);border:1px solid var(--brd);border-radius:10px;margin-bottom:16px;overflow:hidden;}
+.ch{padding:12px 16px;border-bottom:1px solid var(--brd);display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--card2);}
+.ct{font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t2);display:flex;align-items:center;gap:8px;}
+.cb{padding:16px;}
+
+/* TROPA SELECTOR */
+.tropa-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;}
+.tropa-card{background:var(--card2);border:2px solid var(--brd);border-radius:8px;padding:10px 12px;cursor:pointer;transition:all .2s;position:relative;}
+.tropa-card:hover{border-color:var(--green3);background:var(--card3);}
+.tropa-card.selected{border-color:var(--green);background:rgba(109,186,58,.08);box-shadow:0 0 12px rgba(109,186,58,.15);}
+.tropa-card.selected::after{content:'✓';position:absolute;top:6px;right:8px;color:var(--green);font-size:13px;font-weight:700;}
+.tropa-nombre{font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;color:var(--text);text-transform:uppercase;}
+.tropa-info{font-size:10px;color:var(--t3);margin-top:4px;}
+.tropa-peso{font-size:16px;font-weight:700;color:var(--gs);font-family:'Share Tech Mono',monospace;margin-top:6px;}
+.tropa-cant{font-size:10px;color:var(--t3);}
+
+/* DIETA TABS */
+.dieta-tabs{display:flex;gap:6px;margin-bottom:16px;}
+.dtab{flex:1;padding:10px;border-radius:8px;border:2px solid var(--brd);cursor:pointer;text-align:center;transition:all .2s;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:13px;letter-spacing:1px;text-transform:uppercase;}
+.dtab.A{border-color:rgba(74,184,218,.3);color:rgba(74,184,218,.6);}
+.dtab.A.active{border-color:var(--A);color:var(--A);background:rgba(74,184,218,.08);box-shadow:0 0 16px rgba(74,184,218,.1);}
+.dtab.B{border-color:rgba(232,184,48,.3);color:rgba(232,184,48,.6);}
+.dtab.B.active{border-color:var(--B);color:var(--B);background:rgba(232,184,48,.08);box-shadow:0 0 16px rgba(232,184,48,.1);}
+.dtab.C{border-color:rgba(224,90,74,.3);color:rgba(224,90,74,.6);}
+.dtab.C.active{border-color:var(--C);color:var(--C);background:rgba(224,90,74,.08);box-shadow:0 0 16px rgba(224,90,74,.1);}
+
+/* DIETA FORM */
+.dpg{display:none;}
+.dpg.active{display:block;}
+
+.dieta-header-form{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;}
+@media(max-width:600px){.dieta-header-form{grid-template-columns:1fr;}}
+
+.fm{display:flex;flex-direction:column;gap:4px;}
+.fm label{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--t3);}
+.fm input,.fm select,.fm textarea{background:var(--card2);border:1px solid var(--brd);color:var(--text);padding:8px 10px;border-radius:6px;font-size:13px;font-family:'Exo 2',sans-serif;outline:none;transition:border .12s;}
+.fm input:focus,.fm select:focus{border-color:var(--green2);}
+.fm input[type=number]{font-family:'Share Tech Mono',monospace;}
+
+/* INGREDIENTES */
+.ingr-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px;}
+.ingr-table th{background:var(--card2);color:var(--t3);font-size:10px;letter-spacing:.8px;text-transform:uppercase;padding:8px 10px;text-align:left;border-bottom:1px solid var(--brd2);}
+.ingr-table td{padding:6px 8px;border-bottom:1px solid rgba(42,74,42,.4);}
+.ingr-table tr:last-child td{border-bottom:none;}
+.ingr-table input{background:var(--card3);border:1px solid var(--brd);color:var(--text);padding:5px 8px;border-radius:5px;font-size:12px;width:100%;font-family:'Share Tech Mono',monospace;outline:none;}
+.ingr-table input:focus{border-color:var(--green2);}
+.ingr-del{background:none;border:none;color:var(--t4);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:4px;transition:all .15s;}
+.ingr-del:hover{color:var(--red);background:rgba(224,90,74,.1);}
+
+.btn{padding:8px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all .15s;display:inline-flex;align-items:center;gap:6px;font-family:'Exo 2',sans-serif;letter-spacing:.5px;}
+.bp{background:var(--green2);color:#fff;}
+.bp:hover{background:var(--green);}
+.bs{background:var(--card2);color:var(--t2);border:1px solid var(--brd2);}
+.bs:hover{border-color:var(--green2);color:var(--gs);}
+.bd{background:rgba(224,90,74,.12);color:var(--red);border:1px solid rgba(224,90,74,.25);}
+.btn-sm{padding:5px 10px;font-size:11px;}
+
+/* RESUMEN DIETA */
+.dieta-resumen{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;}
+.dr-item{background:var(--card2);border-radius:6px;padding:10px;text-align:center;}
+.dr-v{font-family:'Share Tech Mono',monospace;font-size:18px;font-weight:700;}
+.dr-l{font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;margin-top:3px;}
+
+/* RESULTADOS */
+.res-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;}
+.res-card{background:var(--card2);border:1px solid var(--brd);border-radius:10px;overflow:hidden;}
+.res-tropa-hdr{padding:12px 14px;border-bottom:1px solid var(--brd);display:flex;align-items:center;justify-content:space-between;}
+.res-tropa-nom{font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;}
+.res-tropa-det{font-size:10px;color:var(--t3);}
+.res-dietas{padding:12px 14px;display:flex;flex-direction:column;gap:8px;}
+.res-dieta-row{display:flex;align-items:center;gap:10px;}
+.res-dieta-label{font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;width:80px;}
+.res-bar-wrap{flex:1;background:var(--card);border-radius:4px;height:8px;overflow:hidden;}
+.res-bar{height:100%;border-radius:4px;transition:width .6s cubic-bezier(.4,0,.2,1);}
+.res-val{font-family:'Share Tech Mono',monospace;font-size:11px;width:90px;text-align:right;}
+.res-gmd{font-size:10px;color:var(--t3);text-align:right;width:90px;}
+
+/* COMPARACION TOTAL */
+.comp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;}
+.comp-card{border-radius:10px;padding:16px;text-align:center;border:2px solid;}
+.comp-card.A{border-color:var(--A);background:rgba(74,184,218,.05);}
+.comp-card.B{border-color:var(--B);background:rgba(232,184,48,.05);}
+.comp-card.C{border-color:var(--C);background:rgba(224,90,74,.05);}
+.comp-letra{font-family:'Rajdhani',sans-serif;font-size:28px;font-weight:700;letter-spacing:2px;}
+.comp-letra.A{color:var(--A);}
+.comp-letra.B{color:var(--B);}
+.comp-letra.C{color:var(--C);}
+.comp-nombre{font-size:11px;color:var(--t3);margin-bottom:8px;font-style:italic;}
+.comp-bs-dia{font-family:'Share Tech Mono',monospace;font-size:22px;font-weight:700;margin-top:6px;}
+.comp-bs-dia.A{color:var(--A);}
+.comp-bs-dia.B{color:var(--B);}
+.comp-bs-dia.C{color:var(--C);}
+.comp-lbl{font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;}
+.comp-gmd-row{margin-top:10px;padding-top:10px;border-top:1px solid var(--brd);}
+.comp-gmd-val{font-family:'Share Tech Mono',monospace;font-size:14px;font-weight:600;color:var(--gs);}
+.comp-badge-mejor{background:rgba(109,186,58,.15);color:var(--gs);font-size:9px;font-weight:700;letter-spacing:.5px;padding:2px 8px;border-radius:4px;text-transform:uppercase;display:inline-block;margin-top:6px;}
+
+/* LOADING */
+.loading{text-align:center;padding:40px;color:var(--t3);}
+.loading-spinner{width:32px;height:32px;border:3px solid var(--brd);border-top-color:var(--green);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* NOTIF */
+#ntf{position:fixed;bottom:18px;right:18px;padding:12px 16px;border-radius:8px;font-size:13px;font-weight:600;z-index:9999;display:none;max-width:340px;line-height:1.4;}
+#ntf.ok{background:#162016;border:1px solid var(--green);color:var(--gs);}
+#ntf.err{background:#2a1010;border:1px solid var(--red);color:#ffaaaa;}
+#ntf.info{background:#101820;border:1px solid var(--blue);color:#aaddff;}
+
+/* EMPTY */
+.emp{text-align:center;padding:32px;color:var(--t3);}
+.emp-ic{font-size:36px;margin-bottom:8px;}
+
+/* TABLA COMPARATIVA */
+.tbl-comp{width:100%;border-collapse:collapse;font-size:12px;}
+.tbl-comp th{background:var(--card2);color:var(--t3);font-size:10px;letter-spacing:.8px;text-transform:uppercase;padding:9px 10px;text-align:left;border-bottom:2px solid var(--brd2);}
+.tbl-comp td{padding:8px 10px;border-bottom:1px solid var(--brd);vertical-align:middle;}
+.tbl-comp tr:last-child td{border-bottom:none;}
+.tbl-comp tr:hover td{background:rgba(109,186,58,.03);}
+.mono{font-family:'Share Tech Mono',monospace;font-size:11px;}
+.mejor{color:var(--gs);font-weight:700;}
+
+/* EFICIENCIA */
+.efic-card{background:var(--card2);border-radius:8px;padding:14px;border-left:3px solid var(--teal);}
+.efic-title{font-family:'Rajdhani',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--teal);margin-bottom:8px;}
+.efic-val{font-family:'Share Tech Mono',monospace;font-size:20px;font-weight:700;color:var(--text);}
+.efic-sub{font-size:10px;color:var(--t3);margin-top:3px;}
+
+@media(max-width:700px){
+  .comp-grid{grid-template-columns:1fr;}
+  .dieta-resumen{grid-template-columns:repeat(2,1fr);}
+  .res-grid{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+<div id="ntf"></div>
+
+<div class="hdr">
+  <div class="hdr-logo">
+    <div class="hdr-icon">🧪</div>
+    <div>
+      <div class="hdr-t">Evaluador de Dietas</div>
+      <div class="hdr-s">El Prado 1 — San Ignacio de Velazco</div>
+    </div>
+  </div>
+  <div class="hdr-r">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusTxt" style="font-size:11px;color:var(--t3);">Conectando...</span>
+    <a href="insumos_elprado1__1_.html" class="btn-back">← Insumos</a>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- PASO 1: TROPAS -->
+  <div class="sec-title">① Seleccionar Tropas a Evaluar</div>
+  <div class="card">
+    <div class="ch">
+      <div class="ct">🐄 Grupos de Animales</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span id="tropaSelCount" style="font-size:11px;color:var(--t3);">0 seleccionadas</span>
+        <button class="btn bs btn-sm" onclick="selAll()">Todas</button>
+        <button class="btn bs btn-sm" onclick="deselAll()">Ninguna</button>
+      </div>
+    </div>
+    <div class="cb">
+      <div id="tropaGrid" class="tropa-grid">
+        <div class="loading"><div class="loading-spinner"></div>Cargando animales...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PASO 2: DIETAS -->
+  <div class="sec-title">② Definir Dietas (A, B, C)</div>
+  <div class="card">
+    <div class="ch"><div class="ct">🌾 Configuración de Dietas</div></div>
+    <div class="cb">
+
+      <div class="dieta-tabs">
+        <div class="dtab A active" onclick="showDieta('A')">⬡ Dieta A</div>
+        <div class="dtab B" onclick="showDieta('B')">⬡ Dieta B</div>
+        <div class="dtab C" onclick="showDieta('C')">⬡ Dieta C</div>
+      </div>
+
+      <!-- DIETA A -->
+      <div class="dpg active" id="dpg-A">
+        <div class="dieta-header-form">
+          <div class="fm">
+            <label>Nombre de la Dieta A</label>
+            <input type="text" id="dA-nombre" placeholder="Ej: Suplemento Proteico Base" value="Dieta A">
+          </div>
+          <div class="fm">
+            <label>GMD Esperada (g/día)</label>
+            <input type="number" id="dA-gmd" placeholder="Ej: 600" min="0" step="10" oninput="calcResumen('A')">
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">Ingredientes</div>
+        <table class="ingr-table">
+          <thead><tr>
+            <th>Ingrediente</th>
+            <th>Precio (Bs/ton)</th>
+            <th>Consumo (g/kg PV/día)</th>
+            <th style="width:40px;"></th>
+          </tr></thead>
+          <tbody id="ingr-A"></tbody>
+        </table>
+        <button class="btn bs btn-sm" onclick="addIngr('A')">+ Agregar Ingrediente</button>
+        <div class="dieta-resumen" id="res-A">
+          <div class="dr-item"><div class="dr-v" style="color:var(--A);" id="rA-costo">—</div><div class="dr-l">Bs/kg PV/día</div></div>
+          <div class="dr-item"><div class="dr-v" style="color:var(--gs);" id="rA-gmd">—</div><div class="dr-l">GMD Esperada</div></div>
+          <div class="dr-item"><div class="dr-v" style="color:var(--gold2);" id="rA-efic">—</div><div class="dr-l">Bs por g GMD</div></div>
+        </div>
+      </div>
+
+      <!-- DIETA B -->
+      <div class="dpg" id="dpg-B">
+        <div class="dieta-header-form">
+          <div class="fm">
+            <label>Nombre de la Dieta B</label>
+            <input type="text" id="dB-nombre" placeholder="Ej: Suplemento Energético" value="Dieta B">
+          </div>
+          <div class="fm">
+            <label>GMD Esperada (g/día)</label>
+            <input type="number" id="dB-gmd" placeholder="Ej: 700" min="0" step="10" oninput="calcResumen('B')">
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">Ingredientes</div>
+        <table class="ingr-table">
+          <thead><tr>
+            <th>Ingrediente</th>
+            <th>Precio (Bs/ton)</th>
+            <th>Consumo (g/kg PV/día)</th>
+            <th style="width:40px;"></th>
+          </tr></thead>
+          <tbody id="ingr-B"></tbody>
+        </table>
+        <button class="btn bs btn-sm" onclick="addIngr('B')">+ Agregar Ingrediente</button>
+        <div class="dieta-resumen" id="res-B">
+          <div class="dr-item"><div class="dr-v" style="color:var(--B);" id="rB-costo">—</div><div class="dr-l">Bs/kg PV/día</div></div>
+          <div class="dr-item"><div class="dr-v" style="color:var(--gs);" id="rB-gmd">—</div><div class="dr-l">GMD Esperada</div></div>
+          <div class="dr-item"><div class="dr-v" style="color:var(--gold2);" id="rB-efic">—</div><div class="dr-l">Bs por g GMD</div></div>
+        </div>
+      </div>
+
+      <!-- DIETA C -->
+      <div class="dpg" id="dpg-C">
+        <div class="dieta-header-form">
+          <div class="fm">
+            <label>Nombre de la Dieta C</label>
+            <input type="text" id="dC-nombre" placeholder="Ej: Solo Sal Mineral" value="Dieta C">
+          </div>
+          <div class="fm">
+            <label>GMD Esperada (g/día)</label>
+            <input type="number" id="dC-gmd" placeholder="Ej: 400" min="0" step="10" oninput="calcResumen('C')">
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">Ingredientes</div>
+        <table class="ingr-table">
+          <thead><tr>
+            <th>Ingrediente</th>
+            <th>Precio (Bs/ton)</th>
+            <th>Consumo (g/kg PV/día)</th>
+            <th style="width:40px;"></th>
+          </tr></thead>
+          <tbody id="ingr-C"></tbody>
+        </table>
+        <button class="btn bs btn-sm" onclick="addIngr('C')">+ Agregar Ingrediente</button>
+        <div class="dieta-resumen" id="res-C">
+          <div class="dr-item"><div class="dr-v" style="color:var(--C);" id="rC-costo">—</div><div class="dr-l">Bs/kg PV/día</div></div>
+          <div class="dr-item"><div class="dr-v" style="color:var(--gs);" id="rC-gmd">—</div><div class="dr-l">GMD Esperada</div></div>
+          <div class="dr-item"><div class="dr-v" style="color:var(--gold2);" id="rC-efic">—</div><div class="dr-l">Bs por g GMD</div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- CALCULAR -->
+  <div style="text-align:center;margin-bottom:20px;">
+    <button class="btn bp" style="padding:12px 32px;font-size:14px;letter-spacing:1px;" onclick="calcular()">
+      ⚡ CALCULAR EVALUACIÓN
+    </button>
+  </div>
+
+  <!-- PASO 3: RESULTADOS -->
+  <div id="resultados" style="display:none;">
+
+    <div class="sec-title">③ Comparación Total del Rodeo</div>
+    <div class="comp-grid" id="compTotal"></div>
+
+    <div class="sec-title">④ Detalle por Tropa</div>
+    <div class="card">
+      <div class="ch"><div class="ct">📊 Costo Diario por Tropa (Bs/día)</div></div>
+      <div class="cb" style="overflow-x:auto;">
+        <table class="tbl-comp" id="tblDetalle">
+          <thead><tr>
+            <th>Tropa</th>
+            <th>Animales</th>
+            <th>Peso Prom. (kg)</th>
+            <th>Biomasa (kg)</th>
+            <th id="th-A" style="color:var(--A);">Dieta A (Bs/día)</th>
+            <th id="th-B" style="color:var(--B);">Dieta B (Bs/día)</th>
+            <th id="th-C" style="color:var(--C);">Dieta C (Bs/día)</th>
+            <th>Mejor opción</th>
+          </tr></thead>
+          <tbody id="tblDetalleBody"></tbody>
+          <tfoot id="tblDetalleFoot"></tfoot>
+        </table>
+      </div>
+    </div>
+
+    <div class="sec-title">⑤ Eficiencia Económica</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:20px;" id="eficGrid"></div>
+
+  </div>
+
+</div>
+
+<script>
+const FB = 'https://elprado1-153ef-default-rtdb.firebaseio.com/elprado1/hacienda';
+const GRU_ORD = [
+  'VAQ. VENTA','VAQ. CABEZA','VAQ. CUERPO','VAQ. COLA 1','VAQ. COLA 2','VAQ. COLA 3',
+  'TOR. VENTA','TOR. CABEZA','TOR. CUERPO','TOR. COLA 1','TOR. COLA 2','TOR. COLA 3',
+  'VAQ. CRIA CABEZA','VAQ. CRIA CUERPO','VAQ. CRIA COLA 1','VAQ. CRIA COLA 2',
+  'TOR. CRIA CABEZA','TOR. CRIA CUERPO'
+];
+
+let animalesData = {};
+let pesajesData = [];
+let tropasResumen = []; // [{grupo, cant, pesoPromedio}]
+let tropasSeleccionadas = new Set();
+let ingrCounter = {A:0, B:0, C:0};
+
+// ══════ FIREBASE ══════
+async function fbGet(path){
+  try{
+    const r = await fetch(FB+'/'+path+'.json');
+    return r.ok ? await r.json() : null;
+  }catch(e){return null;}
+}
+
+// ══════ INIT ══════
+async function init(){
+  setStatus('Cargando...','var(--gold2)');
+  const [rA, rP] = await Promise.all([fbGet('animales'), fbGet('pesajes')]);
+  if(!rA){ setStatus('Sin conexión','var(--red)'); ntf('No se pudo conectar con Firebase','err'); return; }
+  animalesData = rA || {};
+  pesajesData  = rP ? Object.values(rP) : [];
+  setStatus('Conectado','var(--green)');
+  buildTropas();
+  // Agregar ingrediente por defecto
+  ['A','B','C'].forEach(d => addIngr(d));
+}
+
+function setStatus(txt, color){
+  document.getElementById('statusTxt').textContent = txt;
+  document.getElementById('statusTxt').style.color = color;
+  document.getElementById('statusDot').style.background = color;
+  document.getElementById('statusDot').style.boxShadow = `0 0 8px ${color}`;
+}
+
+// ══════ TROPAS ══════
+function buildTropas(){
+  // Índice último pesaje por animal
+  const ultPeso = {};
+  pesajesData.sort((a,b)=> new Date(b.fecha)-new Date(a.fecha)).forEach(p=>{
+    if(!ultPeso[p.ide]) ultPeso[p.ide] = p.peso;
+  });
+
+  // Agrupar animales activos por grupo
+  const gmap = {};
+  Object.values(animalesData).forEach(a=>{
+    if(a.estado !== 'ACTIVO') return;
+    const g = a.grupo || 'SIN GRUPO';
+    if(!gmap[g]) gmap[g] = {grupo:g, cant:0, pesos:[]};
+    gmap[g].cant++;
+    const p = ultPeso[a.ide] || a.peso || 0;
+    if(p>0) gmap[g].pesos.push(p);
+  });
+
+  tropasResumen = Object.values(gmap).map(g=>({
+    grupo: g.grupo,
+    cant: g.cant,
+    pesoPromedio: g.pesos.length ? Math.round(g.pesos.reduce((a,b)=>a+b,0)/g.pesos.length) : 0,
+    biomasa: g.pesos.length ? Math.round(g.pesos.reduce((a,b)=>a+b,0)) : 0
+  })).sort((a,b)=>{
+    const ia = GRU_ORD.indexOf(a.grupo), ib = GRU_ORD.indexOf(b.grupo);
+    if(ia>=0&&ib>=0) return ia-ib;
+    if(ia>=0) return -1; if(ib>=0) return 1;
+    return a.grupo.localeCompare(b.grupo);
+  });
+
+  if(!tropasResumen.length){
+    document.getElementById('tropaGrid').innerHTML = '<div class="emp"><div class="emp-ic">🐄</div>No hay animales activos</div>';
+    return;
+  }
+
+  // Seleccionar todas por defecto
+  tropasResumen.forEach(t=>tropasSeleccionadas.add(t.grupo));
+
+  renderTropas();
+}
+
+function renderTropas(){
+  const g = document.getElementById('tropaGrid');
+  if(!tropasResumen.length){ g.innerHTML='<div class="emp">Sin datos</div>'; return; }
+  g.innerHTML = tropasResumen.map(t=>`
+    <div class="tropa-card ${tropasSeleccionadas.has(t.grupo)?'selected':''}" onclick="toggleTropa('${t.grupo}')">
+      <div class="tropa-nombre">${t.grupo}</div>
+      <div class="tropa-peso">${t.pesoPromedio > 0 ? t.pesoPromedio+' kg' : '—'}</div>
+      <div class="tropa-cant">${t.cant} animales${t.pesoPromedio>0?' · '+fmtNum(t.biomasa)+' kg total':''}</div>
+    </div>
+  `).join('');
+  document.getElementById('tropaSelCount').textContent = tropasSeleccionadas.size+' seleccionadas';
+}
+
+function toggleTropa(g){
+  if(tropasSeleccionadas.has(g)) tropasSeleccionadas.delete(g);
+  else tropasSeleccionadas.add(g);
+  renderTropas();
+}
+function selAll(){ tropasResumen.forEach(t=>tropasSeleccionadas.add(t.grupo)); renderTropas(); }
+function deselAll(){ tropasSeleccionadas.clear(); renderTropas(); }
+
+// ══════ DIETA TABS ══════
+function showDieta(d){
+  document.querySelectorAll('.dtab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.dpg').forEach(p=>p.classList.remove('active'));
+  document.querySelector(`.dtab.${d}`).classList.add('active');
+  document.getElementById('dpg-'+d).classList.add('active');
+}
+
+// ══════ INGREDIENTES ══════
+function addIngr(d){
+  const id = ++ingrCounter[d];
+  const tbody = document.getElementById('ingr-'+d);
+  const tr = document.createElement('tr');
+  tr.id = `ingr-${d}-${id}`;
+  tr.innerHTML = `
+    <td><input type="text" placeholder="Ej: Afrechillo de trigo" id="in-${d}-${id}-nom"></td>
+    <td><input type="number" placeholder="Ej: 1800" min="0" step="10" id="in-${d}-${id}-prc" oninput="calcResumen('${d}')"></td>
+    <td><input type="number" placeholder="Ej: 5.0" min="0" step="0.1" id="in-${d}-${id}-con" oninput="calcResumen('${d}')"></td>
+    <td><button class="ingr-del" onclick="delIngr('${d}',${id})">✕</button></td>
+  `;
+  tbody.appendChild(tr);
+}
+
+function delIngr(d, id){
+  const el = document.getElementById(`ingr-${d}-${id}`);
+  if(el) el.remove();
+  calcResumen(d);
+}
+
+function getIngredientes(d){
+  const rows = document.querySelectorAll(`#ingr-${d} tr`);
+  const ingrs = [];
+  rows.forEach(tr=>{
+    const parts = tr.id.split('-');
+    const id = parts[parts.length-1];
+    const nom = document.getElementById(`in-${d}-${id}-nom`)?.value||'';
+    const prc = parseFloat(document.getElementById(`in-${d}-${id}-prc`)?.value)||0;
+    const con = parseFloat(document.getElementById(`in-${d}-${id}-con`)?.value)||0;
+    if(prc>0||con>0) ingrs.push({nom, prc, con});
+  });
+  return ingrs;
+}
+
+function calcCostoPorKgPV(d){
+  // Retorna Bs por kg PV por día
+  const ingrs = getIngredientes(d);
+  let total = 0;
+  ingrs.forEach(i=>{
+    // precio en Bs/ton = Bs/1000kg. Consumo en g/kg PV/día = consumo/1000 kg/kg PV/día
+    // costo = (precio Bs/ton / 1000) * (consumo g/kgPV/dia / 1000)  * 1000 = precio/1000 * consumo/1000 * 1000
+    // simplificado: (precio * consumo) / 1,000,000 * 1000 = precio * consumo / 1000
+    total += (i.prc * i.con) / 1000000 * 1000; // Bs/kgPV/dia
+    // = i.prc [Bs/ton] / 1000 [ton→kg] * i.con [g/kgPV/d] / 1000 [g→kg]
+    // = i.prc * i.con / 1_000_000  (Bs / kgPV / día)
+  });
+  return total;
+}
+
+function calcResumen(d){
+  const costo = calcCostoPorKgPV(d); // Bs/kgPV/dia
+  const gmd = parseFloat(document.getElementById(`d${d}-gmd`).value)||0;
+  const efic = gmd>0 ? costo*1000/gmd : 0; // Bs por g GMD
+
+  document.getElementById(`r${d}-costo`).textContent = costo>0 ? fmtDec(costo) : '—';
+  document.getElementById(`r${d}-gmd`).textContent = gmd>0 ? gmd+' g' : '—';
+  document.getElementById(`r${d}-efic`).textContent = efic>0 ? fmtDec(efic) : '—';
+}
+
+// ══════ CALCULAR ══════
+function calcular(){
+  const tropas = tropasResumen.filter(t=>tropasSeleccionadas.has(t.grupo)&&t.pesoPromedio>0&&t.cant>0);
+  if(!tropas.length){ ntf('Seleccioná al menos una tropa con peso registrado','err'); return; }
+
+  const dietas = ['A','B','C'].map(d=>({
+    letra: d,
+    nombre: document.getElementById(`d${d}-nombre`).value || `Dieta ${d}`,
+    costoPorKgPV: calcCostoPorKgPV(d),
+    gmd: parseFloat(document.getElementById(`d${d}-gmd`).value)||0,
+    ingredientes: getIngredientes(d)
+  }));
+
+  if(dietas.every(d=>d.costoPorKgPV===0)){ ntf('Ingresá precio y consumo en al menos una dieta','err'); return; }
+
+  // Actualizar headers
+  ['A','B','C'].forEach(d=>{
+    const diet = dietas.find(x=>x.letra===d);
+    document.getElementById(`th-${d}`).textContent = `${diet.nombre} (Bs/día)`;
+    document.getElementById(`th-${d}`).style.color = `var(--${d})`;
+  });
+
+  // Calcular por tropa
+  const filas = tropas.map(t=>{
+    const biomasa = t.pesoPromedio * t.cant;
+    const costos = dietas.map(d=>({
+      letra: d.letra,
+      nombre: d.nombre,
+      bsDia: d.costoPorKgPV * biomasa,
+      gmd: d.gmd,
+      efic: d.gmd>0 ? d.costoPorKgPV*1000/d.gmd : 0
+    }));
+    // Mejor: menor Bs/día (entre dietas con precio > 0)
+    const activas = costos.filter(c=>c.bsDia>0);
+    const mejor = activas.length ? activas.reduce((a,b)=>a.bsDia<b.bsDia?a:b) : null;
+    return {tropa: t, costos, mejor, biomasa};
+  });
+
+  // Totales
+  const totales = dietas.map(d=>({
+    letra: d.letra,
+    nombre: d.nombre,
+    gmd: d.gmd,
+    total: filas.reduce((s,f)=>{
+      const c = f.costos.find(x=>x.letra===d.letra);
+      return s + (c?c.bsDia:0);
+    },0)
+  }));
+  const mejorTotal = totales.filter(t=>t.total>0).reduce((a,b)=>a.total<b.total?a:b, {total:Infinity});
+
+  // Render comparación total
+  document.getElementById('compTotal').innerHTML = totales.map(d=>`
+    <div class="comp-card ${d.letra}">
+      <div class="comp-letra ${d.letra}">${d.letra}</div>
+      <div class="comp-nombre">${d.nombre}</div>
+      <div class="comp-bs-dia ${d.letra}">${d.total>0?'Bs '+fmtNum(Math.round(d.total)):'—'}</div>
+      <div class="comp-lbl">Costo total / día</div>
+      ${d.gmd>0?`<div class="comp-gmd-row"><div class="comp-lbl">GMD esperada</div><div class="comp-gmd-val">${d.gmd} g/día</div></div>`:''}
+      ${d.total>0&&d.letra===mejorTotal.letra?`<div class="comp-badge-mejor">✓ Más económica</div>`:''}
+    </div>
+  `).join('');
+
+  // Render tabla detalle
+  const maxCosto = Math.max(...filas.flatMap(f=>f.costos.map(c=>c.bsDia)));
+  document.getElementById('tblDetalleBody').innerHTML = filas.map(f=>`
+    <tr>
+      <td style="font-family:'Rajdhani',sans-serif;font-weight:700;letter-spacing:.5px;">${f.tropa.grupo}</td>
+      <td class="mono">${f.tropa.cant}</td>
+      <td class="mono">${f.tropa.pesoPromedio} kg</td>
+      <td class="mono">${fmtNum(Math.round(f.biomasa))} kg</td>
+      ${f.costos.map(c=>`
+        <td class="mono ${f.mejor&&f.mejor.letra===c.letra&&c.bsDia>0?'mejor':''}">
+          ${c.bsDia>0?'Bs '+fmtNum(Math.round(c.bsDia)):'—'}
+        </td>
+      `).join('')}
+      <td>${f.mejor?`<span style="color:var(--${f.mejor.letra});font-family:'Rajdhani',sans-serif;font-weight:700;">${f.mejor.letra} — ${f.mejor.nombre}</span>`:'—'}</td>
+    </tr>
+  `).join('');
+
+  // Fila totales
+  document.getElementById('tblDetalleFoot').innerHTML = `
+    <tr style="background:var(--card2);font-weight:700;">
+      <td colspan="3" style="font-family:'Rajdhani',sans-serif;letter-spacing:.5px;">TOTAL RODEO</td>
+      <td class="mono">${fmtNum(Math.round(filas.reduce((s,f)=>s+f.biomasa,0)))} kg</td>
+      ${totales.map(d=>`<td class="mono ${d.letra===mejorTotal.letra&&d.total>0?'mejor':''}">${d.total>0?'Bs '+fmtNum(Math.round(d.total)):'—'}</td>`).join('')}
+      <td style="color:var(--${mejorTotal.letra});font-family:'Rajdhani',sans-serif;font-weight:700;">${mejorTotal.total<Infinity?mejorTotal.letra+' — '+mejorTotal.nombre:'—'}</td>
+    </tr>
+  `;
+
+  // Eficiencia económica
+  const biomTotal = filas.reduce((s,f)=>s+f.biomasa,0);
+  document.getElementById('eficGrid').innerHTML = dietas.filter(d=>d.costoPorKgPV>0).map(d=>{
+    const tot = totales.find(t=>t.letra===d.letra);
+    const bsPorAnimal = tot.total/filas.reduce((s,f)=>s+f.tropa.cant,0);
+    const bsPorGGMD = d.gmd>0 ? (d.costoPorKgPV*1000/d.gmd) : 0;
+    return `
+      <div class="efic-card" style="border-left-color:var(--${d.letra});">
+        <div class="efic-title" style="color:var(--${d.letra});">${d.letra} — ${d.nombre}</div>
+        <div class="efic-val">${bsPorAnimal>0?'Bs '+fmtDec(bsPorAnimal):'—'}</div>
+        <div class="efic-sub">por animal / día</div>
+        ${bsPorGGMD>0?`<div style="margin-top:8px;"><div class="efic-val" style="font-size:15px;">Bs ${fmtDec(bsPorGGMD)}</div><div class="efic-sub">por gramo de GMD</div></div>`:''}
+      </div>
+    `;
+  }).join('');
+
+  document.getElementById('resultados').style.display = 'block';
+  document.getElementById('resultados').scrollIntoView({behavior:'smooth',block:'start'});
+  ntf('Evaluación calculada correctamente','ok');
+}
+
+// ══════ UTILS ══════
+function fmtNum(n){ return n.toLocaleString('es-BO'); }
+function fmtDec(n){ return n.toFixed(4).replace(/\.?0+$/,'').replace('.',',') || '0'; }
+
+function ntf(msg, type='ok'){
+  const el = document.getElementById('ntf');
+  el.textContent = msg;
+  el.className = type;
+  el.style.display = 'block';
+  clearTimeout(window._ntfT);
+  window._ntfT = setTimeout(()=>el.style.display='none', 3500);
+}
+
+// ══════ START ══════
+init();
+</script>
+</body>
+</html>
