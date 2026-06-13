@@ -753,36 +753,9 @@ function toggleOcultarSaldo(ci) {
     renderSaldo();
 }
 
-function recalcularVacPendientesDesdeHistorial() {
-    // Recalcula vacPendientes para cada persona leyendo el historial de cierres
-    // y la asistencia registrada — corrige errores de cálculo anteriores
-    var db = JSON.parse(localStorage.getItem('personalFijoDB')) || [];
-    var hist = JSON.parse(localStorage.getItem('asistFijoCierres')) || [];
-    if (!hist.length || !db.length) return;
-
-    var actualizado = false;
-    db.forEach(function(p) {
-        var vacAcum = parseFloat(p.vacPendientesBase) || 0; // base original pre-sistema
-        hist.forEach(function(cierre) {
-            // días correspondientes en ese período
-            var corr = diasVacEnPeriodo(p.ingreso, cierre.periodoIni, cierre.periodoFin);
-            // días tomados en ese período (buscar en los pagos del cierre)
-            var pago = (cierre.pagos || []).find(function(pg){ return pg.ci === p.ci; });
-            var tomados = (pago && pago.det && pago.det.vacTomados) ? pago.det.vacTomados : 0;
-            vacAcum = vacAcum + corr - tomados;
-        });
-        if (p.vacPendientes !== vacAcum) {
-            p.vacPendientes = vacAcum;
-            actualizado = true;
-        }
-    });
-    if (actualizado) {
-        localStorage.setItem('personalFijoDB', JSON.stringify(db));
-    }
-}
+// función eliminada — el recálculo automático sobreescribía valores manuales
 
 function renderSaldo() {
-    recalcularVacPendientesDesdeHistorial();
     var db = JSON.parse(localStorage.getItem('personalFijoDB')) || [];
     var hoy = new Date(); hoy.setHours(0,0,0,0);
     var perIniStr = getPeriodoInicio();
@@ -977,11 +950,14 @@ function confirmarCierre() {
         db[idx].saldoArrastrado = saldoNeg;
 
         // — Vacaciones: usar aniversarios que cayeron DENTRO del período cerrado
+        // vacPendientes actual YA incluye el saldo previo — solo sumar/restar este período
         var diasCorr  = diasVacEnPeriodo(db[idx].ingreso, draftCierre.periodoIni, draftCierre.periodoFin);
         var vacPend   = parseFloat(db[idx].vacPendientes) || 0;
         var vacTom    = (pg.det && pg.det.vacTomados) ? pg.det.vacTomados : 0;
         var nuevoVacPend = vacPend + diasCorr - vacTom;
         db[idx].vacPendientes = nuevoVacPend;
+        // Guardar base para referencia futura
+        db[idx].vacPendientesBase = nuevoVacPend;
 
         actualizado = true;
     });
