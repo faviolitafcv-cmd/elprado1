@@ -667,7 +667,9 @@ function renderTodo() {
     var perIniFecha = parseISO(perIni);
 
     db.forEach(function(p) {
-        var det = calcularDetalle(p.ci, perIniFecha, hoy);
+        var _iniCalc = perIniFecha;
+        if (p.ingreso) { var _ing = parseISO(p.ingreso); if (_ing > _iniCalc) _iniCalc = _ing; }
+        var det = calcularDetalle(p.ci, _iniCalc, hoy);
         var saldo = det.saldo;
         var sCls = saldo>0?'color:#2e7d32;font-weight:bold;':saldo<0?'color:#b71c1c;font-weight:bold;':'color:#9e9e9e;';
 
@@ -827,7 +829,13 @@ function renderSaldo() {
     });
 
     db.forEach(function(p) {
-        var r = calcularDetalle(p.ci, perIni, perFin);
+        // Usar la fecha más reciente entre inicio de período y fecha de ingreso
+        var fechaInicioCalculo = perIni;
+        if (p.ingreso) {
+            var fechaIng = parseISO(p.ingreso);
+            if (fechaIng > perIni) fechaInicioCalculo = fechaIng;
+        }
+        var r = calcularDetalle(p.ci, fechaInicioCalculo, perFin);
         var arrastrado = getSaldoArrastrado(p.ci);
         var saldoTotal = r.saldo + arrastrado;
         var sCls = saldoTotal>0?'sb-pos':saldoTotal<0?'sb-neg':'sb-cero';
@@ -921,7 +929,9 @@ function abrirCierre(desdeISO, hastaISO) {
 
     var totalBs = 0;
     dbCierre.forEach(function(p) {
-        var r = calcularDetalle(p.ci, perIni, perFin);
+        var _iniCalc2 = perIni;
+        if (p.ingreso) { var _ing2 = parseISO(p.ingreso); if (_ing2 > _iniCalc2) _iniCalc2 = _ing2; }
+        var r = calcularDetalle(p.ci, _iniCalc2, perFin);
         var arrastrado = getSaldoArrastrado(p.ci);
         var saldoTotal = r.saldo + arrastrado;
         var liq = parseLiquido(p.liquido);
