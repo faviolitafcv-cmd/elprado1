@@ -233,6 +233,12 @@ localStorage.setItem = function(key, value) {
     <h3 style="color:#1565c0;border-bottom:2px solid #1565c0;padding-bottom:6px;">
         📊 Saldo de Descansos Acumulado por Persona
     </h3>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+        <label style="font-size:13px;color:#555;font-weight:600;">📅 Inicio del período activo:</label>
+        <input type="date" id="inputPeriodoInicio" onchange="cambiarPeriodoInicio(this.value)"
+            style="padding:5px 10px;border:2px solid #1565c0;border-radius:6px;font-size:13px;color:#1565c0;font-weight:bold;cursor:pointer;">
+        <span style="font-size:11px;color:#999;">← cambialo después de cada pago</span>
+    </div>
     <div id="saldo-periodo-info" style="font-size:13px;color:#666;margin-bottom:10px;"></div>
     <div class="grid-saldo" id="grid-saldo"></div>
 </div>
@@ -340,6 +346,18 @@ function safeCi(ci) { return ci.replace(/[^a-zA-Z0-9]/g,'_'); }
 
 function getPeriodoInicio() {
     return localStorage.getItem('asistFijoPeriodoInicio') || INICIO;
+}
+
+function cambiarPeriodoInicio(nuevaFecha) {
+    if (!nuevaFecha) return;
+    localStorage.setItem('asistFijoPeriodoInicio', nuevaFecha);
+    // Subir a Firebase
+    fetch('https://elprado1-153ef-default-rtdb.firebaseio.com/rrhh/asistFijoPeriodoInicio.json', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(nuevaFecha)
+    }).catch(function(){});
+    renderSaldo();
 }
 
 function kA(ci,y,m,d) {
@@ -731,8 +749,12 @@ function toggleOcultarSaldo(ci) {
 function renderSaldo() {
     var db = JSON.parse(localStorage.getItem('personalFijoDB')) || [];
     var hoy = new Date(); hoy.setHours(0,0,0,0);
-    var perIni = parseISO(getPeriodoInicio());
+    var perIniStr = getPeriodoInicio();
+    var perIni = parseISO(perIniStr);
     var perFin = hoy;
+    // Poblar input con la fecha actual del período
+    var inp = document.getElementById('inputPeriodoInicio');
+    if (inp) inp.value = perIniStr;
     var ocultos = getSaldoOcultos();
 
     document.getElementById('saldo-periodo-info').innerHTML =
