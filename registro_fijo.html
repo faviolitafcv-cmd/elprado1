@@ -75,6 +75,19 @@ localStorage.setItem = function(key, value) {
 // Sincronizar al cargar
 (async function() {
   await syncRrhhFromFirebase();
+  // Corregir vacPendientes negativos causados por error en cierre anterior
+  // Solo aplica si el valor guardado es negativo (no debería serlo nunca)
+  var db = JSON.parse(localStorage.getItem('personalFijoDB')) || [];
+  var needsFix = false;
+  db.forEach(function(p) {
+    if (parseFloat(p.vacPendientes) < 0) {
+      p.vacPendientes = 0;
+      needsFix = true;
+    }
+  });
+  if (needsFix) {
+    localStorage.setItem('personalFijoDB', JSON.stringify(db));
+  }
 })();
 
 </script>
@@ -352,7 +365,7 @@ localStorage.setItem = function(key, value) {
                 familia: familiares,
                 liquido: document.getElementById('liquido-pagable').value,
                 excluirAsistencia: document.getElementById('excluir-asistencia').checked,
-                vacPendientes: parseFloat(document.getElementById('vac-pendientes').value) || 0
+                vacPendientes: Math.max(0, parseFloat(document.getElementById('vac-pendientes').value) || 0)
             };
 
             let db = JSON.parse(localStorage.getItem('personalFijoDB')) || [];
@@ -403,7 +416,7 @@ localStorage.setItem = function(key, value) {
                 if(document.getElementById('email'))   document.getElementById('email').value   = p.email   || '';
                 document.getElementById('sueldo-basico').value = p.sueldo;
                 document.getElementById('excluir-asistencia').checked = p.excluirAsistencia || false;
-                if(document.getElementById('vac-pendientes')) document.getElementById('vac-pendientes').value = p.vacPendientes || 0;
+                if(document.getElementById('vac-pendientes')) document.getElementById('vac-pendientes').value = Math.max(0, parseFloat(p.vacPendientes) || 0);
                 document.getElementById('lista-familia').innerHTML = "";
                 if(p.familia) p.familia.forEach(f => agregarFamiliar(f));
                 calcularSueldo();
