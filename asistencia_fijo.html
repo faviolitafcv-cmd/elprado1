@@ -753,7 +753,36 @@ function toggleOcultarSaldo(ci) {
     renderSaldo();
 }
 
+function recalcularVacPendientesDesdeHistorial() {
+    // Recalcula vacPendientes para cada persona leyendo el historial de cierres
+    // y la asistencia registrada — corrige errores de cálculo anteriores
+    var db = JSON.parse(localStorage.getItem('personalFijoDB')) || [];
+    var hist = JSON.parse(localStorage.getItem('asistFijoCierres')) || [];
+    if (!hist.length || !db.length) return;
+
+    var actualizado = false;
+    db.forEach(function(p) {
+        var vacAcum = parseFloat(p.vacPendientesBase) || 0; // base original pre-sistema
+        hist.forEach(function(cierre) {
+            // días correspondientes en ese período
+            var corr = diasVacEnPeriodo(p.ingreso, cierre.periodoIni, cierre.periodoFin);
+            // días tomados en ese período (buscar en los pagos del cierre)
+            var pago = (cierre.pagos || []).find(function(pg){ return pg.ci === p.ci; });
+            var tomados = (pago && pago.det && pago.det.vacTomados) ? pago.det.vacTomados : 0;
+            vacAcum = vacAcum + corr - tomados;
+        });
+        if (p.vacPendientes !== vacAcum) {
+            p.vacPendientes = vacAcum;
+            actualizado = true;
+        }
+    });
+    if (actualizado) {
+        localStorage.setItem('personalFijoDB', JSON.stringify(db));
+    }
+}
+
 function renderSaldo() {
+    recalcularVacPendientesDesdeHistorial();
     var db = JSON.parse(localStorage.getItem('personalFijoDB')) || [];
     var hoy = new Date(); hoy.setHours(0,0,0,0);
     var perIniStr = getPeriodoInicio();
@@ -903,6 +932,29 @@ function abrirCierre(desdeISO, hastaISO) {
     document.getElementById('modal-cierre').classList.add('on');
 }
 
+function diasVacEnPeriodo(fechaIngreso, desdeFecha, hastaFecha) {
+    // Calcula días de vacaciones que se generaron por aniversarios
+    // que caen DENTRO del período cerrado (inclusive)
+    if (!fechaIngreso) return 0;
+    var perIni = parseISO(desdeFecha);
+    var perFin = parseISO(hastaFecha);
+    var p = fechaIngreso.split('-');
+    var iy = +p[0], im = +p[1]-1, id = +p[2];
+    var diasNuevos = 0;
+    for (var y = perIni.getFullYear(); y <= perFin.getFullYear()+1; y++) {
+        var aniv = new Date(y, im, id);
+        if (aniv < perIni) continue;
+        if (aniv > perFin) break;
+        var anosEnEseAniv = y - iy;
+        var dias = 0;
+        if (anosEnEseAniv >= 10) dias = 30;
+        else if (anosEnEseAniv >= 5) dias = 20;
+        else if (anosEnEseAniv >= 1) dias = 15;
+        diasNuevos += dias;
+    }
+    return diasNuevos;
+}
+
 function confirmarCierre() {
     if (!draftCierre) return;
     if (!confirm('¿Confirmar pago y reiniciar saldos desde mañana?')) return;
@@ -924,8 +976,8 @@ function confirmarCierre() {
         var saldoNeg = pg.total < 0 ? pg.total : 0;
         db[idx].saldoArrastrado = saldoNeg;
 
-        // — Vacaciones: saldo pendiente que pasa al nuevo período
-        var diasCorr  = diasVacCorresponden(db[idx].ingreso);
+        // — Vacaciones: usar aniversarios que cayeron DENTRO del período cerrado
+        var diasCorr  = diasVacEnPeriodo(db[idx].ingreso, draftCierre.periodoIni, draftCierre.periodoFin);
         var vacPend   = parseFloat(db[idx].vacPendientes) || 0;
         var vacTom    = (pg.det && pg.det.vacTomados) ? pg.det.vacTomados : 0;
         var nuevoVacPend = vacPend + diasCorr - vacTom;
