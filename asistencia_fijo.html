@@ -172,26 +172,20 @@ localStorage.setItem = function(key, value) {
 (async function() {
   await syncRrhhFromFirebase();
 
-  // ── CORRECCIÓN: arreglar vacPendientes negativos y saldoArrastrado de Percy ──
+  // ── CORRECCIÓN: vacPendientes y saldoArrastrado ──
   var _db = JSON.parse(localStorage.getItem('personalFijoDB')) || [];
   var _fix = false;
   _db.forEach(function(p) {
-    // Corregir vacPendientes negativos
+    // 1. Corregir vacPendientes negativos
     var vp = parseFloat(p.vacPendientes);
     if (!isNaN(vp) && vp < 0) {
-      if (p.ci === '7846189') {
-        p.vacPendientes = 29; // Faviola: tenía 30, tomó 1 en feb-abr
-      } else {
-        p.vacPendientes = 0;
-      }
+      p.vacPendientes = (p.ci === '7846189') ? 29 : 0;
       _fix = true;
     }
-    // Corregir saldoArrastrado de Percy (CI del PDF: el que cerró con -7 días)
-    // Percy Gabriel Vaca Loren — Tractorista 1
-    // Cerraron feb-abr con -7 días, ese valor debe estar en saldoArrastrado
+    // 2. Percy: forzar saldoArrastrado a -7 si no está bien seteado
+    // Cerró feb-abr con -7 días de descanso
     if ((p.nombreCompleto || '').toUpperCase().indexOf('PERCY') >= 0) {
-      var sa = parseFloat(p.saldoArrastrado);
-      if (isNaN(sa) || sa === 0) {
+      if (parseFloat(p.saldoArrastrado) !== -7) {
         p.saldoArrastrado = -7;
         _fix = true;
       }
@@ -205,6 +199,7 @@ localStorage.setItem = function(key, value) {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(_db)
       });
+      console.log('✅ Corrección de datos subida a Firebase');
     } catch(e) { console.log('Error subiendo corrección:', e); }
   }
 })();
