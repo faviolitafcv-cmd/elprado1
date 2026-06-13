@@ -600,11 +600,23 @@ function renderTodo() {
     var diasMes = new Date(anio,mes+1,0).getDate();
     var hoy = new Date(); hoy.setHours(0,0,0,0);
 
+    // Filtrar por fecha de ingreso: solo mostrar si ingresó antes o durante el mes visible
+    var ultimoDiaMes = new Date(anio, mes+1, 0); // último día del mes seleccionado
     var dbFijo = (JSON.parse(localStorage.getItem('personalFijoDB')) || [])
-        .filter(function(p){ return !p.excluirAsistencia; })
+        .filter(function(p){
+            if (p.excluirAsistencia) return false;
+            if (!p.ingreso) return true;
+            var fechaIng = parseISO(p.ingreso);
+            return fechaIng <= ultimoDiaMes; // solo aparece si ya ingresó en este mes
+        })
         .map(function(p){ return Object.assign({}, p, {_tipo:'Fijo'}); });
 
     var dbEventual = (JSON.parse(localStorage.getItem('personalEventualDB')) || [])
+        .filter(function(p){
+            if (!p.ingreso) return true;
+            var fechaIng = parseISO(p.ingreso);
+            return fechaIng <= ultimoDiaMes;
+        })
         .map(function(p){ return Object.assign({}, p, {_tipo:'Eventual'}); });
 
     var db;
