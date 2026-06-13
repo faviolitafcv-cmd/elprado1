@@ -817,8 +817,14 @@ function renderSaldo() {
     var grid = document.getElementById('grid-saldo');
     grid.innerHTML = '';
     
-    // Filtrar ocultos
-    db = db.filter(function(p) { return ocultos.indexOf(p.ci) < 0; });
+    // Filtrar ocultos y excluidos; mostrar solo los que ya ingresaron
+    var hoyISO = toISO(hoy);
+    db = db.filter(function(p) {
+        if (ocultos.indexOf(p.ci) >= 0) return false;
+        if (p.excluirAsistencia) return false;
+        if (p.ingreso && p.ingreso > hoyISO) return false; // aún no ingresó
+        return true;
+    });
 
     db.forEach(function(p) {
         var r = calcularDetalle(p.ci, perIni, perFin);
