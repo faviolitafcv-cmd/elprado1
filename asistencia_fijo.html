@@ -171,6 +171,36 @@ localStorage.setItem = function(key, value) {
 // Sincronizar al cargar
 (async function() {
   await syncRrhhFromFirebase();
+
+  // ── CORRECCIÓN ÚNICA: arreglar vacPendientes negativos en personalFijoDB ──
+  // Causados por error en cierre feb-abr 2026. Se ejecuta, corrige y sube a Firebase.
+  var _db = JSON.parse(localStorage.getItem('personalFijoDB')) || [];
+  var _fix = false;
+  _db.forEach(function(p) {
+    var vp = parseFloat(p.vacPendientes);
+    if (!isNaN(vp) && vp < 0) {
+      // Calcular el valor correcto: base conocida + correspondientes históricos - tomados históricos
+      // Para Faviola (CI 7846189): tenía 30 días antes de feb-2026, tomó 1 → debe ser 29
+      // Para el resto: si es negativo es error, dejar en 0
+      if (p.ci === '7846189') {
+        p.vacPendientes = 29;
+      } else {
+        p.vacPendientes = 0;
+      }
+      _fix = true;
+    }
+  });
+  if (_fix) {
+    localStorage.setItem('personalFijoDB', JSON.stringify(_db));
+    // Subir corrección a Firebase
+    try {
+      await fetch('https://elprado1-153ef-default-rtdb.firebaseio.com/rrhh/personalFijoDB.json', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(_db)
+      });
+    } catch(e) { console.log('Error subiendo corrección vacaciones:', e); }
+  }
 })();
 
 </script>
