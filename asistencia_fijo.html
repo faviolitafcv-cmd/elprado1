@@ -447,6 +447,13 @@ function calcularDetalle(ci, desdeFecha, hastaFecha) {
     return r;
 }
 
+// Obtener saldo arrastrado de períodos anteriores para una persona
+function getSaldoArrastrado(ci) {
+    var db = JSON.parse(localStorage.getItem('personalFijoDB')) || [];
+    var p = db.find(function(x){ return x.ci === ci; });
+    return (p && p.saldoArrastrado) ? parseFloat(p.saldoArrastrado) : 0;
+}
+
 // =========================================================
 // CÁLCULO RESUMEN DEL MES VISIBLE
 // =========================================================
@@ -771,10 +778,13 @@ function renderSaldo() {
 
     db.forEach(function(p) {
         var r = calcularDetalle(p.ci, perIni, perFin);
-        var sCls = r.saldo>0?'sb-pos':r.saldo<0?'sb-neg':'sb-cero';
-        var sLbl = r.saldo>0 ? '⬆️ Le debemos: '+fmtDias(r.saldo)
-                 : r.saldo<0 ? '⬇️ Debe: '+fmtDias(Math.abs(r.saldo))
-                 : '✅ Saldo en cero';
+        var arrastrado = getSaldoArrastrado(p.ci);
+        var saldoTotal = r.saldo + arrastrado;
+        var sCls = saldoTotal>0?'sb-pos':saldoTotal<0?'sb-neg':'sb-cero';
+        var sLbl = (arrastrado < 0 ? '⚠️ Arrastre: '+fmtDias(arrastrado)+' | ' : '')
+                 + (saldoTotal>0 ? '⬆️ Le debemos: '+fmtDias(saldoTotal)
+                 : saldoTotal<0 ? '⬇️ Debe: '+fmtDias(Math.abs(saldoTotal))
+                 : '✅ Saldo en cero');
 
         // VACACIONES
         var diasCorr  = diasVacCorresponden(p.ingreso);
@@ -800,6 +810,7 @@ function renderSaldo() {
             +'<div class="det-row"><span>🔴 Faltas ('+r.faltas+'×3)</span><span>–'+fmtDias(r.faltas*3)+'</span></div>'
             +'<div class="det-row" style="color:#888;font-size:11px;"><span>📋 BM/CAP/PJ/VAC</span><span>'+(r.bajaMed+r.capacit+r.permisos+vacTom)+' días neutros</span></div>'
             +'<div class="saldo-big '+sCls+'">'+sLbl+'</div>'
+            +(arrastrado < 0 ? '<div style="font-size:11px;color:#b71c1c;text-align:center;margin-top:4px;">⚠️ Incluye arrastre de período anterior: '+fmtDias(arrastrado)+'</div>' : '')
 
             // VACACIONES
             +'<div style="font-size:11px;font-weight:bold;color:#006064;margin:10px 0 4px 0;border-top:1px solid #e0e0e0;padding-top:8px;">🏖️ SALDO VACACIONES</div>'
@@ -861,22 +872,25 @@ function abrirCierre(desdeISO, hastaISO) {
     var totalBs = 0;
     dbCierre.forEach(function(p) {
         var r = calcularDetalle(p.ci, perIni, perFin);
+        var arrastrado = getSaldoArrastrado(p.ci);
+        var saldoTotal = r.saldo + arrastrado;
         var liq = parseLiquido(p.liquido);
         var factorDia = liq > 0 ? liq / 30 : 0;
-        var bs = r.saldo > 0 ? Math.round(factorDia * r.saldo * 100) / 100 : 0;
+        var bs = saldoTotal > 0 ? Math.round(factorDia * saldoTotal * 100) / 100 : 0;
         if (bs > 0) totalBs += bs;
-        draftCierre.pagos.push({ci:p.ci, nombre:p.nombreCompleto, cargo:p.cargo||'', det:r, total:r.saldo, liquido:liq, factorDia:factorDia, bs:bs});
-        var rowS = r.saldo>0?'background:#f1f8e9;':r.saldo<0?'background:#ffebee;':'';
+        draftCierre.pagos.push({ci:p.ci, nombre:p.nombreCompleto, cargo:p.cargo||'', det:r, total:saldoTotal, liquido:liq, factorDia:factorDia, bs:bs, arrastrado:arrastrado});
+        var rowS = saldoTotal>0?'background:#f1f8e9;':saldoTotal<0?'background:#ffebee;':'';
         html += '<tr style="'+rowS+'">'
             +'<td class="td-n">'+p.nombreCompleto+'<br><span style="font-size:10px;color:#888;">'+(p.cargo||'')+'</span></td>'
             +'<td>+'+fmtDias(r.ganSabDom)+'</td>'
             +'<td>'+r.ferTrab+' feriado(s)<br><small>+'+fmtDias(r.ganFT)+'</small></td>'
             +'<td>–'+r.descTom+' días</td>'
             +'<td>'+r.faltas+' falta(s)<br><small>–'+fmtDias(r.faltas*3)+'</small></td>'
-            +'<td style="font-weight:bold;font-size:14px;'+(r.saldo>0?'color:#2e7d32;':r.saldo<0?'color:#b71c1c;':'color:#9e9e9e;')+'"><b>'+(r.saldo>=0?'✅ ':'⚠️ ')+fmtDias(r.saldo)+'</b></td>'
+            +(arrastrado < 0 ? '<td style="font-size:11px;color:#b71c1c;">Arrastre: '+fmtDias(arrastrado)+'<br>' : '<td>')
+            +'<b style="font-size:14px;'+(saldoTotal>0?'color:#2e7d32;':saldoTotal<0?'color:#b71c1c;':'color:#9e9e9e;')+'">'+(saldoTotal>=0?'✅ ':'⚠️ ')+fmtDias(saldoTotal)+'</b></td>'
             +'<td style="color:#1565c0;font-size:12px;">'+(liq>0 ? factorDia.toFixed(2)+' Bs/día' : '—')+'</td>'
             +'<td style="font-weight:bold;font-size:14px;color:'+(bs>0?'#880e4f':r.saldo<0?'#b71c1c':'#9e9e9e')+';background:'+(bs>0?'#fce4ec':'')+';">'
-            +(bs>0 ? '💰 '+bs.toFixed(2)+' Bs.' : r.saldo<=0 ? '—' : '<span style="font-size:11px;color:#888;">Sin sueldo cargado</span>')+'</td>'
+            +(bs>0 ? '💰 '+bs.toFixed(2)+' Bs.' : saldoTotal<=0 ? '—' : '<span style="font-size:11px;color:#888;">Sin sueldo cargado</span>')+'</td>'
             +'</tr>';
     });
     html += '<tr style="background:#1a237e;color:white;font-weight:bold;">'
@@ -892,15 +906,45 @@ function abrirCierre(desdeISO, hastaISO) {
 function confirmarCierre() {
     if (!draftCierre) return;
     if (!confirm('¿Confirmar pago y reiniciar saldos desde mañana?')) return;
+
+    // 1. Guardar en historial
     var hist = JSON.parse(localStorage.getItem('asistFijoCierres')) || [];
     hist.push(draftCierre);
     localStorage.setItem('asistFijoCierres', JSON.stringify(hist));
-    // Nuevo período empieza al día siguiente del período cerrado
+
+    // 2. Actualizar cada persona: arrastrar saldo negativo + actualizar vacaciones pendientes
+    var db = JSON.parse(localStorage.getItem('personalFijoDB')) || [];
+    var actualizado = false;
+
+    draftCierre.pagos.forEach(function(pg) {
+        var idx = db.findIndex(function(p){ return p.ci === pg.ci; });
+        if (idx < 0) return;
+
+        // — Saldo negativo de descansos: se guarda como "saldoArrastrado"
+        var saldoNeg = pg.total < 0 ? pg.total : 0;
+        db[idx].saldoArrastrado = saldoNeg;
+
+        // — Vacaciones: saldo pendiente que pasa al nuevo período
+        var diasCorr  = diasVacCorresponden(db[idx].ingreso);
+        var vacPend   = parseFloat(db[idx].vacPendientes) || 0;
+        var vacTom    = (pg.det && pg.det.vacTomados) ? pg.det.vacTomados : 0;
+        var nuevoVacPend = vacPend + diasCorr - vacTom;
+        db[idx].vacPendientes = nuevoVacPend;
+
+        actualizado = true;
+    });
+
+    if (actualizado) {
+        localStorage.setItem('personalFijoDB', JSON.stringify(db));
+    }
+
+    // 3. Avanzar período
     var perFinDate = parseISO(draftCierre.periodoFin);
     perFinDate.setDate(perFinDate.getDate()+1);
     var nuevoIniISO = toISO(perFinDate);
     localStorage.setItem('asistFijoPeriodoInicio', nuevoIniISO);
-    alert('✅ Pago registrado. Nuevo período desde '+fechaHumana(nuevoIniISO)+'.');
+
+    alert('✅ Pago registrado. Nuevo período desde '+fechaHumana(nuevoIniISO)+'.\n\nSaldos negativos y vacaciones pendientes actualizados para cada persona.');
     cerrarModal('modal-cierre');
     renderTodo();
 }
