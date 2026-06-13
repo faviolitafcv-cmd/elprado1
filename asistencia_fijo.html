@@ -732,6 +732,7 @@ function renderSaldo() {
     var db = JSON.parse(localStorage.getItem('personalFijoDB')) || [];
     var hoy = new Date(); hoy.setHours(0,0,0,0);
     var perIni = parseISO(getPeriodoInicio());
+    var perFin = hoy;
     var ocultos = getSaldoOcultos();
 
     document.getElementById('saldo-periodo-info').innerHTML =
