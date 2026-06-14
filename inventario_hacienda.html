@@ -191,6 +191,7 @@ tr:hover td{background:rgba(109,186,58,.04);}
   <div class="tab" onclick="showPg('compras')">📥 Compras</div>
   <div class="tab" onclick="showPg('ventas')">💰 Ventas</div>
   <div class="tab" onclick="showPg('bajas')">📤 Bajas</div>
+  <div class="tab" onclick="showPg('movimientos')">🔄 Movimientos</div>
   <div class="tab" onclick="showPg('informes')">📋 Informes</div>
   <div class="tab" onclick="showPg('proyecciones')">📈 Proyecciones</div>
 </div>
@@ -491,6 +492,189 @@ tr:hover td{background:rgba(109,186,58,.04);}
     </table></div>
     <div style="padding:10px 14px;border-top:1px solid var(--brd);">
       <div class="pag" id="bPag"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ MOVIMIENTOS ═══════ -->
+<div class="pg" id="pg-movimientos">
+
+  <!-- BOTONES DE TIPO -->
+  <div class="ar">
+    <button class="btn bp" onclick="abrirMovimiento('COMPRA')">📥 Compra</button>
+    <button class="btn bp" style="background:var(--green3);" onclick="abrirMovimiento('VENTA')">💰 Venta</button>
+    <button class="btn bg-btn" onclick="abrirMovimiento('INTERNO')">🔄 Movimiento Interno</button>
+    <button class="btn bd" onclick="abrirMovimiento('BAJA')">📤 Baja</button>
+    <div class="sp"></div>
+    <select id="mvFiltTipo" onchange="renderMovimientos()" style="background:var(--card2);border:1px solid var(--brd);color:var(--text);padding:7px 9px;border-radius:5px;font-size:12px;">
+      <option value="">Todos los tipos</option>
+      <option value="COMPRA">📥 Compras</option>
+      <option value="VENTA">💰 Ventas</option>
+      <option value="INTERNO">🔄 Internos</option>
+      <option value="BAJA">📤 Bajas</option>
+    </select>
+    <select id="mvFiltGrupo" onchange="renderMovimientos()" style="background:var(--card2);border:1px solid var(--brd);color:var(--text);padding:7px 9px;border-radius:5px;font-size:12px;">
+      <option value="">Todos los grupos</option>
+    </select>
+    <input type="month" id="mvFiltMes" onchange="renderMovimientos()" style="background:var(--card2);border:1px solid var(--brd);color:var(--text);padding:7px 9px;border-radius:5px;font-size:12px;">
+  </div>
+
+  <!-- RESUMEN STATS -->
+  <div class="stats" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:14px;">
+    <div class="sc"><div class="sc-v" id="mvStatCompras" style="font-size:20px;color:var(--gs);">—</div><div class="sc-l">📥 Compras</div></div>
+    <div class="sc"><div class="sc-v" id="mvStatVentas" style="font-size:20px;color:var(--gold);">—</div><div class="sc-l">💰 Ventas</div></div>
+    <div class="sc"><div class="sc-v" id="mvStatInternos" style="font-size:20px;color:var(--blue);">—</div><div class="sc-l">🔄 Internos</div></div>
+    <div class="sc"><div class="sc-v" id="mvStatBajas" style="font-size:20px;color:var(--red);">—</div><div class="sc-l">📤 Bajas</div></div>
+    <div class="sc"><div class="sc-v" id="mvStatCabTotal" style="font-size:20px;">—</div><div class="sc-l">🐄 Cab. Movidas</div></div>
+  </div>
+
+  <!-- HISTORIAL -->
+  <div class="card">
+    <div class="ch"><div class="ct">📋 Historial de Movimientos</div></div>
+    <div class="tw"><table>
+      <thead><tr>
+        <th>Fecha</th><th>Tipo</th><th>Grupo Origen</th><th>Grupo Destino</th>
+        <th>Cabezas</th><th>Peso Orig.</th><th>Peso Dest.</th>
+        <th>Precio/kg</th><th>Total Bs</th><th>Motivo</th><th>Usuario</th><th></th>
+      </tr></thead>
+      <tbody id="mvBody"><tr><td colspan="12"><div class="emp"><div class="emp-ic">🔄</div>Sin movimientos registrados</div></td></tr></tbody>
+    </table></div>
+    <div style="padding:8px 14px;border-top:1px solid var(--brd);"><div class="pag" id="mvPag"></div></div>
+  </div>
+</div>
+
+<!-- Modal: Movimiento -->
+<div class="mo" id="moMov">
+  <div class="md" style="max-width:640px;">
+    <div class="mh">
+      <div class="mt" id="moMovTit">🔄 Movimiento</div>
+      <button class="mc" onclick="cerrar('moMov')">✕</button>
+    </div>
+    <div class="mb">
+
+      <!-- FECHA Y TIPO -->
+      <div class="fg" style="margin-bottom:14px;">
+        <div class="fm">
+          <label>Fecha del movimiento *</label>
+          <input type="date" id="mvFecha" onchange="mvActualizarGrupoOrigen()">
+        </div>
+        <div class="fm">
+          <label>Tipo</label>
+          <input type="text" id="mvTipoDisplay" readonly style="background:var(--card3);font-weight:700;color:var(--gold);">
+        </div>
+      </div>
+
+      <!-- GRUPO ORIGEN -->
+      <div id="mvSecOrigen" style="background:var(--card2);border:1px solid var(--brd);border-radius:8px;padding:14px;margin-bottom:12px;">
+        <div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:1px;margin-bottom:10px;">GRUPO ORIGEN</div>
+        <div class="fg">
+          <div class="fm">
+            <label>Grupo *</label>
+            <select id="mvGrupoOrigen" onchange="mvActualizarGrupoOrigen()">
+              <option value="">— Seleccioná un grupo —</option>
+            </select>
+          </div>
+          <div class="fm">
+            <label>Cabezas disponibles</label>
+            <input type="text" id="mvCabDisp" readonly style="background:var(--card3);color:var(--gs);font-weight:700;">
+          </div>
+          <div class="fm">
+            <label>Peso medio proyectado (kg)</label>
+            <input type="text" id="mvPesoOrigen" readonly style="background:var(--card3);color:var(--gold);">
+          </div>
+        </div>
+        <div class="fg" style="margin-top:10px;">
+          <div class="fm">
+            <label>Cabezas a mover *</label>
+            <input type="number" id="mvCabezas" min="1" oninput="mvActualizarResumen()">
+          </div>
+          <div class="fm" style="display:flex;align-items:flex-end;">
+            <button class="btn bs btn-sm" onclick="mvTodoElGrupo()" style="margin-bottom:2px;">Todo el grupo</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- GRUPO DESTINO (solo para COMPRA, INTERNO) -->
+      <div id="mvSecDestino" style="background:var(--card2);border:1px solid var(--brd2);border-radius:8px;padding:14px;margin-bottom:12px;display:none;">
+        <div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:1px;margin-bottom:10px;">GRUPO DESTINO</div>
+        <div class="fg">
+          <div class="fm" style="grid-column:1/-1;">
+            <label>Destino</label>
+            <div style="display:flex;gap:8px;margin-bottom:8px;">
+              <button class="btn btn-sm" id="btnDestExist" onclick="mvSetModoDestino('existente')" style="background:var(--green2);color:#fff;">Grupo existente</button>
+              <button class="btn btn-sm bs" id="btnDestNuevo" onclick="mvSetModoDestino('nuevo')">+ Grupo nuevo</button>
+            </div>
+          </div>
+          <div class="fm" id="mvSecDestinoExist">
+            <label>Grupo destino *</label>
+            <select id="mvGrupoDestino" onchange="mvActualizarResumen()">
+              <option value="">— Seleccioná —</option>
+            </select>
+          </div>
+          <div class="fm" id="mvSecDestinoNuevo" style="display:none;">
+            <label>Nombre del grupo nuevo *</label>
+            <input type="text" id="mvGrupoNuevo" placeholder="Ej: VAQ. COLA 4" oninput="mvActualizarResumen()">
+          </div>
+          <div class="fm">
+            <label>Cabezas destino (actuales)</label>
+            <input type="text" id="mvCabDest" readonly style="background:var(--card3);color:var(--t2);">
+          </div>
+          <div class="fm">
+            <label>Peso medio destino (kg)</label>
+            <input type="text" id="mvPesoDest" readonly style="background:var(--card3);color:var(--t2);">
+          </div>
+        </div>
+      </div>
+
+      <!-- DATOS ECONÓMICOS (COMPRA / VENTA) -->
+      <div id="mvSecEconomico" style="background:var(--card2);border:1px solid var(--brd);border-radius:8px;padding:14px;margin-bottom:12px;display:none;">
+        <div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:1px;margin-bottom:10px;" id="mvSecEconTit">DATOS ECONÓMICOS</div>
+        <div class="fg">
+          <div class="fm" id="mvSecPrecio">
+            <label id="mvPrecioLabel">Precio Bs/kg *</label>
+            <input type="number" id="mvPrecio" step="0.01" min="0" oninput="mvActualizarResumen()">
+          </div>
+          <div class="fm" id="mvSecTotal">
+            <label>Total Bs (estimado)</label>
+            <input type="text" id="mvTotal" readonly style="background:var(--card3);color:var(--gold);font-weight:700;">
+          </div>
+          <div class="fm" id="mvSecDestEcon">
+            <label id="mvDestinoLabel">Destino/Predio</label>
+            <input type="text" id="mvDestEcon" placeholder="Ej: Frigorífico BFC">
+          </div>
+        </div>
+      </div>
+
+      <!-- MOTIVO -->
+      <div class="fg" style="margin-bottom:12px;">
+        <div class="fm" id="mvSecMotivo" style="display:none;">
+          <label>Motivo de baja *</label>
+          <select id="mvMotivoBaja">
+            <option value="">— Seleccioná —</option>
+            <option value="MUERTE NATURAL">Muerte natural</option>
+            <option value="ACCIDENTE">Accidente</option>
+            <option value="ENFERMEDAD">Enfermedad</option>
+            <option value="DESCARTE SANITARIO">Descarte sanitario</option>
+            <option value="ROBO">Robo</option>
+            <option value="OTRO">Otro</option>
+          </select>
+        </div>
+        <div class="fm" style="grid-column:1/-1;">
+          <label>Comentario / Observación</label>
+          <input type="text" id="mvComentario" placeholder="Opcional...">
+        </div>
+      </div>
+
+      <!-- RESUMEN DE IMPACTO -->
+      <div id="mvResumen" style="display:none;background:var(--card3);border:1px solid var(--brd2);border-radius:8px;padding:14px;">
+        <div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:1px;margin-bottom:10px;">📊 RESUMEN DE IMPACTO</div>
+        <div id="mvResumenContenido" style="font-size:12px;line-height:1.8;color:var(--t2);"></div>
+      </div>
+
+    </div>
+    <div class="mf">
+      <button class="btn bs" onclick="cerrar('moMov')">Cancelar</button>
+      <button class="btn bp" id="btnGuardarMov" onclick="guardarMovimiento()">💾 Confirmar Movimiento</button>
     </div>
   </div>
 </div>
@@ -4716,6 +4900,308 @@ function verNoVinieron(){
   XLSX.writeFile(wb,'animales_sin_pesaje.xlsx');
   ntf('⬇️ '+noV.length+' animales sin pesaje reciente');
 }
+
+// ═══════════════════════════════════════════════════
+// MÓDULO: MOVIMIENTOS DE GRUPOS
+// ═══════════════════════════════════════════════════
+
+let movimientos = [];
+let _mvTipo = 'INTERNO';
+let _mvModoDestino = 'existente';
+let _mvPagina = 1;
+const MV_PXP = 20;
+
+async function loadMovimientos() {
+  const d = await fbGet('movimientos');
+  movimientos = d ? (Array.isArray(d) ? d : Object.values(d)).filter(Boolean) : [];
+  movimientos.sort((a,b) => b.fecha.localeCompare(a.fecha));
+}
+
+async function saveMovimientos() {
+  await fbSet('movimientos', movimientos);
+}
+
+function calcPesoGrupoEnFecha(nombreGrupo, fecha) {
+  const hoy = fecha || new Date().toISOString().split('T')[0];
+  const activos = Object.values(animales).filter(a =>
+    a.estado === 'ACTIVO' && a.grupo === nombreGrupo && a.pesoIngreso && a.fechaIngreso
+  );
+  if(!activos.length) return null;
+  let sumPeso = 0, n = 0;
+  for(const a of activos) {
+    const lpa = window._lastPes?.[a.ide];
+    let pesoBase = lpa?.peso || a.pesoIngreso;
+    let fechaBase = lpa?.fecha || a.fechaIngreso;
+    const gmd = lpa?.gmd || 0.4;
+    const dias = Math.max(0, Math.round((new Date(hoy+'T12:00:00') - new Date(fechaBase+'T12:00:00')) / 86400000));
+    sumPeso += pesoBase + gmd * dias;
+    n++;
+  }
+  return n > 0 ? Math.round(sumPeso / n * 10) / 10 : null;
+}
+
+function cabezasGrupo(nombreGrupo) {
+  return Object.values(animales).filter(a => a.estado === 'ACTIVO' && a.grupo === nombreGrupo).length;
+}
+
+function abrirMovimiento(tipo) {
+  _mvTipo = tipo;
+  _mvModoDestino = 'existente';
+  const hoy = new Date().toISOString().split('T')[0];
+  document.getElementById('mvFecha').value = hoy;
+  document.getElementById('mvCabezas').value = '';
+  document.getElementById('mvComentario').value = '';
+  document.getElementById('mvPrecio').value = '';
+  document.getElementById('mvTotal').value = '';
+  document.getElementById('mvDestEcon').value = '';
+  document.getElementById('mvGrupoNuevo').value = '';
+  document.getElementById('mvResumen').style.display = 'none';
+
+  const tits = { COMPRA:'📥 Registrar Compra', VENTA:'💰 Registrar Venta', INTERNO:'🔄 Movimiento Interno', BAJA:'📤 Registrar Baja' };
+  document.getElementById('moMovTit').textContent = tits[tipo] || '🔄 Movimiento';
+  document.getElementById('mvTipoDisplay').value = tipo;
+
+  const grupos = [...new Set(Object.values(animales).filter(a=>a.estado==='ACTIVO'&&a.grupo).map(a=>a.grupo))].sort();
+  ['mvGrupoOrigen','mvGrupoDestino'].forEach(id => {
+    const sel = document.getElementById(id);
+    sel.innerHTML = '<option value="">— Seleccioná —</option>';
+    grupos.forEach(g => sel.innerHTML += `<option value="${g}">${g} (${cabezasGrupo(g)} cab.)</option>`);
+  });
+  const fg = document.getElementById('mvFiltGrupo');
+  fg.innerHTML = '<option value="">Todos los grupos</option>';
+  grupos.forEach(g => fg.innerHTML += `<option value="${g}">${g}</option>`);
+
+  document.getElementById('mvSecOrigen').style.display   = tipo === 'COMPRA' ? 'none' : '';
+  document.getElementById('mvSecDestino').style.display  = (tipo === 'COMPRA' || tipo === 'INTERNO') ? '' : 'none';
+  document.getElementById('mvSecEconomico').style.display= (tipo === 'COMPRA' || tipo === 'VENTA') ? '' : 'none';
+  document.getElementById('mvSecMotivo').style.display   = tipo === 'BAJA' ? '' : 'none';
+
+  if(tipo === 'COMPRA') {
+    document.getElementById('mvSecEconTit').textContent  = 'DATOS DE COMPRA';
+    document.getElementById('mvPrecioLabel').textContent = 'Precio compra Bs/kg *';
+    document.getElementById('mvDestinoLabel').textContent= 'Predio de origen';
+    document.getElementById('mvDestEcon').placeholder    = 'Ej: Estancia La Paz';
+  } else if(tipo === 'VENTA') {
+    document.getElementById('mvSecEconTit').textContent  = 'DATOS DE VENTA';
+    document.getElementById('mvPrecioLabel').textContent = 'Precio venta Bs/kg *';
+    document.getElementById('mvDestinoLabel').textContent= 'Destino (frigorífico/comprador)';
+    document.getElementById('mvDestEcon').placeholder    = 'Ej: BFC S.A.';
+  }
+
+  mvSetModoDestino('existente');
+  mvActualizarGrupoOrigen();
+  document.getElementById('moMov').style.display = 'flex';
+}
+
+function mvSetModoDestino(modo) {
+  _mvModoDestino = modo;
+  document.getElementById('mvSecDestinoExist').style.display = modo==='existente' ? '' : 'none';
+  document.getElementById('mvSecDestinoNuevo').style.display = modo==='nuevo'     ? '' : 'none';
+  document.getElementById('btnDestExist').className = 'btn btn-sm'+(modo==='existente'?' bp':' bs');
+  document.getElementById('btnDestNuevo').className = 'btn btn-sm'+(modo==='nuevo'?' bp':' bs');
+  mvActualizarResumen();
+}
+
+function mvTodoElGrupo() {
+  const disp = parseInt(document.getElementById('mvCabDisp').value) || 0;
+  document.getElementById('mvCabezas').value = disp;
+  mvActualizarResumen();
+}
+
+function mvActualizarGrupoOrigen() {
+  const grupo = document.getElementById('mvGrupoOrigen')?.value || '';
+  const fecha = document.getElementById('mvFecha').value;
+  if(!grupo) { document.getElementById('mvCabDisp').value=''; document.getElementById('mvPesoOrigen').value=''; mvActualizarResumen(); return; }
+  document.getElementById('mvCabDisp').value = cabezasGrupo(grupo);
+  const peso = calcPesoGrupoEnFecha(grupo, fecha);
+  document.getElementById('mvPesoOrigen').value = peso ? peso+' kg' : '—';
+  const dest = document.getElementById('mvGrupoDestino')?.value;
+  if(dest) {
+    document.getElementById('mvCabDest').value = cabezasGrupo(dest);
+    const pd = calcPesoGrupoEnFecha(dest, fecha);
+    document.getElementById('mvPesoDest').value = pd ? pd+' kg' : '—';
+  }
+  mvActualizarResumen();
+}
+
+function mvActualizarResumen() {
+  const tipo    = _mvTipo;
+  const cab     = parseInt(document.getElementById('mvCabezas')?.value) || 0;
+  const precio  = parseFloat(document.getElementById('mvPrecio')?.value) || 0;
+  const pesoOrig= parseFloat(document.getElementById('mvPesoOrigen')?.value) || 0;
+  const grupoOrig = document.getElementById('mvGrupoOrigen')?.value || '';
+  const cabDisp = parseInt(document.getElementById('mvCabDisp')?.value) || 0;
+
+  if(precio && cab && pesoOrig) {
+    document.getElementById('mvTotal').value = 'Bs ' + Math.round(precio*pesoOrig*cab).toLocaleString('es-BO');
+  }
+
+  const resDiv = document.getElementById('mvResumen');
+  if(!cab) { resDiv.style.display='none'; return; }
+
+  let html = '';
+  if(tipo !== 'COMPRA') {
+    const nuevo = cabDisp - cab;
+    html += `<div>📤 <strong>${grupoOrig||'—'}</strong>: ${cabDisp} → <span style="color:${nuevo<0?'var(--red)':'var(--gs)'};font-weight:700;">${nuevo} cabezas</span></div>`;
+    if(nuevo < 0) html += `<div style="color:var(--red);">⚠️ Cabezas insuficientes</div>`;
+  }
+  if(tipo === 'INTERNO' || tipo === 'COMPRA') {
+    const gd = _mvModoDestino==='nuevo' ? (document.getElementById('mvGrupoNuevo')?.value||'—') : (document.getElementById('mvGrupoDestino')?.value||'—');
+    const cabD = parseInt(document.getElementById('mvCabDest')?.value)||0;
+    const pesD = parseFloat(document.getElementById('mvPesoDest')?.value)||0;
+    const nuevoCab = cabD + cab;
+    let pond = pesoOrig;
+    if(pesD>0 && cabD>0) pond = Math.round(((pesoOrig*cab)+(pesD*cabD))/nuevoCab*10)/10;
+    html += `<div style="margin-top:6px;">📥 <strong>${gd}</strong>: ${cabD} → <span style="color:var(--blue);font-weight:700;">${nuevoCab} cabezas</span>`;
+    if(pond>0) html += ` · Peso medio: <span style="color:var(--gold);font-weight:700;">${pond} kg</span>`;
+    html += `</div>`;
+  }
+  if(tipo==='VENTA' && precio && pesoOrig && cab) {
+    html += `<div style="margin-top:6px;">💰 Total est.: <span style="color:var(--gold);font-weight:700;">Bs ${Math.round(precio*pesoOrig*cab).toLocaleString('es-BO')}</span></div>`;
+  }
+  document.getElementById('mvResumenContenido').innerHTML = html || '<span style="color:var(--t3);">Completá los datos</span>';
+  resDiv.style.display = 'block';
+}
+
+async function guardarMovimiento() {
+  const tipo  = _mvTipo;
+  const fecha = document.getElementById('mvFecha').value;
+  const cab   = parseInt(document.getElementById('mvCabezas')?.value) || 0;
+  if(!fecha) { ntf('Ingresá la fecha', true); return; }
+  if(!cab)   { ntf('Ingresá las cabezas', true); return; }
+
+  const grupoOrig = tipo !== 'COMPRA' ? document.getElementById('mvGrupoOrigen').value : '';
+  if(tipo !== 'COMPRA' && !grupoOrig) { ntf('Seleccioná el grupo origen', true); return; }
+  const cabDisp = tipo !== 'COMPRA' ? cabezasGrupo(grupoOrig) : 999;
+  if(tipo !== 'COMPRA' && cab > cabDisp) { ntf(`Solo hay ${cabDisp} cabezas en ${grupoOrig}`, true); return; }
+
+  let grupoDest = null;
+  if(tipo === 'INTERNO' || tipo === 'COMPRA') {
+    grupoDest = _mvModoDestino==='nuevo' ? document.getElementById('mvGrupoNuevo').value.trim() : document.getElementById('mvGrupoDestino').value;
+    if(!grupoDest) { ntf('Seleccioná o ingresá el grupo destino', true); return; }
+  }
+  if(tipo === 'BAJA' && !document.getElementById('mvMotivoBaja').value) { ntf('Seleccioná el motivo de baja', true); return; }
+
+  const precio   = parseFloat(document.getElementById('mvPrecio')?.value)||null;
+  const pesoOrig = parseFloat(document.getElementById('mvPesoOrigen')?.value)||null;
+  const destEcon = document.getElementById('mvDestEcon')?.value.trim()||'';
+
+  const reg = {
+    id: Date.now().toString(36)+Math.random().toString(36).substr(2,4),
+    tipo, fecha, grupoOrigen: grupoOrig||null, grupoDestino: grupoDest||null,
+    cabezas: cab, pesoOrigen: pesoOrig, precio,
+    destino: destEcon||null,
+    motivo: tipo==='BAJA' ? document.getElementById('mvMotivoBaja').value : null,
+    comentario: document.getElementById('mvComentario').value.trim()||null,
+    usuario, fechaReg: new Date().toISOString()
+  };
+
+  // Actualizar estado de animales
+  let n = 0;
+  for(const a of Object.values(animales)) {
+    if(n >= cab) break;
+    if(a.estado !== 'ACTIVO') continue;
+    if(tipo !== 'COMPRA' && a.grupo !== grupoOrig) continue;
+    if(tipo === 'VENTA')    animales[a.ide] = {...a, estado:'VENDIDO', fechaVenta:fecha, precioVenta:precio, destinoVenta:destEcon};
+    else if(tipo === 'BAJA')animales[a.ide] = {...a, estado:'MUERTO',  fechaBaja:fecha,  motivoBaja:document.getElementById('mvMotivoBaja').value};
+    else if(tipo === 'INTERNO') animales[a.ide] = {...a, grupo:grupoDest, fechaMovimiento:fecha};
+    n++;
+  }
+
+  try {
+    document.getElementById('btnGuardarMov').disabled = true;
+    movimientos.unshift(reg);
+    await Promise.all([saveMovimientos(), fbSet('animales', animales), actualizarGruposResumen()]);
+    cerrar('moMov');
+    renderMovimientos();
+    renderDash();
+    renderA();
+    ntf(`✅ ${tipo} registrado — ${cab} cabezas`);
+    if(tipo==='COMPRA') ntf('Compra registrada. Agregá los animales individualmente desde Animales.', false, 5000);
+  } catch(e) {
+    ntf('Error: '+e.message, true);
+  } finally {
+    document.getElementById('btnGuardarMov').disabled = false;
+  }
+}
+
+async function actualizarGruposResumen() {
+  const hoy = new Date().toISOString().split('T')[0];
+  const grupos = {};
+  for(const a of Object.values(animales)) {
+    if(a.estado !== 'ACTIVO' || !a.grupo) continue;
+    if(!grupos[a.grupo]) grupos[a.grupo] = {nombre:a.grupo, cabezas:0, sumPeso:0, n:0};
+    grupos[a.grupo].cabezas++;
+    const lpa = window._lastPes?.[a.ide];
+    const pesoBase = lpa?.peso || a.pesoIngreso;
+    const fechaBase = lpa?.fecha || a.fechaIngreso;
+    const gmd = lpa?.gmd || 0.4;
+    if(pesoBase && fechaBase) {
+      const dias = Math.max(0, Math.round((new Date(hoy+'T12:00:00')-new Date(fechaBase+'T12:00:00'))/86400000));
+      grupos[a.grupo].sumPeso += pesoBase + gmd*dias;
+      grupos[a.grupo].n++;
+    }
+  }
+  const resumen = Object.values(grupos).map(g=>({nombre:g.nombre, cabezas:g.cabezas, pesoMedio:g.n>0?Math.round(g.sumPeso/g.n):null}));
+  await fbSet('grupos_resumen', resumen);
+}
+
+function renderMovimientos() {
+  const filtTipo  = document.getElementById('mvFiltTipo')?.value  || '';
+  const filtGrupo = document.getElementById('mvFiltGrupo')?.value || '';
+  const filtMes   = document.getElementById('mvFiltMes')?.value   || '';
+  let data = movimientos.filter(m => {
+    if(filtTipo  && m.tipo !== filtTipo) return false;
+    if(filtGrupo && m.grupoOrigen !== filtGrupo && m.grupoDestino !== filtGrupo) return false;
+    if(filtMes   && !m.fecha.startsWith(filtMes)) return false;
+    return true;
+  });
+  document.getElementById('mvStatCompras').textContent  = data.filter(m=>m.tipo==='COMPRA').length;
+  document.getElementById('mvStatVentas').textContent   = data.filter(m=>m.tipo==='VENTA').length;
+  document.getElementById('mvStatInternos').textContent = data.filter(m=>m.tipo==='INTERNO').length;
+  document.getElementById('mvStatBajas').textContent    = data.filter(m=>m.tipo==='BAJA').length;
+  document.getElementById('mvStatCabTotal').textContent = data.reduce((s,m)=>s+(m.cabezas||0),0);
+
+  const pages = Math.ceil(data.length/MV_PXP)||1;
+  if(_mvPagina>pages) _mvPagina=1;
+  const slice = data.slice((_mvPagina-1)*MV_PXP, _mvPagina*MV_PXP);
+  const BADGE = { COMPRA:'<span class="bg bg-act">📥 COMPRA</span>', VENTA:'<span class="bg bg-vnd">💰 VENTA</span>', INTERNO:'<span class="bg bg-mig">🔄 INTERNO</span>', BAJA:'<span class="bg bg-mrt">📤 BAJA</span>' };
+  const tbody = document.getElementById('mvBody');
+  tbody.innerHTML = slice.length ? slice.map(m=>{
+    const tot = m.precio&&m.pesoOrigen&&m.cabezas ? 'Bs '+Math.round(m.precio*m.pesoOrigen*m.cabezas).toLocaleString('es-BO') : '—';
+    return `<tr>
+      <td class="mn">${m.fecha}</td><td>${BADGE[m.tipo]||m.tipo}</td>
+      <td>${m.grupoOrigen||'—'}</td><td>${m.grupoDestino||'—'}</td>
+      <td style="font-weight:700;color:var(--gs);">${m.cabezas}</td>
+      <td class="mn">${m.pesoOrigen?m.pesoOrigen+'kg':'—'}</td><td class="mn">—</td>
+      <td class="mn">${m.precio?'Bs '+m.precio:'—'}</td>
+      <td class="mn tgo">${tot}</td>
+      <td style="font-size:11px;color:var(--t3);">${m.motivo||m.comentario||'—'}</td>
+      <td style="font-size:11px;color:var(--t3);">${m.usuario||'—'}</td>
+      <td><button class="btn bd btn-sm" onclick="eliminarMovimiento('${m.id}')">🗑</button></td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="12"><div class="emp"><div class="emp-ic">🔄</div>Sin movimientos</div></td></tr>';
+
+  const pagDiv = document.getElementById('mvPag');
+  if(pages<=1){pagDiv.innerHTML='';return;}
+  pagDiv.innerHTML = ((_mvPagina>1)?`<button class="btn bs btn-sm" onclick="_mvPagina=${_mvPagina-1};renderMovimientos()">‹ Ant</button>`:'')
+    +`<span style="font-size:11px;color:var(--t3);padding:0 8px;">${_mvPagina}/${pages}</span>`
+    +((_mvPagina<pages)?`<button class="btn bs btn-sm" onclick="_mvPagina=${_mvPagina+1};renderMovimientos()">Sig ›</button>`:'');
+}
+
+async function eliminarMovimiento(id) {
+  if(!confirm('¿Eliminar del historial?\n(No revierte cambios en animales)')) return;
+  movimientos = movimientos.filter(m=>m.id!==id);
+  await saveMovimientos();
+  renderMovimientos();
+  ntf('Movimiento eliminado');
+}
+
+// Integrar carga y render con funciones existentes
+const _origLoadAll2 = loadAll;
+loadAll = async function() { await _origLoadAll2(); await loadMovimientos(); };
+const _origShowPg2 = showPg;
+showPg = function(id) { _origShowPg2(id); if(id==='movimientos') renderMovimientos(); };
 </script>
 
 <!-- Modal: Importar Inventario Inicial -->
