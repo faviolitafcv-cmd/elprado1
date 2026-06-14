@@ -607,7 +607,7 @@ tr:hover td{background:rgba(109,186,58,.04);}
           </div>
           <div class="fm" id="mvSecDestinoExist">
             <label>Grupo destino *</label>
-            <select id="mvGrupoDestino" onchange="mvActualizarResumen()">
+            <select id="mvGrupoDestino" onchange="mvActualizarDestino();mvActualizarResumen()">
               <option value="">— Seleccioná —</option>
             </select>
           </div>
@@ -5006,6 +5006,19 @@ function mvTodoElGrupo() {
   const disp = parseInt(document.getElementById('mvCabDisp').value) || 0;
   document.getElementById('mvCabezas').value = disp;
   mvActualizarResumen();
+}
+
+function mvActualizarDestino() {
+  const dest  = document.getElementById('mvGrupoDestino')?.value || '';
+  const fecha = document.getElementById('mvFecha').value;
+  if(!dest) {
+    document.getElementById('mvCabDest').value  = '';
+    document.getElementById('mvPesoDest').value = '';
+    return;
+  }
+  document.getElementById('mvCabDest').value  = cabezasGrupo(dest);
+  const pd = calcPesoGrupoEnFecha(dest, fecha);
+  document.getElementById('mvPesoDest').value = pd ? pd + ' kg' : '—';
 }
 
 function mvActualizarGrupoOrigen() {
