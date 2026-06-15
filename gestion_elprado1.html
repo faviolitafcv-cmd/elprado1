@@ -181,6 +181,21 @@ html,body{height:100%;font-family:'Segoe UI',Arial,sans-serif;overflow:hidden}
         </div>
       </div>
 
+      <!-- MÓDULO SANIDAD -->
+      <div class="modulo-card mod-stock" onclick="abrirModulo('sanidad')" style="border-color:rgba(74,154,186,.3);">
+        <div class="modulo-icono">🩺</div>
+        <div class="modulo-tag" style="background:rgba(74,154,186,.15);color:#7acfe0;border-color:rgba(74,154,186,.3);">SANIDAD ANIMAL</div>
+        <div class="modulo-nombre">Salud & Sanidad</div>
+        <div class="modulo-desc">HPG, vacunaciones, botiquín y alertas sanitarias</div>
+        <div class="modulo-submods">
+          <span class="submod">HPG</span>
+          <span class="submod">Aplicaciones</span>
+          <span class="submod">Botiquín</span>
+          <span class="submod">Alertas</span>
+          <span class="submod">Umbrales</span>
+        </div>
+      </div>
+
     </div>
 
     <div class="footer-txt">Sistema de Gestión El Prado 1 &nbsp;|&nbsp; 2026</div>
@@ -240,6 +255,10 @@ const MODULOS = {
   dietas: {
     nombre: 'Evaluador de Dietas',
     archivo: 'evaluador_dietas_elprado1.html'
+  },
+  sanidad: {
+    nombre: '🩺 Salud & Sanidad Animal — El Prado 1',
+    archivo: 'elprado_sanitario.html'
   }
 };
 
