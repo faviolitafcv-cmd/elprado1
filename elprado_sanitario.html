@@ -1072,6 +1072,44 @@ function abrirModalFactura(){
   document.getElementById('moFactura').style.display='flex';
 }
 
+function factBuscarProducto(i, val) {
+  const sug = document.getElementById('fi'+i+'sug');
+  if(!sug) return;
+  if(!val || val.length < 2) { sug.style.display='none'; return; }
+  const matches = Object.values(productos).filter(p =>
+    p.nombre.toLowerCase().includes(val.toLowerCase())
+  ).slice(0, 8);
+  if(!matches.length) { sug.style.display='none'; return; }
+  sug.innerHTML = matches.map(p => `
+    <div onclick="factAutocompletar(${i},'${p.id}')"
+      style="padding:8px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--brd);display:flex;justify-content:space-between;align-items:center;"
+      onmouseover="this.style.background='rgba(58,186,186,.1)'"
+      onmouseout="this.style.background=''">
+      <div>
+        <div style="font-weight:600;color:var(--text);">${p.nombre}</div>
+        <div style="font-size:10px;color:var(--t3);">${p.principioActivo||''} · ${p.categoria} · Stock: ${p.stock} ${p.unidad}</div>
+      </div>
+      <span style="font-size:10px;color:var(--teal);">↵ usar</span>
+    </div>`).join('');
+  sug.style.display = 'block';
+}
+
+function factAutocompletar(i, prodId) {
+  const p = productos[prodId];
+  if(!p) return;
+  document.getElementById('fi'+i+'nom').value   = p.nombre;
+  document.getElementById('fi'+i+'pa').value    = p.principioActivo || '';
+  document.getElementById('fi'+i+'cat').value   = p.categoria || 'OTRO';
+  document.getElementById('fi'+i+'uni').value   = p.unidad || 'ml';
+  document.getElementById('fi'+i+'retiro').value = p.retiro || 0;
+  document.getElementById('fi'+i+'dosis').value  = p.dosisRef || '';
+  if(p.precio) document.getElementById('fi'+i+'precio').value = p.precio;
+  const sug = document.getElementById('fi'+i+'sug');
+  if(sug) sug.style.display = 'none';
+  factCalcTotal();
+  ntf('✅ Datos de "'+p.nombre+'" cargados automáticamente');
+}
+
 function factRenderItems(){
   const c=document.getElementById('factItemsContainer'); if(!c)return;
   c.innerHTML='';
@@ -1081,7 +1119,13 @@ function factRenderItems(){
     c.innerHTML+=`<div style="background:var(--card3);border:1px solid var(--brd);border-radius:6px;padding:10px;margin-bottom:8px;">
       <div style="font-size:10px;color:var(--t3);margin-bottom:8px;font-weight:700;">ÍTEM ${i}</div>
       <div class="fg" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));">
-        <div class="fm" style="grid-column:1/-1;"><label>Nombre producto *</label><input type="text" id="fi${i}nom" placeholder="Nombre comercial"></div>
+        <div class="fm" style="grid-column:1/-1;position:relative;">
+          <label>Nombre producto *</label>
+          <input type="text" id="fi${i}nom" placeholder="Nombre comercial" autocomplete="off"
+            oninput="factBuscarProducto(${i}, this.value)"
+            onblur="setTimeout(()=>{ const s=document.getElementById('fi${i}sug'); if(s)s.style.display='none'; },200)">
+          <div id="fi${i}sug" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:50;background:var(--card);border:1px solid var(--brd2);border-radius:6px;max-height:180px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.4);"></div>
+        </div>
         <div class="fm"><label>Principio activo</label><input type="text" id="fi${i}pa" placeholder="Ej: Ivermectina"></div>
         <div class="fm"><label>Categoría</label><select id="fi${i}cat">${catOpts}</select></div>
         <div class="fm"><label>Cantidad</label><input type="number" id="fi${i}qty" min="0" step="0.1" value="1" oninput="factCalcTotal()"></div>
