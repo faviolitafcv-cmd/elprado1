@@ -1076,7 +1076,8 @@ function factBuscarProducto(i, val) {
   const sug = document.getElementById('fi'+i+'sug');
   if(!sug) return;
   if(!val || val.length < 2) { sug.style.display='none'; return; }
-  const matches = Object.values(productos).filter(p =>
+  const _prods = (typeof productos !== 'undefined') ? productos : (window.productos || {});
+  const matches = Object.values(_prods).filter(p =>
     p.nombre.toLowerCase().includes(val.toLowerCase())
   ).slice(0, 8);
   if(!matches.length) { sug.style.display='none'; return; }
@@ -1095,12 +1096,13 @@ function factBuscarProducto(i, val) {
 }
 
 function factAutocompletar(i, prodId) {
-  const p = productos[prodId];
+  const _prods = (typeof productos !== 'undefined') ? productos : (window.productos || {});
+  const p = _prods[prodId];
   if(!p) return;
-  document.getElementById('fi'+i+'nom').value   = p.nombre;
-  document.getElementById('fi'+i+'pa').value    = p.principioActivo || '';
-  document.getElementById('fi'+i+'cat').value   = p.categoria || 'OTRO';
-  document.getElementById('fi'+i+'uni').value   = p.unidad || 'ml';
+  document.getElementById('fi'+i+'nom').value    = p.nombre;
+  document.getElementById('fi'+i+'pa').value     = p.principioActivo || '';
+  document.getElementById('fi'+i+'cat').value    = p.categoria || 'OTRO';
+  document.getElementById('fi'+i+'uni').value    = p.unidad || 'ml';
   document.getElementById('fi'+i+'retiro').value = p.retiro || 0;
   document.getElementById('fi'+i+'dosis').value  = p.dosisRef || '';
   if(p.precio) document.getElementById('fi'+i+'precio').value = p.precio;
