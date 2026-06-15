@@ -1049,7 +1049,10 @@ function renderFarmacia(){
     <td>${f.items?.length||0} ítems</td>
     <td class="mn tgo">Bs ${Math.round(f.total||0).toLocaleString('es-BO')}</td>
     <td style="font-size:11px;color:var(--t3);">${f.usuario||'—'}</td>
-    <td><button class="btn bd btn-sm" onclick="eliminarFactura('${f.id}')">🗑</button></td>
+    <td style="display:flex;gap:4px;">
+      <button class="btn bs btn-sm" onclick="editarFactura('${f.id}')">✏️</button>
+      <button class="btn bd btn-sm" onclick="eliminarFactura('${f.id}')">🗑</button>
+    </td>
   </tr>`).join('')
   :'<tr><td colspan="7"><div class="emp"><div class="emp-ic">📋</div>Sin facturas</div></td></tr>';
 }
@@ -1064,10 +1067,46 @@ async function eliminarProducto(id){
 // ── FACTURAS ─────────────────────────────────────────
 let _factItems=1;
 
+let _factEditId = null;
+
+function editarFactura(id){
+  const f = facturas.find(x=>x.id===id);
+  if(!f){ ntf('Factura no encontrada', true); return; }
+  _factEditId = id;
+  _factItems = f.items?.length || 1;
+
+  document.getElementById('factFecha').value   = f.fecha || '';
+  document.getElementById('factNum').value     = f.numero || '';
+  document.getElementById('factProv').value    = f.proveedor || '';
+  document.getElementById('factComent').value  = f.comentario || '';
+  document.getElementById('moFactura').querySelector('.mt').textContent = '✏️ Editar Factura';
+
+  factRenderItems();
+
+  // Rellenar ítems existentes
+  (f.items||[]).forEach((item,idx)=>{
+    const i = idx+1;
+    const set = (id,val)=>{ const el=document.getElementById(id); if(el&&val!=null)el.value=val; };
+    set('fi'+i+'nom',   item.nom);
+    set('fi'+i+'pa',    item.pa);
+    set('fi'+i+'cat',   item.cat);
+    set('fi'+i+'qty',   item.qty);
+    set('fi'+i+'uni',   item.uni);
+    set('fi'+i+'precio',item.precio);
+    set('fi'+i+'retiro',item.retiro);
+    set('fi'+i+'dosis', item.dosisRef);
+    set('fi'+i+'venc',  item.venc);
+  });
+  factCalcTotal();
+  document.getElementById('moFactura').style.display='flex';
+}
+
 function abrirModalFactura(){
-  _factItems=1;
-  document.getElementById('factFecha').value=new Date().toISOString().split('T')[0];
+  _factEditId = null;
+  _factItems = 1;
+  document.getElementById('factFecha').value = new Date().toISOString().split('T')[0];
   ['factNum','factProv','factComent'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('moFactura').querySelector('.mt').textContent = '📦 Nueva Factura de Compra';
   factRenderItems();
   document.getElementById('moFactura').style.display='flex';
 }
@@ -1191,11 +1230,19 @@ async function guardarFactura(){
   if(!items.length){ ntf('Agregá al menos un ítem',true); return; }
 
   const factura={
-    id:uid(), fecha, numero:document.getElementById('factNum').value.trim(),
+    id: _factEditId || uid(),
+    fecha, numero:document.getElementById('factNum').value.trim(),
     proveedor:prov, comentario:document.getElementById('factComent').value.trim(),
-    items, total, usuario, fechaReg:new Date().toISOString()
+    items, total, usuario, fechaReg: _factEditId
+      ? facturas.find(f=>f.id===_factEditId)?.fechaReg || new Date().toISOString()
+      : new Date().toISOString()
   };
-  facturas.unshift(factura);
+  if(_factEditId){
+    facturas = facturas.map(f=>f.id===_factEditId ? factura : f);
+  } else {
+    facturas.unshift(factura);
+  }
+  _factEditId = null;
   await Promise.all([fbSet('sanidad/facturas',facturas), fbSet('sanidad/productos',productos)]);
   cerrar('moFactura');
   renderFarmacia();
