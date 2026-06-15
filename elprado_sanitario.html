@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Salud & Sanidad Animal — El Prado 1</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#0d1f0d;--card:#152015;--card2:#1a2a1a;--card3:#1e2e1e;
+  --green:#6dba3a;--green2:#4a9a2a;--green3:#3a8a1a;--gs:#7de06a;
+  --gold:#c9a227;--red:#e05a4a;--blue:#4a9aba;--purple:#9a7adb;
+  --teal:#3ababa;
+  --text:#e8ffe8;--t2:#b8d4b8;--t3:#7a9a7a;--t4:#4a6a4a;
+  --brd:#2a4a2a;--brd2:#3a5a3a;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;}
+.hdr{background:var(--card);border-bottom:2px solid var(--brd2);padding:10px 18px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.hdr-t{font-size:14px;font-weight:700;color:var(--teal);letter-spacing:1px;text-transform:uppercase;}
+.hdr-s{font-size:11px;color:var(--t3);}
+.hdr-r{display:flex;align-items:center;gap:10px;}
+.btn-back{background:none;border:1px solid var(--brd2);color:var(--t2);padding:5px 12px;border-radius:5px;cursor:pointer;font-size:12px;text-decoration:none;display:inline-block;}
+.btn-back:hover{border-color:var(--teal);color:var(--teal);}
+.ubadge{font-size:11px;color:var(--t3);}
+.nav{background:var(--card2);border-bottom:1px solid var(--brd);display:flex;overflow-x:auto;padding:0 8px;gap:1px;scrollbar-width:none;}
+.nav::-webkit-scrollbar{display:none;}
+.tab{padding:10px 15px;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--t3);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;transition:all .15s;user-select:none;}
+.tab:hover{color:var(--t2);background:rgba(58,186,186,.05);}
+.tab.active{color:var(--teal);border-bottom-color:var(--teal);}
+.pg{display:none;padding:18px;max-width:1400px;margin:0 auto;}
+.pg.active{display:block;}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px;}
+.sc{background:var(--card);border:1px solid var(--brd);border-radius:8px;padding:14px;text-align:center;cursor:pointer;transition:border-color .15s;}
+.sc:hover{border-color:var(--brd2);}
+.sc-v{font-size:24px;font-weight:700;color:var(--teal);}
+.sc-l{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-top:4px;}
+.card{background:var(--card);border:1px solid var(--brd);border-radius:8px;margin-bottom:14px;overflow:hidden;}
+.ch{padding:11px 15px;border-bottom:1px solid var(--brd);display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.ct{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t2);display:flex;align-items:center;gap:6px;}
+.cb{padding:14px;}
+.tw{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{background:var(--card2);color:var(--t3);font-size:10px;letter-spacing:.8px;text-transform:uppercase;padding:8px 9px;text-align:left;border-bottom:2px solid var(--brd2);white-space:nowrap;}
+td{padding:7px 9px;border-bottom:1px solid var(--brd);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(58,186,186,.04);}
+.mn{font-family:monospace;font-size:11px;}
+.bg{font-size:9px;font-weight:700;letter-spacing:.4px;padding:2px 7px;border-radius:4px;text-transform:uppercase;display:inline-block;white-space:nowrap;}
+.bg-ok{background:rgba(109,186,58,.15);color:var(--gs);}
+.bg-warn{background:rgba(201,162,39,.15);color:var(--gold);}
+.bg-alert{background:rgba(224,90,74,.15);color:var(--red);}
+.bg-info{background:rgba(58,186,186,.15);color:var(--teal);}
+.bg-vac{background:rgba(154,122,219,.15);color:var(--purple);}
+.btn{padding:7px 13px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all .15s;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;}
+.bp{background:var(--teal);color:#fff;}
+.bp:hover{background:#5ad0d0;}
+.bs{background:var(--card2);color:var(--t2);border:1px solid var(--brd2);}
+.bs:hover{border-color:var(--teal);color:var(--teal);}
+.bd{background:rgba(224,90,74,.12);color:var(--red);border:1px solid rgba(224,90,74,.25);}
+.bd:hover{background:rgba(224,90,74,.22);}
+.bg-btn{background:rgba(201,162,39,.12);color:var(--gold);border:1px solid rgba(201,162,39,.25);}
+.btn-sm{padding:4px 9px;font-size:11px;}
+.btn:disabled{opacity:.5;cursor:default;}
+.ar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center;}
+.fr{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center;}
+.fr select,.fr input{background:var(--card2);border:1px solid var(--brd);color:var(--text);padding:7px 9px;border-radius:5px;font-size:12px;outline:none;}
+.sp{flex:1;}
+.fg{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:13px;}
+.fm{display:flex;flex-direction:column;gap:4px;}
+.fm label{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--t3);}
+.fm input,.fm select,.fm textarea{background:var(--card2);border:1px solid var(--brd);color:var(--text);padding:8px 9px;border-radius:5px;font-size:13px;outline:none;transition:border .12s;}
+.fm input:focus,.fm select:focus,.fm textarea:focus{border-color:var(--teal);}
+.sep{grid-column:1/-1;border-top:1px solid var(--brd);padding-top:10px;font-size:10px;font-weight:700;color:var(--t3);letter-spacing:1px;text-transform:uppercase;}
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:1000;display:none;align-items:center;justify-content:center;padding:16px;}
+.md{background:var(--card);border:1px solid var(--brd2);border-radius:10px;width:100%;max-width:680px;max-height:92vh;overflow-y:auto;}
+.md-lg{max-width:900px;}
+.mh{padding:14px 18px;border-bottom:1px solid var(--brd);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--card);z-index:1;}
+.mt{font-size:13px;font-weight:700;color:var(--text);}
+.mc{background:none;border:none;color:var(--t3);font-size:20px;cursor:pointer;line-height:1;}
+.mc:hover{color:var(--red);}
+.mb{padding:18px;}
+.mf{padding:12px 18px;border-top:1px solid var(--brd);display:flex;gap:8px;justify-content:flex-end;}
+.pag{display:flex;gap:4px;align-items:center;margin-top:12px;}
+.emp{text-align:center;padding:36px 16px;color:var(--t3);}
+.emp-ic{font-size:38px;margin-bottom:10px;}
+#ntf{position:fixed;bottom:18px;right:18px;padding:11px 16px;border-radius:8px;font-size:13px;font-weight:600;z-index:9999;display:none;max-width:340px;line-height:1.3;}
+#ntf.ok{background:#101e1e;border:1px solid var(--teal);color:var(--teal);}
+#ntf.err{background:#2a1010;border:1px solid var(--red);color:#ffaaaa;}
+/* Alerta card */
+.alerta-card{border-radius:8px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:flex-start;gap:12px;border:1px solid;}
+.alerta-roja{background:rgba(224,90,74,.08);border-color:rgba(224,90,74,.3);}
+.alerta-amarilla{background:rgba(201,162,39,.08);border-color:rgba(201,162,39,.3);}
+.alerta-azul{background:rgba(58,186,186,.08);border-color:rgba(58,186,186,.3);}
+/* HPG resultado */
+.hpg-resultado{border-radius:8px;padding:14px;margin-top:12px;}
+.hpg-bajo{background:rgba(109,186,58,.08);border:1px solid rgba(109,186,58,.3);}
+.hpg-medio{background:rgba(201,162,39,.08);border:1px solid rgba(201,162,39,.3);}
+.hpg-alto{background:rgba(224,90,74,.08);border:1px solid rgba(224,90,74,.3);}
+/* Muestra row */
+.muestra-row{display:flex;gap:8px;align-items:center;margin-bottom:6px;}
+.muestra-row input{flex:1;background:var(--card2);border:1px solid var(--brd);color:var(--text);padding:6px 9px;border-radius:5px;font-size:13px;outline:none;}
+.muestra-row input:focus{border-color:var(--teal);}
+/* Stock badge */
+.stock-ok{color:var(--gs);}
+.stock-warn{color:var(--gold);}
+.stock-crit{color:var(--red);}
+@media(max-width:600px){.fg{grid-template-columns:1fr;}.stats{grid-template-columns:repeat(2,1fr);}}
+</style>
+</head>
+<body>
+<div id="ntf"></div>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div>
+    <div class="hdr-t">🩺 Salud & Sanidad Animal</div>
+    <div class="hdr-s">El Prado 1 — San Ignacio de Velazco, Chiquitanía</div>
+  </div>
+  <div class="hdr-r">
+    <span class="ubadge" id="ubadge"></span>
+    <a href="gestion_elprado1.html" class="btn-back">← Inicio</a>
+  </div>
+</div>
+
+<!-- NAV -->
+<div class="nav">
+  <div class="tab active" onclick="showPg('alertas')">⚠️ Alertas</div>
+  <div class="tab" onclick="showPg('hpg')">🔬 HPG</div>
+  <div class="tab" onclick="showPg('aplicaciones')">💉 Aplicaciones</div>
+  <div class="tab" onclick="showPg('farmacia')">💊 Farmacia</div>
+  <div class="tab" onclick="showPg('umbrales')">⚙️ Umbrales</div>
+</div>
+
+<!-- ═══════ ALERTAS ═══════ -->
+<div class="pg active" id="pg-alertas">
+  <div class="stats">
+    <div class="sc"><div class="sc-v" id="stAlertasRojas" style="color:var(--red);">—</div><div class="sc-l">🔴 Urgentes</div></div>
+    <div class="sc"><div class="sc-v" id="stAlertasAmarillas" style="color:var(--gold);">—</div><div class="sc-l">🟡 Atención</div></div>
+    <div class="sc"><div class="sc-v" id="stRetiro" style="color:var(--purple);">—</div><div class="sc-l">🚫 En retiro</div></div>
+    <div class="sc"><div class="sc-v" id="stProximas" style="color:var(--teal);">—</div><div class="sc-l">📅 Próximas aplic.</div></div>
+  </div>
+  <div class="card">
+    <div class="ch"><div class="ct">⚠️ Panel de Alertas Sanitarias</div>
+      <button class="btn bs btn-sm" onclick="renderAlertas()">🔄 Actualizar</button>
+    </div>
+    <div class="cb" id="alertasContenido"><div class="emp"><div class="emp-ic">✅</div>Cargando alertas...</div></div>
+  </div>
+</div>
+
+<!-- ═══════ HPG ═══════ -->
+<div class="pg" id="pg-hpg">
+  <div class="ar">
+    <button class="btn bp" onclick="abrirModalHPG()">🔬 Nuevo Muestreo HPG</button>
+    <div class="sp"></div>
+    <select id="hpgFiltGrupo" onchange="renderHPG()" style="background:var(--card2);border:1px solid var(--brd);color:var(--text);padding:7px 9px;border-radius:5px;font-size:12px;">
+      <option value="">Todos los grupos</option>
+    </select>
+    <input type="month" id="hpgFiltMes" onchange="renderHPG()" style="background:var(--card2);border:1px solid var(--brd);color:var(--text);padding:7px 9px;border-radius:5px;font-size:12px;">
+  </div>
+  <div class="card">
+    <div class="ch"><div class="ct">🔬 Historial de Muestreos HPG</div></div>
+    <div class="tw"><table>
+      <thead><tr>
+        <th>Fecha</th><th>Grupo</th><th>Muestras (n)</th><th>Promedio HPG</th>
+        <th>Desvío Est.</th><th>CV%</th><th>Umbral</th><th>Resultado</th>
+        <th>Recomendación</th><th>Operador</th><th></th>
+      </tr></thead>
+      <tbody id="hpgBody"><tr><td colspan="11"><div class="emp"><div class="emp-ic">🔬</div>Sin muestreos registrados</div></td></tr></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- ═══════ APLICACIONES ═══════ -->
+<div class="pg" id="pg-aplicaciones">
+  <div class="ar">
+    <button class="btn bp" onclick="abrirModalAplicacion()">💉 Nueva Aplicación</button>
+    <div class="sp"></div>
+    <select id="aplFiltTipo" onchange="renderAplicaciones()" style="background:var(--card2);border:1px solid var(--brd);color:var(--text);padding:7px 9px;border-radius:5px;font-size:12px;">
+      <option value="">Todos los tipos</option>
+      <option value="ANTIPARASITARIO">Antiparasitario</option>
+      <option value="VACUNA">Vacuna</option>
+      <option value="MINERAL">Mineral</option>
+      <option value="POUR-ON">Pour-On</option>
+      <option value="ANTIBIOTICO">Antibiótico</option>
+      <option value="OTRO">Otro</option>
+    </select>
+    <select id="aplFiltGrupo" onchange="renderAplicaciones()" style="background:var(--card2);border:1px solid var(--brd);color:var(--text);padding:7px 9px;border-radius:5px;font-size:12px;">
+      <option value="">Todos los grupos</option>
+    </select>
+    <input type="month" id="aplFiltMes" onchange="renderAplicaciones()" style="background:var(--card2);border:1px solid var(--brd);color:var(--text);padding:7px 9px;border-radius:5px;font-size:12px;">
+  </div>
+  <div class="stats">
+    <div class="sc"><div class="sc-v" id="stAplTotal">—</div><div class="sc-l">Total aplicaciones</div></div>
+    <div class="sc"><div class="sc-v" id="stAplAntipar" style="color:var(--red);">—</div><div class="sc-l">Antiparasitarios</div></div>
+    <div class="sc"><div class="sc-v" id="stAplVac" style="color:var(--purple);">—</div><div class="sc-l">Vacunas</div></div>
+    <div class="sc"><div class="sc-v" id="stAplCabTotal">—</div><div class="sc-l">Cab. tratadas</div></div>
+  </div>
+  <div class="card">
+    <div class="ch"><div class="ct">💉 Historial de Aplicaciones</div></div>
+    <div class="tw"><table>
+      <thead><tr>
+        <th>Fecha</th><th>Tipo</th><th>Producto</th><th>P. Activo</th>
+        <th>Grupo / Animal</th><th>Cabezas</th><th>Dosis/cab.</th>
+        <th>Total usado</th><th>Retiro</th><th>Libre retiro</th>
+        <th>Operador</th><th></th>
+      </tr></thead>
+      <tbody id="aplBody"><tr><td colspan="12"><div class="emp"><div class="emp-ic">💉</div>Sin aplicaciones registradas</div></td></tr></tbody>
+    </table></div>
+    <div style="padding:8px 14px;border-top:1px solid var(--brd);"><div class="pag" id="aplPag"></div></div>
+  </div>
+</div>
+
+<!-- ═══════ FARMACIA ═══════ -->
+<div class="pg" id="pg-farmacia">
+  <div class="ar">
+    <button class="btn bp" onclick="abrirModalFactura()">📦 Nueva Factura / Ingreso</button>
+    <button class="btn bs" onclick="abrirModalProducto()">➕ Producto rápido</button>
+    <div class="sp"></div>
+    <select id="farFiltCat" onchange="renderFarmacia()" style="background:var(--card2);border:1px solid var(--brd);color:var(--text);padding:7px 9px;border-radius:5px;font-size:12px;">
+      <option value="">Todas las categorías</option>
+      <option value="ANTIPARASITARIO">Antiparasitario</option>
+      <option value="VACUNA">Vacuna</option>
+      <option value="MINERAL">Mineral</option>
+      <option value="POUR-ON">Pour-On</option>
+      <option value="ANTIBIOTICO">Antibiótico</option>
+      <option value="INSUMO">Insumo (agujas, jeringas...)</option>
+      <option value="OTRO">Otro</option>
+    </select>
+  </div>
+  <div class="stats">
+    <div class="sc"><div class="sc-v" id="stFarProd">—</div><div class="sc-l">Productos</div></div>
+    <div class="sc"><div class="sc-v" id="stFarStockBajo" style="color:var(--gold);">—</div><div class="sc-l">Stock bajo</div></div>
+    <div class="sc"><div class="sc-v" id="stFarSinStock" style="color:var(--red);">—</div><div class="sc-l">Sin stock</div></div>
+    <div class="sc"><div class="sc-v" id="stFarValor" style="color:var(--gold);">—</div><div class="sc-l">Valor stock (Bs)</div></div>
+  </div>
+  <div class="card">
+    <div class="ch"><div class="ct">💊 Stock de Farmacia</div></div>
+    <div class="tw"><table>
+      <thead><tr>
+        <th>Producto</th><th>Principio Activo</th><th>Categoría</th>
+        <th>Stock</th><th>Unidad</th><th>Stock mínimo</th>
+        <th>P. costo (Bs)</th><th>Valor total</th>
+        <th>Retiro (días)</th><th>Vencimiento</th><th></th>
+      </tr></thead>
+      <tbody id="farBody"><tr><td colspan="11"><div class="emp"><div class="emp-ic">💊</div>Sin productos registrados</div></td></tr></tbody>
+    </table></div>
+  </div>
+  <div class="card">
+    <div class="ch"><div class="ct">📋 Historial de Facturas</div></div>
+    <div class="tw"><table>
+      <thead><tr>
+        <th>Fecha</th><th>N° Factura</th><th>Proveedor</th><th>Ítems</th><th>Total Bs</th><th>Usuario</th><th></th>
+      </tr></thead>
+      <tbody id="farFactBody"><tr><td colspan="7"><div class="emp"><div class="emp-ic">📋</div>Sin facturas registradas</div></td></tr></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- ═══════ UMBRALES ═══════ -->
+<div class="pg" id="pg-umbrales">
+  <div class="card">
+    <div class="ch">
+      <div class="ct">⚙️ Configuración de Umbrales HPG</div>
+      <button class="btn bp btn-sm" onclick="guardarUmbrales()">💾 Guardar Umbrales</button>
+    </div>
+    <div class="cb">
+      <div style="font-size:12px;color:var(--t2);margin-bottom:16px;line-height:1.7;background:var(--card2);border:1px solid var(--brd);border-radius:6px;padding:12px;">
+        <strong style="color:var(--teal);">📚 Base bibliográfica:</strong> Umbrales basados en WAAVP, Parasites & Vectors (2023) y estudios en bovinos Bos indicus/Brangus en Brasil tropical
+        (Cooperia 60-75%, Haemonchus 15-25%, Oesophagostomum 10-15% como flora predominante en pastoreo extensivo sobre Brachiaria).<br>
+        <span style="color:var(--gold);">⚠️ Estos valores son orientativos. Como veterinaria podés ajustarlos según tu criterio clínico y los resultados de coprocultivo del establecimiento.</span>
+      </div>
+      <div id="umbralTabla"></div>
+      <div style="margin-top:16px;">
+        <div style="font-size:11px;font-weight:700;color:var(--t3);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">FACTORES AGRAVANTES (reducen el umbral en %)</div>
+        <div class="fg">
+          <div class="fm">
+            <label>Época lluviosa (%)</label>
+            <input type="number" id="factLluvia" min="0" max="80" step="5" value="30">
+          </div>
+          <div class="fm">
+            <label>Condición corporal &lt; 3/5 (%)</label>
+            <input type="number" id="factCC" min="0" max="80" step="5" value="30">
+          </div>
+          <div class="fm">
+            <label>Periparto (pre/post parto) (%)</label>
+            <input type="number" id="factPeriparto" min="0" max="80" step="5" value="40">
+          </div>
+          <div class="fm">
+            <label>Descanso potreros &lt; 28 días (%)</label>
+            <input type="number" id="factDescanso" min="0" max="80" step="5" value="20">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL HPG ═══ -->
+<div class="mo" id="moHPG">
+  <div class="md md-lg">
+    <div class="mh">
+      <div class="mt">🔬 Nuevo Muestreo HPG</div>
+      <button class="mc" onclick="cerrar('moHPG')">✕</button>
+    </div>
+    <div class="mb">
+      <div class="fg" style="margin-bottom:14px;">
+        <div class="fm">
+          <label>Fecha del muestreo *</label>
+          <input type="date" id="hpgFecha">
+        </div>
+        <div class="fm">
+          <label>Grupo *</label>
+          <select id="hpgGrupo" onchange="hpgActualizarGrupo()">
+            <option value="">— Seleccioná —</option>
+          </select>
+        </div>
+        <div class="fm">
+          <label>Categoría del grupo</label>
+          <input type="text" id="hpgCategoria" readonly style="background:var(--card3);color:var(--t2);">
+        </div>
+        <div class="fm">
+          <label>Raza predominante</label>
+          <select id="hpgRaza">
+            <option value="NELORE">Nelore</option>
+            <option value="BRANGUS">Brangus</option>
+            <option value="CRIOLLO">Criollo</option>
+            <option value="CRUZA">Cruza</option>
+          </select>
+        </div>
+        <div class="fm">
+          <label>Peso medio del grupo (kg)</label>
+          <input type="number" id="hpgPeso" step="0.1" placeholder="Auto desde inventario">
+        </div>
+        <div class="fm">
+          <label>Época</label>
+          <select id="hpgEpoca">
+            <option value="SECA">Seca</option>
+            <option value="LLUVIOSA">Lluviosa</option>
+          </select>
+        </div>
+        <div class="fm">
+          <label>Condición corporal promedio</label>
+          <select id="hpgCC">
+            <option value="normal">Normal (≥ 3/5)</option>
+            <option value="baja">Baja (&lt; 3/5)</option>
+          </select>
+        </div>
+        <div class="fm">
+          <label>Periparto</label>
+          <select id="hpgPeriparto">
+            <option value="no">No</option>
+            <option value="si">Sí (pre/post parto)</option>
+          </select>
+        </div>
+        <div class="fm">
+          <label>Descanso potreros</label>
+          <select id="hpgDescanso">
+            <option value="normal">Normal (≥ 28 días)</option>
+            <option value="corto">Corto (&lt; 28 días)</option>
+          </select>
+        </div>
+        <div class="fm">
+          <label>Operador / Laboratorio</label>
+          <input type="text" id="hpgOperador" placeholder="Nombre o laboratorio">
+        </div>
+        <div class="fm">
+          <label>Técnica usada</label>
+          <select id="hpgTecnica">
+            <option value="McMaster">McMaster</option>
+            <option value="Mini-FLOTAC">Mini-FLOTAC</option>
+            <option value="Willis">Willis</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+        <div class="fm">
+          <label>Observaciones</label>
+          <input type="text" id="hpgObs" placeholder="Opcional">
+        </div>
+      </div>
+
+      <!-- MUESTRAS -->
+      <div style="background:var(--card2);border:1px solid var(--brd);border-radius:8px;padding:14px;margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:1px;text-transform:uppercase;">MUESTRAS INDIVIDUALES (5% del grupo = mín. 6 animales)</div>
+          <div style="display:flex;gap:6px;">
+            <button class="btn bs btn-sm" onclick="hpgAgregarMuestra()">+ Muestra</button>
+            <button class="btn bd btn-sm" onclick="hpgQuitarMuestra()">− Quitar</button>
+          </div>
+        </div>
+        <div id="hpgMuestrasContainer"></div>
+        <div id="hpgEstadisticas" style="margin-top:12px;display:none;"></div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn bs" onclick="cerrar('moHPG')">Cancelar</button>
+      <button class="btn bp" onclick="guardarHPG()">💾 Guardar Muestreo</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL APLICACION ═══ -->
+<div class="mo" id="moApl">
+  <div class="md md-lg">
+    <div class="mh">
+      <div class="mt">💉 Registrar Aplicación</div>
+      <button class="mc" onclick="cerrar('moApl')">✕</button>
+    </div>
+    <div class="mb">
+      <div class="fg">
+        <div class="fm">
+          <label>Fecha *</label>
+          <input type="date" id="aplFecha">
+        </div>
+        <div class="fm">
+          <label>Tipo *</label>
+          <select id="aplTipo" onchange="aplFiltrarProductos()">
+            <option value="">— Seleccioná —</option>
+            <option value="ANTIPARASITARIO">Antiparasitario</option>
+            <option value="VACUNA">Vacuna</option>
+            <option value="MINERAL">Mineral</option>
+            <option value="POUR-ON">Pour-On</option>
+            <option value="ANTIBIOTICO">Antibiótico</option>
+            <option value="OTRO">Otro</option>
+          </select>
+        </div>
+        <div class="fm">
+          <label>Producto (desde farmacia) *</label>
+          <select id="aplProducto" onchange="aplCargarProducto()">
+            <option value="">— Primero tipo —</option>
+          </select>
+        </div>
+        <div class="fm">
+          <label>Principio activo</label>
+          <input type="text" id="aplPActivo" readonly style="background:var(--card3);color:var(--t2);">
+        </div>
+        <div class="fm">
+          <label>Stock disponible</label>
+          <input type="text" id="aplStockDisp" readonly style="background:var(--card3);color:var(--gold);">
+        </div>
+        <div class="fm">
+          <label>Período de retiro (días)</label>
+          <input type="text" id="aplRetiro" readonly style="background:var(--card3);color:var(--purple);">
+        </div>
+        <div class="sep">Destino</div>
+        <div class="fm" style="grid-column:1/-1;">
+          <label>Aplicar a</label>
+          <div style="display:flex;gap:8px;margin-bottom:8px;">
+            <button class="btn btn-sm bp" id="btnAplGrupo" onclick="aplSetModo('grupo')">Por grupo</button>
+            <button class="btn btn-sm bs" id="btnAplIndiv" onclick="aplSetModo('individual')">Animal individual</button>
+          </div>
+        </div>
+        <div class="fm" id="aplSecGrupo">
+          <label>Grupo *</label>
+          <select id="aplGrupo" onchange="aplCalcularDosis()">
+            <option value="">— Seleccioná —</option>
+          </select>
+        </div>
+        <div class="fm" id="aplSecCabezas">
+          <label>Cabezas</label>
+          <input type="number" id="aplCabezas" min="1" oninput="aplCalcularDosis()">
+        </div>
+        <div class="fm" id="aplSecIndiv" style="display:none;">
+          <label>IDE / Chip del animal *</label>
+          <input type="text" id="aplIDE" placeholder="N° chip">
+        </div>
+        <div class="sep">Dosis</div>
+        <div class="fm">
+          <label>Dosis por 100 kg PV</label>
+          <input type="text" id="aplDosisRef" readonly style="background:var(--card3);color:var(--t2);" placeholder="Desde el producto">
+        </div>
+        <div class="fm">
+          <label>Peso medio grupo (kg)</label>
+          <input type="number" id="aplPesoMedio" step="0.1" oninput="aplCalcularDosis()">
+        </div>
+        <div class="fm">
+          <label>Dosis por cabeza (ml/dosis)</label>
+          <input type="number" id="aplDosisCab" step="0.1" oninput="aplCalcularTotal()">
+        </div>
+        <div class="fm">
+          <label>Total a usar</label>
+          <input type="text" id="aplTotalUso" readonly style="background:var(--card3);color:var(--gold);font-weight:700;">
+        </div>
+        <div class="fm">
+          <label>Vía de administración</label>
+          <select id="aplVia">
+            <option value="SC">Subcutánea (SC)</option>
+            <option value="IM">Intramuscular (IM)</option>
+            <option value="IV">Intravenosa (IV)</option>
+            <option value="PO">Oral (PO)</option>
+            <option value="TOPICO">Tópico / Pour-On</option>
+            <option value="IN">Intranasal</option>
+          </select>
+        </div>
+        <div class="fm" style="grid-column:1/-1;">
+          <label>Comentario</label>
+          <input type="text" id="aplComentario" placeholder="Opcional">
+        </div>
+      </div>
+      <!-- Resumen -->
+      <div id="aplResumen" style="display:none;margin-top:12px;background:var(--card2);border:1px solid var(--brd);border-radius:8px;padding:14px;">
+        <div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:1px;margin-bottom:8px;">RESUMEN</div>
+        <div id="aplResumenContenido" style="font-size:12px;line-height:1.8;color:var(--t2);"></div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn bs" onclick="cerrar('moApl')">Cancelar</button>
+      <button class="btn bp" onclick="guardarAplicacion()">💾 Confirmar Aplicación</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL FACTURA ═══ -->
+<div class="mo" id="moFactura">
+  <div class="md md-lg">
+    <div class="mh">
+      <div class="mt">📦 Nueva Factura de Compra</div>
+      <button class="mc" onclick="cerrar('moFactura')">✕</button>
+    </div>
+    <div class="mb">
+      <div class="fg" style="margin-bottom:14px;">
+        <div class="fm">
+          <label>Fecha *</label>
+          <input type="date" id="factFecha">
+        </div>
+        <div class="fm">
+          <label>N° Factura</label>
+          <input type="text" id="factNum" placeholder="Ej: 001-0001-00000123">
+        </div>
+        <div class="fm">
+          <label>Proveedor *</label>
+          <input type="text" id="factProv" placeholder="Nombre del proveedor">
+        </div>
+        <div class="fm">
+          <label>Comentario</label>
+          <input type="text" id="factComent" placeholder="Opcional">
+        </div>
+      </div>
+      <!-- ÍTEMS -->
+      <div style="background:var(--card2);border:1px solid var(--brd);border-radius:8px;padding:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:1px;text-transform:uppercase;">ÍTEMS DE LA FACTURA</div>
+          <button class="btn bp btn-sm" onclick="factAgregarItem()">+ Agregar ítem</button>
+        </div>
+        <div id="factItemsContainer"></div>
+        <div style="margin-top:10px;text-align:right;font-size:13px;color:var(--gold);font-weight:700;" id="factTotal">Total: Bs 0</div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn bs" onclick="cerrar('moFactura')">Cancelar</button>
+      <button class="btn bp" onclick="guardarFactura()">💾 Guardar Factura</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL PRODUCTO RAPIDO ═══ -->
+<div class="mo" id="moProducto">
+  <div class="md">
+    <div class="mh">
+      <div class="mt">➕ Producto Rápido</div>
+      <button class="mc" onclick="cerrar('moProducto')">✕</button>
+    </div>
+    <div class="mb">
+      <div class="fg">
+        <div class="fm" style="grid-column:1/-1;">
+          <label>Nombre comercial *</label>
+          <input type="text" id="prodNombre" placeholder="Ej: Ivermectina 1%">
+        </div>
+        <div class="fm" style="grid-column:1/-1;">
+          <label>Principio activo</label>
+          <input type="text" id="prodPActivo" placeholder="Ej: Ivermectina">
+        </div>
+        <div class="fm">
+          <label>Categoría *</label>
+          <select id="prodCat">
+            <option value="ANTIPARASITARIO">Antiparasitario</option>
+            <option value="VACUNA">Vacuna</option>
+            <option value="MINERAL">Mineral</option>
+            <option value="POUR-ON">Pour-On</option>
+            <option value="ANTIBIOTICO">Antibiótico</option>
+            <option value="INSUMO">Insumo</option>
+            <option value="OTRO">Otro</option>
+          </select>
+        </div>
+        <div class="fm">
+          <label>Unidad</label>
+          <select id="prodUnidad">
+            <option value="ml">ml</option>
+            <option value="dosis">dosis</option>
+            <option value="comprimido">comprimido</option>
+            <option value="unidad">unidad</option>
+            <option value="kg">kg</option>
+            <option value="g">g</option>
+          </select>
+        </div>
+        <div class="fm">
+          <label>Stock inicial</label>
+          <input type="number" id="prodStock" min="0" step="0.1" value="0">
+        </div>
+        <div class="fm">
+          <label>Stock mínimo alerta</label>
+          <input type="number" id="prodStockMin" min="0" step="1" value="10">
+        </div>
+        <div class="fm">
+          <label>Precio unitario (Bs)</label>
+          <input type="number" id="prodPrecio" min="0" step="0.01">
+        </div>
+        <div class="fm">
+          <label>Período de retiro (días)</label>
+          <input type="number" id="prodRetiro" min="0" step="1" value="0" placeholder="0 = sin retiro">
+        </div>
+        <div class="fm">
+          <label>Dosis ref. (ml/100kg PV)</label>
+          <input type="number" id="prodDosisRef" min="0" step="0.1" placeholder="Ej: 1">
+        </div>
+        <div class="fm">
+          <label>Vencimiento</label>
+          <input type="date" id="prodVenc">
+        </div>
+        <div class="fm" style="grid-column:1/-1;">
+          <label>Observaciones</label>
+          <input type="text" id="prodObs" placeholder="Ej: Refrigerar entre 2-8°C">
+        </div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn bs" onclick="cerrar('moProducto')">Cancelar</button>
+      <button class="btn bp" onclick="guardarProducto()">💾 Guardar Producto</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// CONFIGURACIÓN Y ESTADO
+// ═══════════════════════════════════════════════════
+const FB = 'https://elprado1-153ef-default-rtdb.firebaseio.com/elprado1';
+let usuario = '';
+let grupos = [];       // desde hacienda/grupos_resumen
+let animales = {};     // desde hacienda/animales
+let hpgData = [];
+let aplicaciones = [];
+let productos = {};    // keyed by id
+let facturas = [];
+let umbrales = {};
+let _aplModo = 'grupo';
+
+const UMBRALES_DEFAULT = [
+  { cat:'Ternero < 12 meses',  raza:'NELORE',   epg: 200, fuente:'Tropical Animal Health & Production 2012' },
+  { cat:'Ternero < 12 meses',  raza:'BRANGUS',  epg: 200, fuente:'WAAVP + Parasites & Vectors 2023' },
+  { cat:'Ternero < 12 meses',  raza:'CRIOLLO',  epg: 150, fuente:'WAAVP + Parasites & Vectors 2023' },
+  { cat:'Recría 12-24 meses',  raza:'NELORE',   epg: 300, fuente:'Parasites & Vectors 2023; Field study Nelore ScienceDirect 2007' },
+  { cat:'Recría 12-24 meses',  raza:'BRANGUS',  epg: 300, fuente:'Parasites & Vectors 2023' },
+  { cat:'Recría 12-24 meses',  raza:'CRIOLLO',  epg: 200, fuente:'WAAVP guidelines' },
+  { cat:'Adulto > 24 meses',   raza:'NELORE',   epg: 500, fuente:'Field study Nelore ScienceDirect 2007' },
+  { cat:'Adulto > 24 meses',   raza:'BRANGUS',  epg: 400, fuente:'Parasites & Vectors 2023' },
+  { cat:'Adulto > 24 meses',   raza:'CRIOLLO',  epg: 300, fuente:'WAAVP guidelines' },
+  { cat:'Vaca periparto',      raza:'NELORE',   epg: 200, fuente:'WAAVP; inmunodepresión periparto' },
+  { cat:'Vaca periparto',      raza:'BRANGUS',  epg: 200, fuente:'WAAVP; inmunodepresión periparto' },
+  { cat:'Vaca periparto',      raza:'CRIOLLO',  epg: 150, fuente:'WAAVP guidelines' },
+];
+
+// ── Firebase ─────────────────────────────────────────
+async function fbGet(path){ const r=await fetch(FB+'/'+path+'.json'); return r.ok?await r.json():null; }
+async function fbSet(path,val){ await fetch(FB+'/'+path+'.json',{method:'PUT',body:JSON.stringify(val),headers:{'Content-Type':'application/json'}}); }
+async function fbPatch(path,val){ await fetch(FB+'/'+path+'.json',{method:'PATCH',body:JSON.stringify(val),headers:{'Content-Type':'application/json'}}); }
+
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).substr(2,5); }
+function toArr(x){ if(!x)return[]; if(Array.isArray(x))return x; return Object.values(x); }
+let _ntfT;
+function ntf(msg,err=false,ms=3000){
+  const el=document.getElementById('ntf');
+  el.textContent=msg; el.className=err?'err':'ok'; el.style.display='block';
+  clearTimeout(_ntfT); if(ms>0)_ntfT=setTimeout(()=>el.style.display='none',ms);
+}
+function cerrar(id){ document.getElementById(id).style.display='none'; }
+function showPg(id){
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('pg-'+id).classList.add('active');
+  document.querySelectorAll('.tab').forEach(t=>{ if(t.getAttribute('onclick')?.includes("'"+id+"'")) t.classList.add('active'); });
+  if(id==='alertas') renderAlertas();
+  else if(id==='hpg') renderHPG();
+  else if(id==='aplicaciones') renderAplicaciones();
+  else if(id==='farmacia') renderFarmacia();
+  else if(id==='umbrales') renderUmbrales();
+}
+
+// ── INIT ─────────────────────────────────────────────
+window.onload = async () => {
+  const u = sessionStorage.getItem('ep_usuario')||localStorage.getItem('elprado_usuario');
+  if(!u){ window.location.href='gestion_elprado1.html'; return; }
+  usuario = u;
+  const rol = sessionStorage.getItem('ep_rol')||'';
+  document.getElementById('ubadge').textContent=(rol==='ADMIN'?'👑 ':'👤 ')+u;
+  const hoy = new Date().toISOString().split('T')[0];
+  ['hpgFecha','aplFecha','factFecha'].forEach(id=>{ const el=document.getElementById(id); if(el)el.value=hoy; });
+  ntf('Cargando datos...', false, 0);
+  await loadAll();
+  ntf('');
+  renderAlertas();
+};
+
+async function loadAll(){
+  try {
+    const [gR, aR, hR, aplR, pR, fR, uR] = await Promise.all([
+      fbGet('hacienda/grupos_resumen'),
+      fbGet('hacienda/animales'),
+      fbGet('sanidad/hpg'),
+      fbGet('sanidad/aplicaciones'),
+      fbGet('sanidad/productos'),
+      fbGet('sanidad/facturas'),
+      fbGet('sanidad/umbrales')
+    ]);
+    grupos    = toArr(gR).filter(Boolean);
+    animales  = aR || {};
+    hpgData   = toArr(hR).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+    aplicaciones = toArr(aplR).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+    productos = pR || {};
+    facturas  = toArr(fR).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+    umbrales  = uR || {};
+    poblarSelectGrupos();
+    renderUmbrales();
+  } catch(e){ ntf('Error al cargar: '+e.message, true); }
+}
+
+function poblarSelectGrupos(){
+  const ids = ['hpgFiltGrupo','aplFiltGrupo','hpgGrupo','aplGrupo'];
+  ids.forEach(id=>{
+    const sel=document.getElementById(id); if(!sel)return;
+    const val=sel.value;
+    const prim = sel.querySelector('option:first-child');
+    sel.innerHTML='';
+    if(prim)sel.appendChild(prim.cloneNode(true));
+    else sel.innerHTML='<option value="">— Seleccioná —</option>';
+    grupos.forEach(g=>{ const o=document.createElement('option'); o.value=g.nombre; o.textContent=g.nombre+' ('+g.cabezas+' cab.)'; sel.appendChild(o); });
+    sel.value=val;
+  });
+}
+
+// ── UMBRALES ─────────────────────────────────────────
+function getUmbral(raza, categoria, epoca, cc, periparto, descanso){
+  // Mapear categoría a fila de umbral
+  let catKey = 'Adulto > 24 meses';
+  if(periparto==='si') catKey = 'Vaca periparto';
+  else {
+    // Estimamos edad por grupo/categoría - usar peso como proxy si no tenemos edad exacta
+    const nom = categoria?.toUpperCase()||'';
+    if(nom.includes('TERNERO')||nom.includes('DESTETE')) catKey='Ternero < 12 meses';
+    else if(nom.includes('RECRIA')||nom.includes('RECRÍA')||nom.includes('JOVEN')) catKey='Recría 12-24 meses';
+  }
+  const razaKey = raza?.toUpperCase()||'NELORE';
+  const key = catKey+'|'+razaKey;
+  let epg = (umbrales[key]?.epg) || UMBRALES_DEFAULT.find(u=>u.cat===catKey&&u.raza===razaKey)?.epg || 300;
+
+  // Factores agravantes
+  const fLluvia  = parseInt(document.getElementById('factLluvia')?.value)||30;
+  const fCC      = parseInt(document.getElementById('factCC')?.value)||30;
+  const fPeri    = parseInt(document.getElementById('factPeriparto')?.value)||40;
+  const fDesc    = parseInt(document.getElementById('factDescanso')?.value)||20;
+
+  let reduc = 0;
+  if(epoca==='LLUVIOSA') reduc+=fLluvia;
+  if(cc==='baja')        reduc+=fCC;
+  if(periparto==='si')   reduc+=fPeri;
+  if(descanso==='corto') reduc+=fDesc;
+  reduc = Math.min(reduc, 70); // máx 70% de reducción
+  return Math.round(epg * (1 - reduc/100));
+}
+
+function renderUmbrales(){
+  const tbl = document.getElementById('umbralTabla'); if(!tbl)return;
+  const cats = [...new Set(UMBRALES_DEFAULT.map(u=>u.cat))];
+  const razas = ['NELORE','BRANGUS','CRIOLLO'];
+  let html = '<div class="tw"><table><thead><tr><th>Categoría</th>';
+  razas.forEach(r=>html+=`<th>${r} (EPG)</th>`);
+  html+='<th>Fuente bibliográfica</th></tr></thead><tbody>';
+  cats.forEach(cat=>{
+    html+='<tr>';
+    html+=`<td style="font-weight:600;color:var(--t2);">${cat}</td>`;
+    razas.forEach(raza=>{
+      const def=UMBRALES_DEFAULT.find(u=>u.cat===cat&&u.raza===raza);
+      const key=cat+'|'+raza;
+      const val=(umbrales[key]?.epg)||def?.epg||300;
+      html+=`<td><input type="number" value="${val}" min="50" max="2000" step="50"
+        style="width:80px;background:var(--card2);border:1px solid var(--brd);color:var(--teal);padding:4px 6px;border-radius:4px;font-size:12px;font-weight:700;"
+        onchange="umbrales['${key}']={epg:parseInt(this.value)}"
+        title="${def?.fuente||''}"></td>`;
+    });
+    const fuente=UMBRALES_DEFAULT.find(u=>u.cat===cat)?.fuente||'';
+    html+=`<td style="font-size:10px;color:var(--t3);">${fuente}</td>`;
+    html+='</tr>';
+  });
+  html+='</tbody></table></div>';
+  tbl.innerHTML=html;
+}
+
+async function guardarUmbrales(){
+  await fbSet('sanidad/umbrales', umbrales);
+  ntf('✅ Umbrales guardados');
+}
+
+// ── HPG ──────────────────────────────────────────────
+let _hpgMuestras = 6;
+
+function abrirModalHPG(){
+  _hpgMuestras = 6;
+  hpgGenerarMuestras();
+  document.getElementById('hpgEstadisticas').style.display='none';
+  document.getElementById('moHPG').style.display='flex';
+}
+
+function hpgGenerarMuestras(){
+  const c=document.getElementById('hpgMuestrasContainer'); if(!c)return;
+  c.innerHTML='';
+  for(let i=1;i<=_hpgMuestras;i++){
+    c.innerHTML+=`<div class="muestra-row">
+      <span style="font-size:11px;color:var(--t3);width:70px;">Muestra ${i}</span>
+      <input type="number" id="hpgM${i}" min="0" step="1" placeholder="HPG" oninput="hpgCalcular()">
+      <span style="font-size:11px;color:var(--t3);">huevos/g</span>
+    </div>`;
+  }
+}
+
+function hpgAgregarMuestra(){ _hpgMuestras++; hpgGenerarMuestras(); }
+function hpgQuitarMuestra(){ if(_hpgMuestras>1){ _hpgMuestras--; hpgGenerarMuestras(); } }
+
+function hpgCalcular(){
+  const vals=[];
+  for(let i=1;i<=_hpgMuestras;i++){
+    const v=parseFloat(document.getElementById('hpgM'+i)?.value);
+    if(!isNaN(v)&&v>=0) vals.push(v);
+  }
+  const estDiv=document.getElementById('hpgEstadisticas');
+  if(vals.length<2){ estDiv.style.display='none'; return; }
+
+  const n=vals.length;
+  const prom=vals.reduce((a,b)=>a+b,0)/n;
+  const desvio=Math.sqrt(vals.map(v=>(v-prom)**2).reduce((a,b)=>a+b,0)/(n-1));
+  const cv=prom>0?(desvio/prom*100):0;
+
+  const raza=document.getElementById('hpgRaza')?.value||'NELORE';
+  const cat=document.getElementById('hpgCategoria')?.value||'';
+  const epoca=document.getElementById('hpgEpoca')?.value||'SECA';
+  const cc=document.getElementById('hpgCC')?.value||'normal';
+  const peri=document.getElementById('hpgPeriparto')?.value||'no';
+  const desc=document.getElementById('hpgDescanso')?.value||'normal';
+  const umbral=getUmbral(raza,cat,epoca,cc,peri,desc);
+
+  let nivel='bajo', color='var(--gs)', rec='✅ Sin necesidad de tratamiento por el momento.', cls='hpg-bajo';
+  if(prom>=umbral*0.7 && prom<umbral){ nivel='medio'; color='var(--gold)'; rec='⚠️ Monitorear. Cercano al umbral de tratamiento.'; cls='hpg-medio'; }
+  if(prom>=umbral){ nivel='alto'; color='var(--red)'; rec='🚨 Se recomienda tratamiento antiparasitario. Consultar rotación de principios activos.'; cls='hpg-alto'; }
+
+  estDiv.innerHTML=`<div class="${cls} hpg-resultado">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:10px;">
+      <div><div style="font-size:10px;color:var(--t3);">Promedio HPG</div><div style="font-size:20px;font-weight:700;color:${color};">${Math.round(prom)}</div></div>
+      <div><div style="font-size:10px;color:var(--t3);">Desvío estándar</div><div style="font-size:16px;font-weight:600;color:var(--t2);">${desvio.toFixed(1)}</div></div>
+      <div><div style="font-size:10px;color:var(--t3);">CV%</div><div style="font-size:16px;font-weight:600;color:var(--t2);">${cv.toFixed(1)}%</div></div>
+      <div><div style="font-size:10px;color:var(--t3);">N muestras</div><div style="font-size:16px;font-weight:600;color:var(--t2);">${n}</div></div>
+      <div><div style="font-size:10px;color:var(--t3);">Umbral (ajustado)</div><div style="font-size:16px;font-weight:600;color:var(--gold);">${umbral} HPG</div></div>
+    </div>
+    <div style="font-size:12px;color:var(--t2);padding-top:8px;border-top:1px solid rgba(255,255,255,.08);">${rec}</div>
+  </div>`;
+  estDiv.style.display='block';
+}
+
+function hpgActualizarGrupo(){
+  const g=document.getElementById('hpgGrupo')?.value||'';
+  const grp=grupos.find(x=>x.nombre===g);
+  if(grp){
+    document.getElementById('hpgPeso').value=grp.pesoMedio||'';
+    // Inferir categoría desde nombre del grupo
+    let cat='Adulto > 24 meses';
+    const n=g.toUpperCase();
+    if(n.includes('TERNERO')||n.includes('DESTETE')) cat='Ternero < 12 meses';
+    else if(n.includes('RECRIA')||n.includes('RECRÍA')) cat='Recría 12-24 meses';
+    document.getElementById('hpgCategoria').value=cat;
+  }
+  hpgCalcular();
+}
+
+async function guardarHPG(){
+  const fecha=document.getElementById('hpgFecha').value;
+  const grupo=document.getElementById('hpgGrupo').value;
+  if(!fecha||!grupo){ ntf('Completá fecha y grupo',true); return; }
+  const vals=[];
+  for(let i=1;i<=_hpgMuestras;i++){
+    const v=parseFloat(document.getElementById('hpgM'+i)?.value);
+    if(!isNaN(v)&&v>=0) vals.push(v);
+  }
+  if(vals.length<1){ ntf('Ingresá al menos una muestra',true); return; }
+  const n=vals.length;
+  const prom=vals.reduce((a,b)=>a+b,0)/n;
+  const desvio=n>1?Math.sqrt(vals.map(v=>(v-prom)**2).reduce((a,b)=>a+b,0)/(n-1)):0;
+  const cv=prom>0?(desvio/prom*100):0;
+  const raza=document.getElementById('hpgRaza').value;
+  const cat=document.getElementById('hpgCategoria').value;
+  const epoca=document.getElementById('hpgEpoca').value;
+  const cc=document.getElementById('hpgCC').value;
+  const peri=document.getElementById('hpgPeriparto').value;
+  const desc=document.getElementById('hpgDescanso').value;
+  const umbral=getUmbral(raza,cat,epoca,cc,peri,desc);
+  const reg={
+    id:uid(), fecha, grupo, raza, categoria:cat, epoca, cc, periparto:peri, descanso:desc,
+    pesoMedio:parseFloat(document.getElementById('hpgPeso').value)||null,
+    tecnica:document.getElementById('hpgTecnica').value,
+    operador:document.getElementById('hpgOperador').value,
+    obs:document.getElementById('hpgObs').value,
+    muestras:vals, n, promedio:Math.round(prom*10)/10,
+    desvio:Math.round(desvio*10)/10, cv:Math.round(cv*10)/10,
+    umbral, resultado:prom>=umbral?'ALTO':prom>=umbral*0.7?'MEDIO':'BAJO',
+    recomendacion:prom>=umbral?'TRATAR':prom>=umbral*0.7?'MONITOREAR':'OK',
+    usuario, fechaReg:new Date().toISOString()
+  };
+  hpgData.unshift(reg);
+  await fbSet('sanidad/hpg', hpgData);
+  cerrar('moHPG');
+  renderHPG();
+  renderAlertas();
+  ntf('✅ Muestreo HPG guardado');
+}
+
+function renderHPG(){
+  const fg=document.getElementById('hpgFiltGrupo')?.value||'';
+  const fm=document.getElementById('hpgFiltMes')?.value||'';
+  let data=hpgData.filter(h=>(!fg||h.grupo===fg)&&(!fm||h.fecha.startsWith(fm)));
+  const RES_BADGE={
+    ALTO:'<span class="bg bg-alert">🔴 ALTO</span>',
+    MEDIO:'<span class="bg bg-warn">🟡 MEDIO</span>',
+    BAJO:'<span class="bg bg-ok">🟢 BAJO</span>'
+  };
+  const REC_BADGE={
+    TRATAR:'<span class="bg bg-alert">TRATAR</span>',
+    MONITOREAR:'<span class="bg bg-warn">MONITOREAR</span>',
+    OK:'<span class="bg bg-ok">OK</span>'
+  };
+  const tbody=document.getElementById('hpgBody');
+  tbody.innerHTML=data.length?data.map(h=>`<tr>
+    <td class="mn">${h.fecha}</td>
+    <td style="font-weight:600;">${h.grupo}</td>
+    <td style="text-align:center;">${h.n}</td>
+    <td style="font-weight:700;color:${h.resultado==='ALTO'?'var(--red)':h.resultado==='MEDIO'?'var(--gold)':'var(--gs)'};">${h.promedio}</td>
+    <td class="mn">${h.desvio}</td>
+    <td class="mn">${h.cv}%</td>
+    <td class="mn" style="color:var(--gold);">${h.umbral}</td>
+    <td>${RES_BADGE[h.resultado]||h.resultado}</td>
+    <td>${REC_BADGE[h.recomendacion]||h.recomendacion}</td>
+    <td style="font-size:11px;color:var(--t3);">${h.operador||'—'}</td>
+    <td><button class="btn bd btn-sm" onclick="eliminarHPG('${h.id}')">🗑</button></td>
+  </tr>`).join('')
+  :'<tr><td colspan="11"><div class="emp"><div class="emp-ic">🔬</div>Sin muestreos</div></td></tr>';
+}
+
+async function eliminarHPG(id){
+  if(!confirm('¿Eliminar este muestreo?')) return;
+  hpgData=hpgData.filter(h=>h.id!==id);
+  await fbSet('sanidad/hpg',hpgData);
+  renderHPG(); renderAlertas();
+}
+
+// ── FARMACIA ─────────────────────────────────────────
+function abrirModalProducto(_id){
+  // Limpiar
+  ['prodNombre','prodPActivo','prodObs'].forEach(id=>document.getElementById(id).value='');
+  ['prodStock','prodStockMin','prodPrecio','prodRetiro','prodDosisRef'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('prodCat').value='ANTIPARASITARIO';
+  document.getElementById('prodUnidad').value='ml';
+  document.getElementById('prodVenc').value='';
+  document.getElementById('moProducto').style.display='flex';
+}
+
+async function guardarProducto(){
+  const nombre=document.getElementById('prodNombre').value.trim();
+  if(!nombre){ ntf('Ingresá el nombre del producto',true); return; }
+  const id=uid();
+  productos[id]={
+    id, nombre,
+    principioActivo:document.getElementById('prodPActivo').value.trim(),
+    categoria:document.getElementById('prodCat').value,
+    unidad:document.getElementById('prodUnidad').value,
+    stock:parseFloat(document.getElementById('prodStock').value)||0,
+    stockMinimo:parseFloat(document.getElementById('prodStockMin').value)||10,
+    precio:parseFloat(document.getElementById('prodPrecio').value)||0,
+    retiro:parseInt(document.getElementById('prodRetiro').value)||0,
+    dosisRef:parseFloat(document.getElementById('prodDosisRef').value)||null,
+    vencimiento:document.getElementById('prodVenc').value||null,
+    obs:document.getElementById('prodObs').value.trim(),
+    usuario, fechaReg:new Date().toISOString()
+  };
+  await fbSet('sanidad/productos',productos);
+  cerrar('moProducto');
+  renderFarmacia();
+  ntf('✅ Producto guardado');
+}
+
+function renderFarmacia(){
+  const filtCat=document.getElementById('farFiltCat')?.value||'';
+  const prods=Object.values(productos).filter(p=>!filtCat||p.categoria===filtCat);
+  const hoy=new Date().toISOString().split('T')[0];
+
+  let sinStock=0, stockBajo=0, valorTotal=0;
+  prods.forEach(p=>{
+    if(p.stock<=0) sinStock++;
+    else if(p.stock<=p.stockMinimo) stockBajo++;
+    valorTotal+=(p.stock||0)*(p.precio||0);
+  });
+  document.getElementById('stFarProd').textContent=prods.length;
+  document.getElementById('stFarStockBajo').textContent=stockBajo;
+  document.getElementById('stFarSinStock').textContent=sinStock;
+  document.getElementById('stFarValor').textContent='Bs '+Math.round(valorTotal).toLocaleString('es-BO');
+
+  const CAT_BADGE={
+    ANTIPARASITARIO:'<span class="bg bg-alert">Antipar.</span>',
+    VACUNA:'<span class="bg bg-vac">Vacuna</span>',
+    MINERAL:'<span class="bg bg-ok">Mineral</span>',
+    'POUR-ON':'<span class="bg bg-info">Pour-On</span>',
+    ANTIBIOTICO:'<span class="bg bg-warn">Antibiótico</span>',
+    INSUMO:'<span class="bg" style="background:rgba(100,100,100,.15);color:var(--t3);">Insumo</span>',
+    OTRO:'<span class="bg" style="background:rgba(100,100,100,.15);color:var(--t3);">Otro</span>'
+  };
+
+  const tbody=document.getElementById('farBody');
+  tbody.innerHTML=prods.length?prods.sort((a,b)=>a.nombre.localeCompare(b.nombre)).map(p=>{
+    const stockClass=p.stock<=0?'stock-crit':p.stock<=p.stockMinimo?'stock-warn':'stock-ok';
+    const vencOk=p.vencimiento&&p.vencimiento<hoy?'<span style="color:var(--red);">⚠️ VENCIDO</span>':'';
+    return`<tr>
+      <td style="font-weight:600;">${p.nombre}${vencOk}</td>
+      <td style="font-size:11px;color:var(--t3);">${p.principioActivo||'—'}</td>
+      <td>${CAT_BADGE[p.categoria]||p.categoria}</td>
+      <td class="mn ${stockClass}" style="font-weight:700;">${p.stock} ${p.unidad}</td>
+      <td class="mn">${p.unidad}</td>
+      <td class="mn" style="color:var(--t3);">${p.stockMinimo} ${p.unidad}</td>
+      <td class="mn">Bs ${p.precio||0}</td>
+      <td class="mn tgo">Bs ${Math.round((p.stock||0)*(p.precio||0)).toLocaleString('es-BO')}</td>
+      <td class="mn" style="color:var(--purple);">${p.retiro||0}d</td>
+      <td class="mn" style="color:${p.vencimiento&&p.vencimiento<hoy?'var(--red)':'var(--t3)'};">${p.vencimiento||'—'}</td>
+      <td><button class="btn bd btn-sm" onclick="eliminarProducto('${p.id}')">🗑</button></td>
+    </tr>`;
+  }).join('')
+  :'<tr><td colspan="11"><div class="emp"><div class="emp-ic">💊</div>Sin productos</div></td></tr>';
+
+  // Facturas
+  const ftbody=document.getElementById('farFactBody');
+  ftbody.innerHTML=facturas.length?facturas.map(f=>`<tr>
+    <td class="mn">${f.fecha}</td>
+    <td class="mn">${f.numero||'—'}</td>
+    <td>${f.proveedor}</td>
+    <td>${f.items?.length||0} ítems</td>
+    <td class="mn tgo">Bs ${Math.round(f.total||0).toLocaleString('es-BO')}</td>
+    <td style="font-size:11px;color:var(--t3);">${f.usuario||'—'}</td>
+    <td><button class="btn bd btn-sm" onclick="eliminarFactura('${f.id}')">🗑</button></td>
+  </tr>`).join('')
+  :'<tr><td colspan="7"><div class="emp"><div class="emp-ic">📋</div>Sin facturas</div></td></tr>';
+}
+
+async function eliminarProducto(id){
+  if(!confirm('¿Eliminar este producto?')) return;
+  delete productos[id];
+  await fbSet('sanidad/productos',productos);
+  renderFarmacia();
+}
+
+// ── FACTURAS ─────────────────────────────────────────
+let _factItems=1;
+
+function abrirModalFactura(){
+  _factItems=1;
+  document.getElementById('factFecha').value=new Date().toISOString().split('T')[0];
+  ['factNum','factProv','factComent'].forEach(id=>document.getElementById(id).value='');
+  factRenderItems();
+  document.getElementById('moFactura').style.display='flex';
+}
+
+function factRenderItems(){
+  const c=document.getElementById('factItemsContainer'); if(!c)return;
+  c.innerHTML='';
+  for(let i=1;i<=_factItems;i++){
+    const cats=['ANTIPARASITARIO','VACUNA','MINERAL','POUR-ON','ANTIBIOTICO','INSUMO','OTRO'];
+    const catOpts=cats.map(x=>`<option value="${x}">${x}</option>`).join('');
+    c.innerHTML+=`<div style="background:var(--card3);border:1px solid var(--brd);border-radius:6px;padding:10px;margin-bottom:8px;">
+      <div style="font-size:10px;color:var(--t3);margin-bottom:8px;font-weight:700;">ÍTEM ${i}</div>
+      <div class="fg" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));">
+        <div class="fm" style="grid-column:1/-1;"><label>Nombre producto *</label><input type="text" id="fi${i}nom" placeholder="Nombre comercial"></div>
+        <div class="fm"><label>Principio activo</label><input type="text" id="fi${i}pa" placeholder="Ej: Ivermectina"></div>
+        <div class="fm"><label>Categoría</label><select id="fi${i}cat">${catOpts}</select></div>
+        <div class="fm"><label>Cantidad</label><input type="number" id="fi${i}qty" min="0" step="0.1" value="1" oninput="factCalcTotal()"></div>
+        <div class="fm"><label>Unidad</label><select id="fi${i}uni"><option>ml</option><option>dosis</option><option>unidad</option><option>kg</option><option>g</option><option>caja</option></select></div>
+        <div class="fm"><label>Precio unit. (Bs)</label><input type="number" id="fi${i}precio" min="0" step="0.01" oninput="factCalcTotal()"></div>
+        <div class="fm"><label>Retiro (días)</label><input type="number" id="fi${i}retiro" min="0" step="1" value="0"></div>
+        <div class="fm"><label>Dosis ref. (ml/100kgPV)</label><input type="number" id="fi${i}dosis" min="0" step="0.1"></div>
+        <div class="fm"><label>Vencimiento</label><input type="date" id="fi${i}venc"></div>
+      </div>
+    </div>`;
+  }
+  factCalcTotal();
+}
+
+function factAgregarItem(){ _factItems++; factRenderItems(); }
+
+function factCalcTotal(){
+  let total=0;
+  for(let i=1;i<=_factItems;i++){
+    const qty=parseFloat(document.getElementById('fi'+i+'qty')?.value)||0;
+    const precio=parseFloat(document.getElementById('fi'+i+'precio')?.value)||0;
+    total+=qty*precio;
+  }
+  document.getElementById('factTotal').textContent='Total: Bs '+Math.round(total*100)/100;
+}
+
+async function guardarFactura(){
+  const fecha=document.getElementById('factFecha').value;
+  const prov=document.getElementById('factProv').value.trim();
+  if(!fecha||!prov){ ntf('Completá fecha y proveedor',true); return; }
+
+  const items=[];
+  let total=0;
+  for(let i=1;i<=_factItems;i++){
+    const nom=document.getElementById('fi'+i+'nom')?.value.trim();
+    if(!nom) continue;
+    const qty=parseFloat(document.getElementById('fi'+i+'qty')?.value)||0;
+    const precio=parseFloat(document.getElementById('fi'+i+'precio')?.value)||0;
+    const cat=document.getElementById('fi'+i+'cat')?.value||'OTRO';
+    const uni=document.getElementById('fi'+i+'uni')?.value||'unidad';
+    const pa=document.getElementById('fi'+i+'pa')?.value.trim()||'';
+    const retiro=parseInt(document.getElementById('fi'+i+'retiro')?.value)||0;
+    const dosisRef=parseFloat(document.getElementById('fi'+i+'dosis')?.value)||null;
+    const venc=document.getElementById('fi'+i+'venc')?.value||null;
+    items.push({nom,pa,cat,qty,uni,precio,retiro,dosisRef,venc});
+    total+=qty*precio;
+
+    // Agregar/actualizar producto en farmacia
+    const existente=Object.values(productos).find(p=>p.nombre.toLowerCase()===nom.toLowerCase());
+    if(existente){
+      existente.stock=(existente.stock||0)+qty;
+      existente.precio=precio;
+      if(venc) existente.vencimiento=venc;
+    } else {
+      const pid=uid();
+      productos[pid]={id:pid,nombre:nom,principioActivo:pa,categoria:cat,unidad:uni,
+        stock:qty,stockMinimo:10,precio,retiro,dosisRef,vencimiento:venc,
+        obs:'',usuario,fechaReg:new Date().toISOString()};
+    }
+  }
+  if(!items.length){ ntf('Agregá al menos un ítem',true); return; }
+
+  const factura={
+    id:uid(), fecha, numero:document.getElementById('factNum').value.trim(),
+    proveedor:prov, comentario:document.getElementById('factComent').value.trim(),
+    items, total, usuario, fechaReg:new Date().toISOString()
+  };
+  facturas.unshift(factura);
+  await Promise.all([fbSet('sanidad/facturas',facturas), fbSet('sanidad/productos',productos)]);
+  cerrar('moFactura');
+  renderFarmacia();
+  ntf('✅ Factura guardada y stock actualizado');
+}
+
+async function eliminarFactura(id){
+  if(!confirm('¿Eliminar esta factura?\n(No revierte el stock)')) return;
+  facturas=facturas.filter(f=>f.id!==id);
+  await fbSet('sanidad/facturas',facturas);
+  renderFarmacia();
+}
+
+// ── APLICACIONES ─────────────────────────────────────
+function abrirModalAplicacion(){
+  const hoy=new Date().toISOString().split('T')[0];
+  document.getElementById('aplFecha').value=hoy;
+  ['aplTipo','aplProducto','aplGrupo','aplVia'].forEach(id=>document.getElementById(id).value='');
+  ['aplPActivo','aplStockDisp','aplRetiro','aplDosisRef','aplPesoMedio','aplDosisCab','aplTotalUso','aplComentario'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('aplIDE').value='';
+  document.getElementById('aplResumen').style.display='none';
+  aplSetModo('grupo');
+  document.getElementById('moApl').style.display='flex';
+}
+
+function aplSetModo(modo){
+  _aplModo=modo;
+  document.getElementById('aplSecGrupo').style.display=modo==='grupo'?'':'none';
+  document.getElementById('aplSecCabezas').style.display=modo==='grupo'?'':'none';
+  document.getElementById('aplSecIndiv').style.display=modo==='individual'?'':'none';
+  document.getElementById('btnAplGrupo').className='btn btn-sm'+(modo==='grupo'?' bp':' bs');
+  document.getElementById('btnAplIndiv').className='btn btn-sm'+(modo==='individual'?' bp':' bs');
+}
+
+function aplFiltrarProductos(){
+  const tipo=document.getElementById('aplTipo').value;
+  const sel=document.getElementById('aplProducto');
+  sel.innerHTML='<option value="">— Seleccioná —</option>';
+  Object.values(productos).filter(p=>!tipo||p.categoria===tipo).forEach(p=>{
+    sel.innerHTML+=`<option value="${p.id}">${p.nombre} (${p.stock} ${p.unidad})</option>`;
+  });
+}
+
+function aplCargarProducto(){
+  const pid=document.getElementById('aplProducto').value;
+  const prod=productos[pid];
+  if(!prod){ ['aplPActivo','aplStockDisp','aplRetiro','aplDosisRef'].forEach(id=>document.getElementById(id).value=''); return; }
+  document.getElementById('aplPActivo').value=prod.principioActivo||'';
+  document.getElementById('aplStockDisp').value=prod.stock+' '+prod.unidad;
+  document.getElementById('aplRetiro').value=prod.retiro?prod.retiro+' días':'Sin retiro';
+  document.getElementById('aplDosisRef').value=prod.dosisRef?(prod.dosisRef+' ml/100kg PV'):'';
+  aplCalcularDosis();
+}
+
+function aplCalcularDosis(){
+  const pid=document.getElementById('aplProducto').value;
+  const prod=productos[pid];
+  const peso=parseFloat(document.getElementById('aplPesoMedio').value)||0;
+  if(prod?.dosisRef && peso>0){
+    const dosisCab=Math.round(prod.dosisRef*peso/100*100)/100;
+    document.getElementById('aplDosisCab').value=dosisCab;
+    aplCalcularTotal();
+  }
+  // Peso desde grupo
+  if(!peso){
+    const grpNom=document.getElementById('aplGrupo').value;
+    const grp=grupos.find(g=>g.nombre===grpNom);
+    if(grp?.pesoMedio) document.getElementById('aplPesoMedio').value=grp.pesoMedio;
+  }
+}
+
+function aplCalcularTotal(){
+  const dosisCab=parseFloat(document.getElementById('aplDosisCab').value)||0;
+  let cab=0;
+  if(_aplModo==='grupo'){
+    cab=parseInt(document.getElementById('aplCabezas').value)||0;
+    if(!cab){
+      const grpNom=document.getElementById('aplGrupo').value;
+      const grp=grupos.find(g=>g.nombre===grpNom);
+      if(grp) cab=grp.cabezas||0;
+    }
+  } else { cab=1; }
+  const pid=document.getElementById('aplProducto').value;
+  const prod=productos[pid];
+  const total=dosisCab*cab;
+  document.getElementById('aplTotalUso').value=total>0?(total.toFixed(1)+' '+(prod?.unidad||'ml')):'';
+
+  // Resumen
+  const grpNom=document.getElementById('aplGrupo').value;
+  const retiro=parseInt(document.getElementById('aplRetiro').value)||0;
+  const fecha=document.getElementById('aplFecha').value;
+  if(total>0 && prod && (grpNom||_aplModo==='individual')){
+    let html=`<div>💉 Producto: <strong>${prod.nombre}</strong> (${prod.principioActivo||'—'})</div>`;
+    html+=`<div>📦 Stock actual: <strong>${prod.stock} ${prod.unidad}</strong> → después: <strong style="color:${prod.stock-total<0?'var(--red)':'var(--gs)'};">${(prod.stock-total).toFixed(1)} ${prod.unidad}</strong></div>`;
+    if(cab>0) html+=`<div>🐄 ${_aplModo==='grupo'?grpNom+' — '+cab+' cabezas':'Animal individual'} · Dosis/cab: ${dosisCab} ${prod.unidad||'ml'}</div>`;
+    if(retiro>0 && fecha){
+      const libre=new Date(fecha); libre.setDate(libre.getDate()+retiro);
+      html+=`<div style="color:var(--purple);">🚫 Período de retiro: ${retiro} días → libre el <strong>${libre.toISOString().split('T')[0]}</strong></div>`;
+    }
+    if(prod.stock-total<0) html+=`<div style="color:var(--red);">⚠️ Stock insuficiente. Disponible: ${prod.stock} ${prod.unidad}</div>`;
+    document.getElementById('aplResumenContenido').innerHTML=html;
+    document.getElementById('aplResumen').style.display='block';
+  }
+}
+
+async function guardarAplicacion(){
+  const fecha=document.getElementById('aplFecha').value;
+  const tipo=document.getElementById('aplTipo').value;
+  const pid=document.getElementById('aplProducto').value;
+  if(!fecha||!tipo||!pid){ ntf('Completá fecha, tipo y producto',true); return; }
+  const prod=productos[pid];
+  const dosisCab=parseFloat(document.getElementById('aplDosisCab').value)||0;
+  let cab=0, destino='';
+  if(_aplModo==='grupo'){
+    destino=document.getElementById('aplGrupo').value;
+    if(!destino){ ntf('Seleccioná el grupo',true); return; }
+    cab=parseInt(document.getElementById('aplCabezas').value)||(grupos.find(g=>g.nombre===destino)?.cabezas||0);
+  } else {
+    destino=document.getElementById('aplIDE').value.trim();
+    if(!destino){ ntf('Ingresá el IDE del animal',true); return; }
+    cab=1;
+  }
+  const total=dosisCab*cab;
+  if(prod && total>prod.stock){ ntf('Stock insuficiente: '+prod.stock+' '+prod.unidad+' disponibles',true); return; }
+
+  const retiro=prod?.retiro||0;
+  let libreRetiro=null;
+  if(retiro>0){
+    const d=new Date(fecha); d.setDate(d.getDate()+retiro);
+    libreRetiro=d.toISOString().split('T')[0];
+  }
+  const reg={
+    id:uid(), fecha, tipo, productoId:pid, productoNombre:prod?.nombre||'',
+    principioActivo:prod?.principioActivo||'',
+    modo:_aplModo, destino, cabezas:cab,
+    pesoMedio:parseFloat(document.getElementById('aplPesoMedio').value)||null,
+    dosisCab, totalUso:total, unidad:prod?.unidad||'',
+    via:document.getElementById('aplVia').value,
+    retiro, libreRetiro, comentario:document.getElementById('aplComentario').value,
+    usuario, fechaReg:new Date().toISOString()
+  };
+  // Descontar stock
+  if(prod && total>0){ prod.stock=Math.max(0, prod.stock-total); }
+  aplicaciones.unshift(reg);
+  await Promise.all([fbSet('sanidad/aplicaciones',aplicaciones), fbSet('sanidad/productos',productos)]);
+  cerrar('moApl');
+  renderAplicaciones();
+  renderFarmacia();
+  renderAlertas();
+  ntf('✅ Aplicación registrada. Stock actualizado.');
+}
+
+function renderAplicaciones(){
+  const ft=document.getElementById('aplFiltTipo')?.value||'';
+  const fg=document.getElementById('aplFiltGrupo')?.value||'';
+  const fm=document.getElementById('aplFiltMes')?.value||'';
+  let data=aplicaciones.filter(a=>(!ft||a.tipo===ft)&&(!fg||a.destino===fg)&&(!fm||a.fecha.startsWith(fm)));
+  document.getElementById('stAplTotal').textContent=data.length;
+  document.getElementById('stAplAntipar').textContent=data.filter(a=>a.tipo==='ANTIPARASITARIO').length;
+  document.getElementById('stAplVac').textContent=data.filter(a=>a.tipo==='VACUNA').length;
+  document.getElementById('stAplCabTotal').textContent=data.reduce((s,a)=>s+(a.cabezas||0),0);
+  const TIPO_BADGE={
+    ANTIPARASITARIO:'<span class="bg bg-alert">Antipar.</span>',
+    VACUNA:'<span class="bg bg-vac">Vacuna</span>',
+    MINERAL:'<span class="bg bg-ok">Mineral</span>',
+    'POUR-ON':'<span class="bg bg-info">Pour-On</span>',
+    ANTIBIOTICO:'<span class="bg bg-warn">Antibiótico</span>',
+    OTRO:'<span class="bg" style="background:rgba(100,100,100,.15);color:var(--t3);">Otro</span>'
+  };
+  const hoy=new Date().toISOString().split('T')[0];
+  const tbody=document.getElementById('aplBody');
+  tbody.innerHTML=data.length?data.map(a=>{
+    const enRetiro=a.libreRetiro&&a.libreRetiro>hoy;
+    return`<tr${enRetiro?' style="background:rgba(154,122,219,.06);"':''}>
+      <td class="mn">${a.fecha}</td>
+      <td>${TIPO_BADGE[a.tipo]||a.tipo}</td>
+      <td style="font-weight:600;">${a.productoNombre}</td>
+      <td style="font-size:11px;color:var(--t3);">${a.principioActivo||'—'}</td>
+      <td>${a.destino}${a.modo==='individual'?' <span class="bg bg-info">INDIV.</span>':''}</td>
+      <td style="font-weight:700;color:var(--gs);">${a.cabezas}</td>
+      <td class="mn">${a.dosisCab} ${a.unidad}</td>
+      <td class="mn" style="color:var(--gold);">${a.totalUso} ${a.unidad}</td>
+      <td class="mn" style="color:var(--purple);">${a.retiro?a.retiro+'d':'—'}</td>
+      <td class="mn" style="color:${enRetiro?'var(--red)':'var(--t3)'};">${a.libreRetiro||'—'}${enRetiro?' 🚫':''}</td>
+      <td style="font-size:11px;color:var(--t3);">${a.usuario||'—'}</td>
+      <td><button class="btn bd btn-sm" onclick="eliminarAplicacion('${a.id}')">🗑</button></td>
+    </tr>`;
+  }).join('')
+  :'<tr><td colspan="12"><div class="emp"><div class="emp-ic">💉</div>Sin aplicaciones</div></td></tr>';
+}
+
+async function eliminarAplicacion(id){
+  if(!confirm('¿Eliminar esta aplicación?\n(No revierte el stock)')) return;
+  aplicaciones=aplicaciones.filter(a=>a.id!==id);
+  await fbSet('sanidad/aplicaciones',aplicaciones);
+  renderAplicaciones(); renderAlertas();
+}
+
+// ── ALERTAS ──────────────────────────────────────────
+function renderAlertas(){
+  const hoy=new Date().toISOString().split('T')[0];
+  const alertas=[];
+
+  // 1. Grupos con HPG alto sin tratamiento posterior
+  hpgData.forEach(h=>{
+    if(h.resultado==='ALTO'){
+      const tratado=aplicaciones.some(a=>a.tipo==='ANTIPARASITARIO'&&a.destino===h.grupo&&a.fecha>=h.fecha);
+      if(!tratado) alertas.push({tipo:'roja',ico:'🔴',titulo:'HPG alto sin tratamiento',msg:`${h.grupo} — Promedio ${h.promedio} HPG (umbral ${h.umbral}) el ${h.fecha}. Sin antiparasitario posterior.`});
+    }
+    if(h.resultado==='MEDIO'){
+      alertas.push({tipo:'amarilla',ico:'🟡',titulo:'HPG en zona de atención',msg:`${h.grupo} — Promedio ${h.promedio} HPG el ${h.fecha}. Monitorear.`});
+    }
+  });
+
+  // 2. Animales/grupos en período de retiro
+  let enRetiro=0;
+  aplicaciones.filter(a=>a.libreRetiro&&a.libreRetiro>hoy).forEach(a=>{
+    enRetiro++;
+    alertas.push({tipo:'retiro',ico:'🚫',titulo:'Período de retiro activo',msg:`${a.destino} — ${a.productoNombre}. Libre el ${a.libreRetiro}.`});
+  });
+
+  // 3. Productos con stock bajo
+  Object.values(productos).forEach(p=>{
+    if(p.stock<=0) alertas.push({tipo:'roja',ico:'🔴',titulo:'Sin stock',msg:`${p.nombre} — Stock agotado.`});
+    else if(p.stock<=p.stockMinimo) alertas.push({tipo:'amarilla',ico:'🟡',titulo:'Stock bajo',msg:`${p.nombre} — ${p.stock} ${p.unidad} (mínimo: ${p.stockMinimo}).`});
+  });
+
+  // 4. Productos vencidos
+  Object.values(productos).forEach(p=>{
+    if(p.vencimiento&&p.vencimiento<hoy) alertas.push({tipo:'roja',ico:'⚠️',titulo:'Producto vencido',msg:`${p.nombre} — Venció el ${p.vencimiento}.`});
+  });
+
+  // 5. Grupos sin HPG en más de 60 días
+  grupos.forEach(g=>{
+    const ultimo=hpgData.find(h=>h.grupo===g.nombre);
+    if(!ultimo){
+      alertas.push({tipo:'azul',ico:'🔬',titulo:'Sin muestreo HPG',msg:`${g.nombre} — No tiene muestreos registrados.`});
+    } else {
+      const dias=Math.round((new Date(hoy)-new Date(ultimo.fecha))/86400000);
+      if(dias>60) alertas.push({tipo:'azul',ico:'🔬',titulo:'HPG desactualizado',msg:`${g.nombre} — Último muestreo hace ${dias} días (${ultimo.fecha}).`});
+    }
+  });
+
+  const rojas=alertas.filter(a=>a.tipo==='roja').length;
+  const amarillas=alertas.filter(a=>a.tipo==='amarilla').length;
+  const proximas=alertas.filter(a=>a.tipo==='azul').length;
+  document.getElementById('stAlertasRojas').textContent=rojas;
+  document.getElementById('stAlertasAmarillas').textContent=amarillas;
+  document.getElementById('stRetiro').textContent=enRetiro;
+  document.getElementById('stProximas').textContent=proximas;
+
+  const cont=document.getElementById('alertasContenido');
+  if(!alertas.length){
+    cont.innerHTML='<div class="emp"><div class="emp-ic">✅</div>Sin alertas activas. Todo en orden.</div>';
+    return;
+  }
+  const clases={roja:'alerta-roja',amarilla:'alerta-amarilla',retiro:'alerta-roja',azul:'alerta-azul'};
+  cont.innerHTML=alertas.map(a=>`
+    <div class="alerta-card ${clases[a.tipo]||'alerta-azul'}">
+      <div style="font-size:20px;">${a.ico}</div>
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px;">${a.titulo}</div>
+        <div style="font-size:12px;color:var(--t2);">${a.msg}</div>
+      </div>
+    </div>`).join('');
+}
+</script>
+</body>
+</html>
