@@ -25,7 +25,7 @@ html,body{height:100%;font-family:'Segoe UI',Arial,sans-serif;overflow:hidden}
 /* ── PANTALLA PRINCIPAL ── */
 #pantalla-inicio{
   position:fixed;inset:0;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;z-index:10;
+  align-items:center;justify-content:flex-start;z-index:10;overflow-y:auto;
   transition:opacity .4s,transform .4s;
 }
 #pantalla-inicio.oculto{opacity:0;pointer-events:none;transform:scale(.96)}
@@ -34,7 +34,7 @@ html,body{height:100%;font-family:'Segoe UI',Arial,sans-serif;overflow:hidden}
 #bg-foto{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;z-index:0}
 #bg-overlay{position:fixed;inset:0;background:rgba(0,0,0,.52);z-index:1}
 
-.contenido{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:24px;padding:16px 20px;width:100%;max-width:860px}
+.contenido{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:20px;padding:20px 20px 30px;width:100%;max-width:1100px}
 
 /* Header */
 .hdr{text-align:center;color:#fff}
