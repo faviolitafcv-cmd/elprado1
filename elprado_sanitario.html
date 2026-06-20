@@ -106,7 +106,31 @@ tr:hover td{background:rgba(58,186,186,.04);}
 .stock-ok{color:var(--gs);}
 .stock-warn{color:var(--gold);}
 .stock-crit{color:var(--red);}
-@media(max-width:600px){.fg{grid-template-columns:1fr;}.stats{grid-template-columns:repeat(2,1fr);}}
+/* Calendario */
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:8px;}
+.cal-dow{text-align:center;font-size:10px;font-weight:700;color:var(--t3);letter-spacing:1px;padding:6px 0;text-transform:uppercase;}
+.cal-dia{background:var(--card2);border:1px solid var(--brd);border-radius:6px;min-height:90px;padding:5px;cursor:pointer;transition:border-color .15s;position:relative;}
+.cal-dia:hover{border-color:var(--brd2);}
+.cal-dia.hoy{border-color:var(--teal);background:rgba(58,186,186,.06);}
+.cal-dia.otro-mes{opacity:.35;}
+.cal-num{font-size:11px;font-weight:700;color:var(--t3);margin-bottom:3px;}
+.cal-dia.hoy .cal-num{color:var(--teal);}
+.cal-chip{font-size:9px;font-weight:700;border-radius:4px;padding:2px 5px;margin-bottom:2px;cursor:pointer;display:flex;align-items:center;gap:3px;line-height:1.3;transition:opacity .12s;}
+.cal-chip:hover{opacity:.8;}
+.cal-chip.rojo{background:rgba(224,90,74,.2);color:#ffaaaa;border:1px solid rgba(224,90,74,.4);}
+.cal-chip.amarillo{background:rgba(201,162,39,.2);color:#ffe080;border:1px solid rgba(201,162,39,.4);}
+.cal-chip.verde{background:rgba(109,186,58,.15);color:#a0e870;border:1px solid rgba(109,186,58,.3);}
+.cal-chip.azul{background:rgba(58,186,186,.15);color:#80e0e0;border:1px solid rgba(58,186,186,.3);}
+/* Panel detalle */
+.det-panel{position:fixed;right:0;top:0;bottom:0;width:340px;background:var(--card);border-left:1px solid var(--brd2);z-index:200;display:none;flex-direction:column;box-shadow:-4px 0 20px rgba(0,0,0,.4);}
+.det-hdr{padding:14px 16px;border-bottom:1px solid var(--brd);display:flex;justify-content:space-between;align-items:center;}
+.det-body{padding:16px;overflow-y:auto;flex:1;}
+.det-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--brd);font-size:12px;}
+.det-row:last-child{border-bottom:none;}
+.det-lbl{color:var(--t3);font-size:10px;text-transform:uppercase;letter-spacing:.8px;}
+.det-val{font-weight:600;color:var(--text);}
+@media(max-width:600px){.cal-grid{grid-template-columns:repeat(7,1fr);}.cal-dia{min-height:60px;}.det-panel{width:100%;}}
+
 </style>
 </head>
 <body>
@@ -127,10 +151,43 @@ tr:hover td{background:rgba(58,186,186,.04);}
 <!-- NAV -->
 <div class="nav">
   <div class="tab active" onclick="showPg('alertas')">⚠️ Alertas</div>
+  <div class="tab" onclick="showPg('calendario')">📅 Calendario</div>
   <div class="tab" onclick="showPg('hpg')">🔬 HPG</div>
   <div class="tab" onclick="showPg('aplicaciones')">💉 Aplicaciones</div>
   <div class="tab" onclick="showPg('farmacia')">💊 Farmacia</div>
   <div class="tab" onclick="showPg('umbrales')">⚙️ Umbrales</div>
+</div>
+
+<!-- ═══════ CALENDARIO ═══════ -->
+<div class="pg" id="pg-calendario">
+  <div class="ar">
+    <button class="btn bs btn-sm" onclick="calMes(-1)">‹ Mes anterior</button>
+    <div style="font-size:14px;font-weight:700;color:var(--text);padding:0 12px;" id="calTitulo">—</div>
+    <button class="btn bs btn-sm" onclick="calMes(1)">Mes siguiente ›</button>
+    <button class="btn bp btn-sm" onclick="calHoy()">Hoy</button>
+    <div class="sp"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:11px;align-items:center;">
+      <span style="background:rgba(224,90,74,.2);color:#ffaaaa;border:1px solid rgba(224,90,74,.4);padding:2px 8px;border-radius:4px;">🔴 HPG alto — tratar</span>
+      <span style="background:rgba(201,162,39,.2);color:#ffe080;border:1px solid rgba(201,162,39,.4);padding:2px 8px;border-radius:4px;">🟡 Monitorear hoy</span>
+      <span style="background:rgba(109,186,58,.15);color:#a0e870;border:1px solid rgba(109,186,58,.3);padding:2px 8px;border-radius:4px;">🟢 Programado</span>
+      <span style="background:rgba(58,186,186,.15);color:#80e0e0;border:1px solid rgba(58,186,186,.3);padding:2px 8px;border-radius:4px;">🔵 Post-tratamiento</span>
+    </div>
+  </div>
+  <div class="card">
+    <div class="cb" style="padding:10px;">
+      <div class="cal-grid" id="calDow"></div>
+      <div class="cal-grid" id="calGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Panel detalle grupo -->
+<div class="det-panel" id="detPanel">
+  <div class="det-hdr">
+    <div style="font-size:13px;font-weight:700;" id="detTitulo">—</div>
+    <button class="mc" onclick="cerrarDetalle()">✕</button>
+  </div>
+  <div class="det-body" id="detBody"></div>
 </div>
 
 <!-- ═══════ ALERTAS ═══════ -->
@@ -271,6 +328,23 @@ tr:hover td{background:rgba(58,186,186,.04);}
         (Cooperia 60-75%, Haemonchus 15-25%, Oesophagostomum 10-15% como flora predominante en pastoreo extensivo sobre Brachiaria).<br>
         <span style="color:var(--gold);">⚠️ Estos valores son orientativos. Como veterinaria podés ajustarlos según tu criterio clínico y los resultados de coprocultivo del establecimiento.</span>
       </div>
+
+      <!-- SISTEMA DE PASTOREO -->
+      <div style="background:var(--card2);border:1px solid var(--brd2);border-radius:8px;padding:14px;margin-bottom:16px;">
+        <div style="font-size:11px;font-weight:700;color:var(--t3);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">🌿 Sistema de Pastoreo del Establecimiento</div>
+        <div class="fg">
+          <div class="fm" style="grid-column:1/-1;">
+            <label>Tipo de sistema</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
+              <button class="btn btn-sm" id="btnSistExt" onclick="setSistemaPastoreo('EXTENSIVO')">🟢 Extensivo</button>
+              <button class="btn btn-sm" id="btnSistSemi" onclick="setSistemaPastoreo('SEMI_INTENSIVO')">🟡 Semi-intensivo</button>
+              <button class="btn btn-sm bp" id="btnSistInt" onclick="setSistemaPastoreo('INTENSIVO')">🔴 Intensivo rotativo</button>
+            </div>
+          </div>
+          <div class="fm" id="descSistema" style="grid-column:1/-1;font-size:11px;color:var(--t3);line-height:1.6;padding:8px;background:var(--card3);border-radius:6px;border:1px solid var(--brd);"></div>
+        </div>
+      </div>
+
       <div id="umbralTabla"></div>
       <div style="margin-top:16px;">
         <div style="font-size:11px;font-weight:700;color:var(--t3);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">FACTORES AGRAVANTES (reducen el umbral en %)</div>
@@ -681,6 +755,7 @@ function showPg(id){
   document.getElementById('pg-'+id).classList.add('active');
   document.querySelectorAll('.tab').forEach(t=>{ if(t.getAttribute('onclick')?.includes("'"+id+"'")) t.classList.add('active'); });
   if(id==='alertas') renderAlertas();
+  else if(id==='calendario') renderCalendario();
   else if(id==='hpg') renderHPG();
   else if(id==='aplicaciones') renderAplicaciones();
   else if(id==='farmacia') renderFarmacia();
@@ -704,14 +779,15 @@ window.onload = async () => {
 
 async function loadAll(){
   try {
-    const [gR, aR, hR, aplR, pR, fR, uR] = await Promise.all([
+    const [gR, aR, hR, aplR, pR, fR, uR, cfgR] = await Promise.all([
       fbGet('hacienda/grupos_resumen'),
       fbGet('hacienda/animales'),
       fbGet('sanidad/hpg'),
       fbGet('sanidad/aplicaciones'),
       fbGet('sanidad/productos'),
       fbGet('sanidad/facturas'),
-      fbGet('sanidad/umbrales')
+      fbGet('sanidad/umbrales'),
+      fbGet('sanidad/config')
     ]);
     grupos    = toArr(gR).filter(Boolean);
     animales  = aR || {};
@@ -720,6 +796,14 @@ async function loadAll(){
     productos = pR || {};
     facturas  = toArr(fR).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
     umbrales  = uR || {};
+    // Cargar configuración guardada
+    if(cfgR){
+      _sistemaPastoreo = cfgR.sistemaPastoreo || 'INTENSIVO';
+      if(cfgR.factLluvia)   { const el=document.getElementById('factLluvia');   if(el)el.value=cfgR.factLluvia; }
+      if(cfgR.factCC)       { const el=document.getElementById('factCC');        if(el)el.value=cfgR.factCC; }
+      if(cfgR.factPeriparto){ const el=document.getElementById('factPeriparto'); if(el)el.value=cfgR.factPeriparto; }
+      if(cfgR.factDescanso) { const el=document.getElementById('factDescanso');  if(el)el.value=cfgR.factDescanso; }
+    }
     poblarSelectGrupos();
     renderUmbrales();
   } catch(e){ ntf('Error al cargar: '+e.message, true); }
@@ -739,37 +823,75 @@ function poblarSelectGrupos(){
   });
 }
 
-// ── UMBRALES ─────────────────────────────────────────
-function getUmbral(raza, categoria, epoca, cc, periparto, descanso){
-  // Mapear categoría a fila de umbral
-  let catKey = 'Adulto > 24 meses';
-  if(periparto==='si') catKey = 'Vaca periparto';
-  else {
-    // Estimamos edad por grupo/categoría - usar peso como proxy si no tenemos edad exacta
-    const nom = categoria?.toUpperCase()||'';
-    if(nom.includes('TERNERO')||nom.includes('DESTETE')) catKey='Ternero < 12 meses';
-    else if(nom.includes('RECRIA')||nom.includes('RECRÍA')||nom.includes('JOVEN')) catKey='Recría 12-24 meses';
+// ── SISTEMA DE PASTOREO ──────────────────────────────
+// Umbrales base por sistema (cat|raza → EPG)
+const UMBRALES_SISTEMA = {
+  EXTENSIVO: {
+    'Ternero < 12 meses|NELORE':200,'Ternero < 12 meses|BRANGUS':200,'Ternero < 12 meses|CRIOLLO':150,
+    'Recría 12-24 meses|NELORE':300,'Recría 12-24 meses|BRANGUS':300,'Recría 12-24 meses|CRIOLLO':200,
+    'Adulto > 24 meses|NELORE':500,'Adulto > 24 meses|BRANGUS':400,'Adulto > 24 meses|CRIOLLO':300,
+    'Vaca periparto|NELORE':200,'Vaca periparto|BRANGUS':200,'Vaca periparto|CRIOLLO':150
+  },
+  SEMI_INTENSIVO: {
+    'Ternero < 12 meses|NELORE':175,'Ternero < 12 meses|BRANGUS':175,'Ternero < 12 meses|CRIOLLO':125,
+    'Recría 12-24 meses|NELORE':250,'Recría 12-24 meses|BRANGUS':250,'Recría 12-24 meses|CRIOLLO':175,
+    'Adulto > 24 meses|NELORE':400,'Adulto > 24 meses|BRANGUS':300,'Adulto > 24 meses|CRIOLLO':250,
+    'Vaca periparto|NELORE':175,'Vaca periparto|BRANGUS':175,'Vaca periparto|CRIOLLO':125
+  },
+  INTENSIVO: {
+    'Ternero < 12 meses|NELORE':150,'Ternero < 12 meses|BRANGUS':150,'Ternero < 12 meses|CRIOLLO':100,
+    'Recría 12-24 meses|NELORE':200,'Recría 12-24 meses|BRANGUS':200,'Recría 12-24 meses|CRIOLLO':150,
+    'Adulto > 24 meses|NELORE':300,'Adulto > 24 meses|BRANGUS':250,'Adulto > 24 meses|CRIOLLO':200,
+    'Vaca periparto|NELORE':150,'Vaca periparto|BRANGUS':150,'Vaca periparto|CRIOLLO':100
   }
-  const razaKey = raza?.toUpperCase()||'NELORE';
-  const key = catKey+'|'+razaKey;
-  let epg = (umbrales[key]?.epg) || UMBRALES_DEFAULT.find(u=>u.cat===catKey&&u.raza===razaKey)?.epg || 300;
+};
 
-  // Factores agravantes
-  const fLluvia  = parseInt(document.getElementById('factLluvia')?.value)||30;
-  const fCC      = parseInt(document.getElementById('factCC')?.value)||30;
-  const fPeri    = parseInt(document.getElementById('factPeriparto')?.value)||40;
-  const fDesc    = parseInt(document.getElementById('factDescanso')?.value)||20;
+const DESC_SISTEMA = {
+  EXTENSIVO: '🟢 <strong>Extensivo:</strong> Carga &lt; 1 UA/ha · Sin rotación o potreros grandes · Descanso &gt; 60 días · Sin suplementación o mínima.',
+  SEMI_INTENSIVO: '🟡 <strong>Semi-intensivo:</strong> Carga 1-2.5 UA/ha · Rotación simple 4-8 potreros · Descanso 35-60 días · Suplementación mineral básica.',
+  INTENSIVO: '🔴 <strong>Intensivo rotativo:</strong> Carga &gt; 2.5 UA/ha · Subdivisión en parcelas · Descanso 21-35 días · Aforos regulares · Mayor presión de reinfección parasitaria. <span style="color:var(--gold);">← El Prado 1</span>'
+};
 
-  let reduc = 0;
-  if(epoca==='LLUVIOSA') reduc+=fLluvia;
-  if(cc==='baja')        reduc+=fCC;
-  if(periparto==='si')   reduc+=fPeri;
-  if(descanso==='corto') reduc+=fDesc;
-  reduc = Math.min(reduc, 70); // máx 70% de reducción
-  return Math.round(epg * (1 - reduc/100));
+let _sistemaPastoreo = 'INTENSIVO';
+
+function setSistemaPastoreo(sist){
+  _sistemaPastoreo = sist;
+  ['EXTENSIVO','SEMI_INTENSIVO','INTENSIVO'].forEach(s=>{
+    const id = s==='EXTENSIVO'?'btnSistExt':s==='SEMI_INTENSIVO'?'btnSistSemi':'btnSistInt';
+    const btn = document.getElementById(id);
+    if(btn) btn.className = 'btn btn-sm' + (s===sist?' bp':' bs');
+  });
+  const desc = document.getElementById('descSistema');
+  if(desc) desc.innerHTML = DESC_SISTEMA[sist]||'';
+  // Actualizar tabla de umbrales con nuevos valores base
+  renderUmbrales();
+  ntf('Sistema cambiado a '+sist.replace('_',' ')+' — umbrales actualizados');
+}
+
+async function guardarUmbrales(){
+  // Guardar también el sistema de pastoreo
+  await Promise.all([
+    fbSet('sanidad/umbrales', umbrales),
+    fbSet('sanidad/config', { sistemaPastoreo: _sistemaPastoreo,
+      factLluvia: parseInt(document.getElementById('factLluvia')?.value)||30,
+      factCC: parseInt(document.getElementById('factCC')?.value)||30,
+      factPeriparto: parseInt(document.getElementById('factPeriparto')?.value)||40,
+      factDescanso: parseInt(document.getElementById('factDescanso')?.value)||20
+    })
+  ]);
+  ntf('✅ Umbrales y configuración guardados');
 }
 
 function renderUmbrales(){
+  // Actualizar botones sistema
+  ['EXTENSIVO','SEMI_INTENSIVO','INTENSIVO'].forEach(s=>{
+    const id = s==='EXTENSIVO'?'btnSistExt':s==='SEMI_INTENSIVO'?'btnSistSemi':'btnSistInt';
+    const btn = document.getElementById(id);
+    if(btn) btn.className = 'btn btn-sm'+(s===_sistemaPastoreo?' bp':' bs');
+  });
+  const desc = document.getElementById('descSistema');
+  if(desc) desc.innerHTML = DESC_SISTEMA[_sistemaPastoreo]||'';
+
   const tbl = document.getElementById('umbralTabla'); if(!tbl)return;
   const cats = [...new Set(UMBRALES_DEFAULT.map(u=>u.cat))];
   const razas = ['NELORE','BRANGUS','CRIOLLO'];
@@ -780,13 +902,14 @@ function renderUmbrales(){
     html+='<tr>';
     html+=`<td style="font-weight:600;color:var(--t2);">${cat}</td>`;
     razas.forEach(raza=>{
-      const def=UMBRALES_DEFAULT.find(u=>u.cat===cat&&u.raza===raza);
       const key=cat+'|'+raza;
-      const val=(umbrales[key]?.epg)||def?.epg||300;
+      // Valor: umbral guardado > sistema actual > default
+      const sistVal = UMBRALES_SISTEMA[_sistemaPastoreo]?.[key];
+      const val = (umbrales[key]?.epg) || sistVal || UMBRALES_DEFAULT.find(u=>u.cat===cat&&u.raza===raza)?.epg || 300;
       html+=`<td><input type="number" value="${val}" min="50" max="2000" step="50"
         style="width:80px;background:var(--card2);border:1px solid var(--brd);color:var(--teal);padding:4px 6px;border-radius:4px;font-size:12px;font-weight:700;"
         onchange="umbrales['${key}']={epg:parseInt(this.value)}"
-        title="${def?.fuente||''}"></td>`;
+        title="Sistema: ${_sistemaPastoreo}"></td>`;
     });
     const fuente=UMBRALES_DEFAULT.find(u=>u.cat===cat)?.fuente||'';
     html+=`<td style="font-size:10px;color:var(--t3);">${fuente}</td>`;
@@ -796,9 +919,32 @@ function renderUmbrales(){
   tbl.innerHTML=html;
 }
 
-async function guardarUmbrales(){
-  await fbSet('sanidad/umbrales', umbrales);
-  ntf('✅ Umbrales guardados');
+function getUmbral(raza, categoria, epoca, cc, periparto, descanso){
+  let catKey = 'Adulto > 24 meses';
+  if(periparto==='si') catKey = 'Vaca periparto';
+  else {
+    const nom = categoria?.toUpperCase()||'';
+    if(nom.includes('TERNERO')||nom.includes('DESTETE')) catKey='Ternero < 12 meses';
+    else if(nom.includes('RECRIA')||nom.includes('RECRÍA')||nom.includes('JOVEN')) catKey='Recría 12-24 meses';
+  }
+  const razaKey = raza?.toUpperCase()||'NELORE';
+  const key = catKey+'|'+razaKey;
+  // Prioridad: umbral manual > sistema actual > default
+  const sistVal = UMBRALES_SISTEMA[_sistemaPastoreo]?.[key];
+  let epg = (umbrales[key]?.epg) || sistVal || UMBRALES_DEFAULT.find(u=>u.cat===catKey&&u.raza===razaKey)?.epg || 300;
+
+  const fLluvia  = parseInt(document.getElementById('factLluvia')?.value)||30;
+  const fCC      = parseInt(document.getElementById('factCC')?.value)||30;
+  const fPeri    = parseInt(document.getElementById('factPeriparto')?.value)||40;
+  const fDesc    = parseInt(document.getElementById('factDescanso')?.value)||20;
+
+  let reduc = 0;
+  if(epoca==='LLUVIOSA') reduc+=fLluvia;
+  if(cc==='baja')        reduc+=fCC;
+  if(periparto==='si')   reduc+=fPeri;
+  if(descanso==='corto') reduc+=fDesc;
+  reduc = Math.min(reduc, 70);
+  return Math.round(epg * (1 - reduc/100));
 }
 
 // ── HPG ──────────────────────────────────────────────
@@ -876,6 +1022,15 @@ function hpgActualizarGrupo(){
     if(n.includes('TERNERO')||n.includes('DESTETE')) cat='Ternero < 12 meses';
     else if(n.includes('RECRIA')||n.includes('RECRÍA')) cat='Recría 12-24 meses';
     document.getElementById('hpgCategoria').value=cat;
+
+    // Calcular 5% del grupo → número de muestras (mínimo 6)
+    const cab = grp.cabezas || 0;
+    const nMuestras = Math.max(6, Math.ceil(cab * 0.05));
+    _hpgMuestras = nMuestras;
+    hpgGenerarMuestras();
+
+    // Mostrar info al usuario
+    ntf(`🔬 ${cab} cabezas → ${nMuestras} muestras (5% del grupo)`, false, 3000);
   }
   hpgCalcular();
 }
@@ -947,7 +1102,10 @@ function renderHPG(){
     <td>${RES_BADGE[h.resultado]||h.resultado}</td>
     <td>${REC_BADGE[h.recomendacion]||h.recomendacion}</td>
     <td style="font-size:11px;color:var(--t3);">${h.operador||'—'}</td>
-    <td><button class="btn bd btn-sm" onclick="eliminarHPG('${h.id}')">🗑</button></td>
+    <td style="display:flex;gap:4px;">
+      ${h.recomendacion==='TRATAR'?`<button class="btn bp btn-sm" onclick="abrirTratamientoDesdeHPG('${h.grupo}','${h.fecha}')" style="background:var(--red);font-size:10px;">💉 Tratar</button>`:''}
+      <button class="btn bd btn-sm" onclick="eliminarHPG('${h.id}')">🗑</button>
+    </td>
   </tr>`).join('')
   :'<tr><td colspan="11"><div class="emp"><div class="emp-ic">🔬</div>Sin muestreos</div></td></tr>';
 }
@@ -1217,7 +1375,11 @@ async function guardarFactura(){
     // Agregar/actualizar producto en farmacia
     const existente=Object.values(productos).find(p=>p.nombre.toLowerCase()===nom.toLowerCase());
     if(existente){
-      existente.stock=(existente.stock||0)+qty;
+      // Si es edición y el precio cambió → actualizar aplicaciones retroactivamente
+      if(_factEditId && precio > 0 && existente.precio !== precio){
+        actualizarPrecioAplicaciones(existente.id, existente.nombre, precio, fecha);
+      }
+      if(!_factEditId) existente.stock=(existente.stock||0)+qty;
       existente.precio=precio;
       if(venc) existente.vencimiento=venc;
     } else {
@@ -1243,10 +1405,32 @@ async function guardarFactura(){
     facturas.unshift(factura);
   }
   _factEditId = null;
-  await Promise.all([fbSet('sanidad/facturas',facturas), fbSet('sanidad/productos',productos)]);
+  await Promise.all([
+    fbSet('sanidad/facturas', facturas),
+    fbSet('sanidad/productos', productos),
+    fbSet('sanidad/aplicaciones', aplicaciones)
+  ]);
   cerrar('moFactura');
   renderFarmacia();
-  ntf('✅ Factura guardada y stock actualizado');
+  renderAplicaciones();
+  ntf('✅ Factura guardada · stock y aplicaciones actualizados');
+}
+
+// Actualiza el precio en todas las aplicaciones de un producto
+// posteriores a la fecha de la factura editada
+function actualizarPrecioAplicaciones(prodId, prodNombre, nuevoPrecio, fechaFactura){
+  let actualizadas = 0;
+  aplicaciones.forEach(a => {
+    if(a.fecha < fechaFactura) return; // solo posteriores
+    if(a.productoId !== prodId && a.productoNombre?.toLowerCase() !== prodNombre.toLowerCase()) return;
+    // Recalcular costo total
+    a.precio = nuevoPrecio;
+    a.costoTotal = Math.round(nuevoPrecio * (a.totalUso||0) * 100) / 100;
+    actualizadas++;
+  });
+  if(actualizadas > 0){
+    ntf(`💰 Precio actualizado en ${actualizadas} aplicación(es) posterior(es)`, false, 4000);
+  }
 }
 
 async function eliminarFactura(id){
@@ -1508,6 +1692,265 @@ function renderAlertas(){
         <div style="font-size:12px;color:var(--t2);">${a.msg}</div>
       </div>
     </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// MÓDULO: CALENDARIO DE MONITOREO HPG
+// ═══════════════════════════════════════════════════
+
+let _calAnio  = new Date().getFullYear();
+let _calMes   = new Date().getMonth(); // 0-11
+const DIAS_MONITOREO = 14;
+const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const DIAS_ES  = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+
+function calMes(d){ _calMes+=d; if(_calMes>11){_calMes=0;_calAnio++;} if(_calMes<0){_calMes=11;_calAnio--;} renderCalendario(); }
+function calHoy(){ _calAnio=new Date().getFullYear(); _calMes=new Date().getMonth(); renderCalendario(); }
+
+// Calcula el estado y próximo monitoreo de cada grupo
+function calcEstadoGrupos(){
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const estados = {};
+
+  grupos.forEach(g=>{
+    // Último HPG del grupo
+    const ultHPG = hpgData.find(h=>h.grupo===g.nombre);
+    // Última desparasitación del grupo
+    const ultDesp = aplicaciones.filter(a=>
+      a.tipo==='ANTIPARASITARIO' &&
+      (a.destino===g.nombre || a.grupoOrigen===g.nombre)
+    ).sort((a,b)=>b.fecha.localeCompare(a.fecha))[0];
+
+    // Fecha de referencia para próximo monitoreo
+    // Si hubo desparasitación DESPUÉS del HPG → referencia = desparasitación
+    let fechaRef = null;
+    let refTipo  = null;
+    if(ultHPG && ultDesp && ultDesp.fecha >= ultHPG.fecha){
+      fechaRef = ultDesp.fecha;
+      refTipo  = 'tratamiento';
+    } else if(ultHPG) {
+      fechaRef = ultHPG.fecha;
+      refTipo  = 'hpg';
+    }
+
+    let estado = 'sin_datos';
+    let proxMonitoreo = null;
+    let diasRestantes = null;
+    let muestras = Math.max(6, Math.ceil((g.cabezas||0)*0.05));
+
+    if(fechaRef){
+      const fRef = new Date(fechaRef+'T12:00:00');
+      const prox = new Date(fRef);
+      prox.setDate(prox.getDate() + DIAS_MONITOREO);
+      proxMonitoreo = prox.toISOString().split('T')[0];
+      diasRestantes = Math.round((prox - hoy) / 86400000);
+
+      // HPG alto sin tratar → rojo urgente
+      if(ultHPG?.recomendacion==='TRATAR' && (!ultDesp || ultDesp.fecha < ultHPG.fecha)){
+        estado = 'tratar';
+      } else if(diasRestantes < 0){
+        estado = 'vencido'; // monitoreo atrasado
+      } else if(diasRestantes === 0){
+        estado = 'hoy';
+      } else if(refTipo==='tratamiento'){
+        estado = 'post_tratamiento';
+      } else {
+        estado = 'programado';
+      }
+    }
+
+    estados[g.nombre] = { grupo:g.nombre, cabezas:g.cabezas||0, muestras,
+      ultHPG, ultDesp, proxMonitoreo, diasRestantes, estado, refTipo };
+  });
+  return estados;
+}
+
+function renderCalendario(){
+  document.getElementById('calTitulo').textContent = MESES_ES[_calMes] + ' ' + _calAnio;
+
+  // Días de la semana
+  const dowEl = document.getElementById('calDow');
+  dowEl.innerHTML = DIAS_ES.map(d=>`<div class="cal-dow">${d}</div>`).join('');
+
+  const estados = calcEstadoGrupos();
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const hoyStr = hoy.toISOString().split('T')[0];
+
+  // Primer día del mes y total de días
+  const primerDia = new Date(_calAnio, _calMes, 1).getDay(); // 0=dom
+  const diasEnMes = new Date(_calAnio, _calMes+1, 0).getDate();
+
+  // Agrupar grupos por fecha de próximo monitoreo
+  const porFecha = {};
+  Object.values(estados).forEach(e=>{
+    if(!e.proxMonitoreo) return;
+    if(!porFecha[e.proxMonitoreo]) porFecha[e.proxMonitoreo]=[];
+    porFecha[e.proxMonitoreo].push(e);
+  });
+  // Grupos con estado urgente (tratar) → mostrar en fecha del HPG o hoy
+  Object.values(estados).forEach(e=>{
+    if(e.estado==='tratar'){
+      const f = e.ultHPG?.fecha || hoyStr;
+      if(!porFecha[f]) porFecha[f]=[];
+      if(!porFecha[f].find(x=>x.grupo===e.grupo)) porFecha[f].push(e);
+    }
+    if(e.estado==='vencido'){
+      if(!porFecha[hoyStr]) porFecha[hoyStr]=[];
+      if(!porFecha[hoyStr].find(x=>x.grupo===e.grupo)) porFecha[hoyStr].push(e);
+    }
+  });
+
+  const COLOR = {
+    tratar:'rojo', vencido:'amarillo', hoy:'amarillo',
+    programado:'verde', post_tratamiento:'azul', sin_datos:'verde'
+  };
+  const ICO = { tratar:'🔴', vencido:'🟡', hoy:'🟡', programado:'🟢', post_tratamiento:'🔵', sin_datos:'⚪' };
+
+  let html = '';
+  // Celdas vacías inicio
+  for(let i=0;i<primerDia;i++){
+    html+=`<div class="cal-dia otro-mes"><div class="cal-num"></div></div>`;
+  }
+  // Días del mes
+  for(let d=1;d<=diasEnMes;d++){
+    const fecha=`${_calAnio}-${String(_calMes+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const esHoy = fecha===hoyStr;
+    const grupos_dia = porFecha[fecha]||[];
+    let chips='';
+    grupos_dia.slice(0,3).forEach(e=>{
+      const cls=COLOR[e.estado]||'verde';
+      const ico=ICO[e.estado]||'🟢';
+      chips+=`<div class="cal-chip ${cls}" onclick="abrirDetalle('${e.grupo}','${fecha}',event)" title="${e.grupo} — ${e.muestras} muestras">
+        ${ico} <span>${e.grupo}</span> <span style="opacity:.7">${e.muestras}m</span>
+      </div>`;
+    });
+    if(grupos_dia.length>3){
+      chips+=`<div style="font-size:9px;color:var(--t3);padding:1px 4px;">+${grupos_dia.length-3} más</div>`;
+    }
+    html+=`<div class="cal-dia${esHoy?' hoy':''}" onclick="abrirDetallesDia('${fecha}')">
+      <div class="cal-num">${d}</div>
+      ${chips}
+    </div>`;
+  }
+  // Celdas vacías fin
+  const total = primerDia + diasEnMes;
+  const resto = total % 7;
+  if(resto>0) for(let i=0;i<7-resto;i++) html+=`<div class="cal-dia otro-mes"></div>`;
+
+  document.getElementById('calGrid').innerHTML=html;
+}
+
+function abrirDetalle(nombreGrupo, fecha, ev){
+  if(ev) ev.stopPropagation();
+  const estados = calcEstadoGrupos();
+  const e = estados[nombreGrupo];
+  if(!e) return;
+
+  document.getElementById('detTitulo').textContent = nombreGrupo;
+  const COLOR_TEXTO = {
+    tratar:'var(--red)', vencido:'var(--gold)', hoy:'var(--gold)',
+    programado:'var(--gs)', post_tratamiento:'var(--teal)', sin_datos:'var(--t3)'
+  };
+  const LABEL = {
+    tratar:'🔴 HPG ALTO — TRATAR URGENTE', vencido:'🟡 MONITOREO VENCIDO',
+    hoy:'🟡 MONITOREAR HOY', programado:'🟢 Programado',
+    post_tratamiento:'🔵 Post-tratamiento', sin_datos:'⚪ Sin datos'
+  };
+
+  let html=`
+    <div style="padding:8px 10px;border-radius:6px;margin-bottom:14px;background:rgba(58,186,186,.08);border:1px solid var(--brd2);">
+      <div style="font-size:11px;font-weight:700;color:${COLOR_TEXTO[e.estado]||'var(--text)'};">${LABEL[e.estado]||''}</div>
+    </div>
+    <div class="det-row"><span class="det-lbl">Cabezas</span><span class="det-val">${e.cabezas}</span></div>
+    <div class="det-row"><span class="det-lbl">Muestras a sacar (5%)</span><span class="det-val" style="color:var(--teal);font-size:16px;">${e.muestras}</span></div>`;
+
+  if(e.ultHPG){
+    html+=`
+    <div class="det-row"><span class="det-lbl">Último HPG</span><span class="det-val">${e.ultHPG.fecha}</span></div>
+    <div class="det-row"><span class="det-lbl">Promedio HPG</span><span class="det-val" style="color:${e.ultHPG.resultado==='ALTO'?'var(--red)':e.ultHPG.resultado==='MEDIO'?'var(--gold)':'var(--gs)'};">${e.ultHPG.promedio} EPG</span></div>
+    <div class="det-row"><span class="det-lbl">Resultado</span><span class="det-val">${e.ultHPG.resultado}</span></div>
+    <div class="det-row"><span class="det-lbl">Umbral usado</span><span class="det-val">${e.ultHPG.umbral} EPG</span></div>`;
+  } else {
+    html+=`<div class="det-row"><span class="det-lbl">Último HPG</span><span class="det-val" style="color:var(--t3);">Sin registro</span></div>`;
+  }
+
+  if(e.ultDesp){
+    html+=`
+    <div class="det-row"><span class="det-lbl">Último tratamiento</span><span class="det-val">${e.ultDesp.fecha}</span></div>
+    <div class="det-row"><span class="det-lbl">Producto</span><span class="det-val">${e.ultDesp.productoNombre||'—'}</span></div>`;
+  }
+
+  if(e.proxMonitoreo){
+    const dias = e.diasRestantes;
+    const color = dias<0?'var(--red)':dias===0?'var(--gold)':'var(--gs)';
+    html+=`
+    <div class="det-row"><span class="det-lbl">Próximo monitoreo</span><span class="det-val" style="color:${color};">${e.proxMonitoreo} ${dias<0?'('+Math.abs(dias)+'d atrasado)':dias===0?'(HOY)':'(en '+dias+'d)'}</span></div>`;
+  }
+
+  // Botones de acción
+  html+=`<div style="display:flex;flex-direction:column;gap:8px;margin-top:16px;">
+    <button class="btn bp" onclick="abrirHPGDesdeCalendario('${nombreGrupo}')">🔬 Registrar HPG</button>`;
+  if(e.estado==='tratar'||e.estado==='vencido'||e.estado==='hoy'){
+    html+=`<button class="btn" style="background:var(--red);color:#fff;" onclick="abrirTratamientoDesdeHPG('${nombreGrupo}','${e.ultHPG?.fecha||''}')">💉 Registrar tratamiento</button>`;
+  }
+  html+=`</div>`;
+
+  document.getElementById('detBody').innerHTML=html;
+  document.getElementById('detPanel').style.display='flex';
+}
+
+function abrirDetallesDia(fecha){
+  const estados = calcEstadoGrupos();
+  const gruposDia = Object.values(estados).filter(e=>e.proxMonitoreo===fecha||
+    (e.estado==='tratar'&&(e.ultHPG?.fecha===fecha||fecha===new Date().toISOString().split('T')[0]))||
+    (e.estado==='vencido'&&fecha===new Date().toISOString().split('T')[0])
+  );
+  if(!gruposDia.length) return;
+  if(gruposDia.length===1){ abrirDetalle(gruposDia[0].grupo, fecha, null); return; }
+
+  // Mostrar lista de grupos del día
+  document.getElementById('detTitulo').textContent = '📅 ' + fecha;
+  let html = gruposDia.map(e=>`
+    <div onclick="abrirDetalle('${e.grupo}','${fecha}',event)"
+      style="padding:10px 12px;border-radius:6px;border:1px solid var(--brd2);margin-bottom:8px;cursor:pointer;background:var(--card2);">
+      <div style="font-weight:700;font-size:12px;">${e.grupo}</div>
+      <div style="font-size:11px;color:var(--t3);">${e.muestras} muestras · ${e.cabezas} cab.</div>
+    </div>`).join('');
+  document.getElementById('detBody').innerHTML=html;
+  document.getElementById('detPanel').style.display='flex';
+}
+
+function cerrarDetalle(){ document.getElementById('detPanel').style.display='none'; }
+
+function abrirHPGDesdeCalendario(nombreGrupo){
+  cerrarDetalle();
+  abrirModalHPG();
+  setTimeout(()=>{
+    const sel=document.getElementById('hpgGrupo');
+    if(sel){ sel.value=nombreGrupo; hpgActualizarGrupo(); }
+    showPg('hpg');
+  },100);
+}
+
+function abrirTratamientoDesdeHPG(nombreGrupo, fechaHPG){
+  cerrarDetalle();
+  abrirModalAplicacion();
+  setTimeout(()=>{
+    // Preseleccionar tipo antiparasitario y grupo
+    const selTipo=document.getElementById('aplTipo');
+    if(selTipo){ selTipo.value='ANTIPARASITARIO'; aplFiltrarProductos(); }
+    const selGrupo=document.getElementById('aplGrupo');
+    if(selGrupo){ selGrupo.value=nombreGrupo; aplCalcularDosis(); }
+    const grp=grupos.find(g=>g.nombre===nombreGrupo);
+    if(grp){
+      const cabEl=document.getElementById('aplCabezas');
+      if(cabEl) cabEl.value=grp.cabezas||0;
+      const pesoEl=document.getElementById('aplPesoMedio');
+      if(pesoEl) pesoEl.value=grp.pesoMedio||0;
+    }
+    aplCalcularTotal();
+    showPg('aplicaciones');
+  },100);
 }
 </script>
 </body>
