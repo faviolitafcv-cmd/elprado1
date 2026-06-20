@@ -367,6 +367,21 @@ tr:hover td{background:rgba(58,186,186,.04);}
           </div>
         </div>
       </div>
+
+      <!-- CONTACTOS DE ALERTA -->
+      <div style="margin-top:16px;">
+        <div style="font-size:11px;font-weight:700;color:var(--t3);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">📱 CONTACTOS DE ALERTA WHATSAPP</div>
+        <div style="font-size:11px;color:var(--t2);margin-bottom:12px;line-height:1.6;background:var(--card2);border:1px solid var(--brd);border-radius:6px;padding:10px;">
+          Estos números recibirán los recordatorios diarios y alertas de HPG alto. Incluí el código de país sin el +. Ej: <strong style="color:var(--teal);">59168753525</strong>
+        </div>
+        <div id="contactosLista" style="margin-bottom:10px;"></div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" id="newContactoNombre" placeholder="Nombre (ej: Faviola)" style="background:var(--card2);border:1px solid var(--brd);color:var(--text);padding:8px 9px;border-radius:5px;font-size:13px;outline:none;flex:1;">
+          <input type="text" id="newContactoNumero" placeholder="Número (ej: 59168753525)" style="background:var(--card2);border:1px solid var(--brd);color:var(--text);padding:8px 9px;border-radius:5px;font-size:13px;outline:none;flex:1;">
+          <button class="btn bp btn-sm" onclick="agregarContacto()">+ Agregar</button>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -806,6 +821,7 @@ async function loadAll(){
     }
     poblarSelectGrupos();
     renderUmbrales();
+    await loadContactos();
   } catch(e){ ntf('Error al cargar: '+e.message, true); }
 }
 
@@ -868,18 +884,70 @@ function setSistemaPastoreo(sist){
   ntf('Sistema cambiado a '+sist.replace('_',' ')+' — umbrales actualizados');
 }
 
+// ── CONTACTOS DE ALERTA ──────────────────────────────
+let contactosAlerta = [];
+
+async function loadContactos(){
+  const d = await fbGet('sanidad/contactos_alerta');
+  contactosAlerta = d ? (Array.isArray(d) ? d : Object.values(d)).filter(Boolean) : [];
+  // Asegurar que el número propio siempre esté
+  if(!contactosAlerta.find(c=>c.numero==='59168753525')){
+    contactosAlerta.unshift({ nombre:'Faviola', numero:'59168753525', principal:true });
+  }
+  renderContactos();
+}
+
+function renderContactos(){
+  const lista = document.getElementById('contactosLista');
+  if(!lista) return;
+  if(!contactosAlerta.length){
+    lista.innerHTML='<div style="font-size:12px;color:var(--t3);padding:8px 0;">Sin contactos agregados.</div>';
+    return;
+  }
+  lista.innerHTML = contactosAlerta.map((c,i)=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--card2);border:1px solid var(--brd);border-radius:6px;margin-bottom:6px;">
+      <div style="flex:1;">
+        <span style="font-size:12px;font-weight:600;color:var(--text);">${c.nombre}</span>
+        <span style="font-size:11px;color:var(--t3);margin-left:8px;">+${c.numero}</span>
+        ${c.principal?'<span style="font-size:9px;background:rgba(58,186,186,.15);color:var(--teal);padding:1px 6px;border-radius:4px;margin-left:6px;">PRINCIPAL</span>':''}
+      </div>
+      ${!c.principal?`<button class="btn bd btn-sm" onclick="eliminarContacto(${i})">🗑</button>`:''}
+    </div>`).join('');
+}
+
+function agregarContacto(){
+  const nombre = document.getElementById('newContactoNombre').value.trim();
+  const numero = document.getElementById('newContactoNumero').value.trim().replace(/\+/g,'');
+  if(!nombre||!numero){ ntf('Ingresá nombre y número',true); return; }
+  if(!/^\d{10,15}$/.test(numero)){ ntf('Número inválido — solo dígitos con código de país (ej: 59168753525)',true); return; }
+  if(contactosAlerta.find(c=>c.numero===numero)){ ntf('Ese número ya está en la lista',true); return; }
+  contactosAlerta.push({ nombre, numero });
+  document.getElementById('newContactoNombre').value='';
+  document.getElementById('newContactoNumero').value='';
+  renderContactos();
+  ntf('Contacto agregado — guardá los umbrales para confirmar');
+}
+
+function eliminarContacto(idx){
+  if(contactosAlerta[idx]?.principal){ ntf('No podés eliminar el contacto principal',true); return; }
+  contactosAlerta.splice(idx,1);
+  renderContactos();
+  ntf('Contacto eliminado — guardá los umbrales para confirmar');
+}
+
 async function guardarUmbrales(){
-  // Guardar también el sistema de pastoreo
   await Promise.all([
     fbSet('sanidad/umbrales', umbrales),
-    fbSet('sanidad/config', { sistemaPastoreo: _sistemaPastoreo,
+    fbSet('sanidad/contactos_alerta', contactosAlerta),
+    fbSet('sanidad/config', {
+      sistemaPastoreo: _sistemaPastoreo,
       factLluvia: parseInt(document.getElementById('factLluvia')?.value)||30,
       factCC: parseInt(document.getElementById('factCC')?.value)||30,
       factPeriparto: parseInt(document.getElementById('factPeriparto')?.value)||40,
       factDescanso: parseInt(document.getElementById('factDescanso')?.value)||20
     })
   ]);
-  ntf('✅ Umbrales y configuración guardados');
+  ntf('✅ Umbrales, factores y contactos guardados');
 }
 
 function renderUmbrales(){
