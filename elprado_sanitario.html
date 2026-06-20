@@ -794,7 +794,7 @@ window.onload = async () => {
 
 async function loadAll(){
   try {
-    const [gR, aR, hR, aplR, pR, fR, uR, cfgR] = await Promise.all([
+    const [gR, aR, hR, aplR, pR, fR, uR, cfgR, pesR] = await Promise.all([
       fbGet('hacienda/grupos_resumen'),
       fbGet('hacienda/animales'),
       fbGet('sanidad/hpg'),
@@ -802,10 +802,20 @@ async function loadAll(){
       fbGet('sanidad/productos'),
       fbGet('sanidad/facturas'),
       fbGet('sanidad/umbrales'),
-      fbGet('sanidad/config')
+      fbGet('sanidad/config'),
+      fbGet('hacienda/pesajes')
     ]);
     grupos    = toArr(gR).filter(Boolean);
     animales  = aR || {};
+    // Construir índice de último pesaje por animal
+    const pesajesArr = toArr(pesR).filter(Boolean);
+    window._lastPes = {};
+    pesajesArr.forEach(p=>{
+      if(!p.ide) return;
+      if(!window._lastPes[p.ide] || p.fecha > window._lastPes[p.ide].fecha){
+        window._lastPes[p.ide] = p;
+      }
+    });
     hpgData   = toArr(hR).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
     aplicaciones = toArr(aplR).filter(Boolean).sort((a,b)=>b.fecha.localeCompare(a.fecha));
     productos = pR || {};
@@ -1082,24 +1092,42 @@ function hpgCalcular(){
 function hpgActualizarGrupo(){
   const g=document.getElementById('hpgGrupo')?.value||'';
   const grp=grupos.find(x=>x.nombre===g);
-  if(grp){
-    document.getElementById('hpgPeso').value=grp.pesoMedio||'';
-    // Inferir categoría desde nombre del grupo
-    let cat='Adulto > 24 meses';
-    const n=g.toUpperCase();
-    if(n.includes('TERNERO')||n.includes('DESTETE')) cat='Ternero < 12 meses';
-    else if(n.includes('RECRIA')||n.includes('RECRÍA')) cat='Recría 12-24 meses';
-    document.getElementById('hpgCategoria').value=cat;
+  if(!grp){ return; }
 
-    // Calcular 5% del grupo → número de muestras (mínimo 6)
-    const cab = grp.cabezas || 0;
-    const nMuestras = Math.max(6, Math.ceil(cab * 0.05));
-    _hpgMuestras = nMuestras;
-    hpgGenerarMuestras();
-
-    // Mostrar info al usuario
-    ntf(`🔬 ${cab} cabezas → ${nMuestras} muestras (5% del grupo)`, false, 3000);
+  // Peso proyectado — usar pesoMedio si existe, si no calcular desde animales
+  let peso = grp.pesoMedio || null;
+  if(!peso && typeof animales !== 'undefined'){
+    const hoy = new Date().toISOString().split('T')[0];
+    const activos = Object.values(animales).filter(a=>a.estado==='ACTIVO'&&a.grupo===g&&a.pesoIngreso&&a.fechaIngreso);
+    if(activos.length){
+      let sum=0;
+      activos.forEach(a=>{
+        const lpa = window._lastPes?.[a.ide];
+        const pesoBase = lpa?.peso||a.pesoIngreso;
+        const fechaBase = lpa?.fecha||a.fechaIngreso;
+        const gmd = lpa?.gmd||0.4;
+        const dias = Math.max(0,Math.round((new Date(hoy+'T12:00:00')-new Date(fechaBase+'T12:00:00'))/86400000));
+        sum += pesoBase + gmd*dias;
+      });
+      peso = Math.round(sum/activos.length);
+    }
   }
+  if(peso) document.getElementById('hpgPeso').value = peso;
+
+  // Inferir categoría
+  let cat='Adulto > 24 meses';
+  const n=g.toUpperCase();
+  if(n.includes('TERNERO')||n.includes('DESTETE')) cat='Ternero < 12 meses';
+  else if(n.includes('RECRIA')||n.includes('RECRÍA')) cat='Recría 12-24 meses';
+  document.getElementById('hpgCategoria').value=cat;
+
+  // Calcular 5% del grupo → número de muestras (mínimo 6)
+  const cab = grp.cabezas || 0;
+  const nMuestras = Math.max(6, Math.ceil(cab * 0.05));
+  _hpgMuestras = nMuestras;
+  hpgGenerarMuestras();
+
+  ntf('🔬 ' + cab + ' cabezas → ' + nMuestras + ' muestras (5% del grupo)', false, 3000);
   hpgCalcular();
 }
 
