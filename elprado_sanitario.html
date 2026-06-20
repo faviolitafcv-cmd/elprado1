@@ -1125,6 +1125,9 @@ function hpgActualizarGrupo(){
   const cab = grp.cabezas || 0;
   const nMuestras = Math.max(6, Math.ceil(cab * 0.05));
   _hpgMuestras = nMuestras;
+  // Limpiar y regenerar
+  const c = document.getElementById('hpgMuestrasContainer');
+  if(c) c.innerHTML = '';
   hpgGenerarMuestras();
 
   ntf('🔬 ' + cab + ' cabezas → ' + nMuestras + ' muestras (5% del grupo)', false, 3000);
