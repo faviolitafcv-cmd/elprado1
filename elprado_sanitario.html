@@ -805,7 +805,10 @@ async function loadAll(){
       fbGet('sanidad/config'),
       fbGet('hacienda/pesajes')
     ]);
-    grupos    = toArr(gR).filter(Boolean);
+    grupos    = toArr(gR).filter(Boolean).map(g=>({
+      ...g,
+      pesoMedio: g.pesoHoy || g.pesoMedio || null // normalizar campo peso
+    }));
     animales  = aR || {};
     // Construir índice de último pesaje por animal
     const pesajesArr = toArr(pesR).filter(Boolean);
@@ -1094,24 +1097,8 @@ function hpgActualizarGrupo(){
   const grp=grupos.find(x=>x.nombre===g);
   if(!grp){ return; }
 
-  // Peso proyectado — usar pesoMedio si existe, si no calcular desde animales
-  let peso = grp.pesoMedio || null;
-  if(!peso && typeof animales !== 'undefined'){
-    const hoy = new Date().toISOString().split('T')[0];
-    const activos = Object.values(animales).filter(a=>a.estado==='ACTIVO'&&a.grupo===g&&a.pesoIngreso&&a.fechaIngreso);
-    if(activos.length){
-      let sum=0;
-      activos.forEach(a=>{
-        const lpa = window._lastPes?.[a.ide];
-        const pesoBase = lpa?.peso||a.pesoIngreso;
-        const fechaBase = lpa?.fecha||a.fechaIngreso;
-        const gmd = lpa?.gmd||0.4;
-        const dias = Math.max(0,Math.round((new Date(hoy+'T12:00:00')-new Date(fechaBase+'T12:00:00'))/86400000));
-        sum += pesoBase + gmd*dias;
-      });
-      peso = Math.round(sum/activos.length);
-    }
-  }
+  // Peso proyectado a hoy — viene del inventario
+  let peso = grp.pesoHoy || grp.pesoMedio || null;
   if(peso) document.getElementById('hpgPeso').value = peso;
 
   // Inferir categoría
