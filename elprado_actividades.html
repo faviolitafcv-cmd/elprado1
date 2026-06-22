@@ -2148,6 +2148,19 @@ async function syncFromFirebase() {
           const localVal = localRaw ? JSON.parse(localRaw) : null;
           const fbArr = Array.isArray(val) ? val
             : (val && typeof val === 'object') ? Object.values(val) : null;
+          // lluvia: merge inteligente — nunca perder registros locales
+          if(key === 'lluvia') {
+            if(!fbArr) return;
+            const localArr = Array.isArray(localVal) ? localVal : [];
+            const mapa = {};
+            [...fbArr, ...localArr].forEach(rec => {
+              const clave = (rec.fecha||'') + '|' + (rec.gestion||'');
+              mapa[clave] = rec; // local sobrescribe Firebase
+            });
+            const merged = Object.values(mapa).sort((a,b) => (a.fecha||'') > (b.fecha||'') ? 1 : -1);
+            _set.call(localStorage, lsKey, JSON.stringify(merged));
+            return;
+          }
           // actividades: conservar local si tiene MÁS registros (proteger datos de campo)
           if(key === 'actividades') {
             if(fbArr && Array.isArray(localVal) && localVal.length > fbArr.length) {
@@ -2232,27 +2245,51 @@ function iniciarAutoSync() {
   setInterval(async () => {
     try {
       const _set = window._lsOrig || Storage.prototype.setItem;
-      const claves = ['lluvia', 'plan', 'pedidos', 'pluviometros'];
-      for(const key of claves) {
-        const r = await fetch(FB_URL + '/' + key + '.json');
+      // lluvia: merge inteligente (nunca perder registros)
+      try {
+        const r = await fetch(FB_URL + '/lluvia.json');
         const val = await r.json();
-        if(val === null || val === undefined) continue;
-        const fbArr = Array.isArray(val) ? val
-          : (val && typeof val === 'object') ? Object.values(val) : null;
-        if(!fbArr) continue;
-        // Nunca sobreescribir si local tiene MÁS datos (protege contra fallo de red)
-        const localRaw = localStorage.getItem('elprado_' + key);
-        if(localRaw) {
-          try {
-            const localArr = JSON.parse(localRaw);
-            if(Array.isArray(localArr) && localArr.length > fbArr.length) {
-              console.log('[auto-sync] ' + key + ': local (' + localArr.length + ') > Firebase (' + fbArr.length + ') → conservando local');
-              continue;
-            }
-          } catch(e) {}
+        if(val !== null && val !== undefined) {
+          const fbArr = (Array.isArray(val) ? val : Object.values(val)).filter(Boolean);
+          const localRaw = localStorage.getItem('elprado_lluvia');
+          const localArr = localRaw ? JSON.parse(localRaw) : [];
+          // Merge: Firebase + local, local gana para mismo fecha+gestion
+          const mapa = {};
+          [...fbArr, ...(Array.isArray(localArr) ? localArr : [])].forEach(rec => {
+            const clave = (rec.fecha||'') + '|' + (rec.gestion||'');
+            mapa[clave] = rec; // local sobrescribe Firebase (más reciente)
+          });
+          const merged = Object.values(mapa).sort((a,b) => (a.fecha||'') > (b.fecha||'') ? 1 : -1);
+          _set.call(localStorage, 'elprado_lluvia', JSON.stringify(merged));
+          // Si el merge tiene más datos que Firebase, subir
+          if(merged.length > fbArr.length) {
+            fetch(FB_URL + '/lluvia.json', {
+              method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(merged)
+            }).catch(()=>{});
+          }
         }
-        _set.call(localStorage, 'elprado_' + key, JSON.stringify(fbArr));
+      } catch(e) {}
+
+      // plan, pedidos, pluviometros: lógica simple (Firebase gana si tiene más)
+      for(const key of ['plan', 'pedidos', 'pluviometros']) {
+        try {
+          const r = await fetch(FB_URL + '/' + key + '.json');
+          const val = await r.json();
+          if(val === null || val === undefined) continue;
+          const fbArr = Array.isArray(val) ? val
+            : (val && typeof val === 'object') ? Object.values(val) : null;
+          if(!fbArr) continue;
+          const localRaw = localStorage.getItem('elprado_' + key);
+          if(localRaw) {
+            try {
+              const localArr = JSON.parse(localRaw);
+              if(Array.isArray(localArr) && localArr.length > fbArr.length) continue;
+            } catch(e) {}
+          }
+          _set.call(localStorage, 'elprado_' + key, JSON.stringify(fbArr));
+        } catch(e) {}
       }
+
       if(typeof renderCalendarioLluvia === 'function') try { renderCalendarioLluvia(); } catch(e) {}
       if(typeof renderResumenLluvia === 'function') try { renderResumenLluvia(); } catch(e) {}
       if(typeof renderAnalisisGestion === 'function') try { renderAnalisisGestion(); } catch(e) {}
@@ -5668,12 +5705,33 @@ function guardarLluviaDia() {
     usuario: localStorage.getItem('elprado_usuario') || ''
   });
   const fechaGuardada = llDiaActual;
+
+  // Guardar local primero
   setLluvia(filtrado);
-  // Subida directa a Firebase
-  fetch('https://elprado1-153ef-default-rtdb.firebaseio.com/elprado1/lluvia.json', {
-    method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(filtrado)
-  }).then(() => console.log('[lluvia] Firebase OK — ' + filtrado.length))
+
+  // Merge con Firebase antes de subir — evita sobreescribir datos de otros dispositivos
+  fetch('https://elprado1-153ef-default-rtdb.firebaseio.com/elprado1/lluvia.json')
+    .then(r => r.json())
+    .then(fbRaw => {
+      const fbLluvia = fbRaw ? (Array.isArray(fbRaw) ? fbRaw : Object.values(fbRaw)).filter(Boolean) : [];
+      // Merge: local gana para el mismo fecha+gestion
+      const mapa = {};
+      [...fbLluvia, ...filtrado].forEach(rec => {
+        const clave = (rec.fecha||'') + '|' + (rec.gestion||'');
+        mapa[clave] = rec;
+      });
+      const merged = Object.values(mapa).sort((a,b) => (a.fecha||'') > (b.fecha||'') ? 1 : -1);
+      // Actualizar local con merged
+      const _set = window._lsOrig || Storage.prototype.setItem;
+      _set.call(localStorage, 'elprado_lluvia', JSON.stringify(merged));
+      // Subir merged a Firebase
+      return fetch('https://elprado1-153ef-default-rtdb.firebaseio.com/elprado1/lluvia.json', {
+        method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(merged)
+      });
+    })
+    .then(() => console.log('[lluvia] Firebase merge OK — ' + filtrado.length + ' registros'))
     .catch(e => console.log('[lluvia] Firebase error:', e));
+
   cerrarModalLluvia();
   renderCalendarioLluvia();
   renderResumenLluvia();
