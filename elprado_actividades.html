@@ -2336,7 +2336,12 @@ function getData(key, def) {
 }
 function setData(key, val) {
   localStorage.setItem('elprado_' + key, JSON.stringify(val));
-  fbSet(key, val).catch(e => console.log('FB error:', e));
+  // Proteger contra FB_URL no inicializado todavía
+  try {
+    if(typeof FB_URL !== 'undefined') {
+      fbSet(key, val).catch(e => console.log('FB error:', e));
+    }
+  } catch(e) {}
 }
 function getActividades() { return getData('actividades', []); }
 function getGrupos() { return getData('grupos', GRUPOS_BASE); }
@@ -5845,6 +5850,7 @@ function renderPluviometros() {
 function renderCamposLluvia() {
   const pluvios = getPluviometros();
   const el = document.getElementById('llCamposPluvio');
+  if(!el) return; // elemento no visible, salir silenciosamente
   if(!pluvios.length) {
     el.innerHTML = '<div style="font-size:12px;color:var(--text3);">Primero configurá al menos un pluviómetro en la sección de arriba.</div>';
     return;
