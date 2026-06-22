@@ -7866,39 +7866,50 @@ function eliminarCircuito(id) {
         var lsKey = 'elprado_' + key;
         var existing = localStorage.getItem(lsKey);
 
-        // lluvia: usar el que tenga más registros
+        // lluvia: MERGE real — nunca perder registros locales
         if(MERGE_MAS_REGISTROS.indexOf(key) >= 0) {
           var fbVal = Array.isArray(data[key]) ? data[key]
             : (data[key] && typeof data[key] === 'object') ? Object.values(data[key]) : null;
-          var fbLen = fbVal ? fbVal.length : 0;
-          var localLen = 0;
-          if(existing) {
-            try { var lp = JSON.parse(existing); localLen = Array.isArray(lp) ? lp.length : 0; } catch(e) {}
-          }
-          if(fbLen > localLen) {
-            _orig.call(localStorage, lsKey, JSON.stringify(fbVal));
-            console.log('[sync] ' + key + ': Firebase (' + fbLen + ') > local (' + localLen + ') → usando Firebase');
+          if(!fbVal) return;
+          var localArr2 = [];
+          if(existing) { try { var lp2 = JSON.parse(existing); if(Array.isArray(lp2)) localArr2 = lp2; } catch(e) {} }
+          // Merge: Firebase + local, local gana para mismo fecha+gestion
+          var mapa2 = {};
+          fbVal.concat(localArr2).forEach(function(rec) {
+            var clave = (rec.fecha||'') + '|' + (rec.gestion||'');
+            mapa2[clave] = rec;
+          });
+          var merged2 = Object.values(mapa2).sort(function(a,b){ return (a.fecha||'') > (b.fecha||'') ? 1 : -1; });
+          _orig.call(localStorage, lsKey, JSON.stringify(merged2));
+          // Si el merge tiene más datos que Firebase, subir
+          if(merged2.length > fbVal.length) {
+            fbWrite('/elprado1/' + key, merged2);
+            console.log('[sync] lluvia: merge → ' + merged2.length + ' registros (fb=' + fbVal.length + ' local=' + localArr2.length + ')');
           }
           return;
         }
 
-        // pluviometros: Firebase gana si tiene más potreros asignados en total
+        // pluviometros: merge por nombre — nunca perder potreros asignados
         if(MERGE_CONFIG.indexOf(key) >= 0) {
-          var fbArr = Array.isArray(data[key]) ? data[key]
+          var fbArr2 = Array.isArray(data[key]) ? data[key]
             : (data[key] && typeof data[key] === 'object') ? Object.values(data[key]) : null;
-          if(!fbArr) return;
-          var fbPotreros = fbArr.reduce(function(s, p) { return s + ((p.potreros||[]).length); }, 0);
-          var localPotreros = 0;
-          if(existing) {
-            try {
-              var lArr = JSON.parse(existing);
-              if(Array.isArray(lArr)) localPotreros = lArr.reduce(function(s, p) { return s + ((p.potreros||[]).length); }, 0);
-            } catch(e) {}
-          }
-          if(fbPotreros > localPotreros) {
-            _orig.call(localStorage, lsKey, JSON.stringify(fbArr));
-            console.log('[sync] pluviometros: Firebase (' + fbPotreros + ' potreros) > local (' + localPotreros + ') → usando Firebase');
-          }
+          if(!fbArr2) return;
+          var localPluvios = [];
+          if(existing) { try { var lp3 = JSON.parse(existing); if(Array.isArray(lp3)) localPluvios = lp3; } catch(e) {} }
+          // Merge por nombre: local gana (tiene potreros más recientes)
+          var mapaP = {};
+          fbArr2.forEach(function(p) { mapaP[p.nombre] = p; });
+          localPluvios.forEach(function(p) {
+            // local gana solo si tiene potreros asignados
+            if(!mapaP[p.nombre] || (p.potreros||[]).length >= (mapaP[p.nombre].potreros||[]).length) {
+              mapaP[p.nombre] = p;
+            }
+          });
+          var mergedP = Object.values(mapaP);
+          _orig.call(localStorage, lsKey, JSON.stringify(mergedP));
+          // Subir si cambió
+          fbWrite('/elprado1/' + key, mergedP);
+          console.log('[sync] pluviometros: merge → ' + mergedP.length + ' pluviómetros');
           return;
         }
 
