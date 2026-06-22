@@ -1850,6 +1850,11 @@ tr:hover td { background: rgba(255,255,255,.02); }
 
 <script>
 // ═══════════════════════════════════════
+// FIREBASE URL — declarado al inicio para evitar errores de inicialización
+// ═══════════════════════════════════════
+const FB_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com/elprado1';
+
+// ═══════════════════════════════════════
 // DATOS BASE
 // ═══════════════════════════════════════
 const POTREROS_BASE = {
@@ -2027,7 +2032,7 @@ const NO_CUENTA_DESCANSO = ['SIEMBRA'];
 // ═══════════════════════════════════════
 // FIREBASE CONFIG
 // ═══════════════════════════════════════
-const FB_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com/elprado1';
+// FB_URL declarado al inicio del script principal
 
 function getGestionActual() {
   const hoy = new Date();
