@@ -5225,13 +5225,78 @@ var _cambioActual = null;  // registro en edición
 function imprimirCampo() {
   const tabla = document.getElementById('campoTabla');
   const titulo = document.getElementById('campoFechaLabel')?.textContent || '';
+  const hoy = new Date().toISOString().split('T')[0];
+  if(!campoFechaBase) campoFechaBase = hoy;
+
+  // Recopilar parcelas activas en la semana con sus dimensiones
+  const dias = [];
+  for(let i = -3; i <= 3; i++) dias.push(sumarDias(campoFechaBase, i));
+  const acts = getActividades().filter(a => a.actividad === 'MATERIA SECA' && a.fechaIng);
+  const parcelasVistas = {};
+  dias.forEach(d => {
+    acts.forEach(a => {
+      const activa = (a.fechaSal && a.fechaIng <= d && a.fechaSal >= d) ||
+                     (!a.fechaSal && a.fechaIng === d);
+      if(activa && (a.anchoM || a.largoM)) {
+        const clave = (a.lote||'') + '|' + (a.potrero||'') + '|' + (a.parcela||'');
+        if(!parcelasVistas[clave]) {
+          parcelasVistas[clave] = {
+            lote: a.lote || '—',
+            potrero: a.potrero || '—',
+            parcela: a.parcela || '—',
+            anchoM: a.anchoM || '—',
+            largoM: a.largoM || '—',
+            ha: a.ha ? a.ha.toFixed(2) : '—'
+          };
+        }
+      }
+    });
+  });
+
+  const filasDim = Object.values(parcelasVistas).sort((a,b) =>
+    (a.lote+a.potrero+String(a.parcela)).localeCompare(b.lote+b.potrero+String(b.parcela))
+  );
+
+  let tablaDim = '';
+  if(filasDim.length > 0) {
+    tablaDim = `
+      <div style="margin-top:24px;page-break-inside:avoid;">
+        <h3 style="color:#1a3a1a;font-size:12px;margin-bottom:8px;border-bottom:2px solid #2e4020;padding-bottom:4px;">
+          📏 Dimensiones de Parcelas — Semana ${titulo}
+        </h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Grupo / Lote</th>
+              <th>Potrero</th>
+              <th>Parcela</th>
+              <th>Ancho (m)</th>
+              <th>Largo (m)</th>
+              <th>Ha</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filasDim.map(f => `
+              <tr>
+                <td style="text-align:left;">${f.lote}</td>
+                <td>${f.potrero}</td>
+                <td>${f.parcela}</td>
+                <td>${f.anchoM}</td>
+                <td>${f.largoM}</td>
+                <td>${f.ha}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
   const win = window.open('', '_blank');
   win.document.write(`<!DOCTYPE html><html><head>
     <title>Estado del Campo — ${titulo}</title>
     <style>
       body { font-family: Arial, sans-serif; padding: 20px; font-size: 11px; }
       h2 { color: #1a3a1a; margin-bottom: 16px; }
-      table { border-collapse: collapse; width: 100%; }
+      table { border-collapse: collapse; width: 100%; margin-bottom: 8px; }
       th { background: #2e4020; color: white; padding: 6px 8px; text-align: center; font-size: 10px; }
       td { padding: 5px 7px; border: 1px solid #ccc; text-align: center; font-size: 10px; }
       td:first-child { text-align: left; font-weight: bold; }
@@ -5243,6 +5308,7 @@ function imprimirCampo() {
   </head><body>
     <h2>📍 Estado del Campo — ${titulo}</h2>
     ${tabla.outerHTML}
+    ${tablaDim}
     <script>window.onload=function(){window.print();}<\/script>
   </body></html>`);
   win.document.close();
