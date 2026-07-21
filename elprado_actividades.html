@@ -5235,8 +5235,9 @@ function imprimirCampo() {
   const parcelasVistas = {};
   dias.forEach(d => {
     acts.forEach(a => {
-      const activa = (a.fechaSal && a.fechaIng <= d && a.fechaSal >= d) ||
-                     (!a.fechaSal && a.fechaIng === d);
+      const fi = a.fechaIng || '';
+      const fs = a.fechaSal || '';
+      const activa = fi && fi <= d && (fs ? fs >= d : fi === d);
       if(activa && (a.anchoM || a.largoM)) {
         const clave = (a.lote||'') + '|' + (a.potrero||'') + '|' + (a.parcela||'');
         if(!parcelasVistas[clave]) {
@@ -5303,12 +5304,12 @@ function imprimirCampo() {
       div[style*="gold"] { color: #b8860b !important; font-weight: bold; font-size: 10px; }
       div[style*="red"] { color: #cc0000 !important; }
       div[style*="green"] { color: #1a6b1a !important; }
-      @media print { body { padding: 10px; } }
+      .fila-vacia { display: none; }
+      @media print { body { padding: 10px; } .fila-vacia { display: none !important; } }
     </style>
   </head><body>
     <h2>📍 Estado del Campo — ${titulo}</h2>
     ${tabla.outerHTML}
-    ${tablaDim}
     <script>window.onload=function(){window.print();}<\/script>
   </body></html>`);
   win.document.close();
@@ -5472,17 +5473,23 @@ function renderCampo() {
         ? `<div style="font-size:11px;font-weight:700;color:var(--gold2);margin-top:2px;">${turnoSalLabel || turnoIngLabel}</div>`
         : '';
 
+      const dimLabel = (reg.anchoM || reg.largoM)
+        ? `<div style="font-size:9px;color:var(--text3);margin-top:2px;">A: ${reg.anchoM||'?'}m | L: ${reg.largoM||'?'}m</div>`
+        : '';
+
       return `<td style="text-align:center;cursor:pointer;${bgBase}${esCentro?'':''}padding:4px;" onclick="abrirCambioSalida('${lote}','${reg.potrero}','${reg.parcela}','${reg.fechaSal||''}','${reg.id}','${reg.horaSal||''}')">
         <div style="background:${bgColor};border-radius:5px;padding:4px 6px;">
           <div style="font-size:12px;font-weight:700;color:${color};">${reg.potrero}·P${reg.parcela}</div>
           <div style="font-size:10px;color:var(--text3);">${reg.fechaSal||'—'}</div>
           ${turnoLabel}
           ${badge}
+          ${dimLabel}
         </div>
       </td>`;
     }).join('');
 
-    return `<tr>
+    const tieneData = celdas.includes('onclick=');
+    return `<tr class="${tieneData?'':'fila-vacia'}">
       <td style="font-size:12px;font-weight:600;color:var(--text2);padding:6px 8px;">${loteLabel}</td>
       ${celdas}
     </tr>`;
