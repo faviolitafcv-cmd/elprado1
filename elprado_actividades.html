@@ -5477,6 +5477,10 @@ function renderCampo() {
         ? `<div style="font-size:9px;color:var(--text3);margin-top:2px;">A: ${reg.anchoM||'?'}m | L: ${reg.largoM||'?'}m</div>`
         : '';
 
+      const comentLabel = reg.comentario
+        ? `<div style="font-size:9px;color:var(--gold2);font-weight:700;margin-top:2px;">${reg.comentario.toUpperCase()}</div>`
+        : '';
+
       return `<td style="text-align:center;cursor:pointer;${bgBase}${esCentro?'':''}padding:4px;" onclick="abrirCambioSalida('${lote}','${reg.potrero}','${reg.parcela}','${reg.fechaSal||''}','${reg.id}','${reg.horaSal||''}')">
         <div style="background:${bgColor};border-radius:5px;padding:4px 6px;">
           <div style="font-size:12px;font-weight:700;color:${color};">${reg.potrero}·P${reg.parcela}</div>
@@ -5484,6 +5488,7 @@ function renderCampo() {
           ${turnoLabel}
           ${badge}
           ${dimLabel}
+          ${comentLabel}
         </div>
       </td>`;
     }).join('');
