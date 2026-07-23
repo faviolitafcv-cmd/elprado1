@@ -1929,7 +1929,7 @@ function renderDash(){
       }
     }
   });
-  const rows_d=Object.values(gmap).sort((a,b)=>(GRU_ORD.indexOf(a.grupo)-GRU_ORD.indexOf(b.grupo))||a.grupo.localeCompare(b.grupo));
+  const rows_d=Object.values(gmap).sort((a,b)=>(GRU_ORD.indexOf(a.grupo||'')-GRU_ORD.indexOf(b.grupo||'')||( a.grupo||'').localeCompare(b.grupo||''));
   const tbody_d=document.getElementById('dGrupos');
   if(!rows_d.length){tbody_d.innerHTML='<tr><td colspan="6"><div class="emp">Sin animales</div></td></tr>';}
   else{tbody_d.innerHTML=rows_d.map(g=>{
@@ -3942,7 +3942,7 @@ function renderValuacion(){
     }
   });
 
-  const rows = Object.values(gmap).sort((a,b)=>(GRU_ORD.indexOf(a.grupo)-GRU_ORD.indexOf(b.grupo))||a.grupo.localeCompare(b.grupo));
+  const rows = Object.values(gmap).sort((a,b)=>(GRU_ORD.indexOf(a.grupo||'')-GRU_ORD.indexOf(b.grupo||'')||( a.grupo||'').localeCompare(b.grupo||''));
   let totCabezas=0, totKgP=0, totValor=0, totCosto=0;
 
   const tbody = document.getElementById('valTabla');
@@ -4134,7 +4134,7 @@ function renderInf(){
       }
     }
   });
-  const rows_ri=Object.values(gmap_ri).sort((a,b)=>(GRU_ORD.indexOf(a.grupo)-GRU_ORD.indexOf(b.grupo))||a.grupo.localeCompare(b.grupo));
+  const rows_ri=Object.values(gmap_ri).sort((a,b)=>(GRU_ORD.indexOf(a.grupo||'')-GRU_ORD.indexOf(b.grupo||'')||( a.grupo||'').localeCompare(b.grupo||''));
   const tb_ri=document.getElementById('iInv');
   if(tb_ri) tb_ri.innerHTML=rows_ri.length?rows_ri.map(g=>{
     const gmd=g.nGmd>0?(g.sumGmd/g.nGmd).toFixed(3):null;
