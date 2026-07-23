@@ -4640,10 +4640,10 @@ function readVentaXls(file){
       if(rows.length<2){ntf('Archivo vacío',true);return;}
       const hdr=rows[0].map(h=>String(h||'').trim().toUpperCase());
       const ci=hdr.findIndex(h=>h==='IDE');
-      const cp=hdr.findIndex(h=>h==='PESO'||h.indexOf('PESO')===0);
+      const cp=hdr.findIndex(h=>h==='PESO'||(h&&h.indexOf('PESO')===0));
       const cr=hdr.findIndex(h=>h==='RAZA');
-      const cc=hdr.findIndex(h=>h==='CATEGORIA'||h.indexOf('CAT')===0);
-      const ccl=hdr.findIndex(h=>h==='CLASF. PESAJ'||h.indexOf('CLAS')===0);
+      const cc=hdr.findIndex(h=>h==='CATEGORIA'||(h&&h.indexOf('CAT')===0));
+      const ccl=hdr.findIndex(h=>h==='CLASF. PESAJ'||(h&&h.indexOf('CLAS')===0));
       if(ci<0){ntf('No se encontró columna IDE',true);return;}
       _ventaAnimales=[];window._ventaNoEnc=[];let kgTot=0;
       for(let i=1;i<rows.length;i++){
