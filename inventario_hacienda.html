@@ -2800,8 +2800,8 @@ function renderP(){
     if(p.fecha>gmap[k].uf) gmap[k].uf=p.fecha;
   });
   const gRows=Object.values(gmap).sort((a,b)=>{
-    const co=CAT_ORD.indexOf(a.cat)-CAT_ORD.indexOf(b.cat);
-    return co||GRU_ORD.indexOf(a.grupo)-GRU_ORD.indexOf(b.grupo);
+    const co=CAT_ORD.indexOf(a.cat||'')-CAT_ORD.indexOf(b.cat||'');
+    return co||GRU_ORD.indexOf(a.grupo||'')-GRU_ORD.indexOf(b.grupo||'');
   });
   const tb=document.getElementById('pGmd');
   tb.innerHTML=gRows.length?gRows.map(g=>`<tr>
@@ -3280,8 +3280,8 @@ function renderInfLegacy(){
     if(g!=null){if(!gmdMap[k]){gmdMap[k]={s:0,n:0};} gmdMap[k].s+=g; gmdMap[k].n++;}
   });
   const rows=Object.values(gmap).sort((a,b)=>{
-    const co=CAT_ORD.indexOf(a.cat)-CAT_ORD.indexOf(b.cat);
-    return co||GRU_ORD.indexOf(a.grupo)-GRU_ORD.indexOf(b.grupo)||a.origen.localeCompare(b.origen);
+    const co=CAT_ORD.indexOf(a.cat||'')-CAT_ORD.indexOf(b.cat||'');
+    return co||GRU_ORD.indexOf(a.grupo||'')-GRU_ORD.indexOf(b.grupo||'')||(a.origen||'').localeCompare(b.origen||'');
   });
   const tb=document.getElementById('iInv');
   tb.innerHTML=rows.length?rows.map(g=>{
