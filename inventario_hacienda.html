@@ -745,12 +745,18 @@ tr:hover td{background:rgba(109,186,58,.04);}
     </div>
 
     <div style="padding:0 14px 12px;">
+      <div style="font-size:11px;font-weight:700;color:var(--teal);margin-bottom:6px;">📊 GRÁFICO — Bs/día/animal por categoría (¿Qué conviene comprar?)</div>
+      <div id="igGraficoDia" style="background:var(--card2);border-radius:8px;padding:16px;min-height:80px;"></div>
+    </div>
+
+    <div style="padding:0 14px 12px;">
       <div style="font-size:11px;font-weight:700;color:var(--gold);margin-bottom:6px;">▌ NIVEL 3 — POR ORIGEN (¿Dónde conviene comprar?)</div>
       <div class="tw"><table>
         <thead><tr>
           <th>Origen</th><th>Cab.</th><th>GMD</th><th>Días</th>
           <th>Bs/kg compra</th><th>Bs/kg venta</th>
           <th style="color:var(--gold);">Margen Bs/kg</th>
+          <th style="color:var(--teal);">Bs/día/animal</th>
           <th>Gan./cabeza</th><th>Ganancia total</th>
         </tr></thead>
         <tbody id="igOrigen"></tbody>
@@ -3608,6 +3614,7 @@ function renderIG(){
     +'<th style="color:var(--gold);" title="Ganancia ÷ kg ganados en campo">① Rend. Bs/kg prod.</th>'
     +'<th style="color:var(--blue);" title="Kg ganados × precio venta/kg">② Valor generado campo</th>'
     +'<th style="color:var(--purple);" title="Margen calculado con costo de reposición de hoy">③ Margen reposición</th>'
+    +'<th style="color:var(--teal);" title="(Precio venta − Precio compra) ÷ días en campo">④ Bs/día/animal</th>'
     +'<th>Gan./cab.</th><th style="color:var(--green);">Ganancia total</th><th>#</th>';
   document.getElementById('igTablaBody').innerHTML=rows.map((g,i)=>{
     const mar=g.nMar>0?(g.sMar/g.nMar).toFixed(2):null;
@@ -3621,6 +3628,9 @@ function renderIG(){
     const valCampoProm=g.nValCampo>0?Math.round(g.totValCampo/g.nValCampo):null;
     const marRepProm=g.nMarRepos>0?(g.sMarRepos/g.nMarRepos).toFixed(2):null;
     const mrCol=marRepProm!=null?(parseFloat(marRepProm)>30?'var(--green)':parseFloat(marRepProm)>10?'var(--gold)':'var(--red)'):'var(--t2)';
+    // Bs/día/animal = ganancia promedio por cabeza ÷ días promedio
+    const bsDia = gc!=null&&dias&&dias>0?(gc/dias).toFixed(2):null;
+    const bsDiaCol = bsDia!=null?(parseFloat(bsDia)>30?'var(--green)':parseFloat(bsDia)>15?'var(--gold)':'var(--red)'):'var(--t2)';
     return`<tr><td><b>${g.tipo}</b></td><td>${g.cat}</td><td class="mn tg">${g.n}</td>
       <td class="mn" style="font-size:11px;color:var(--t2);">${pct}%</td>
       <td class="mn">${gmd?gmd+' kg/d':'—'}</td><td class="mn">${dias?dias+' d':'—'}</td>
@@ -3628,10 +3638,40 @@ function renderIG(){
       <td class="mn" style="color:${mc};font-weight:800;" title="Rendimiento: ganancia ÷ kg ganados">${mar?'Bs '+mar:'—'}</td>
       <td class="mn" style="color:var(--blue);" title="Kg ganados × Bs/kg venta">${valCampoProm?'Bs '+fmt(valCampoProm):'—'}</td>
       <td class="mn" style="color:${mrCol};font-weight:700;" title="Margen con costo de reposición actual">${marRepProm?'Bs '+marRepProm:'—'}</td>
+      <td class="mn" style="color:${bsDiaCol};font-weight:800;" title="(Ganancia/cab) ÷ días en campo">${bsDia?'Bs '+bsDia:'—'}</td>
       <td class="mn">${gc?'Bs '+fmt(gc):'—'}</td>
       <td class="mn tg"><b>Bs ${fmt(g.totGan)}</b></td>
       <td class="mn">${medals[i]||('#'+(i+1))}</td></tr>`;
   }).join('');
+
+  // GRÁFICO Bs/día/animal
+  const grafEl = document.getElementById('igGraficoDia');
+  if(grafEl) {
+    const grafData = rows.map(g=>{
+      const gc=g.nGan>0?Math.round(g.totGan/g.nGan):null;
+      const dias=g.nDias>0?Math.round(g.sDias/g.nDias):null;
+      const bsDia=gc!=null&&dias&&dias>0?parseFloat((gc/dias).toFixed(2)):null;
+      return {label:`${g.tipo}\n${g.cat}`, val:bsDia, dias};
+    }).filter(d=>d.val!=null).sort((a,b)=>b.val-a.val);
+    const maxVal=Math.max(...grafData.map(d=>d.val),1);
+    grafEl.innerHTML=grafData.map((d,i)=>{
+      const pct=Math.round((d.val/maxVal)*100);
+      const col=d.val>30?'var(--green)':d.val>15?'var(--gold)':'var(--red)';
+      const labels=d.label.split('\n');
+      return`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <div style="width:160px;font-size:11px;text-align:right;color:var(--t2);line-height:1.3;">
+          <div style="font-weight:700;color:var(--text);">${labels[0]}</div>
+          <div>${labels[1]||''}</div>
+          <div style="font-size:10px;color:var(--t3);">${d.dias} días prom.</div>
+        </div>
+        <div style="flex:1;background:var(--card3);border-radius:4px;height:28px;position:relative;">
+          <div style="width:${pct}%;background:${col};border-radius:4px;height:100%;transition:width .4s;"></div>
+          <span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:12px;font-weight:800;color:${pct>40?'#fff':'var(--text)'};">Bs ${d.val}/día</span>
+        </div>
+        <div style="width:30px;font-size:14px;">${['🥇','🥈','🥉'][i]||''}</div>
+      </div>`;
+    }).join('') || '<div style="color:var(--t3);font-size:12px;">Sin datos de ventas registradas.</div>';
+  }
 
   // NIVEL 3
   document.getElementById('igOrigen').innerHTML=Object.values(byOrig).sort((a,b)=>b.totGan-a.totGan).map(o=>{
@@ -3642,10 +3682,13 @@ function renderIG(){
     const gmd=o.nGmd>0?(o.sGmd/o.nGmd).toFixed(3):null;
     const gc=o.nGan>0?Math.round(o.totGan/o.nGan):null;
     const mc=mar!=null?(parseFloat(mar)>30?'var(--green)':parseFloat(mar)>15?'var(--gold)':'var(--red)'):'var(--t2)';
+    const bsDia=gc!=null&&dias&&dias>0?(gc/dias).toFixed(2):null;
+    const bsDiaCol=bsDia!=null?(parseFloat(bsDia)>30?'var(--green)':parseFloat(bsDia)>15?'var(--gold)':'var(--red)'):'var(--t2)';
     return`<tr><td><b>${o.o}</b></td><td class="mn tg">${o.n}</td>
       <td class="mn">${gmd?gmd+' kg/d':'—'}</td><td class="mn">${dias?dias+' d':'—'}</td>
       <td class="mn">${bkc?'Bs '+bkc:'—'}</td><td class="mn">${bkv?'Bs '+bkv:'—'}</td>
       <td class="mn" style="color:${mc};font-weight:700;">${mar?'Bs '+mar:'—'}</td>
+      <td class="mn" style="color:${bsDiaCol};font-weight:800;">${bsDia?'Bs '+bsDia:'—'}</td>
       <td class="mn">${gc?'Bs '+fmt(gc):'—'}</td>
       <td class="mn tg"><b>Bs ${fmt(o.totGan)}</b></td></tr>`;
   }).join('');
