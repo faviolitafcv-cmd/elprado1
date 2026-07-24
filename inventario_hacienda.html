@@ -1929,7 +1929,7 @@ function renderDash(){
       }
     }
   });
-  const rows_d=Object.values(gmap).sort((a,b)=>(GRU_ORD.indexOf(a.grupo||'')-GRU_ORD.indexOf(b.grupo||''))||( a.grupo||'').localeCompare(b.grupo||''));
+  const rows_d=Object.values(gmap).sort((a,b)=>(GRU_ORD.indexOf(a.grupo||'')-GRU_ORD.indexOf(b.grupo||''))||(a.grupo||'').localeCompare(b.grupo||''));
   const tbody_d=document.getElementById('dGrupos');
   if(!rows_d.length){tbody_d.innerHTML='<tr><td colspan="6"><div class="emp">Sin animales</div></td></tr>';}
   else{tbody_d.innerHTML=rows_d.map(g=>{
@@ -3063,10 +3063,12 @@ function verReciboCompra(cId){
       <div class="fm"><label>Municipio</label><input id="vMun" type="text" placeholder="San Ignacio..."></div>
       <div class="fm"><label>Tipo Animal</label><select id="vTipo"><option value="">— Seleccionar —</option><option value="INVERNADA">INVERNADA</option><option value="CRIA-REPRODUCTORES">CRIA-REPRODUCTORES</option></select></div>
       <div class="fm"><label>Mercado *</label><select id="vMercado" onchange="toggleDestinoVenta()"><option value="">— Seleccionar —</option><option value="EXPORTACION">EXPORTACIÓN</option><option value="NACIONAL">NACIONAL</option></select></div>
-      <div class="fm"><label>Tipo Destino *</label><select id="vTipoDestino" onchange="toggleDestinoVenta()"><option value="">— Seleccionar —</option><option value="FRIGORIFICO">FRIGORÍFICO</option><option value="PRIVADO">PRIVADO</option></select></div>
+      <div class="fm"><label>Tipo Destino *</label><select id="vTipoDestino" onchange="toggleDestinoVenta()"><option value="">— Seleccionar —</option><option value="FRIGORIFICO">🏭 Frigorífico</option><option value="PRIVADO">🤝 Privado</option><option value="REMATE">🔨 Centro de Remate</option><option value="OTRO">📝 Otro</option></select></div>
       <div class="fm" id="vFrigorificoWrap" style="display:none;"><label>Frigorífico *</label><select id="vFrigorifico" onchange="toggleDestinoVenta()"><option value="">— Seleccionar —</option><option value="BFC S.A.">BFC S.A.</option><option value="FRIGOR S.A.">FRIGOR S.A.</option><option value="FRIGOSI S.A.">FRIGOSI S.A.</option><option value="FRIDOSA">FRIDOSA</option><option value="OTRO">OTRO</option></select></div>
       <div class="fm" id="vFrigorificoOtroWrap" style="display:none;"><label>Otro frigorífico</label><input id="vFrigorificoOtro" type="text"></div>
       <div class="fm" id="vPrivadoWrap" style="display:none;"><label>Comprador *</label><input id="vDest" type="text" placeholder="Nombre del comprador"></div>
+      <div class="fm" id="vRemateWrap" style="display:none;"><label>Centro de Remate *</label><input id="vRemate" type="text" placeholder="Nombre del centro de remate"></div>
+      <div class="fm" id="vOtroWrap" style="display:none;"><label>Descripción *</label><input id="vOtro" type="text" placeholder="Describí el tipo de venta"></div>
       <div class="sep">Kilogramos</div>
       <div class="fm"><label>Kg Brutos *</label><input id="vKgBruto" type="number" step="0.1" oninput="calcVenta()"></div>
       <div class="fm"><label>Desbaste %</label><div style="display:flex;gap:6px;align-items:center;"><input id="vDesbaste" type="number" step="0.1" value="0" min="0" max="20" oninput="calcVenta()" style="width:80px;"><span style="font-size:12px;color:var(--t3);">% → <span id="vKgDesbaste" style="color:var(--gold);">0 kg</span></span></div></div>
@@ -3088,9 +3090,13 @@ function verReciboCompra(cId){
       <div class="fm"><label>Transporte (Bs)</label><input id="vTransporte" type="number" step="0.01" value="0" oninput="calcVenta()"></div>
       <div class="fm"><label>Total a Cobrar</label><input id="vTotalCobrar" readonly style="background:rgba(109,186,58,.1);font-weight:700;color:var(--gr);font-size:14px;"></div>
       <div class="fm"><label>Bs/kg neto</label><input id="vPrecKg" readonly style="background:rgba(109,186,58,.1);color:var(--gr);"></div>
-      <div class="sep" style="grid-column:1/-1;">Animales — Excel de la Balanza</div>
+      <div class="sep" style="grid-column:1/-1;">Animales — IDE y Peso</div>
       <div class="fm full" style="grid-column:1/-1;">
-        <input type="file" id="vXls" accept=".xls,.xlsx" style="font-size:12px;" onchange="readVentaXls(this.files[0])">
+        <div style="font-size:11px;color:var(--t3);margin-bottom:8px;">Copiá la columna de IDEs de tu Excel y pegala en el primer campo. Copiá la columna de pesos y pegala en el segundo. El sistema los empareja por orden.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div><label style="font-size:11px;font-weight:700;color:var(--t2);display:block;margin-bottom:4px;">📋 IDEs (uno por línea)</label><textarea id="vPasteIdes" rows="10" placeholder="68000000703151" style="width:100%;background:var(--card2);border:1px solid var(--brd);color:var(--text);padding:8px;border-radius:5px;font-size:11px;font-family:monospace;resize:vertical;outline:none;" oninput="procesarPegadoVenta()"></textarea></div>
+          <div><label style="font-size:11px;font-weight:700;color:var(--t2);display:block;margin-bottom:4px;">⚖️ Pesos en kg (uno por línea)</label><textarea id="vPastePesos" rows="10" placeholder="489" style="width:100%;background:var(--card2);border:1px solid var(--brd);color:var(--text);padding:8px;border-radius:5px;font-size:11px;font-family:monospace;resize:vertical;outline:none;" oninput="procesarPegadoVenta()"></textarea></div>
+        </div>
       </div>
       <div id="vXlsPrev" style="grid-column:1/-1;font-size:12px;"></div>
     </div></div>
@@ -3118,7 +3124,7 @@ function verReciboCompra(cId){
       <div class="fm"><label>Tipo Animal</label><select id="evTipo"><option value="">—</option><option value="INVERNADA">INVERNADA</option><option value="CRIA-REPRODUCTORES">CRIA-REPRODUCTORES</option></select></div>
       <div class="fm"><label>Municipio</label><input id="evMun" type="text"></div>
       <div class="fm"><label>Mercado</label><select id="evMercado"><option value="">—</option><option value="EXPORTACION">EXPORTACIÓN</option><option value="NACIONAL">NACIONAL</option></select></div>
-      <div class="fm"><label>Tipo Destino</label><select id="evTipoDestino" onchange="toggleEditVenta()"><option value="">—</option><option value="FRIGORIFICO">FRIGORÍFICO</option><option value="PRIVADO">PRIVADO</option></select></div>
+      <div class="fm"><label>Tipo Destino</label><select id="evTipoDestino" onchange="toggleEditVenta()"><option value="">—</option><option value="FRIGORIFICO">🏭 Frigorífico</option><option value="PRIVADO">🤝 Privado</option><option value="REMATE">🔨 Centro de Remate</option><option value="OTRO">📝 Otro</option></select></div>
       <div class="fm" id="evFrigWrap" style="display:none;"><label>Frigorífico</label><select id="evFrigorifico"><option value="">—</option><option value="BFC S.A.">BFC S.A.</option><option value="FRIGOR S.A.">FRIGOR S.A.</option><option value="FRIGOSI S.A.">FRIGOSI S.A.</option><option value="FRIDOSA">FRIDOSA</option></select></div>
       <div class="fm" id="evPrivWrap" style="display:none;"><label>Comprador</label><input id="evDestino" type="text"></div>
     </div></div>
@@ -3942,7 +3948,7 @@ function renderValuacion(){
     }
   });
 
-  const rows = Object.values(gmap).sort((a,b)=>(GRU_ORD.indexOf(a.grupo||'')-GRU_ORD.indexOf(b.grupo||''))||( a.grupo||'').localeCompare(b.grupo||''));
+  const rows = Object.values(gmap).sort((a,b)=>(GRU_ORD.indexOf(a.grupo||'')-GRU_ORD.indexOf(b.grupo||''))||(a.grupo||'').localeCompare(b.grupo||''));
   let totCabezas=0, totKgP=0, totValor=0, totCosto=0;
 
   const tbody = document.getElementById('valTabla');
@@ -4134,7 +4140,7 @@ function renderInf(){
       }
     }
   });
-  const rows_ri=Object.values(gmap_ri).sort((a,b)=>(GRU_ORD.indexOf(a.grupo||'')-GRU_ORD.indexOf(b.grupo||''))||( a.grupo||'').localeCompare(b.grupo||''));
+  const rows_ri=Object.values(gmap_ri).sort((a,b)=>(GRU_ORD.indexOf(a.grupo||'')-GRU_ORD.indexOf(b.grupo||''))||(a.grupo||'').localeCompare(b.grupo||''));
   const tb_ri=document.getElementById('iInv');
   if(tb_ri) tb_ri.innerHTML=rows_ri.length?rows_ri.map(g=>{
     const gmd=g.nGmd>0?(g.sumGmd/g.nGmd).toFixed(3):null;
@@ -4165,6 +4171,7 @@ function genCodigoVenta(){
 function sortVA(f){if(vaSortField===f)vaSortDir*=-1;else{vaSortField=f;vaSortDir=-1;}renderVAnimales();}
 
 function openV(){
+  ['vPasteIdes','vPasteIdes','vPastePesos'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   _ventaAnimales=[];_cuentasVenta=[];window._ventaNoEnc=[];
   ['vF2','vDest','vMun','vComNombre','vFrigorifico','vFrigorificoOtro'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   ['vMercado','vTipoDestino','vTipo'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
@@ -4185,11 +4192,52 @@ function openV(){
 
 function toggleDestinoVenta(){
   const td=document.getElementById('vTipoDestino')?.value||'';
-  const fw=document.getElementById('vFrigorificoWrap');const pw=document.getElementById('vPrivadoWrap');
-  const fo=document.getElementById('vFrigorificoOtroWrap');const fs=document.getElementById('vFrigorifico');
+  const fw=document.getElementById('vFrigorificoWrap');
+  const pw=document.getElementById('vPrivadoWrap');
+  const fo=document.getElementById('vFrigorificoOtroWrap');
+  const fs=document.getElementById('vFrigorifico');
+  const rw=document.getElementById('vRemateWrap');
+  const ow=document.getElementById('vOtroWrap');
   if(fw)fw.style.display=td==='FRIGORIFICO'?'':'none';
   if(pw)pw.style.display=td==='PRIVADO'?'':'none';
+  if(rw)rw.style.display=td==='REMATE'?'':'none';
+  if(ow)ow.style.display=td==='OTRO'?'':'none';
   if(fo)fo.style.display=(td==='FRIGORIFICO'&&fs?.value==='OTRO')?'':'none';
+}
+
+function procesarPegadoVenta(){
+  const idesRaw=document.getElementById('vPasteIdes')?.value||'';
+  const pesosRaw=document.getElementById('vPastePesos')?.value||'';
+  const ides=idesRaw.split('\n').map(s=>s.trim()).filter(Boolean);
+  const pesosArr=pesosRaw.split('\n').map(s=>s.trim()).filter(Boolean).map(s=>parseFloat(s.replace(',','.'))||0);
+  if(!ides.length) return;
+  _ventaAnimales=[];window._ventaNoEnc=[];let kgTot=0;
+  ides.forEach((ideRaw,i)=>{
+    let ide=String(ideRaw).replace(/\.0$/,'').trim();
+    if(!ide||ide==='0') return;
+    const peso=pesosArr[i]||0;
+    const aEx=animales[ide];
+    if(!aEx){window._ventaNoEnc.push(ide);return;}
+    if(aEx.estado==='EN VENTA'||aEx.estado==='VENDIDO'){
+      const vRef=aEx.ventaId?ventas.find(v=>v.id===aEx.ventaId):null;
+      window._ventaNoEnc.push(ide+' (ya en '+(vRef?vRef.codigo:aEx.estado)+')');return;
+    }
+    _ventaAnimales.push({ide,peso,raza:aEx.raza||'',categoria:aEx.categoria||'',clasificacion:''});
+    kgTot+=peso;
+  });
+  const pesoProm=_ventaAnimales.length>0?kgTot/_ventaAnimales.length:0;
+  let prev='<div style="margin-top:8px;padding:10px;background:rgba(109,186,58,.07);border-radius:6px;">';
+  prev+='<div style="font-weight:700;color:var(--gr);">✅ '+_ventaAnimales.length+' animales cargados</div>';
+  if(ides.length!==pesosArr.length) prev+='<div style="font-size:11px;color:var(--gold);">⚠️ IDEs: '+ides.length+' | Pesos: '+pesosArr.length+' — verificá que sean la misma cantidad</div>';
+  prev+='<div style="font-size:11px;color:var(--t3);">Kg total: <strong>'+kgTot.toFixed(1)+' kg</strong> — Peso prom: <strong>'+pesoProm.toFixed(1)+' kg</strong></div>';
+  if(window._ventaNoEnc.length>0){
+    prev+='<div style="margin-top:6px;padding:6px;background:rgba(220,50,50,.1);border:1px solid rgba(220,50,50,.3);border-radius:4px;">';
+    prev+='<div style="font-size:11px;font-weight:700;color:var(--red);">⚠️ '+window._ventaNoEnc.length+' IDEs no encontrados:</div>';
+    prev+='<div style="font-size:11px;color:var(--red);font-family:monospace;line-height:1.8;">'+window._ventaNoEnc.slice(0,20).join('<br>')+(window._ventaNoEnc.length>20?'<br>...y '+(window._ventaNoEnc.length-20)+' más':'')+'</div></div>';
+  }
+  prev+='</div>';
+  const el=document.getElementById('vXlsPrev');if(el)el.innerHTML=prev;
+  const kb=document.getElementById('vKgBruto');if(kb){kb.value=kgTot.toFixed(1);calcVenta();}
 }
 
 function calcVenta(){
@@ -4232,6 +4280,8 @@ async function saveVenta(){
   if(modo==='porkg'){const pk=parseFloat(document.getElementById('vPrecKgInput')?.value)||0;bruto=Math.round(kgNeto*pk*100)/100;}
   else{bruto=parseFloat(document.getElementById('vPrecBruto')?.value)||0;}
   if(tipoDestino==='FRIGORIFICO'){frigorifico=document.getElementById('vFrigorifico')?.value||'';if(frigorifico==='OTRO')frigorifico=document.getElementById('vFrigorificoOtro')?.value.trim()||'';dest=frigorifico;}
+  else if(tipoDestino==='REMATE'){dest=document.getElementById('vRemate')?.value.trim()||'';}
+  else if(tipoDestino==='OTRO'){dest=document.getElementById('vOtro')?.value.trim()||'';}
   else{dest=document.getElementById('vDest')?.value.trim()||'';}
   if(!fecha||!dest||bruto<=0){ntf('Completá fecha, destino y precio',true);return;}
   if(!_ventaAnimales.length){ntf('Subí el Excel de la balanza',true);return;}
@@ -5245,10 +5295,12 @@ showPg = function(id) { _origShowPg2(id); if(id==='movimientos') renderMovimient
       <div class="fm"><label>Municipio</label><input id="vMun" type="text" placeholder="San Ignacio..."></div>
       <div class="fm"><label>Tipo Animal</label><select id="vTipo"><option value="">— Seleccionar —</option><option value="INVERNADA">INVERNADA</option><option value="CRIA-REPRODUCTORES">CRIA-REPRODUCTORES</option></select></div>
       <div class="fm"><label>Mercado *</label><select id="vMercado" onchange="toggleDestinoVenta()"><option value="">— Seleccionar —</option><option value="EXPORTACION">EXPORTACIÓN</option><option value="NACIONAL">NACIONAL</option></select></div>
-      <div class="fm"><label>Tipo Destino *</label><select id="vTipoDestino" onchange="toggleDestinoVenta()"><option value="">— Seleccionar —</option><option value="FRIGORIFICO">FRIGORÍFICO</option><option value="PRIVADO">PRIVADO</option></select></div>
+      <div class="fm"><label>Tipo Destino *</label><select id="vTipoDestino" onchange="toggleDestinoVenta()"><option value="">— Seleccionar —</option><option value="FRIGORIFICO">🏭 Frigorífico</option><option value="PRIVADO">🤝 Privado</option><option value="REMATE">🔨 Centro de Remate</option><option value="OTRO">📝 Otro</option></select></div>
       <div class="fm" id="vFrigorificoWrap" style="display:none;"><label>Frigorífico *</label><select id="vFrigorifico" onchange="toggleDestinoVenta()"><option value="">— Seleccionar —</option><option value="BFC S.A.">BFC S.A.</option><option value="FRIGOR S.A.">FRIGOR S.A.</option><option value="FRIGOSI S.A.">FRIGOSI S.A.</option><option value="FRIDOSA">FRIDOSA</option><option value="OTRO">OTRO</option></select></div>
       <div class="fm" id="vFrigorificoOtroWrap" style="display:none;"><label>Otro frigorífico</label><input id="vFrigorificoOtro" type="text"></div>
       <div class="fm" id="vPrivadoWrap" style="display:none;"><label>Comprador *</label><input id="vDest" type="text" placeholder="Nombre del comprador"></div>
+      <div class="fm" id="vRemateWrap" style="display:none;"><label>Centro de Remate *</label><input id="vRemate" type="text" placeholder="Nombre del centro de remate"></div>
+      <div class="fm" id="vOtroWrap" style="display:none;"><label>Descripción *</label><input id="vOtro" type="text" placeholder="Describí el tipo de venta"></div>
       <div class="sep">Kilogramos</div>
       <div class="fm"><label>Kg Brutos *</label><input id="vKgBruto" type="number" step="0.1" oninput="calcVenta()"></div>
       <div class="fm"><label>Desbaste %</label><div style="display:flex;gap:6px;align-items:center;"><input id="vDesbaste" type="number" step="0.1" value="0" min="0" max="20" oninput="calcVenta()" style="width:80px;"><span style="font-size:12px;color:var(--t3);">% → <span id="vKgDesbaste" style="color:var(--gold);">0 kg</span></span></div></div>
@@ -5270,9 +5322,13 @@ showPg = function(id) { _origShowPg2(id); if(id==='movimientos') renderMovimient
       <div class="fm"><label>Transporte (Bs)</label><input id="vTransporte" type="number" step="0.01" value="0" oninput="calcVenta()"></div>
       <div class="fm"><label>Total a Cobrar</label><input id="vTotalCobrar" readonly style="background:rgba(109,186,58,.1);font-weight:700;color:var(--gr);font-size:14px;"></div>
       <div class="fm"><label>Bs/kg neto</label><input id="vPrecKg" readonly style="background:rgba(109,186,58,.1);color:var(--gr);"></div>
-      <div class="sep" style="grid-column:1/-1;">Animales — Excel de la Balanza</div>
+      <div class="sep" style="grid-column:1/-1;">Animales — IDE y Peso</div>
       <div class="fm full" style="grid-column:1/-1;">
-        <input type="file" id="vXls" accept=".xls,.xlsx" style="font-size:12px;" onchange="readVentaXls(this.files[0])">
+        <div style="font-size:11px;color:var(--t3);margin-bottom:8px;">Copiá la columna de IDEs de tu Excel y pegala en el primer campo. Copiá la columna de pesos y pegala en el segundo. El sistema los empareja por orden.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div><label style="font-size:11px;font-weight:700;color:var(--t2);display:block;margin-bottom:4px;">📋 IDEs (uno por línea)</label><textarea id="vPasteIdes" rows="10" placeholder="68000000703151" style="width:100%;background:var(--card2);border:1px solid var(--brd);color:var(--text);padding:8px;border-radius:5px;font-size:11px;font-family:monospace;resize:vertical;outline:none;" oninput="procesarPegadoVenta()"></textarea></div>
+          <div><label style="font-size:11px;font-weight:700;color:var(--t2);display:block;margin-bottom:4px;">⚖️ Pesos en kg (uno por línea)</label><textarea id="vPastePesos" rows="10" placeholder="489" style="width:100%;background:var(--card2);border:1px solid var(--brd);color:var(--text);padding:8px;border-radius:5px;font-size:11px;font-family:monospace;resize:vertical;outline:none;" oninput="procesarPegadoVenta()"></textarea></div>
+        </div>
       </div>
       <div id="vXlsPrev" style="grid-column:1/-1;font-size:12px;"></div>
     </div></div>
@@ -5300,7 +5356,7 @@ showPg = function(id) { _origShowPg2(id); if(id==='movimientos') renderMovimient
       <div class="fm"><label>Tipo Animal</label><select id="evTipo"><option value="">—</option><option value="INVERNADA">INVERNADA</option><option value="CRIA-REPRODUCTORES">CRIA-REPRODUCTORES</option></select></div>
       <div class="fm"><label>Municipio</label><input id="evMun" type="text"></div>
       <div class="fm"><label>Mercado</label><select id="evMercado"><option value="">—</option><option value="EXPORTACION">EXPORTACIÓN</option><option value="NACIONAL">NACIONAL</option></select></div>
-      <div class="fm"><label>Tipo Destino</label><select id="evTipoDestino" onchange="toggleEditVenta()"><option value="">—</option><option value="FRIGORIFICO">FRIGORÍFICO</option><option value="PRIVADO">PRIVADO</option></select></div>
+      <div class="fm"><label>Tipo Destino</label><select id="evTipoDestino" onchange="toggleEditVenta()"><option value="">—</option><option value="FRIGORIFICO">🏭 Frigorífico</option><option value="PRIVADO">🤝 Privado</option><option value="REMATE">🔨 Centro de Remate</option><option value="OTRO">📝 Otro</option></select></div>
       <div class="fm" id="evFrigWrap" style="display:none;"><label>Frigorífico</label><select id="evFrigorifico"><option value="">—</option><option value="BFC S.A.">BFC S.A.</option><option value="FRIGOR S.A.">FRIGOR S.A.</option><option value="FRIGOSI S.A.">FRIGOSI S.A.</option><option value="FRIDOSA">FRIDOSA</option></select></div>
       <div class="fm" id="evPrivWrap" style="display:none;"><label>Comprador</label><input id="evDestino" type="text"></div>
     </div></div>
