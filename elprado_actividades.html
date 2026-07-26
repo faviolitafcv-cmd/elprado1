@@ -5406,9 +5406,17 @@ function renderCampo() {
     a.actividad === 'MATERIA SECA' && a.fechaIng && a.lote
   );
 
-  // Usar grupos configurados en Configuración
+  // Usar grupos configurados en Configuración + grupos reales de Inventario (grupos_resumen)
+  // Esto evita que un grupo con animales activos (ej. "TOR. CRIA CABEZA") quede
+  // fuera de la tabla de Campo solo porque no fue agregado a mano en Configuración.
+  if (!window._gruposInventario) {
+    // Aún no se cargó desde Firebase: disparar carga y re-renderizar cuando llegue.
+    cargarGruposDesdeInventario().then(() => renderCampo());
+  }
   const gruposConfig = getGrupos();
-  const lotes = gruposConfig.map(g => g.nombre);
+  const nombresConfig = gruposConfig.map(g => g.nombre);
+  const nombresInventario = (window._gruposInventario || []).map(g => g.nombre);
+  const lotes = [...new Set([...nombresConfig, ...nombresInventario])];
 
   const thead = document.getElementById('campoHead');
   const tbody = document.getElementById('campoBody');
