@@ -4215,7 +4215,10 @@ function sortVA(f){if(vaSortField===f)vaSortDir*=-1;else{vaSortField=f;vaSortDir
 
 function openV(){
   ['vPasteIdes','vPasteIdes','vPastePesos'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  _ventaAnimales=[];_cuentasVenta=[];window._ventaNoEnc=[];
+  _ventaAnimales=[];_cuentasVenta=[];window._ventaNoEnc=[];_ventaCatCfg={};
+  const cb=document.getElementById('vCatBreakdown');if(cb)cb.innerHTML='';
+  const secK=document.getElementById('vSecKilos');if(secK)secK.style.display='contents';
+  const secP=document.getElementById('vSecPrecio');if(secP)secP.style.display='contents';
   ['vF2','vDest','vMun','vComNombre','vFrigorifico','vFrigorificoOtro'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   ['vMercado','vTipoDestino','vTipo'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   ['vKgBruto','vPrecBruto','vComPrecio','vTransporte','vPrecKgInput'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
@@ -4280,7 +4283,278 @@ function procesarPegadoVenta(){
   }
   prev+='</div>';
   const el=document.getElementById('vXlsPrev');if(el)el.innerHTML=prev;
-  const kb=document.getElementById('vKgBruto');if(kb){kb.value=kgTot.toFixed(1);calcVenta();}
+  const kb=document.getElementById('vKgBruto');if(kb)kb.value=kgTot.toFixed(1);
+  renderVentaCatBreakdown();
+}
+
+// ═══ DESGLOSE DE VENTA POR CATEGORÍA ═══
+let _ventaCatCfg = {}; // { CATEGORIA: {desbastePct, modo:'porkg'|'total', precKg, precioTotal} }
+
+function agruparVentaPorCategoria(){
+  const g={};
+  _ventaAnimales.forEach(a=>{
+    const cat=a.categoria||'SIN CATEGORÍA';
+    if(!g[cat]) g[cat]=[];
+    g[cat].push(a);
+  });
+  return g;
+}
+
+function _catSlug(cat){ return cat.replace(/[^a-zA-Z0-9]/g,'_'); }
+
+function calcVentaAny(){
+  const cats=Object.keys(_ventaCatCfg);
+  if(cats.length) calcVentaGranTotal(); else calcVenta();
+}
+
+function renderVentaCatBreakdown(){
+  const cont=document.getElementById('vCatBreakdown');
+  if(!cont) return;
+  const grupos=agruparVentaPorCategoria();
+  const cats=Object.keys(grupos);
+  const secK=document.getElementById('vSecKilos');
+  const secP=document.getElementById('vSecPrecio');
+  if(secK) secK.style.display = cats.length? 'none':'contents';
+  if(secP) secP.style.display = cats.length? 'none':'contents';
+  if(!cats.length){ cont.innerHTML=''; _ventaCatCfg={}; return; }
+  // Preservar configuración de categorías que siguen presentes; descartar las que ya no están.
+  const nuevaCfg={};
+  cats.forEach(cat=>{ nuevaCfg[cat]=_ventaCatCfg[cat]||{desbastePct:0,modo:'porkg',precKg:0,precioTotal:0}; });
+  _ventaCatCfg=nuevaCfg;
+  let html='<div class="sep" style="grid-column:1/-1;">Desglose por Categoría</div>';
+  cats.forEach(cat=>{
+    const arr=grupos[cat];
+    const kgBruto=arr.reduce((s,a)=>s+(a.peso||0),0);
+    const cfg=_ventaCatCfg[cat];
+    const slug=_catSlug(cat);
+    html+=`<div class="fm full" style="grid-column:1/-1;background:rgba(109,186,58,.05);border-radius:8px;padding:12px;margin-bottom:8px;">
+      <div style="font-weight:700;color:var(--gold);margin-bottom:8px;">${cat} — ${arr.length} cabeza${arr.length!==1?'s':''} · ${kgBruto.toFixed(1)} kg brutos</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;">
+        <div class="fm"><label>Desbaste %</label><input type="number" step="0.1" min="0" max="20" value="${cfg.desbastePct}" oninput="updateVentaCat('${cat}','desbastePct',this.value)"></div>
+        <div class="fm"><label>Kg Netos</label><input readonly id="vCatKgNeto_${slug}" style="background:rgba(109,186,58,.1);color:var(--gr);font-weight:700;"></div>
+        <div class="fm"><label>Modo de precio</label>
+          <select onchange="updateVentaCat('${cat}','modo',this.value)">
+            <option value="porkg" ${cfg.modo==='porkg'?'selected':''}>Bs/kg</option>
+            <option value="total" ${cfg.modo==='total'?'selected':''}>Monto total Bs</option>
+          </select>
+        </div>
+        <div class="fm">
+          <label>${cfg.modo==='total'?'Monto Total Bs':'Bs/kg'}</label>
+          <input type="number" step="0.01" value="${cfg.modo==='total'?(cfg.precioTotal||''):(cfg.precKg||'')}" oninput="updateVentaCat('${cat}','${cfg.modo==='total'?'precioTotal':'precKg'}',this.value)">
+        </div>
+        <div class="fm"><label>Total Bs (categoría)</label><input readonly id="vCatTotalBs_${slug}" style="background:rgba(109,186,58,.1);color:var(--gr);font-weight:700;"></div>
+        <div class="fm"><label>Bs/kg efectivo</label><input readonly id="vCatPrecEf_${slug}" style="background:rgba(109,186,58,.1);color:var(--gr);"></div>
+      </div>
+    </div>`;
+  });
+  html+='<div class="fm full" id="vCatResumen" style="grid-column:1/-1;font-size:13px;font-weight:700;color:var(--gold);padding:8px 0;"></div>';
+  cont.innerHTML=html;
+  calcVentaGranTotal();
+}
+
+function updateVentaCat(cat, field, val){
+  if(!_ventaCatCfg[cat]) _ventaCatCfg[cat]={desbastePct:0,modo:'porkg',precKg:0,precioTotal:0};
+  if(field==='modo'){
+    _ventaCatCfg[cat].modo=val;
+    renderVentaCatBreakdown(); // reconstruye para cambiar la etiqueta/campo de precio
+    return;
+  }
+  _ventaCatCfg[cat][field]=parseFloat(val)||0;
+  calcVentaGranTotal();
+}
+
+function calcVentaCategoria(cat){
+  const grupos=agruparVentaPorCategoria();
+  const arr=grupos[cat]||[];
+  const kgBruto=arr.reduce((s,a)=>s+(a.peso||0),0);
+  const cfg=_ventaCatCfg[cat]||{desbastePct:0,modo:'porkg',precKg:0,precioTotal:0};
+  const kd=Math.round(kgBruto*(cfg.desbastePct||0)/100*10)/10;
+  const kgNeto=Math.round((kgBruto-kd)*10)/10;
+  let totalBs=0,precEf=0;
+  if(cfg.modo==='total'){ totalBs=cfg.precioTotal||0; precEf=kgNeto>0?totalBs/kgNeto:0; }
+  else { precEf=cfg.precKg||0; totalBs=Math.round(kgNeto*precEf*100)/100; }
+  const slug=_catSlug(cat);
+  const elN=document.getElementById('vCatKgNeto_'+slug); if(elN) elN.value=kgNeto.toFixed(1)+' kg';
+  const elT=document.getElementById('vCatTotalBs_'+slug); if(elT) elT.value='Bs '+totalBs.toLocaleString('es-BO',{minimumFractionDigits:2});
+  const elP=document.getElementById('vCatPrecEf_'+slug); if(elP) elP.value='Bs '+precEf.toFixed(4)+'/kg';
+  return {kgBruto,kgNeto,totalBs,precEf,cabezas:arr.length,desbastePct:cfg.desbastePct||0};
+}
+
+function calcVentaGranTotal(){
+  const cats=Object.keys(_ventaCatCfg);
+  if(!cats.length) return;
+  let kgBrutoTot=0,kgNetoTot=0,brutoBsTot=0;
+  cats.forEach(cat=>{
+    const r=calcVentaCategoria(cat);
+    kgBrutoTot+=r.kgBruto; kgNetoTot+=r.kgNeto; brutoBsTot+=r.totalBs;
+  });
+  // Sincronizar campos agregados (ocultos) para que el resto del sistema (guardar, imprimir) los siga usando
+  const kb=document.getElementById('vKgBruto'); if(kb) kb.value=kgBrutoTot.toFixed(1);
+  const kn=document.getElementById('vKgNeto'); if(kn) kn.value=kgNetoTot.toFixed(1)+' kg netos';
+  const pbc=document.getElementById('vPrecBrutoCalc'); if(pbc) pbc.value='Bs '+brutoBsTot.toLocaleString('es-BO',{minimumFractionDigits:2});
+  const com=parseFloat(document.getElementById('vComPrecio')?.value)||0;
+  const tr=parseFloat(document.getElementById('vTransporte')?.value)||0;
+  const total=Math.round((brutoBsTot-com-tr)*100)/100;
+  const vtc=document.getElementById('vTotalCobrar'); if(vtc) vtc.value='Bs '+total.toLocaleString('es-BO',{minimumFractionDigits:2});
+  const pk2=kgNetoTot>0?total/kgNetoTot:0;
+  const vpk=document.getElementById('vPrecKg'); if(vpk) vpk.value='Bs '+pk2.toFixed(4)+'/kg neto';
+  const resumen=document.getElementById('vCatResumen');
+  if(resumen) resumen.innerHTML='TOTAL: '+kgBrutoTot.toFixed(1)+' kg brutos → '+kgNetoTot.toFixed(1)+' kg netos · Bs '+brutoBsTot.toLocaleString('es-BO',{minimumFractionDigits:2})+' bruto · <span style="color:var(--gr);">Bs '+total.toLocaleString('es-BO',{minimumFractionDigits:2})+' a cobrar</span> (tras comisión/transporte)';
+}
+
+// ═══ LIQUIDAR VENTA (cargar precio de una venta ya registrada sin liquidar) ═══
+let _liquidarVentaId=null;
+let _liquidarGrupos={}; // { CATEGORIA: [{ide,pesoVenta}, ...] } — kg ya fijos (desbaste ya aplicado al registrar)
+let _liquidarCatCfg={};
+
+function liquidarVenta(vId){
+  if(sessionStorage.getItem('ep_rol')!=='ADMIN'){ntf('Solo el administrador puede liquidar ventas',true);return;}
+  const v=ventas.find(x=>x.id===vId);
+  if(!v){ntf('Venta no encontrada',true);return;}
+  _liquidarVentaId=vId;
+  const bjs=bajas.filter(b=>b.ventaId===vId&&b.tipo==='VENTA');
+  if(!bjs.length){ntf('Esta venta no tiene animales registrados',true);return;}
+  _liquidarGrupos={};
+  bjs.forEach(b=>{
+    const cat=b.categoriaAnimal||'SIN CATEGORÍA';
+    if(!_liquidarGrupos[cat])_liquidarGrupos[cat]=[];
+    _liquidarGrupos[cat].push({ide:b.ide,pesoVenta:b.pesoVenta||0,bid:b.id});
+  });
+  // Si ya se había liquidado antes (re-editar), precargar los valores previos por categoría.
+  _liquidarCatCfg={};
+  if(v.categorias&&v.categorias.length){
+    v.categorias.forEach(c=>{
+      _liquidarCatCfg[c.categoria]={modo:c.modo||'porkg',precKg:c.modo==='total'?0:(c.precioKgEfectivo||0),precioTotal:c.modo==='total'?(c.totalBs||0):0};
+    });
+  }
+  document.getElementById('lvComNombre').value=v.comisionista||'';
+  document.getElementById('lvComPrecio').value=v.precioComision||0;
+  document.getElementById('lvTransporte').value=v.transporte||0;
+  document.getElementById('lvInfo').innerHTML='<b style="color:var(--gold);">'+v.codigo+'</b> — '+v.destino+' · '+(v.cabezasRegistradas||bjs.length)+' cabezas · '+(v.kgTotal||0).toFixed(1)+' kg netos ya registrados (fijos)';
+  renderLiquidarCatBreakdown();
+  document.getElementById('moLiquidarV').classList.add('open');
+}
+
+function renderLiquidarCatBreakdown(){
+  const cont=document.getElementById('lvCatBreakdown');
+  if(!cont)return;
+  const cats=Object.keys(_liquidarGrupos);
+  const nuevaCfg={};
+  cats.forEach(cat=>{ nuevaCfg[cat]=_liquidarCatCfg[cat]||{modo:'porkg',precKg:0,precioTotal:0}; });
+  _liquidarCatCfg=nuevaCfg;
+  let html='<div class="sep" style="grid-column:1/-1;">Precio por Categoría</div>';
+  cats.forEach(cat=>{
+    const arr=_liquidarGrupos[cat];
+    const kgNeto=arr.reduce((s,a)=>s+(a.pesoVenta||0),0);
+    const cfg=_liquidarCatCfg[cat];
+    const slug=_catSlug(cat);
+    html+=`<div class="fm full" style="grid-column:1/-1;background:rgba(109,186,58,.05);border-radius:8px;padding:12px;margin-bottom:8px;">
+      <div style="font-weight:700;color:var(--gold);margin-bottom:8px;">${cat} — ${arr.length} cabeza${arr.length!==1?'s':''} · ${kgNeto.toFixed(1)} kg netos</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;">
+        <div class="fm"><label>Modo de precio</label>
+          <select onchange="updateLiquidarCat('${cat}','modo',this.value)">
+            <option value="porkg" ${cfg.modo==='porkg'?'selected':''}>Bs/kg</option>
+            <option value="total" ${cfg.modo==='total'?'selected':''}>Monto total Bs</option>
+          </select>
+        </div>
+        <div class="fm">
+          <label>${cfg.modo==='total'?'Monto Total Bs':'Bs/kg'}</label>
+          <input type="number" step="0.01" value="${cfg.modo==='total'?(cfg.precioTotal||''):(cfg.precKg||'')}" oninput="updateLiquidarCat('${cat}','${cfg.modo==='total'?'precioTotal':'precKg'}',this.value)">
+        </div>
+        <div class="fm"><label>Total Bs (categoría)</label><input readonly id="lvCatTotalBs_${slug}" style="background:rgba(109,186,58,.1);color:var(--gr);font-weight:700;"></div>
+        <div class="fm"><label>Bs/kg efectivo</label><input readonly id="lvCatPrecEf_${slug}" style="background:rgba(109,186,58,.1);color:var(--gr);"></div>
+      </div>
+    </div>`;
+  });
+  html+='<div class="fm full" id="lvCatResumen" style="grid-column:1/-1;font-size:13px;font-weight:700;color:var(--gold);padding:8px 0;"></div>';
+  cont.innerHTML=html;
+  calcLiquidarGranTotal();
+}
+
+function updateLiquidarCat(cat, field, val){
+  if(!_liquidarCatCfg[cat])_liquidarCatCfg[cat]={modo:'porkg',precKg:0,precioTotal:0};
+  if(field==='modo'){
+    _liquidarCatCfg[cat].modo=val;
+    renderLiquidarCatBreakdown();
+    return;
+  }
+  _liquidarCatCfg[cat][field]=parseFloat(val)||0;
+  calcLiquidarGranTotal();
+}
+
+function calcLiquidarCategoria(cat){
+  const arr=_liquidarGrupos[cat]||[];
+  const kgNeto=arr.reduce((s,a)=>s+(a.pesoVenta||0),0);
+  const cfg=_liquidarCatCfg[cat]||{modo:'porkg',precKg:0,precioTotal:0};
+  let totalBs=0,precEf=0;
+  if(cfg.modo==='total'){ totalBs=cfg.precioTotal||0; precEf=kgNeto>0?totalBs/kgNeto:0; }
+  else { precEf=cfg.precKg||0; totalBs=Math.round(kgNeto*precEf*100)/100; }
+  const slug=_catSlug(cat);
+  const elT=document.getElementById('lvCatTotalBs_'+slug); if(elT) elT.value='Bs '+totalBs.toLocaleString('es-BO',{minimumFractionDigits:2});
+  const elP=document.getElementById('lvCatPrecEf_'+slug); if(elP) elP.value='Bs '+precEf.toFixed(4)+'/kg';
+  return {kgNeto,totalBs,precEf,cabezas:arr.length};
+}
+
+function calcLiquidarGranTotal(){
+  const cats=Object.keys(_liquidarGrupos);
+  if(!cats.length)return;
+  let kgNetoTot=0,brutoBsTot=0;
+  cats.forEach(cat=>{ const r=calcLiquidarCategoria(cat); kgNetoTot+=r.kgNeto; brutoBsTot+=r.totalBs; });
+  const com=parseFloat(document.getElementById('lvComPrecio')?.value)||0;
+  const tr=parseFloat(document.getElementById('lvTransporte')?.value)||0;
+  const total=Math.round((brutoBsTot-com-tr)*100)/100;
+  const vtc=document.getElementById('lvTotalCobrar'); if(vtc) vtc.value='Bs '+total.toLocaleString('es-BO',{minimumFractionDigits:2});
+  const resumen=document.getElementById('lvCatResumen');
+  if(resumen) resumen.innerHTML='TOTAL: '+kgNetoTot.toFixed(1)+' kg netos · Bs '+brutoBsTot.toLocaleString('es-BO',{minimumFractionDigits:2})+' bruto · <span style="color:var(--gr);">Bs '+total.toLocaleString('es-BO',{minimumFractionDigits:2})+' a cobrar</span> (tras comisión/transporte)';
+}
+
+async function guardarLiquidarVenta(){
+  if(sessionStorage.getItem('ep_rol')!=='ADMIN'){ntf('Solo el administrador puede liquidar ventas',true);return;}
+  const vId=_liquidarVentaId;
+  const v=ventas.find(x=>x.id===vId);
+  if(!v){ntf('Venta no encontrada',true);return;}
+  const cats=Object.keys(_liquidarCatCfg);
+  const catCalc={};
+  let kgNetoTot=0,brutoBsTot=0,catResumen=[];
+  cats.forEach(cat=>{
+    const r=calcLiquidarCategoria(cat);
+    catCalc[cat]=r;
+    kgNetoTot+=r.kgNeto; brutoBsTot+=r.totalBs;
+    catResumen.push({categoria:cat,cabezas:r.cabezas,kgNeto:r.kgNeto,modo:_liquidarCatCfg[cat].modo,totalBs:r.totalBs,precioKgEfectivo:r.precEf});
+  });
+  if(brutoBsTot<=0){ntf('Ingresá el precio de al menos una categoría',true);return;}
+  const com=parseFloat(document.getElementById('lvComPrecio')?.value)||0;
+  const trans=parseFloat(document.getElementById('lvTransporte')?.value)||0;
+  const comNom=document.getElementById('lvComNombre')?.value.trim()||'';
+  const totalCobrar=Math.round((brutoBsTot-com-trans)*100)/100;
+  const precKg=kgNetoTot>0?totalCobrar/kgNetoTot:0;
+  const factorAjuste=brutoBsTot>0?totalCobrar/brutoBsTot:1;
+  const btn=document.getElementById('btnLiquidarV');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Guardando...';}
+  const updates={};
+  updates['ventas/'+vId+'/precioBruto']=brutoBsTot;
+  updates['ventas/'+vId+'/comisionista']=comNom||null;
+  updates['ventas/'+vId+'/precioComision']=com;
+  updates['ventas/'+vId+'/transporte']=trans;
+  updates['ventas/'+vId+'/totalCobrar']=totalCobrar;
+  updates['ventas/'+vId+'/precioKg']=precKg;
+  updates['ventas/'+vId+'/categorias']=catResumen;
+  updates['ventas/'+vId+'/liquidada']=true;
+  Object.keys(_liquidarGrupos).forEach(cat=>{
+    const cc=catCalc[cat];
+    _liquidarGrupos[cat].forEach(a=>{
+      const precA=Math.round((a.pesoVenta||0)*cc.precEf*factorAjuste*100)/100;
+      updates['bajas/'+a.bid+'/precioVenta']=precA;
+    });
+  });
+  try{
+    await fbPatch('',updates);
+    Object.assign(v,{precioBruto:brutoBsTot,comisionista:comNom||null,precioComision:com,transporte:trans,totalCobrar,precioKg:precKg,categorias:catResumen,liquidada:true});
+    bajas.forEach(b=>{ if(b.ventaId===vId&&updates['bajas/'+b.id+'/precioVenta']!==undefined) b.precioVenta=updates['bajas/'+b.id+'/precioVenta']; });
+    cerrar('moLiquidarV');renderDash();renderV();
+    ntf('✅ Venta '+v.codigo+' liquidada — Bs '+fmt(totalCobrar));
+  }catch(e){ntf('Error: '+e.message,true);}
+  finally{if(btn){btn.disabled=false;btn.textContent='💵 Guardar Liquidación';}}
 }
 
 function calcVenta(){
@@ -4315,21 +4589,42 @@ async function saveVenta(){
   const com=parseFloat(document.getElementById('vComPrecio')?.value)||0;
   const trans=parseFloat(document.getElementById('vTransporte')?.value)||0;
   const comNom=document.getElementById('vComNombre')?.value.trim()||'';
-  const kgBruto=parseFloat(document.getElementById('vKgBruto')?.value)||0;
-  const desbPct=parseFloat(document.getElementById('vDesbaste')?.value)||0;
-  const kgNeto=Math.round((kgBruto-kgBruto*desbPct/100)*10)/10;
-  const modo=document.querySelector('input[name="vModoPrice"]:checked')?.value||'porkg';
-  let bruto=0,frigorifico='',dest='';
-  if(modo==='porkg'){const pk=parseFloat(document.getElementById('vPrecKgInput')?.value)||0;bruto=Math.round(kgNeto*pk*100)/100;}
-  else{bruto=parseFloat(document.getElementById('vPrecBruto')?.value)||0;}
+
+  const catsActivas=Object.keys(_ventaCatCfg);
+  const usaCategorias=catsActivas.length>0;
+
+  let kgBruto=0,kgNeto=0,bruto=0,desbPct=0,catResumen=[];
+  const catCalc={}; // por categoría: {kgBruto,kgNeto,totalBs,precEf,desbastePct}
+  if(usaCategorias){
+    catsActivas.forEach(cat=>{
+      const r=calcVentaCategoria(cat);
+      catCalc[cat]=r;
+      kgBruto+=r.kgBruto; kgNeto+=r.kgNeto; bruto+=r.totalBs;
+      catResumen.push({categoria:cat,cabezas:r.cabezas,kgBruto:r.kgBruto,kgNeto:r.kgNeto,
+        desbastePct:r.desbastePct,modo:_ventaCatCfg[cat].modo,totalBs:r.totalBs,precioKgEfectivo:r.precEf});
+    });
+    desbPct=kgBruto>0?Math.round((1-kgNeto/kgBruto)*1000)/10:0; // % promedio ponderado, solo informativo
+  } else {
+    kgBruto=parseFloat(document.getElementById('vKgBruto')?.value)||0;
+    desbPct=parseFloat(document.getElementById('vDesbaste')?.value)||0;
+    kgNeto=Math.round((kgBruto-kgBruto*desbPct/100)*10)/10;
+    const modo=document.querySelector('input[name="vModoPrice"]:checked')?.value||'porkg';
+    if(modo==='porkg'){const pk=parseFloat(document.getElementById('vPrecKgInput')?.value)||0;bruto=Math.round(kgNeto*pk*100)/100;}
+    else{bruto=parseFloat(document.getElementById('vPrecBruto')?.value)||0;}
+  }
+
+  let frigorifico='',dest='';
   if(tipoDestino==='FRIGORIFICO'){frigorifico=document.getElementById('vFrigorifico')?.value||'';if(frigorifico==='OTRO')frigorifico=document.getElementById('vFrigorificoOtro')?.value.trim()||'';dest=frigorifico;}
   else if(tipoDestino==='REMATE'){dest=document.getElementById('vRemate')?.value.trim()||'';}
   else if(tipoDestino==='OTRO'){dest=document.getElementById('vOtro')?.value.trim()||'';}
   else{dest=document.getElementById('vDest')?.value.trim()||'';}
-  if(!fecha||!dest||bruto<=0){ntf('Completá fecha, destino y precio',true);return;}
+  if(!fecha||!dest){ntf('Completá fecha y destino',true);return;}
   if(!_ventaAnimales.length){ntf('Subí el Excel de la balanza',true);return;}
+  const liquidada=bruto>0;
   const totalCobrar=Math.round((bruto-com-trans)*100)/100;
   const precKg=kgNeto>0?totalCobrar/kgNeto:0;
+  // Factor de prorrateo de comisión/transporte, para repartirlo entre categorías sin romper el total.
+  const factorAjuste=bruto>0?totalCobrar/bruto:1;
   const noEnc=window._ventaNoEnc||[];
   const pesoProm=_ventaAnimales.length>0?kgNeto/_ventaAnimales.length:0;
   const cabTot=_ventaAnimales.length+noEnc.length;
@@ -4347,31 +4642,44 @@ async function saveVenta(){
     kgFaltantes:kgFalt,bsFaltantes:bsFalt,animalesFaltantes:noEnc.length,
     idesFaltantes:noEnc.length>0?noEnc:[],pesoProm:Math.round(pesoProm*10)/10,
     precioBruto:bruto,comisionista:comNom||null,precioComision:com,
-    transporte:trans,totalCobrar,precioKg:precKg,estado,usuario};
+    transporte:trans,totalCobrar,precioKg:precKg,estado,usuario,liquidada,
+    categorias:usaCategorias?catResumen:null};
   const updates={};updates['ventas/'+vId]=ventaObj;
   for(const a of _ventaAnimales){
-    const precA=Math.round(a.peso*precKg*100)/100;
+    let precA,pesoVenta,catAnimal=null,desbAnimal=0;
+    if(usaCategorias){
+      catAnimal=a.categoria||'SIN CATEGORÍA';
+      const cc=catCalc[catAnimal]||{precEf:precKg,desbastePct:0};
+      desbAnimal=cc.desbastePct||0;
+      pesoVenta=Math.round(a.peso*(1-desbAnimal/100)*10)/10;
+      precA=Math.round(pesoVenta*cc.precEf*factorAjuste*100)/100;
+    } else {
+      pesoVenta=a.peso;
+      precA=Math.round(a.peso*precKg*100)/100;
+    }
     const bid='b_'+a.ide+'_'+fecha.replace(/-/g,'');
-    updates['animales/'+a.ide+'/estado']='EN VENTA';
+    updates['animales/'+a.ide+'/estado']='VENDIDO';
     updates['animales/'+a.ide+'/ventaId']=vId;
     updates['bajas/'+bid]={id:bid,ide:a.ide,tipo:'VENTA',fecha,
-      pesoVenta:a.peso,precioVenta:precA,destino:dest,ventaId:vId,
+      pesoVenta,precioVenta:precA,destino:dest,ventaId:vId,
       categoriaAnimal:animales[a.ide]?.categoria||null,
       grupoAnimal:animales[a.ide]?.grupo||null,
       origenAnimal:animales[a.ide]?.origen||null,usuario};
-    if(animales[a.ide]){animales[a.ide].estado='EN VENTA';animales[a.ide].ventaId=vId;}
+    if(animales[a.ide]){animales[a.ide].estado='VENDIDO';animales[a.ide].ventaId=vId;}
   }
   try{
     await fbPatch('',updates);
     ventas.unshift(ventaObj);
     cerrar('moV2');renderDash();renderA();renderV();
     if(estado==='ABIERTA')ntf('⚠️ Venta '+codigo+' ABIERTA — faltan '+noEnc.length+' animales',true);
+    else if(!liquidada)ntf('✅ Venta '+codigo+' registrada — animales dados de baja. ⏳ Falta liquidar el precio');
     else ntf('✅ Venta '+codigo+' cerrada — '+_ventaAnimales.length+' animales');
   }catch(e){ntf('Error: '+e.message,true);}
   finally{if(btn){btn.disabled=false;btn.textContent='💰 Registrar Venta';}}
 }
 
 async function eliminarVenta(vId){
+  if(sessionStorage.getItem('ep_rol')!=='ADMIN'){ntf('Solo el administrador puede eliminar ventas',true);return;}
   const v=ventas.find(x=>x.id===vId);
   if(!v){ntf('Venta no encontrada',true);return;}
   if(!confirm('¿Eliminar venta '+v.codigo+'? Los animales volverán a ACTIVO.')) return;
@@ -4397,6 +4705,7 @@ function renderV(){
     const eBg=est==='ABIERTA'?'rgba(255,150,0,.15)':'rgba(109,186,58,.15)';
     const cab=v.cabezasRegistradas||v.cabezas||'—';
     const cabT=v.cabezasTotales||v.cabezas||'—';
+    const pendienteLiq=v.liquidada===false;
     return`<tr>
       <td class="mn" style="font-size:11px;font-weight:700;color:var(--gold);">${v.codigo||'—'}</td>
       <td class="mn" style="font-size:11px;">${fmtFecha(v.fecha)}</td>
@@ -4405,13 +4714,17 @@ function renderV(){
       <td style="font-size:11px;">${v.tipo||'—'}</td>
       <td class="mn tg">${cab}${cabT!==cab?'<span style="font-size:9px;color:var(--t3);">/'+cabT+'</span>':''}</td>
       <td class="mn">${v.kgTotal?Math.round(v.kgTotal)+' kg':'—'}${v.kgFaltantes?'<span style="font-size:9px;color:#f90;"> -'+v.kgFaltantes+'</span>':''}</td>
-      <td class="mn tgo">Bs ${fmt(v.totalCobrar||0)}</td>
+      <td class="mn tgo">${pendienteLiq?'<span style="color:var(--t3);">—</span>':'Bs '+fmt(v.totalCobrar||0)}</td>
       <td class="mn">${v.precioKg?'Bs '+Number(v.precioKg).toFixed(2):'—'}</td>
-      <td><span style="font-size:10px;padding:2px 8px;border-radius:4px;background:${eBg};color:${eCol};font-weight:700;">${est}</span></td>
+      <td>
+        <span style="font-size:10px;padding:2px 8px;border-radius:4px;background:${eBg};color:${eCol};font-weight:700;">${est}</span>
+        ${pendienteLiq?'<br><span style="font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(255,150,0,.15);color:#f90;font-weight:700;display:inline-block;margin-top:3px;">⏳ Pendiente de liquidar</span>':''}
+      </td>
       <td style="white-space:nowrap;">
-        <button class="btn bs btn-sm" style="border-color:var(--gold);color:var(--gold);" onclick="editarVenta('${v.id}')">✏️</button>
+        ${(pendienteLiq&&sessionStorage.getItem('ep_rol')==='ADMIN')?`<button class="btn bs btn-sm" style="border-color:#f90;color:#f90;" onclick="liquidarVenta('${v.id}')">💵</button>`:''}
+        ${sessionStorage.getItem('ep_rol')==='ADMIN'?`<button class="btn bs btn-sm" style="border-color:var(--gold);color:var(--gold);" onclick="editarVenta('${v.id}')">✏️</button>`:''}
         ${est==='ABIERTA'?`<button class="btn bs btn-sm" style="border-color:#f90;color:#f90;" onclick="completarVenta('${v.id}')">➕</button>`:''}
-        <button class="btn bd btn-sm" onclick="eliminarVenta('${v.id}')">✕</button>
+        ${sessionStorage.getItem('ep_rol')==='ADMIN'?`<button class="btn bd btn-sm" onclick="eliminarVenta('${v.id}')">✕</button>`:''}
       </td>
     </tr>`;
   }).join('');
@@ -4639,6 +4952,7 @@ async function confirmarImportVH(){
 
 // ═══ EDITAR VENTA ═══
 function editarVenta(vId){
+  if(sessionStorage.getItem('ep_rol')!=='ADMIN'){ntf('Solo el administrador puede editar ventas',true);return;}
   const v=ventas.find(x=>x.id===vId);if(!v){ntf('Venta no encontrada',true);return;}
   document.getElementById('evCodigo').value=v.codigo||'';
   document.getElementById('evFecha').value=fechaParaInput(v.fecha)||'';
@@ -4659,6 +4973,7 @@ function toggleEditVenta(){
   if(pw)pw.style.display=td==='PRIVADO'?'':'none';
 }
 async function guardarEditVenta(){
+  if(sessionStorage.getItem('ep_rol')!=='ADMIN'){ntf('Solo el administrador puede editar ventas',true);return;}
   const vId=document.getElementById('moEditV').dataset.vid;
   const v=ventas.find(x=>x.id===vId);if(!v){ntf('Error',true);return;}
   const fecha=document.getElementById('evFecha').value;
@@ -5344,10 +5659,13 @@ showPg = function(id) { _origShowPg2(id); if(id==='movimientos') renderMovimient
       <div class="fm" id="vPrivadoWrap" style="display:none;"><label>Comprador *</label><input id="vDest" type="text" placeholder="Nombre del comprador"></div>
       <div class="fm" id="vRemateWrap" style="display:none;"><label>Centro de Remate *</label><input id="vRemate" type="text" placeholder="Nombre del centro de remate"></div>
       <div class="fm" id="vOtroWrap" style="display:none;"><label>Descripción *</label><input id="vOtro" type="text" placeholder="Describí el tipo de venta"></div>
+      <div id="vSecKilos" style="display:contents;">
       <div class="sep">Kilogramos</div>
       <div class="fm"><label>Kg Brutos *</label><input id="vKgBruto" type="number" step="0.1" oninput="calcVenta()"></div>
       <div class="fm"><label>Desbaste %</label><div style="display:flex;gap:6px;align-items:center;"><input id="vDesbaste" type="number" step="0.1" value="0" min="0" max="20" oninput="calcVenta()" style="width:80px;"><span style="font-size:12px;color:var(--t3);">% → <span id="vKgDesbaste" style="color:var(--gold);">0 kg</span></span></div></div>
       <div class="fm full"><label>Kg Netos</label><input id="vKgNeto" readonly style="background:rgba(109,186,58,.07);color:var(--gr);font-weight:700;"></div>
+      </div>
+      <div id="vSecPrecio" style="display:contents;">
       <div class="sep" style="grid-column:1/-1;">Precio</div>
       <div class="fm full" style="grid-column:1/-1;">
         <div style="display:flex;gap:12px;margin-bottom:8px;">
@@ -5360,9 +5678,11 @@ showPg = function(id) { _origShowPg2(id); if(id==='movimientos') renderMovimient
           <div class="fm"><label>Precio Bruto Calculado</label><input id="vPrecBrutoCalc" readonly style="background:rgba(109,186,58,.07);color:var(--gr);"></div>
         </div>
       </div>
+      </div>
+      <div id="vCatBreakdown" style="grid-column:1/-1;"></div>
       <div class="fm"><label>Comisionista</label><input id="vComNombre" type="text"></div>
-      <div class="fm"><label>Comisión (Bs)</label><input id="vComPrecio" type="number" step="0.01" value="0" oninput="calcVenta()"></div>
-      <div class="fm"><label>Transporte (Bs)</label><input id="vTransporte" type="number" step="0.01" value="0" oninput="calcVenta()"></div>
+      <div class="fm"><label>Comisión (Bs)</label><input id="vComPrecio" type="number" step="0.01" value="0" oninput="calcVentaAny()"></div>
+      <div class="fm"><label>Transporte (Bs)</label><input id="vTransporte" type="number" step="0.01" value="0" oninput="calcVentaAny()"></div>
       <div class="fm"><label>Total a Cobrar</label><input id="vTotalCobrar" readonly style="background:rgba(109,186,58,.1);font-weight:700;color:var(--gr);font-size:14px;"></div>
       <div class="fm"><label>Bs/kg neto</label><input id="vPrecKg" readonly style="background:rgba(109,186,58,.1);color:var(--gr);"></div>
       <div class="sep" style="grid-column:1/-1;">Animales — IDE y Peso</div>
@@ -5404,6 +5724,24 @@ showPg = function(id) { _origShowPg2(id); if(id==='movimientos') renderMovimient
       <div class="fm" id="evPrivWrap" style="display:none;"><label>Comprador</label><input id="evDestino" type="text"></div>
     </div></div>
     <div class="mf"><button class="btn bs" onclick="cerrar('moEditV')">Cancelar</button><button class="btn bp" onclick="guardarEditVenta()">💾 Guardar</button></div>
+  </div>
+</div>
+
+<!-- Modal: Completar Venta Abierta -->
+
+<!-- Modal: Liquidar Venta (cargar precio de una venta ya registrada sin liquidar) -->
+<div class="mo" id="moLiquidarV">
+  <div class="md md-lg" style="max-width:680px;">
+    <div class="mh"><div class="mt">💵 Liquidar Venta</div><button class="mc" onclick="cerrar('moLiquidarV')">✕</button></div>
+    <div class="mb"><div class="fg">
+      <div id="lvInfo" style="grid-column:1/-1;font-size:12px;color:var(--t3);margin-bottom:4px;"></div>
+      <div id="lvCatBreakdown" style="grid-column:1/-1;"></div>
+      <div class="fm"><label>Comisionista</label><input id="lvComNombre" type="text"></div>
+      <div class="fm"><label>Comisión (Bs)</label><input id="lvComPrecio" type="number" step="0.01" value="0" oninput="calcLiquidarGranTotal()"></div>
+      <div class="fm"><label>Transporte (Bs)</label><input id="lvTransporte" type="number" step="0.01" value="0" oninput="calcLiquidarGranTotal()"></div>
+      <div class="fm"><label>Total a Cobrar</label><input id="lvTotalCobrar" readonly style="background:rgba(109,186,58,.1);font-weight:700;color:var(--gr);font-size:14px;"></div>
+    </div></div>
+    <div class="mf"><button class="btn bs" onclick="cerrar('moLiquidarV')">Cancelar</button><button class="btn bp" id="btnLiquidarV" onclick="guardarLiquidarVenta()">💵 Guardar Liquidación</button></div>
   </div>
 </div>
 
