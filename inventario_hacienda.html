@@ -897,6 +897,10 @@ tr:hover td{background:rgba(109,186,58,.04);}
         <input type="number" id="simPrecRepos" step="0.5" min="0" placeholder="ej: 22"
           style="width:80px;background:var(--card3);color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:3px 8px;font-size:12px;"
           onchange="window._precRepos=parseFloat(this.value)||null;renderSimulador()">
+        <span style="font-size:11px;color:var(--t2);">Contar animales arriba de (kg):</span>
+        <input type="number" id="simPesoMin" step="5" min="0" placeholder="ej: 480"
+          style="width:80px;background:var(--card3);color:var(--teal);border:1px solid var(--teal);border-radius:4px;padding:3px 8px;font-size:12px;"
+          onchange="renderSimulador()">
       </div>
       <div style="font-size:11px;color:var(--t2);margin-bottom:6px;">Ajustá el precio de venta y la GMD esperada para cada momento — vienen precargados con el precio del grupo y la GMD histórica, pero podés cambiarlos para jugar con distintos escenarios (ej. si esperás que baje el precio en la seca, o que la GMD se achique).</div>
       <div style="overflow-x:auto;margin-bottom:12px;">
@@ -1574,6 +1578,7 @@ function renderSimulador(){
 
   // Calcular promedios reales del grupo
   let sumPesoH=0,nPH=0,sumGmd=0,nGmd=0,sumPesoIng=0,nPI=0,sumDias=0,nDias=0,sumPC=0,nPC=0;
+  const pesosIndividuales=[]; // peso HOY de cada animal, para poder proyectar y contar cabezas arriba de un umbral
   animGrupo.forEach(a=>{
     if(a.pesoIngreso){sumPesoIng+=a.pesoIngreso;nPI++;}
     if(a.precioCompra){sumPC+=a.precioCompra;nPC++;} // Solo se promedia sobre animales con precio de compra real cargado
@@ -1590,6 +1595,7 @@ function renderSimulador(){
           sumPesoH+=pH;nPH++;
           sumGmd+=gmdR;nGmd++;
           sumDias+=(dTot+dExt);nDias++;
+          pesosIndividuales.push(pH);
         }
       }
     }
@@ -1623,6 +1629,19 @@ function renderSimulador(){
   const peso30v = pesoH + gmd30*30;
   const peso60v = peso30v + gmd60*30;
   const peso90v = peso60v + gmd90*30;
+
+  // ─── Cabezas arriba del peso mínimo, por horizonte ───
+  // Proyecta el peso de CADA animal individual (no el promedio) con el mismo escenario de GMD del panel.
+  const pesoMinSim = parseFloat(document.getElementById('simPesoMin')?.value)||null;
+  let cabezasPorHorizonte=null;
+  if(pesoMinSim){
+    const cont0=pesosIndividuales.filter(p=>p>=pesoMinSim).length;
+    const cont30=pesosIndividuales.filter(p=>(p+gmd30*30)>=pesoMinSim).length;
+    const cont60=pesosIndividuales.filter(p=>(p+gmd30*30+gmd60*30)>=pesoMinSim).length;
+    const cont90=pesosIndividuales.filter(p=>(p+gmd30*30+gmd60*30+gmd90*30)>=pesoMinSim).length;
+    cabezasPorHorizonte={0:cont0,30:cont30,60:cont60,90:cont90};
+  }
+  const nConDatoPeso=pesosIndividuales.length; // animales con dato suficiente para proyectar (puede ser < cabezas totales)
 
   const horizontes = [
     {d:0,  label:'HOY',       peso:pesoH,  precVenta:precVenta},
@@ -1672,6 +1691,7 @@ function renderSimulador(){
       ind1,  // Rentabilidad diaria ajustada (repos)
       ind2,  // Rentabilidad diaria histórica (costo real) — null si no hay dato
       ind3,  // Eficiencia Bs/kg ganado (ajustada repos)
+      cabezasArriba: cabezasPorHorizonte?cabezasPorHorizonte[d]:null,
       col};
   });
 
@@ -1685,6 +1705,7 @@ function renderSimulador(){
       ${bsKgCompraReal!=null
         ?'ℹ️ El indicador ② usa el precio de compra real, promedio sobre <b style="color:var(--gold);">'+coberturaPC+'</b> animales del grupo que tienen ese dato cargado.'
         :'⚠️ Ningún animal de este grupo tiene precio de compra real cargado — el indicador ② no se muestra (no se inventa un valor).'}
+      ${pesoMinSim?'<br>ℹ️ El conteo de cabezas ≥ '+pesoMinSim+' kg se calcula sobre <b style="color:var(--teal);">'+nConDatoPeso+' de '+cabezas+'</b> animales del grupo que tienen pesaje suficiente para proyectar (el resto no tiene datos de peso registrados).':''}
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:16px;">
     ${filas.map(f=>`
@@ -1694,6 +1715,7 @@ function renderSimulador(){
         <div style="font-size:11px;color:var(--t2);margin-top:6px;">Peso: <b>${f.peso} kg</b> · <span style="color:var(--green);">+${f.kgGanados} kg gan.</span></div>
         <div style="font-size:11px;color:var(--t2);">Días en campo: <b>${f.diasTotal}</b></div>
         <div style="font-size:11px;color:var(--t2);">Ingreso venta: <b>Bs ${fmt(f.ingresos)}</b></div>
+        ${f.cabezasArriba!=null?`<div style="margin-top:4px;font-size:12px;color:var(--teal);font-weight:700;">→ ${f.cabezasArriba} de ${nConDatoPeso} animales ≥ ${pesoMinSim} kg</div>`:''}
         <div style="margin-top:6px;padding:5px 8px;background:var(--card3);border-radius:5px;font-size:11px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;">
           <div><span style="color:var(--t2);">P. compra real</span><br><b style="color:var(--gold);">${bsKgCompraReal?'Bs '+bsKgCompraReal+'/kg':'—'}</b></div>
           <div><span style="color:var(--t2);">P. reposición</span><br><b style="color:var(--gold);">${precRepos?'Bs '+precRepos+'/kg':'—'}</b></div>
