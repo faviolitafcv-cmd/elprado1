@@ -893,14 +893,38 @@ tr:hover td{background:rgba(109,186,58,.04);}
         <select id="simGrupo" onchange="precargarPrecioVentaGrupo();renderSimulador()" style="font-size:12px;">
           <option value="">— Seleccioná un grupo —</option>
         </select>
-        <span style="font-size:11px;color:var(--t2);">P. venta Bs/kg:</span>
-        <input type="number" id="simPrecVenta" step="0.5" min="0" placeholder="ej: 24"
-          style="width:80px;background:var(--card3);color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:3px 8px;font-size:12px;"
-          onchange="renderSimulador()">
         <span style="font-size:11px;color:var(--t2);">P. repos. Bs/kg:</span>
         <input type="number" id="simPrecRepos" step="0.5" min="0" placeholder="ej: 22"
           style="width:80px;background:var(--card3);color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:3px 8px;font-size:12px;"
           onchange="window._precRepos=parseFloat(this.value)||null;renderSimulador()">
+      </div>
+      <div style="font-size:11px;color:var(--t2);margin-bottom:6px;">Ajustá el precio de venta y la GMD esperada para cada momento — vienen precargados con el precio del grupo y la GMD histórica, pero podés cambiarlos para jugar con distintos escenarios (ej. si esperás que baje el precio en la seca, o que la GMD se achique).</div>
+      <div style="overflow-x:auto;margin-bottom:12px;">
+        <table style="width:100%;min-width:520px;">
+          <thead><tr>
+            <th style="font-size:11px;color:var(--t2);"></th>
+            <th style="font-size:11px;color:var(--red);text-align:center;">HOY</th>
+            <th style="font-size:11px;color:var(--gold);text-align:center;">30 días</th>
+            <th style="font-size:11px;color:var(--blue);text-align:center;">60 días</th>
+            <th style="font-size:11px;color:var(--green);text-align:center;">90 días</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td style="font-size:11px;color:var(--t2);">Precio venta Bs/kg</td>
+              <td style="text-align:center;"><input type="number" id="simPrecVenta" step="0.5" min="0" placeholder="ej: 24" style="width:75px;background:var(--card3);color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:3px 6px;font-size:12px;text-align:center;" onchange="renderSimulador()"></td>
+              <td style="text-align:center;"><input type="number" id="simPrecVenta30" step="0.5" min="0" placeholder="= hoy" style="width:75px;background:var(--card3);color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:3px 6px;font-size:12px;text-align:center;" onchange="renderSimulador()"></td>
+              <td style="text-align:center;"><input type="number" id="simPrecVenta60" step="0.5" min="0" placeholder="= hoy" style="width:75px;background:var(--card3);color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:3px 6px;font-size:12px;text-align:center;" onchange="renderSimulador()"></td>
+              <td style="text-align:center;"><input type="number" id="simPrecVenta90" step="0.5" min="0" placeholder="= hoy" style="width:75px;background:var(--card3);color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:3px 6px;font-size:12px;text-align:center;" onchange="renderSimulador()"></td>
+            </tr>
+            <tr>
+              <td style="font-size:11px;color:var(--t2);">GMD del tramo (kg/día)</td>
+              <td style="text-align:center;color:var(--t3);font-size:11px;">—</td>
+              <td style="text-align:center;"><input type="number" id="simGmd30" step="0.01" min="0" placeholder="hist." style="width:75px;background:var(--card3);color:var(--teal);border:1px solid var(--teal);border-radius:4px;padding:3px 6px;font-size:12px;text-align:center;" onchange="renderSimulador()"></td>
+              <td style="text-align:center;"><input type="number" id="simGmd60" step="0.01" min="0" placeholder="hist." style="width:75px;background:var(--card3);color:var(--teal);border:1px solid var(--teal);border-radius:4px;padding:3px 6px;font-size:12px;text-align:center;" onchange="renderSimulador()"></td>
+              <td style="text-align:center;"><input type="number" id="simGmd90" step="0.01" min="0" placeholder="hist." style="width:75px;background:var(--card3);color:var(--teal);border:1px solid var(--teal);border-radius:4px;padding:3px 6px;font-size:12px;text-align:center;" onchange="renderSimulador()"></td>
+            </tr>
+          </tbody>
+        </table>
       </div>
       <div id="simResultado"></div>
     </div>
@@ -1534,8 +1558,13 @@ function renderSimulador(){
   if(precRepos){window._precRepos=precRepos;const si=document.getElementById('simPrecRepos');if(si&&!si.value)si.value=precRepos;}
   const div = document.getElementById('simResultado');
   if(!g){div.innerHTML='<p style="color:var(--t2);font-size:12px;">Seleccioná un grupo para simular</p>';return;}
-  if(!precVenta){div.innerHTML='<p style="color:var(--t2);font-size:12px;">Ingresá el precio de venta Bs/kg</p>';return;}
+  if(!precVenta){div.innerHTML='<p style="color:var(--t2);font-size:12px;">Ingresá el precio de venta Bs/kg de HOY</p>';return;}
   if(!precRepos){div.innerHTML='<p style="color:var(--t2);font-size:12px;">Ingresá el precio de reposición arriba ↑</p>';return;}
+
+  // Precio de venta por horizonte: si no se cargó uno específico, usa el de HOY.
+  const precVenta30 = parseFloat(document.getElementById('simPrecVenta30')?.value)||precVenta;
+  const precVenta60 = parseFloat(document.getElementById('simPrecVenta60')?.value)||precVenta;
+  const precVenta90 = parseFloat(document.getElementById('simPrecVenta90')?.value)||precVenta;
 
   // Calcular datos del grupo directamente desde animales[]
   const hoy = new Date();
@@ -1547,7 +1576,7 @@ function renderSimulador(){
   let sumPesoH=0,nPH=0,sumGmd=0,nGmd=0,sumPesoIng=0,nPI=0,sumDias=0,nDias=0,sumPC=0,nPC=0;
   animGrupo.forEach(a=>{
     if(a.pesoIngreso){sumPesoIng+=a.pesoIngreso;nPI++;}
-    if(a.precioCompra){sumPC+=a.precioCompra;nPC++;}
+    if(a.precioCompra){sumPC+=a.precioCompra;nPC++;} // Solo se promedia sobre animales con precio de compra real cargado
     const lpa=lp[a.ide];
     if(lpa&&a.pesoIngreso&&a.fechaIngreso&&lpa.peso&&lpa.fecha){
       let fi=parseFecha(a.fechaIngreso);
@@ -1567,79 +1596,96 @@ function renderSimulador(){
   });
 
   const cabezas = animGrupo.length;
-  const gd = {
-    animales: animGrupo.map(a=>({ide:a.ide})),
-    n: cabezas
-  };
   // Usar los promedios calculados directamente
   const pesoH = nPH>0?sumPesoH/nPH:0;
-  const gmd = nGmd>0?sumGmd/nGmd:0;
-  const dias = [0,30,60,90];
+  const gmdHist = nGmd>0?Math.round(sumGmd/nGmd*1000)/1000:0;
+
+  // GMD por tramo: precargada con la histórica, pero editable por el usuario para jugar escenarios.
+  const gmdInp30=document.getElementById('simGmd30'); if(gmdInp30)gmdInp30.placeholder=gmdHist>0?gmdHist.toFixed(3):'hist.';
+  const gmdInp60=document.getElementById('simGmd60'); if(gmdInp60)gmdInp60.placeholder=gmdHist>0?gmdHist.toFixed(3):'hist.';
+  const gmdInp90=document.getElementById('simGmd90'); if(gmdInp90)gmdInp90.placeholder=gmdHist>0?gmdHist.toFixed(3):'hist.';
+  const gmd30 = parseFloat(document.getElementById('simGmd30')?.value)||gmdHist;
+  const gmd60 = parseFloat(document.getElementById('simGmd60')?.value)||gmdHist;
+  const gmd90 = parseFloat(document.getElementById('simGmd90')?.value)||gmdHist;
 
   // Días promedio actuales en campo de los animales del grupo
   const diasCampoActual = nDias>0?Math.round(sumDias/nDias):0;
-  const pesoIngProm = nPI>0?sumPesoIng/nPI:(pesoH - gmd*diasCampoActual);
-  // Precio compra original promedio por animal
-  const precCompOrig = nPC>0?sumPC/nPC:pesoIngProm*precRepos;
-  // Precio compra real promedio Bs/kg
-  const bsKgCompraReal = pesoIngProm>0&&precCompOrig>0
+  const pesoIngProm = nPI>0?sumPesoIng/nPI:(pesoH - gmdHist*diasCampoActual);
+  // Precio compra original promedio por animal — SOLO sobre animales con el dato real cargado.
+  // Si ningún animal del grupo tiene precio de compra, no se inventa: se muestra "—".
+  const precCompOrig = nPC>0?sumPC/nPC:null;
+  const bsKgCompraReal = (precCompOrig!=null&&pesoIngProm>0)
     ? Math.round(precCompOrig/pesoIngProm*100)/100
     : null;
+  const coberturaPC = nPC+'/'+cabezas; // cuántos animales del grupo tienen precio de compra real
 
-  const filas = dias.map(d=>{
+  // Peso proyectado acumulativo: cada tramo crece con SU PROPIA gmd (no desde cero)
+  const peso30v = pesoH + gmd30*30;
+  const peso60v = peso30v + gmd60*30;
+  const peso90v = peso60v + gmd90*30;
+
+  const horizontes = [
+    {d:0,  label:'HOY',       peso:pesoH,  precVenta:precVenta},
+    {d:30, label:'En 30 días',peso:peso30v,precVenta:precVenta30},
+    {d:60, label:'En 60 días',peso:peso60v,precVenta:precVenta60},
+    {d:90, label:'En 90 días',peso:peso90v,precVenta:precVenta90},
+  ];
+
+  const filas = horizontes.map(h=>{
+    const d=h.d, peso=h.peso, precVentaH=h.precVenta;
     const diasTotal = diasCampoActual + d;
-    const peso = pesoH + gmd*d;
     const kgGanados = peso - pesoIngProm; // kg ganados por animal
 
-    // Costo de reposición actual
+    // Costo de reposición actual (no depende del horizonte: es lo que costaría HOY reponer el animal a su peso de ingreso)
     const costoRUnit = pesoIngProm * precRepos;
-    const ingresos = peso * precVenta * cabezas;
-
-    // precCompOrig calculado arriba desde sumPC/nPC
+    const ingresos = peso * precVentaH * cabezas;
 
     // ─── INDICADOR 1: Rentabilidad diaria ajustada (reposición) ───
-    // (P.venta − P.compra repos.) ÷ días
-    const margenRepos = (peso * precVenta) - costoRUnit; // por animal
+    const margenRepos = (peso * precVentaH) - costoRUnit; // por animal
     const margenReposTot = margenRepos * cabezas;
     const ind1 = diasTotal > 0
       ? Math.round(margenRepos / diasTotal * 100) / 100
       : null;
 
     // ─── INDICADOR 2: Rentabilidad diaria histórica (costo real) ───
-    // (P.venta − P.compra original) ÷ días
-    const margenHist = (peso * precVenta) - precCompOrig; // por animal
-    const margenHistTot = margenHist * cabezas;
-    const ind2 = diasTotal > 0
+    // Solo se calcula si hay al menos un animal del grupo con precio de compra real.
+    const margenHist = precCompOrig!=null ? (peso * precVentaH) - precCompOrig : null; // por animal
+    const margenHistTot = margenHist!=null ? margenHist * cabezas : null;
+    const ind2 = (diasTotal > 0 && margenHist!=null)
       ? Math.round(margenHist / diasTotal * 100) / 100
       : null;
 
     // ─── INDICADOR 3: Eficiencia por kg ganado (ajustada reposición) ───
-    // (P.venta − P.compra repos.) ÷ kg ganados
     const ind3 = kgGanados > 0
       ? Math.round(margenRepos / kgGanados * 100) / 100
       : null;
-    const label = d===0?'HOY':('En '+d+' días');
+    const label = h.label;
     const col = d===0?'var(--red)':d===30?'var(--gold)':d===60?'var(--blue)':'var(--green)';
     return{d,label,
       peso:Math.round(peso),
       kgGanados:Math.round(kgGanados),
       diasTotal,
+      precVentaH,
       ingresos:Math.round(ingresos),
       margenReposTot:Math.round(margenReposTot),
-      margenHistTot:Math.round(margenHistTot),
+      margenHistTot:margenHistTot!=null?Math.round(margenHistTot):null,
       ind1,  // Rentabilidad diaria ajustada (repos)
-      ind2,  // Rentabilidad diaria histórica (costo real)
+      ind2,  // Rentabilidad diaria histórica (costo real) — null si no hay dato
       ind3,  // Eficiencia Bs/kg ganado (ajustada repos)
       col};
   });
 
   // Óptimo = mayor ind1 (rentabilidad diaria ajustada reposición)
-  // Cuando empieza a bajar → señal de venta
   const optimo = filas.reduce((best,f)=>
     f.ind1!=null&&(best.ind1==null||f.ind1>best.ind1)?f:best,
     filas[0]);
 
   div.innerHTML=`
+    <div style="font-size:10px;color:var(--t2);margin-bottom:8px;">
+      ${bsKgCompraReal!=null
+        ?'ℹ️ El indicador ② usa el precio de compra real, promedio sobre <b style="color:var(--gold);">'+coberturaPC+'</b> animales del grupo que tienen ese dato cargado.'
+        :'⚠️ Ningún animal de este grupo tiene precio de compra real cargado — el indicador ② no se muestra (no se inventa un valor).'}
+    </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:16px;">
     ${filas.map(f=>`
       <div style="background:var(--card2);padding:14px;border-radius:8px;border:2px solid ${f.d===optimo.d?f.col:'transparent'};position:relative;">
@@ -1651,7 +1697,7 @@ function renderSimulador(){
         <div style="margin-top:6px;padding:5px 8px;background:var(--card3);border-radius:5px;font-size:11px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;">
           <div><span style="color:var(--t2);">P. compra real</span><br><b style="color:var(--gold);">${bsKgCompraReal?'Bs '+bsKgCompraReal+'/kg':'—'}</b></div>
           <div><span style="color:var(--t2);">P. reposición</span><br><b style="color:var(--gold);">${precRepos?'Bs '+precRepos+'/kg':'—'}</b></div>
-          <div><span style="color:var(--t2);">P. venta</span><br><b style="color:var(--gold);">${precVenta?'Bs '+precVenta+'/kg':'—'}</b></div>
+          <div><span style="color:var(--t2);">P. venta</span><br><b style="color:var(--gold);">${f.precVentaH?'Bs '+f.precVentaH+'/kg':'—'}</b></div>
         </div>
         <div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--card3);">
           <div style="font-size:10px;color:var(--t2);font-weight:700;">① RENT. DIARIA (ajust. repos.)</div>
@@ -1661,13 +1707,14 @@ function renderSimulador(){
         <div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--card3);">
           <div style="font-size:10px;color:var(--t2);font-weight:700;">② RENT. DIARIA (costo real)</div>
           <div style="font-size:15px;font-weight:800;color:${f.col};">${f.ind2!=null?'Bs '+f.ind2+'/día':'—'}</div>
-          <div style="font-size:10px;color:var(--t2);">Margen total: Bs ${fmt(f.margenHistTot)}</div>
+          <div style="font-size:10px;color:var(--t2);">Margen total: ${f.margenHistTot!=null?'Bs '+fmt(f.margenHistTot):'—'}</div>
         </div>
         <div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--card3);">
           <div style="font-size:10px;color:var(--t2);font-weight:700;">③ EFICIENCIA (Bs/kg ganado, repos.)</div>
           <div style="font-size:15px;font-weight:800;color:${f.col};">${f.ind3!=null?'Bs '+f.ind3+'/kg':'—'}</div>
         </div>
-      </div>`).join('')}
+      </div>
+    `).join('')}
     </div>
     <div style="padding:10px 14px;background:var(--card2);border-radius:8px;border-left:4px solid ${optimo.col};font-size:12px;">
       <b style="color:${optimo.col};">📊 Recomendación:</b> El momento óptimo de venta para <b>${GRUS[g]||g}</b> es <b style="color:${optimo.col};">${optimo.label}</b> 
