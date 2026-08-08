@@ -463,8 +463,9 @@ tr:hover td{background:rgba(109,186,58,.04);}
         <th>Peso I.</th><th>Precio C.</th>
         <th style="cursor:pointer;" onclick="sortVA('gmd')">GMD ↕</th><th style="cursor:pointer;" onclick="sortVA('dias')">Días ↕</th>
         <th style="cursor:pointer;" onclick="sortVA('ganancia')">Ganancia ↕</th><th style="cursor:pointer;" onclick="sortVA('bsDia')">Bs/día ↕</th>
+        <th>Acciones</th>
       </tr></thead>
-      <tbody id="vAnimBody"><tr><td colspan="17" class="emp">—</td></tr></tbody>
+      <tbody id="vAnimBody"><tr><td colspan="18" class="emp">—</td></tr></tbody>
     </table></div>
     <div style="padding:8px 14px;border-top:1px solid var(--brd);"><div class="pag" id="vAnimPag"></div></div>
   </div>
@@ -4868,7 +4869,7 @@ function renderVAnimales(){
   const PXP=50,total=vendidos.length,totalPages=Math.ceil(total/PXP)||1;
   if(pVAnim>totalPages)pVAnim=1;
   const slice=vendidos.slice((pVAnim-1)*PXP,pVAnim*PXP);
-  if(!slice.length){tb.innerHTML='<tr><td colspan="17"><div class="emp">Sin animales</div></td></tr>';document.getElementById('vAnimPag').innerHTML='';return;}
+  if(!slice.length){tb.innerHTML='<tr><td colspan="18"><div class="emp">Sin animales</div></td></tr>';document.getElementById('vAnimPag').innerHTML='';return;}
   tb.innerHTML=slice.map(b=>{
     const a=animales[b.ide]||{},v=ventas.find(x=>x.id===b.ventaId)||{};
     const fi=parseFecha(a.fechaIngreso||''),fv=parseFecha(b.fecha||'');
@@ -4898,6 +4899,7 @@ function renderVAnimales(){
       <td class="mn" style="font-size:11px;">${dias?dias+' días':'—'}</td>
       <td class="mn">${gan}</td>
       <td class="mn">${bsDia}</td>
+      <td>${sessionStorage.getItem('ep_rol')==='ADMIN'?`<button class="btn bs btn-sm" style="border-color:var(--gold);color:var(--gold);" onclick="abrirCorregirIde('${b.id}')" title="Corregir chip">✏️</button>`:''}</td>
     </tr>`;
   }).join('');
   const pag=document.getElementById('vAnimPag');
@@ -4907,6 +4909,84 @@ function renderVAnimales(){
   if(selO&&selO.options.length<=1){
     const origs=[...new Set(bajas.filter(b=>b.tipo==='VENTA').map(b=>animales[b.ide]?.origen||b.origenAnimal).filter(Boolean))].sort();
     selO.innerHTML='<option value="">Todos los orígenes</option>'+origs.map(o=>`<option value="${o}">${o}</option>`).join('');
+  }
+}
+
+// ═══ CORREGIR CHIP DE UN ANIMAL VENDIDO (sin tocar precio ni kg) ═══
+let _ciBajaId = null;
+
+function abrirCorregirIde(bid){
+  if(sessionStorage.getItem('ep_rol')!=='ADMIN'){ntf('Solo el administrador puede corregir el chip de una venta',true);return;}
+  const b = bajas.find(x=>x.id===bid);
+  if(!b){ntf('Registro de venta no encontrado',true);return;}
+  _ciBajaId = bid;
+  document.getElementById('ciIdeViejo').value = b.ide;
+  document.getElementById('ciDatosVenta').value = (b.pesoVenta?b.pesoVenta+' kg':'—')+' · '+(b.precioVenta?'Bs '+fmt(b.precioVenta):'—')+' · '+fmtFecha(b.fecha);
+  document.getElementById('ciIdeNuevo').value = '';
+  document.getElementById('ciPreview').innerHTML = '';
+  document.getElementById('btnGuardarCorrIde').disabled = true;
+  document.getElementById('moCorrIde').classList.add('open');
+}
+
+function ciBuscarNuevo(){
+  const nuevoIde = document.getElementById('ciIdeNuevo').value.trim();
+  const div = document.getElementById('ciPreview');
+  const btn = document.getElementById('btnGuardarCorrIde');
+  const viejoIde = document.getElementById('ciIdeViejo').value;
+  if(!nuevoIde){ div.innerHTML=''; btn.disabled=true; return; }
+  if(nuevoIde===viejoIde){ div.innerHTML='<div style="color:var(--red);">Es el mismo chip — no hay nada que corregir.</div>'; btn.disabled=true; return; }
+  const nuevoA = animales[nuevoIde];
+  if(!nuevoA){ div.innerHTML='<div style="color:var(--red);">⚠️ Ese chip no existe en el inventario. Verificalo o dalo de alta primero desde Animales.</div>'; btn.disabled=true; return; }
+  if(nuevoA.estado!=='ACTIVO'){ div.innerHTML='<div style="color:var(--red);">⚠️ Ese chip ya figura como '+nuevoA.estado+' — no se puede asignar a esta venta.</div>'; btn.disabled=true; return; }
+  const viejoA = animales[viejoIde];
+  let html = `<div style="background:rgba(109,186,58,.08);border-radius:6px;padding:8px;">
+    ✅ Encontrado: <b>${GRUS[nuevoA.grupo]||nuevoA.grupo||'—'}</b> · ${CATS[nuevoA.categoria]||nuevoA.categoria||'—'} · ${nuevoA.origen||'—'}
+  </div>`;
+  if(viejoA && nuevoA.categoria!==viejoA.categoria){
+    html += `<div style="margin-top:6px;color:#f90;font-size:11px;">⚠️ La categoría cambia (${viejoA.categoria||'—'} → ${nuevoA.categoria||'—'}). Los totales por categoría de la venta a la que pertenece este registro NO se recalculan automáticamente — revisalos a mano si hace falta.</div>`;
+  }
+  div.innerHTML = html;
+  btn.disabled = false;
+}
+
+async function guardarCorregirIde(){
+  if(sessionStorage.getItem('ep_rol')!=='ADMIN'){ntf('Solo el administrador puede corregir el chip de una venta',true);return;}
+  const bid = _ciBajaId;
+  const b = bajas.find(x=>x.id===bid);
+  if(!b){ntf('Registro de venta no encontrado',true);return;}
+  const viejoIde = b.ide;
+  const nuevoIde = document.getElementById('ciIdeNuevo').value.trim();
+  const nuevoA = animales[nuevoIde];
+  if(!nuevoIde || nuevoIde===viejoIde || !nuevoA || nuevoA.estado!=='ACTIVO'){
+    ntf('Revisá el chip correcto antes de confirmar',true); return;
+  }
+  const btn = document.getElementById('btnGuardarCorrIde');
+  btn.disabled=true; btn.textContent='⏳ Guardando...';
+  const updates = {};
+  // El precio de venta y el peso vendido (b.precioVenta / b.pesoVenta) NO se tocan.
+  updates['bajas/'+bid+'/ide'] = nuevoIde;
+  updates['bajas/'+bid+'/categoriaAnimal'] = nuevoA.categoria||null;
+  updates['bajas/'+bid+'/grupoAnimal'] = nuevoA.grupo||null;
+  updates['bajas/'+bid+'/origenAnimal'] = nuevoA.origen||null;
+  updates['animales/'+nuevoIde+'/estado'] = 'VENDIDO';
+  updates['animales/'+nuevoIde+'/ventaId'] = b.ventaId||null;
+  updates['animales/'+viejoIde+'/estado'] = 'ACTIVO';
+  updates['animales/'+viejoIde+'/ventaId'] = null;
+  try{
+    await fbPatch('',updates);
+    b.ide = nuevoIde;
+    b.categoriaAnimal = nuevoA.categoria||null;
+    b.grupoAnimal = nuevoA.grupo||null;
+    b.origenAnimal = nuevoA.origen||null;
+    if(animales[nuevoIde]){animales[nuevoIde].estado='VENDIDO';animales[nuevoIde].ventaId=b.ventaId||null;}
+    if(animales[viejoIde]){animales[viejoIde].estado='ACTIVO';animales[viejoIde].ventaId=null;}
+    cerrar('moCorrIde');
+    renderVAnimales(); renderDash(); renderA();
+    ntf('✅ Chip corregido — '+viejoIde+' volvió a Activo, '+nuevoIde+' quedó como Vendido (mismo precio y peso)');
+  }catch(e){
+    ntf('Error: '+e.message,true);
+  }finally{
+    btn.disabled=false; btn.textContent='💾 Confirmar Corrección';
   }
 }
 
@@ -6012,6 +6092,23 @@ showPg = function(id) { _origShowPg2(id); if(id==='movimientos') renderMovimient
       <div class="fm" id="evPrivWrap" style="display:none;"><label>Comprador</label><input id="evDestino" type="text"></div>
     </div></div>
     <div class="mf"><button class="btn bs" onclick="cerrar('moEditV')">Cancelar</button><button class="btn bp" onclick="guardarEditVenta()">💾 Guardar</button></div>
+  </div>
+</div>
+
+<!-- Modal: Corregir chip de un animal vendido (sin tocar precio ni kg) -->
+<div class="mo" id="moCorrIde">
+  <div class="md" style="max-width:480px;">
+    <div class="mh"><div class="mt">✏️ Corregir Chip de Venta</div><button class="mc" onclick="cerrar('moCorrIde')">✕</button></div>
+    <div class="mb">
+      <div style="font-size:11px;color:var(--t2);margin-bottom:12px;">Corregí el chip si se cargó mal al registrar la venta. El precio de venta y los kg vendidos <b style="color:var(--gold);">no se modifican</b>. El chip viejo vuelve automáticamente a Activo en el inventario.</div>
+      <div class="fg">
+        <div class="fm"><label>Chip actual (vendido)</label><input id="ciIdeViejo" readonly style="background:var(--card3);color:var(--t2);font-family:monospace;"></div>
+        <div class="fm"><label>Precio / Peso de esta venta (no cambian)</label><input id="ciDatosVenta" readonly style="background:var(--card3);color:var(--gold);font-size:11px;"></div>
+        <div class="fm" style="grid-column:1/-1;"><label>Chip correcto *</label><input id="ciIdeNuevo" type="text" placeholder="Pegá el chip correcto" oninput="ciBuscarNuevo()" style="font-family:monospace;"></div>
+      </div>
+      <div id="ciPreview" style="margin-top:10px;font-size:12px;"></div>
+    </div>
+    <div class="mf"><button class="btn bs" onclick="cerrar('moCorrIde')">Cancelar</button><button class="btn bp" id="btnGuardarCorrIde" onclick="guardarCorregirIde()" disabled>💾 Confirmar Corrección</button></div>
   </div>
 </div>
 
