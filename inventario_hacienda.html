@@ -564,7 +564,7 @@ tr:hover td{background:rgba(109,186,58,.04);}
         </div>
       </div>
 
-      <!-- GRUPO ORIGEN -->
+      <!-- GRUPO ORIGEN (Venta / Baja — Movimiento Interno usa la sección de chips más abajo) -->
       <div id="mvSecOrigen" style="background:var(--card2);border:1px solid var(--brd);border-radius:8px;padding:14px;margin-bottom:12px;">
         <div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:1px;margin-bottom:10px;">GRUPO ORIGEN</div>
         <div class="fg">
@@ -592,6 +592,23 @@ tr:hover td{background:rgba(109,186,58,.04);}
             <button class="btn bs btn-sm" onclick="mvTodoElGrupo()" style="margin-bottom:2px;">Todo el grupo</button>
           </div>
         </div>
+      </div>
+
+      <!-- MOVIMIENTO INTERNO POR LISTA DE CHIPS -->
+      <div id="mvSecInternoChips" style="background:var(--card2);border:1px solid var(--brd);border-radius:8px;padding:14px;margin-bottom:12px;display:none;">
+        <div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:1px;margin-bottom:10px;">ANIMALES A MOVER</div>
+        <div style="font-size:11px;color:var(--t2);margin-bottom:8px;">Pegá la lista de chips (uno por línea). Si además los pesaste, pegá los pesos en el mismo orden — es opcional; si lo dejás vacío, el movimiento se hace sin registrar peso nuevo.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div>
+            <label style="font-size:11px;font-weight:700;color:var(--t2);display:block;margin-bottom:4px;">📋 Chips (uno por línea) *</label>
+            <textarea id="mvPasteIdes" rows="8" placeholder="68000000703151" style="width:100%;background:var(--card3);border:1px solid var(--brd);color:var(--text);padding:8px;border-radius:5px;font-size:11px;font-family:monospace;resize:vertical;outline:none;" oninput="mvProcesarChips()"></textarea>
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:700;color:var(--t2);display:block;margin-bottom:4px;">⚖️ Pesos en kg (opcional, mismo orden)</label>
+            <textarea id="mvPastePesos" rows="8" placeholder="489" style="width:100%;background:var(--card3);border:1px solid var(--brd);color:var(--text);padding:8px;border-radius:5px;font-size:11px;font-family:monospace;resize:vertical;outline:none;" oninput="mvProcesarChips()"></textarea>
+          </div>
+        </div>
+        <div id="mvChipsPreview" style="margin-top:12px;font-size:12px;"><div style="color:var(--t2);font-size:12px;">Pegá los chips arriba para ver la vista previa.</div></div>
       </div>
 
       <!-- GRUPO DESTINO (solo para COMPRA, INTERNO) -->
@@ -5385,6 +5402,9 @@ function verNoVinieron(){
 let movimientos = [];
 let _mvTipo = 'INTERNO';
 let _mvModoDestino = 'existente';
+let _mvChipsData = null; // { encontrados:[], noActivos:[], noEncontrados:[], tienePesos:bool }
+window._mvReincorporar = {}; // ide -> bool, marcados para reincorporar desde no-activos
+window._mvOmitidos = {};     // ide -> bool, chips no encontrados que se decidió omitir del movimiento
 let _mvPagina = 1;
 const MV_PXP = 20;
 
@@ -5448,10 +5468,19 @@ function abrirMovimiento(tipo) {
   fg.innerHTML = '<option value="">Todos los grupos</option>';
   grupos.forEach(g => fg.innerHTML += `<option value="${g}">${g}</option>`);
 
-  document.getElementById('mvSecOrigen').style.display   = tipo === 'COMPRA' ? 'none' : '';
+  document.getElementById('mvSecOrigen').style.display   = (tipo === 'COMPRA' || tipo === 'INTERNO') ? 'none' : '';
+  document.getElementById('mvSecInternoChips').style.display = tipo === 'INTERNO' ? '' : 'none';
   document.getElementById('mvSecDestino').style.display  = (tipo === 'COMPRA' || tipo === 'INTERNO') ? '' : 'none';
   document.getElementById('mvSecEconomico').style.display= (tipo === 'COMPRA' || tipo === 'VENTA') ? '' : 'none';
   document.getElementById('mvSecMotivo').style.display   = tipo === 'BAJA' ? '' : 'none';
+
+  // Reset del estado de la vista de chips (Movimiento Interno)
+  document.getElementById('mvPasteIdes').value = '';
+  document.getElementById('mvPastePesos').value = '';
+  document.getElementById('mvChipsPreview').innerHTML = '<div style="color:var(--t2);font-size:12px;">Pegá los chips arriba para ver la vista previa.</div>';
+  _mvChipsData = null;
+  window._mvReincorporar = {};
+  window._mvOmitidos = {};
 
   if(tipo === 'COMPRA') {
     document.getElementById('mvSecEconTit').textContent  = 'DATOS DE COMPRA';
@@ -5514,8 +5543,113 @@ function mvActualizarGrupoOrigen() {
   mvActualizarResumen();
 }
 
+// ═══ MOVIMIENTO INTERNO POR LISTA DE CHIPS ═══
+function mvProcesarChips(){
+  const idesRaw = document.getElementById('mvPasteIdes').value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+  const pesosRaw = document.getElementById('mvPastePesos').value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+  const div = document.getElementById('mvChipsPreview');
+  if(!idesRaw.length){
+    div.innerHTML = '<div style="color:var(--t2);font-size:12px;">Pegá los chips arriba para ver la vista previa.</div>';
+    _mvChipsData = null; mvActualizarResumen(); return;
+  }
+  const tienePesos = pesosRaw.length > 0;
+  if(tienePesos && pesosRaw.length !== idesRaw.length){
+    div.innerHTML = `<div style="color:var(--red);font-size:12px;">⚠️ Cargaste ${idesRaw.length} chips pero ${pesosRaw.length} pesos — tienen que ser la misma cantidad, en el mismo orden. Corregí antes de seguir.</div>`;
+    _mvChipsData = null; mvActualizarResumen(); return;
+  }
+  const encontrados=[], noActivos=[], noEncontrados=[];
+  idesRaw.forEach((ide,i)=>{
+    if(window._mvOmitidos[ide]) return; // ya decidido omitir
+    const peso = tienePesos ? (parseFloat(pesosRaw[i])||null) : null;
+    const a = animales[ide];
+    if(!a){ noEncontrados.push({ide,peso}); return; }
+    if(a.estado!=='ACTIVO'){ noActivos.push({ide,peso,estado:a.estado,grupoActual:a.grupo||'SIN GRUPO'}); return; }
+    encontrados.push({ide,peso,grupoActual:a.grupo||'SIN GRUPO'});
+  });
+  _mvChipsData = {encontrados,noActivos,noEncontrados,tienePesos};
+  mvRenderChipsPreview();
+  mvActualizarResumen();
+}
+
+function mvRenderChipsPreview(){
+  const d=_mvChipsData;
+  const div=document.getElementById('mvChipsPreview');
+  if(!d){div.innerHTML='<div style="color:var(--t2);font-size:12px;">Pegá los chips arriba para ver la vista previa.</div>';return;}
+  let html='';
+  if(d.encontrados.length){
+    const porGrupo={};
+    d.encontrados.forEach(e=>{ (porGrupo[e.grupoActual]=porGrupo[e.grupoActual]||[]).push(e); });
+    html+=`<div style="background:rgba(109,186,58,.08);border-radius:6px;padding:10px;margin-bottom:8px;">
+      <div style="font-weight:700;color:var(--gs);margin-bottom:6px;">✅ ${d.encontrados.length} animales activos encontrados</div>`;
+    Object.keys(porGrupo).sort().forEach(g=>{
+      const arr=porGrupo[g];
+      html+=`<div style="font-size:11px;color:var(--t2);margin:4px 0;">
+        <b style="color:var(--gold);">${arr.length}</b> vienen de <b>${GRUS[g]||g}</b>
+        <span style="cursor:pointer;color:var(--blue);text-decoration:underline;" onclick="const el=this.nextElementSibling;el.style.display=el.style.display==='none'?'block':'none';">[ver chips]</span>
+        <div style="display:none;font-family:monospace;font-size:10px;color:var(--t3);padding:4px 0 4px 12px;">${arr.map(x=>x.ide+(x.peso?' — '+x.peso+' kg':'')).join('<br>')}</div>
+      </div>`;
+    });
+    html+='</div>';
+  }
+  if(d.noActivos.length){
+    html+=`<div style="background:rgba(255,150,0,.08);border-radius:6px;padding:10px;margin-bottom:8px;">
+      <div style="font-weight:700;color:#f90;margin-bottom:6px;">⚠️ ${d.noActivos.length} encontrados pero NO activos</div>
+      <div style="font-size:11px;color:var(--t2);margin-bottom:6px;">Figuran vendidos, muertos o en venta. Si en realidad siguen en el campo (fue un error de registro), marcalos para reincorporar — si no los marcás, quedan afuera del movimiento:</div>
+      ${d.noActivos.map(x=>`
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;margin-top:4px;cursor:pointer;">
+          <input type="checkbox" onchange="window._mvReincorporar['${x.ide}']=this.checked;mvActualizarResumen()" ${window._mvReincorporar[x.ide]?'checked':''}>
+          <span style="font-family:monospace;">${x.ide}</span> — estado actual: <b style="color:#f90;">${x.estado}</b>, último grupo: ${GRUS[x.grupoActual]||x.grupoActual}${x.peso?', peso cargado: '+x.peso+'kg':''}
+        </label>`).join('')}
+    </div>`;
+  }
+  if(d.noEncontrados.length){
+    html+=`<div style="background:rgba(220,60,60,.08);border-radius:6px;padding:10px;">
+      <div style="font-weight:700;color:var(--red);margin-bottom:6px;">❌ ${d.noEncontrados.length} chips no encontrados en el sistema</div>
+      <div style="font-size:11px;color:var(--t2);margin-bottom:6px;">No existen en el inventario. Elegí qué hacer con cada uno:</div>
+      ${d.noEncontrados.map(x=>`
+        <div style="font-size:11px;margin-top:4px;display:flex;align-items:center;gap:8px;">
+          <span style="font-family:monospace;">${x.ide}</span>${x.peso?' — '+x.peso+' kg':''}
+          <button class="btn bs btn-sm" style="padding:2px 8px;font-size:10px;" onclick="mvOmitirChip('${x.ide}')">Omitir</button>
+          <button class="btn bp btn-sm" style="padding:2px 8px;font-size:10px;" onclick="mvAltaRapidaChip('${x.ide}',${x.peso||'null'})">+ Dar de alta</button>
+        </div>`).join('')}
+    </div>`;
+  }
+  div.innerHTML = html || '<div style="color:var(--t2);font-size:12px;">Pegá los chips arriba para ver la vista previa.</div>';
+}
+
+function mvOmitirChip(ide){
+  window._mvOmitidos[ide]=true;
+  mvProcesarChips(); // re-procesa excluyendo el omitido
+}
+
+function mvAltaRapidaChip(ide, peso){
+  window._mvOmitidos[ide]=true; // se omite de este movimiento; se agrega aparte y se puede repegar después
+  openMA();
+  document.getElementById('aIde').value = ide;
+  if(peso) document.getElementById('aPI').value = peso;
+  ntf('Completá los datos del animal y guardalo. Después volvé a pegar la lista de chips en Movimiento Interno para incluirlo.', false, 6000);
+}
+
 function mvActualizarResumen() {
   const tipo    = _mvTipo;
+
+  if(tipo === 'INTERNO'){
+    const resDiv = document.getElementById('mvResumen');
+    const d = _mvChipsData;
+    if(!d){ resDiv.style.display='none'; return; }
+    const reincorporarCount = d.noActivos.filter(x=>window._mvReincorporar[x.ide]).length;
+    const totalMover = d.encontrados.length + reincorporarCount;
+    const gd = _mvModoDestino==='nuevo' ? (document.getElementById('mvGrupoNuevo')?.value||'—') : (document.getElementById('mvGrupoDestino')?.value||'—');
+    let html = `<div>📦 Total a mover: <b style="color:var(--gold);">${totalMover}</b> animales`;
+    if(reincorporarCount) html += ` (incluye ${reincorporarCount} reincorporados)`;
+    html += `</div><div style="margin-top:4px;">📥 Destino: <strong>${gd}</strong></div>`;
+    if(d.tienePesos) html += `<div style="margin-top:4px;color:var(--t2);font-size:11px;">Se registrará un pesaje nuevo para los animales con peso cargado.</div>`;
+    if(d.noEncontrados.length) html += `<div style="margin-top:4px;color:var(--red);font-size:11px;">${d.noEncontrados.length} chips sin resolver (omitir o dar de alta) antes de guardar.</div>`;
+    document.getElementById('mvResumenContenido').innerHTML = html;
+    resDiv.style.display = totalMover>0 ? 'block' : 'none';
+    return;
+  }
+
   const cab     = parseInt(document.getElementById('mvCabezas')?.value) || 0;
   const precio  = parseFloat(document.getElementById('mvPrecio')?.value) || 0;
   const pesoOrig= parseFloat(document.getElementById('mvPesoOrigen')?.value) || 0;
@@ -5553,11 +5687,96 @@ function mvActualizarResumen() {
   resDiv.style.display = 'block';
 }
 
+async function guardarMovimientoInternoChips(fecha){
+  const d = _mvChipsData;
+  if(!d || (!d.encontrados.length && !d.noActivos.some(x=>window._mvReincorporar[x.ide]))){
+    ntf('Pegá al menos un chip válido para mover', true); return;
+  }
+  if(d.noEncontrados.length){
+    ntf('Resolvé los '+d.noEncontrados.length+' chips no encontrados (omitir o dar de alta) antes de guardar', true); return;
+  }
+  const grupoDest = _mvModoDestino==='nuevo' ? document.getElementById('mvGrupoNuevo').value.trim() : document.getElementById('mvGrupoDestino').value;
+  if(!grupoDest) { ntf('Seleccioná o ingresá el grupo destino', true); return; }
+
+  // Lista final: encontrados activos + no-activos marcados para reincorporar
+  const aMover = [
+    ...d.encontrados.map(x=>({...x, reincorporar:false})),
+    ...d.noActivos.filter(x=>window._mvReincorporar[x.ide]).map(x=>({...x, reincorporar:true}))
+  ];
+
+  const btn=document.getElementById('btnGuardarMov');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Guardando...';}
+
+  const updates={};
+  const nuevosPesajes=[];
+  const comentario = document.getElementById('mvComentario')?.value.trim()||'';
+
+  aMover.forEach(x=>{
+    const a = animales[x.ide];
+    const grupoAnterior = a.grupo||'SIN GRUPO';
+    // Actualizar animal: grupo nuevo, y si estaba dado de baja, reincorporar a ACTIVO
+    const patchAnimal = {grupo:grupoDest, fechaMovimiento:fecha};
+    if(x.reincorporar) patchAnimal.estado='ACTIVO';
+    Object.assign(animales[x.ide], patchAnimal);
+    updates['animales/'+x.ide+'/grupo']=grupoDest;
+    updates['animales/'+x.ide+'/fechaMovimiento']=fecha;
+    if(x.reincorporar) updates['animales/'+x.ide+'/estado']='ACTIVO';
+
+    // Si se cargó peso, registrar un pesaje nuevo (mismo criterio que Pesaje Manual)
+    if(x.peso){
+      const ultP = pesajes.find(p=>String(p.ide)===x.ide);
+      const pAnt = ultP?ultP.peso:a.pesoIngreso;
+      const fAnt = ultP?ultP.fecha:a.fechaIngreso;
+      const dias = Math.max(1, Math.floor((new Date(fecha+'T12:00:00')-new Date(fAnt+'T12:00:00'))/86400000));
+      const gmd = Math.round(((x.peso-pAnt)/dias)*1000)/1000;
+      const pid = 'p_'+x.ide+'_'+fecha.replace(/-/g,'');
+      const p = {id:pid,ide:x.ide,fecha,peso:x.peso,gmd,pesoAnterior:pAnt,diasDesde:dias,
+        grupoAnterior,grupoNuevo:grupoDest,migro:true,fuente:'MOVIMIENTO',origen:a.origen,usuario};
+      updates['pesajes/'+pid]=p;
+      nuevosPesajes.push(p);
+    }
+  });
+
+  const reg = {
+    id: Date.now().toString(36)+Math.random().toString(36).substr(2,4),
+    tipo:'INTERNO', fecha, grupoOrigen:null, grupoDestino:grupoDest,
+    cabezas: aMover.length, pesoOrigen:null, precio:null, destino:null, motivo:null,
+    chips: aMover.map(x=>x.ide), reincorporados: aMover.filter(x=>x.reincorporar).map(x=>x.ide),
+    comentario: comentario||null, usuario, fechaReg: new Date().toISOString()
+  };
+
+  try{
+    movimientos.unshift(reg);
+    await Promise.all([fbPatch('',updates), saveMovimientos(), actualizarGruposResumen()]);
+    nuevosPesajes.forEach(p=>{
+      const idx=pesajes.findIndex(x=>x.id===p.id);
+      if(idx>=0)pesajes[idx]=p; else pesajes.unshift(p);
+    });
+    if(nuevosPesajes.length) pesajes.sort((a,b)=>b.fecha.localeCompare(a.fecha));
+    cerrar('moMov');
+    renderMovimientos(); renderDash(); renderA(); renderP();
+    let msg = `✅ Movimiento registrado — ${aMover.length} animales a ${GRUS[grupoDest]||grupoDest}`;
+    if(nuevosPesajes.length) msg += ` (${nuevosPesajes.length} con pesaje nuevo)`;
+    ntf(msg);
+  }catch(e){
+    movimientos.shift(); // revertir el unshift si falló el guardado
+    ntf('Error: '+e.message, true);
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='💾 Confirmar Movimiento';}
+  }
+}
+
 async function guardarMovimiento() {
   const tipo  = _mvTipo;
   const fecha = document.getElementById('mvFecha').value;
-  const cab   = parseInt(document.getElementById('mvCabezas')?.value) || 0;
   if(!fecha) { ntf('Ingresá la fecha', true); return; }
+
+  // ═══ MOVIMIENTO INTERNO POR LISTA DE CHIPS (reemplaza la lógica de "cantidad" para este tipo) ═══
+  if(tipo === 'INTERNO'){
+    return guardarMovimientoInternoChips(fecha);
+  }
+
+  const cab   = parseInt(document.getElementById('mvCabezas')?.value) || 0;
   if(!cab)   { ntf('Ingresá las cabezas', true); return; }
 
   const grupoOrig = tipo !== 'COMPRA' ? document.getElementById('mvGrupoOrigen').value : '';
