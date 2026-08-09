@@ -678,6 +678,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
   <div class="tab" onclick="showPage('lluvia')">🌧 Lluvia</div>
   <div class="tab" onclick="showPage('analisis')">🔬 Análisis</div>
   <div class="tab" onclick="showPage('campo')">📍 Campo</div>
+  <div class="tab" onclick="showPage('ranking')">🏆 Ranking Potreros</div>
   <div class="tab" onclick="showPage('circuitos')">🔄 Circuitos</div>
 </div>
 
@@ -1630,6 +1631,72 @@ tr:hover td { background: rgba(255,255,255,.02); }
 </div>
 
 
+<!-- ════════════════ RANKING DE POTREROS ════════════════ -->
+<div class="page" id="page-ranking">
+  <div class="card">
+    <div class="card-title"><span>🏆</span> Ranking de Potreros — Producción de MS Anualizada
+      <span style="font-size:10px;color:var(--text3);font-weight:400;margin-left:8px;">Comparación normalizada por descanso, para decisiones de resiembra</span>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:14px;line-height:1.6;">
+      Este número NO es la suma real de lo que produjo cada potrero — es una estimación:
+      <b>(producción promedio por pase) × (365 días ÷ descanso promedio)</b>, para poder comparar potreros
+      aunque hayan rotado una cantidad distinta de veces en el año. Cuantas menos mediciones tenga un potrero,
+      menos confiable es su número — fijate en la columna "Mediciones" antes de decidir.
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
+      <div class="form-group" style="margin:0;">
+        <label style="font-size:10px;">Variedad</label>
+        <select id="rkVariedad" onchange="renderRankingPotreros()">
+          <option value="">Todas</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label style="font-size:10px;">Época</label>
+        <select id="rkEpoca" onchange="renderRankingPotreros()">
+          <option value="GENERAL">General (todo el año)</option>
+          <option value="LLUVIA">Época de lluvia</option>
+          <option value="SECA">Época seca</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label style="font-size:10px;">Orden</label>
+        <select id="rkOrden" onchange="renderRankingPotreros()">
+          <option value="desc">Mejor → Peor</option>
+          <option value="asc">Peor → Mejor</option>
+        </select>
+      </div>
+      <button class="btn btn-secondary btn-sm" style="margin-top:14px;" onclick="abrirConfigEpocas()">⚙ Configurar meses de cada época</button>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="tbl" style="width:100%;min-width:900px;">
+        <thead><tr>
+          <th>POTRERO</th><th>VARIEDAD</th><th>MEDICIONES</th>
+          <th>DESCANSO PROM.</th><th>PROD. PROM/PASE</th><th>ROT. EST./AÑO</th>
+          <th>PROD. ANUALIZADA</th><th>TOTAL REAL ACUM.</th><th>VS. MEDIA VARIEDAD</th>
+        </tr></thead>
+        <tbody id="rkBody"><tr><td colspan="9" style="text-align:center;color:var(--text3);padding:20px;">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Configurar meses de cada época -->
+<div class="modal-bg" id="modalEpocas">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-title">
+      ⚙ Meses de cada Época
+      <button class="modal-close" onclick="cerrarModal('modalEpocas')">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:14px;">Marcá a qué época pertenece cada mes. Se guarda para todo el sistema.</div>
+    <div id="epocasMeses" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
+    <div class="btn-row" style="margin-top:16px;">
+      <button class="btn btn-secondary" onclick="cerrarModal('modalEpocas')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarEpocas()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+
 <!-- ════════════════ PLANIFICACIÓN ════════════════ -->
 <div class="page" id="page-plan">
   <div class="card" style="margin-bottom:12px;background:rgba(109,186,58,.06);border-color:rgba(109,186,58,.2);">
@@ -2350,6 +2417,136 @@ function setData(key, val) {
 }
 function getActividades() { return getData('actividades', []); }
 function getGrupos() { return getData('grupos', GRUPOS_BASE); }
+
+// ═══════════════════════════════════════
+// RANKING DE POTREROS — producción de MS anualizada, normalizada por descanso
+// ═══════════════════════════════════════
+const EPOCAS_BASE = { LLUVIA:[11,12,1,2,3,4], SECA:[5,6,7,8,9,10] };
+function getEpocas(){ return getData('epocas', EPOCAS_BASE); }
+
+function abrirConfigEpocas(){
+  const ep = getEpocas();
+  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  let html = '';
+  meses.forEach((m,i)=>{
+    const num = i+1;
+    const esLluvia = (ep.LLUVIA||[]).includes(num);
+    html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;background:var(--card2);border-radius:5px;">
+      <span style="font-size:12px;">${m}</span>
+      <select data-mes="${num}" style="font-size:11px;padding:3px 6px;">
+        <option value="LLUVIA" ${esLluvia?'selected':''}>🌧 Lluvia</option>
+        <option value="SECA" ${!esLluvia?'selected':''}>☀ Seca</option>
+      </select>
+    </div>`;
+  });
+  document.getElementById('epocasMeses').innerHTML = html;
+  document.getElementById('modalEpocas').classList.add('open');
+}
+
+function guardarEpocas(){
+  const lluvia=[], seca=[];
+  document.querySelectorAll('#epocasMeses select').forEach(sel=>{
+    const num = parseInt(sel.dataset.mes);
+    if(sel.value==='LLUVIA') lluvia.push(num); else seca.push(num);
+  });
+  setData('epocas', {LLUVIA:lluvia, SECA:seca});
+  cerrarModal('modalEpocas');
+  renderRankingPotreros();
+}
+
+function poblarSelectVariedadRanking(){
+  const sel = document.getElementById('rkVariedad');
+  if(!sel || sel.dataset.poblado) return;
+  const acts = getActividades().filter(a=>a.actividad==='MATERIA SECA');
+  const variedades = [...new Set(acts.map(a=>a.variedad).filter(Boolean))].sort();
+  variedades.forEach(v=>{
+    const opt=document.createElement('option'); opt.value=v; opt.textContent=v;
+    sel.appendChild(opt);
+  });
+  sel.dataset.poblado='1';
+}
+
+function renderRankingPotreros(){
+  poblarSelectVariedadRanking();
+  const tbody = document.getElementById('rkBody');
+  if(!tbody) return;
+  const variedadFiltro = document.getElementById('rkVariedad')?.value || '';
+  const epocaSel = document.getElementById('rkEpoca')?.value || 'GENERAL';
+  const orden = document.getElementById('rkOrden')?.value || 'desc';
+  const epocas = getEpocas();
+
+  let acts = getActividades().filter(a=>a.actividad==='MATERIA SECA' && a.potrero && a.fechaIng && a.kgMsHa!=null);
+  if(variedadFiltro) acts = acts.filter(a=>a.variedad===variedadFiltro);
+  if(epocaSel!=='GENERAL'){
+    const mesesEpoca = epocas[epocaSel]||[];
+    acts = acts.filter(a=>{
+      const mes = parseInt(String(a.fechaIng).slice(5,7));
+      return mesesEpoca.includes(mes);
+    });
+  }
+  const diasEpoca = epocaSel==='GENERAL' ? 365 : (epocas[epocaSel]||[]).length*30.4;
+
+  // Agrupar por POTRERO completo (todas sus parcelas), no por parcela puntual
+  const porPotrero = {};
+  acts.forEach(a=>{
+    const key = a.potrero;
+    if(!porPotrero[key]) porPotrero[key] = {potrero:a.potrero, variedad:a.variedad, items:[]};
+    porPotrero[key].items.push(a);
+  });
+
+  const filas = Object.values(porPotrero).map(g=>{
+    const n = g.items.length;
+    const sumProd = g.items.reduce((s,x)=>s+(x.kgMsHa||0),0);
+    const prodProm = n>0 ? sumProd/n : 0;
+    const descansos = g.items.map(x=>x.retorno).filter(x=>x!=null && x>0);
+    const descansoProm = descansos.length>0 ? descansos.reduce((s,x)=>s+x,0)/descansos.length : null;
+    const rotEst = descansoProm>0 ? diasEpoca/descansoProm : null;
+    const prodAnualizada = (rotEst!=null) ? prodProm*rotEst : null;
+    return {potrero:g.potrero, variedad:g.variedad, n, descansoProm, prodProm, rotEst, prodAnualizada, totalReal:sumProd};
+  });
+
+  // Media de la variedad (dentro de lo ya filtrado por época), para marcar arriba/abajo
+  const mediasPorVariedad = {};
+  filas.forEach(f=>{
+    if(f.prodAnualizada==null) return;
+    if(!mediasPorVariedad[f.variedad]) mediasPorVariedad[f.variedad]={sum:0,n:0};
+    mediasPorVariedad[f.variedad].sum+=f.prodAnualizada;
+    mediasPorVariedad[f.variedad].n++;
+  });
+  Object.keys(mediasPorVariedad).forEach(v=>{ mediasPorVariedad[v].media = mediasPorVariedad[v].sum/mediasPorVariedad[v].n; });
+
+  filas.forEach(f=>{
+    const m = mediasPorVariedad[f.variedad];
+    f.vsMedia = (m && f.prodAnualizada!=null) ? (f.prodAnualizada-m.media)/m.media*100 : null;
+  });
+
+  filas.sort((a,b)=>{
+    const av=a.prodAnualizada??-Infinity, bv=b.prodAnualizada??-Infinity;
+    return orden==='desc' ? bv-av : av-bv;
+  });
+
+  if(!filas.length){
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:20px;">Sin datos para este filtro</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filas.map(f=>{
+    const confianza = f.n<3 ? 'style="color:#f90;"' : '';
+    const vsMediaTxt = f.vsMedia!=null ? (f.vsMedia>=0?'▲ +':'▼ ')+Math.round(f.vsMedia)+'%' : '—';
+    const vsMediaColor = f.vsMedia==null ? 'var(--text3)' : f.vsMedia>=0 ? 'var(--green2)' : '#e05a4a';
+    return `<tr>
+      <td><b>${f.potrero}</b></td>
+      <td>${f.variedad||'—'}</td>
+      <td ${confianza}>${f.n}${f.n<3?' ⚠':''}</td>
+      <td>${f.descansoProm!=null?Math.round(f.descansoProm)+' días':'—'}</td>
+      <td>${Math.round(f.prodProm)} kg/ha</td>
+      <td>${f.rotEst!=null?f.rotEst.toFixed(1):'—'}</td>
+      <td><b style="color:var(--gold);">${f.prodAnualizada!=null?Math.round(f.prodAnualizada).toLocaleString('es-BO')+' kg/ha':'—'}</b></td>
+      <td style="color:var(--text3);">${Math.round(f.totalReal).toLocaleString('es-BO')} kg/ha</td>
+      <td style="color:${vsMediaColor};font-weight:700;">${vsMediaTxt}</td>
+    </tr>`;
+  }).join('');
+}
 
 // ═══════════════════════════════════════════════════════════
 // INTEGRACIÓN CON INVENTARIO DE HACIENDA
@@ -6551,7 +6748,7 @@ function showPage(id) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
-  const tabs = ['actividades','nueva','resumen','plan','pedidos','config','lluvia','analisis','campo','circuitos'];
+  const tabs = ['actividades','nueva','resumen','plan','pedidos','config','lluvia','analisis','campo','ranking','circuitos'];
   const idx = tabs.indexOf(id);
   document.querySelectorAll('.tab')[idx]?.classList.add('active');
   if(id==='resumen') { actualizarGestionesDisponibles(); renderResumen(); renderMetricasHA(); }
@@ -6560,6 +6757,7 @@ function showPage(id) {
   if(id==='actividades') { renderStats(); }
   if(id==='plan') { renderPlan(); }
   if(id==='pedidos') { renderPedidos(); }
+  if(id==='ranking') { renderRankingPotreros(); }
   if(id==='analisis'||id==='calidad') {
     renderMuestras(); poblarSelectorZonas(); preLlenarFechasBrom();
     // Migrar bromatológicos históricos a la matriz si es la primera vez
