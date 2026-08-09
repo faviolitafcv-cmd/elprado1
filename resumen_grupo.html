@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>El Prado 1 — Resumen de Grupo</title>
+<style>
+  :root{
+    --bg:#0d1a10; --card:#132218; --card2:#1a2e20; --brd:#28402f;
+    --text:#e8f0e9; --t2:#9db3a3; --t3:#6f8977;
+    --gold:#e0b84a; --green:#6dba3a; --red:#e05a4a; --blue:#4a9fe0; --orange:#f0973a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    padding:0;min-height:100vh;}
+  .wrap{max-width:520px;margin:0 auto;padding:16px 14px 60px;}
+  .topbar{display:flex;align-items:center;gap:8px;padding:14px 0 8px;}
+  .topbar .logo{font-size:11px;letter-spacing:1.5px;color:var(--t3);font-weight:700;}
+  .header{background:linear-gradient(135deg,var(--card2),var(--card));border:1px solid var(--brd);border-radius:14px;
+    padding:20px 18px;margin-bottom:14px;}
+  .header .grupo{font-size:22px;font-weight:800;color:var(--gold);letter-spacing:.5px;}
+  .header .sub{font-size:12px;color:var(--t2);margin-top:2px;}
+  .stats3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px;}
+  .stat{background:rgba(0,0,0,.18);border-radius:10px;padding:10px 8px;text-align:center;}
+  .stat .v{font-size:19px;font-weight:800;color:var(--text);}
+  .stat .l{font-size:10px;color:var(--t2);margin-top:2px;text-transform:uppercase;letter-spacing:.5px;}
+  .section{background:var(--card);border:1px solid var(--brd);border-radius:12px;margin-bottom:12px;overflow:hidden;}
+  .section-h{padding:12px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--brd);}
+  .section-h .ic{font-size:16px;}
+  .section-h .t{font-size:13px;font-weight:700;color:var(--text);letter-spacing:.3px;text-transform:uppercase;}
+  .section-b{padding:14px 16px;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+  .field{background:var(--card2);border-radius:8px;padding:9px 11px;}
+  .field .l{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.3px;}
+  .field .v{font-size:14px;font-weight:700;color:var(--text);margin-top:2px;}
+  .field .v.gold{color:var(--gold);}
+  .field .v.green{color:var(--green);}
+  .compare{font-size:11px;color:var(--t2);margin-top:4px;}
+  .compare b{color:var(--text);}
+  .rotrow{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--brd);font-size:12px;}
+  .rotrow:last-child{border-bottom:none;}
+  .rotrow .fecha{color:var(--t2);}
+  .rotrow .kgms{color:var(--gold);font-weight:700;}
+  .barra-origen{margin-bottom:12px;}
+  .barra-origen-top{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;}
+  .barra-origen-top b{color:var(--text);}
+  .barra-track{height:8px;background:var(--card2);border-radius:4px;overflow:hidden;cursor:pointer;}
+  .barra-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--gold));border-radius:4px;}
+  .barra-detalle{display:none;margin-top:6px;padding:8px 10px;background:var(--card2);border-radius:6px;font-size:11px;color:var(--t2);font-family:monospace;}
+  .en-construccion{padding:24px 16px;text-align:center;color:var(--t3);}
+  .en-construccion .ic{font-size:30px;margin-bottom:8px;}
+  .en-construccion .msg{font-size:13px;}
+  .btn-vermas{width:100%;padding:13px;background:var(--card2);border:1px solid var(--brd);border-radius:10px;
+    color:var(--gold);font-weight:700;font-size:13px;text-align:center;cursor:pointer;margin-top:4px;}
+  .btn-vermas:active{background:var(--brd);}
+  table.detalle{width:100%;border-collapse:collapse;font-size:11px;}
+  table.detalle th{text-align:left;color:var(--t3);font-weight:700;padding:6px 4px;border-bottom:1px solid var(--brd);
+    text-transform:uppercase;font-size:9px;position:sticky;top:0;background:var(--card);}
+  table.detalle td{padding:6px 4px;border-bottom:1px solid var(--card2);color:var(--text);}
+  table.detalle td.mn{font-family:monospace;}
+  .loading{text-align:center;padding:60px 20px;color:var(--t2);}
+  .loading .sp{width:28px;height:28px;border:3px solid var(--brd);border-top-color:var(--gold);border-radius:50%;
+    margin:0 auto 12px;animation:spin 1s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .error{background:var(--card);border:1px solid var(--red);border-radius:12px;padding:20px;text-align:center;color:var(--t2);font-size:13px;}
+  .footer-note{text-align:center;font-size:10px;color:var(--t3);margin-top:20px;padding:0 20px;}
+  .modal-detalle{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:50;padding:12px;}
+  .modal-detalle.open{display:flex;align-items:flex-end;justify-content:center;}
+  .modal-detalle .card{background:var(--card);border-radius:16px 16px 0 0;max-width:520px;width:100%;
+    max-height:82vh;display:flex;flex-direction:column;}
+  .modal-detalle .mh{padding:14px 16px;border-bottom:1px solid var(--brd);display:flex;justify-content:space-between;align-items:center;}
+  .modal-detalle .mh .t{font-weight:700;font-size:14px;}
+  .modal-detalle .mh .x{font-size:20px;color:var(--t2);cursor:pointer;padding:4px 8px;}
+  .modal-detalle .mb{overflow-y:auto;padding:10px 16px 16px;}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="loading"><div class="sp"></div>Cargando datos del grupo…</div>
+</div>
+
+<div class="modal-detalle" id="moDetalle">
+  <div class="card">
+    <div class="mh"><div class="t">🐄 Animales del grupo</div><div class="x" onclick="cerrarDetalle()">✕</div></div>
+    <div class="mb"><div id="tablaDetalle"></div></div>
+  </div>
+</div>
+
+<script>
+const FB_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com/elprado1';
+
+const GRUS = {}; // se completa si hace falta mapear nombre técnico → display; por ahora el nombre del grupo ya es legible
+
+function qs(name){ return new URLSearchParams(location.search).get(name); }
+function fmt(n,d=0){ if(n==null||isNaN(n)) return '—'; return Number(n).toLocaleString('es-BO',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function fmtFecha(f){ if(!f) return '—'; const p=String(f).split('-'); if(p.length!==3) return f; return p[2]+'/'+p[1]+'/'+p[0]; }
+function parseFecha(f){
+  if(!f) return null;
+  const s=String(f).trim();
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  const p=s.split(/[\/\-]/);
+  if(p.length===3){ if(p[2].length===4) return p[2]+'-'+p[1].padStart(2,'0')+'-'+p[0].padStart(2,'0'); }
+  return null;
+}
+function diffDias(f1,f2){ return Math.round((new Date(f2+'T12:00:00')-new Date(f1+'T12:00:00'))/86400000); }
+function gestionInicio(hoy){
+  const y = hoy.getMonth()>=7 ? hoy.getFullYear() : hoy.getFullYear()-1; // mes 7 = agosto (0-index)
+  return y+'-08-01';
+}
+
+async function cargar(){
+  const grupo = qs('grupo');
+  const app = document.getElementById('app');
+  if(!grupo){
+    app.innerHTML = '<div class="error">Falta indicar el grupo en el link (parámetro <code>?grupo=</code>).</div>';
+    return;
+  }
+  try{
+    const [rAnim, rAct, rPes, rProd, rMovs] = await Promise.all([
+      fetch(FB_URL+'/hacienda/animales.json').then(r=>r.json()),
+      fetch(FB_URL+'/actividades.json').then(r=>r.json()),
+      fetch(FB_URL+'/hacienda/pesajes.json').then(r=>r.json()),
+      fetch(FB_URL+'/insumos/productos.json').then(r=>r.json()),
+      fetch(FB_URL+'/insumos/movimientos.json').then(r=>r.json())
+    ]);
+    const animales = rAnim || {};
+    const actividades = Array.isArray(rAct) ? rAct : Object.values(rAct||{});
+    const pesajes = Array.isArray(rPes) ? rPes : Object.values(rPes||{});
+    const productos = rProd || {};
+    const movimientos = rMovs || {};
+    // Último pesaje real por animal (el más reciente por fecha), igual criterio que el resto del sistema
+    const lastPes = {};
+    pesajes.forEach(p=>{
+      if(!p || !p.ide || !p.fecha) return;
+      if(!lastPes[p.ide] || p.fecha > lastPes[p.ide].fecha) lastPes[p.ide] = {peso:p.peso, fecha:p.fecha};
+    });
+    render(grupo, animales, actividades, lastPes, productos, movimientos);
+  }catch(e){
+    app.innerHTML = '<div class="error">No se pudo cargar la información. Revisá tu conexión e intentá de nuevo.<br><span style="font-size:10px;">'+e.message+'</span></div>';
+  }
+}
+
+function render(grupo, animales, actividades, lastPes, productos, movimientos){
+  const hoy = new Date();
+  const hoyStr = hoy.toISOString().slice(0,10);
+
+  const animGrupo = Object.entries(animales)
+    .map(([ide,a])=>({...a,ide}))
+    .filter(a=>a.estado==='ACTIVO' && (a.grupo||'')===grupo);
+
+  if(!animGrupo.length){
+    document.getElementById('app').innerHTML =
+      '<div class="topbar"><span class="logo">EL PRADO 1</span></div>'+
+      '<div class="error">No se encontraron animales activos en el grupo "'+grupo+'".</div>';
+    return;
+  }
+
+  // ── Peso proyectado, GMD histórica, por animal ──
+  let sumPesoH=0,nPH=0,sumGmd=0,nGmd=0;
+  const razaCount={}, origenCount={};
+  animGrupo.forEach(a=>{
+    razaCount[a.raza||'Sin dato']=(razaCount[a.raza||'Sin dato']||0)+1;
+    origenCount[a.origen||'Sin dato']=(origenCount[a.origen||'Sin dato']||0)+1;
+    const lp = lastPes[a.ide];
+    if(a.pesoIngreso && a.fechaIngreso && lp && lp.peso && lp.fecha){
+      const fi = parseFecha(a.fechaIngreso);
+      const dTot = fi ? diffDias(fi, lp.fecha) : null;
+      if(dTot>0){
+        const gmdR = (lp.peso-a.pesoIngreso)/dTot;
+        const dExt = Math.max(0, diffDias(lp.fecha, hoyStr));
+        const pH = lp.peso + gmdR*dExt;
+        sumPesoH+=pH; nPH++;
+        sumGmd+=gmdR; nGmd++;
+        a._pesoHoy = pH; a._gmdR = gmdR; a._ultPeso = lp.peso;
+      }
+    }
+  });
+  const cabezas = animGrupo.length;
+  const pesoProm = nPH>0 ? sumPesoH/nPH : (animGrupo.reduce((s,a)=>s+(a.pesoIngreso||0),0)/cabezas);
+  const gmdProm = nGmd>0 ? sumGmd/nGmd : null;
+
+  // ── GMD histórica de la MISMA categoría, en TODO el campo, para comparar ──
+  const categoria = animGrupo[0].categoria || null;
+  let sumGmdCat=0,nGmdCat=0;
+  if(categoria){
+    Object.entries(animales).forEach(([ide,a])=>{
+      const lp = lastPes[ide];
+      if(a.categoria===categoria && a.pesoIngreso && a.fechaIngreso && lp && lp.peso && lp.fecha){
+        const fi = parseFecha(a.fechaIngreso);
+        const dTot = fi ? diffDias(fi, lp.fecha) : null;
+        if(dTot>0){ sumGmdCat += (lp.peso-a.pesoIngreso)/dTot; nGmdCat++; }
+      }
+    });
+  }
+  const gmdCatProm = nGmdCat>0 ? sumGmdCat/nGmdCat : null;
+
+  // ── Actividades de este grupo: potrero actual / potrero de mañana ──
+  const actsGrupo = actividades.filter(x=>(x.lote||'')===grupo && x.fechaIng)
+    .sort((a,b)=> (b.fechaIng||'').localeCompare(a.fechaIng||''));
+  const actualEnt = actsGrupo.find(x=> x.fechaIng<=hoyStr && (!x.fechaSal || x.fechaSal>=hoyStr)) || actsGrupo[0] || null;
+  const futuras = actividades.filter(x=>(x.lote||'')===grupo && x.fechaIng && x.fechaIng>hoyStr)
+    .sort((a,b)=>(a.fechaIng||'').localeCompare(b.fechaIng||''));
+  const proximaEnt = futuras[0] || null;
+
+  // ── Historial reciente + producción MS acumulada de la gestión, para ese mismo potrero+parcela ──
+  let historialPotrero=[], produccionGestion=null, vecesGestion=0;
+  if(actualEnt && actualEnt.potrero){
+    const mismoPotrero = actividades.filter(x=>
+      x.potrero===actualEnt.potrero && x.parcela===actualEnt.parcela && x.fechaIng
+    ).sort((a,b)=>(b.fechaIng||'').localeCompare(a.fechaIng||''));
+    historialPotrero = mismoPotrero.slice(0,3);
+    const inicioGestion = gestionInicio(hoy);
+    const enGestion = mismoPotrero.filter(x=>x.fechaIng>=inicioGestion && x.fechaIng<=hoyStr);
+    vecesGestion = enGestion.length;
+    if(enGestion.length){
+      produccionGestion = enGestion.reduce((s,x)=>s+(x.kgMsHa||0),0);
+    }
+  }
+
+  // ── NUTRICIÓN: consumo de sal/suplemento, misma lógica que insumos_elprado1.html ──
+  const salidasGrupo = Object.entries(movimientos)
+    .filter(([,m])=>m && m.tipo==='SALIDA' && m.productoId && m.grupo===grupo && m.fecha)
+    .map(([id,m])=>({id,...m}))
+    .sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  const porProducto = {};
+  salidasGrupo.forEach(s=>{ (porProducto[s.productoId]=porProducto[s.productoId]||[]).push(s); });
+  const consumos = [];
+  Object.entries(porProducto).forEach(([prodId, arr])=>{
+    const ultimo = arr[arr.length-1];
+    const anterior = arr.length>1 ? arr[arr.length-2] : null;
+    const fechaIni = new Date(ultimo.fecha+'T12:00:00');
+    const dias = Math.max(1, Math.round((hoy - fechaIni)/86400000));
+    const kg = parseFloat(ultimo.cantidad)||0;
+    const kgDia = kg/dias;
+    const gCabDia = cabezas>0 ? (kgDia/cabezas*1000) : null;
+    const g100kgDia = (cabezas>0 && pesoProm>0) ? (kgDia/cabezas/pesoProm*100*1000) : null;
+    let estado='none';
+    if(g100kgDia!==null){ if(g100kgDia>=40) estado='ok'; else if(g100kgDia>=30) estado='warn'; else estado='low'; }
+    consumos.push({prodNom:productos[prodId]?.nombre||'—', tipo:productos[prodId]?.tipo||'', fechaIni:ultimo.fecha, dias, gCabDia, g100kgDia, estado});
+  });
+
+  // ── HTML ──
+  const razaHtml = Object.entries(razaCount).sort((a,b)=>b[1]-a[1])
+    .map(([r,n])=>r+' '+Math.round(n/cabezas*100)+'%').join(' · ');
+
+  let html = '';
+  html += `<div class="topbar"><span class="logo">🌱 EL PRADO 1 — SAN IGNACIO DE VELASCO</span></div>`;
+
+  html += `<div class="header">
+    <div class="grupo">${grupo}</div>
+    <div class="sub">Actualizado en vivo · ${new Date().toLocaleDateString('es-BO')}</div>
+    <div class="stats3">
+      <div class="stat"><div class="v">${cabezas}</div><div class="l">Cabezas</div></div>
+      <div class="stat"><div class="v gold">${fmt(pesoProm)} kg</div><div class="l">Peso Prom.</div></div>
+      <div class="stat"><div class="v green">${gmdProm!=null?fmt(gmdProm,3):'—'}</div><div class="l">GMD kg/día</div></div>
+    </div>
+  </div>`;
+
+  // ── PRODUCTIVO ──
+  html += `<div class="section"><div class="section-h"><span class="ic">🌾</span><span class="t">Datos Productivos</span></div><div class="section-b">`;
+  html += `<div class="row2">
+    <div class="field"><div class="l">Potrero actual</div><div class="v">${actualEnt?actualEnt.potrero+' — Parc. '+actualEnt.parcela:'—'}</div></div>
+    <div class="field"><div class="l">Potrero mañana</div><div class="v">${proximaEnt?proximaEnt.potrero+' — Parc. '+proximaEnt.parcela:'Sin definir'}</div></div>
+  </div>`;
+  html += `<div class="row2">
+    <div class="field"><div class="l">Tamaño parcela</div><div class="v">${actualEnt?.ha?fmt(actualEnt.ha,2)+' ha':'—'}</div></div>
+    <div class="field"><div class="l">Dimensiones</div><div class="v">${actualEnt?.anchoM?fmt(actualEnt.anchoM,0)+'m × '+fmt(actualEnt.largoM,0)+'m':'—'}</div></div>
+  </div>`;
+  html += `<div class="row2">
+    <div class="field"><div class="l">% Materia Seca</div><div class="v gold">${actualEnt?.pctMs!=null?fmt(actualEnt.pctMs*100,1)+'%':'—'}</div></div>
+    <div class="field"><div class="l">Kg MS/ha</div><div class="v gold">${actualEnt?.kgMsHa!=null?fmt(actualEnt.kgMsHa,0):'—'}</div></div>
+  </div>`;
+  html += `<div class="row2">
+    <div class="field"><div class="l">Carga instantánea</div><div class="v">${actualEnt?.uaHa!=null?fmt(actualEnt.uaHa,2)+' UA/ha':'—'}</div></div>
+    <div class="field"><div class="l">Descanso previo</div><div class="v">${actualEnt?.retorno!=null?actualEnt.retorno+' días':'—'}</div></div>
+  </div>`;
+  html += `<div class="field" style="margin-bottom:10px;"><div class="l">Composición racial</div><div class="v" style="font-size:12px;">${razaHtml||'—'}</div></div>`;
+
+  if(gmdCatProm!=null && gmdProm!=null){
+    const dif = gmdProm-gmdCatProm;
+    html += `<div class="compare">GMD de este grupo (<b>${fmt(gmdProm,3)} kg/d</b>) vs. promedio histórico de ${categoria||'esta categoría'} en el campo (<b>${fmt(gmdCatProm,3)} kg/d</b>) — ${dif>=0?'<span style="color:var(--green);">▲ '+fmt(Math.abs(dif),3)+' arriba</span>':'<span style="color:var(--orange);">▼ '+fmt(Math.abs(dif),3)+' abajo</span>'} del histórico.</div>`;
+  }
+
+  if(historialPotrero.length){
+    html += `<div style="margin-top:14px;font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.3px;font-weight:700;">Últimas rotaciones en este potrero</div>`;
+    historialPotrero.forEach(x=>{
+      html += `<div class="rotrow"><span class="fecha">${fmtFecha(x.fechaIng)} — ${x.lote||'—'}</span><span class="kgms">${x.kgMsHa!=null?fmt(x.kgMsHa,0)+' kg MS/ha':'—'}</span></div>`;
+    });
+  }
+
+  if(produccionGestion!=null){
+    html += `<div class="field" style="margin-top:12px;background:rgba(224,184,74,.1);border:1px solid var(--gold);">
+      <div class="l">Producción MS acumulada — Gestión ${gestionInicio(hoy).slice(0,4)}-${(+gestionInicio(hoy).slice(0,4)+1)}</div>
+      <div class="v gold" style="font-size:17px;">${fmt(produccionGestion,0)} kg MS/ha</div>
+      <div style="font-size:10px;color:var(--t3);margin-top:2px;">Suma real de ${vecesGestion} entrada${vecesGestion!==1?'s':''} a este potrero desde el 1 de agosto</div>
+    </div>`;
+  }
+  html += `</div></div>`;
+
+  // ── NUTRICIÓN ──
+  html += `<div class="section"><div class="section-h"><span class="ic">🧂</span><span class="t">Nutrición</span></div><div class="section-b">`;
+  if(!consumos.length){
+    html += `<div style="color:var(--t2);font-size:12px;text-align:center;padding:10px 0;">Sin registro de sal/suplemento asignado a este grupo todavía.</div>`;
+  } else {
+    consumos.forEach(c=>{
+      const col = c.estado==='ok'?'var(--green)':c.estado==='warn'?'var(--orange)':c.estado==='low'?'var(--red)':'var(--t3)';
+      const label = c.estado==='ok'?'✔ Consumo adecuado':c.estado==='warn'?'⚠ Consumo bajo':c.estado==='low'?'⛔ Consumo insuficiente':'—';
+      html += `<div class="field" style="margin-bottom:10px;">
+        <div class="l">${c.prodNom}${c.tipo?' — '+c.tipo.replace('_',' '):''}</div>
+        <div class="row2" style="margin-top:6px;margin-bottom:0;">
+          <div class="field" style="background:rgba(0,0,0,.15);"><div class="l">g/cabeza/día</div><div class="v gold">${c.gCabDia!=null?fmt(c.gCabDia,0)+' g':'—'}</div></div>
+          <div class="field" style="background:rgba(0,0,0,.15);"><div class="l">g / 100kg PV / día</div><div class="v gold">${c.g100kgDia!=null?fmt(c.g100kgDia,0)+' g':'—'}</div></div>
+        </div>
+        <div class="compare" style="margin-top:6px;color:${col};font-weight:700;">${label}</div>
+        <div style="font-size:10px;color:var(--t3);margin-top:2px;">Desde ${fmtFecha(c.fechaIni)} (${c.dias} días) — período vigente</div>
+      </div>`;
+    });
+  }
+  html += `</div></div>`;
+
+  // ── SANITARIO (en construcción) ──
+  html += `<div class="section"><div class="section-h"><span class="ic">💉</span><span class="t">Datos Sanitarios</span></div>
+    <div class="en-construccion"><div class="ic">🚧</div><div class="msg">En construcción — próximamente vas a ver acá el último HPG y desparasitación de este grupo.</div></div>
+  </div>`;
+
+  // ── COMPOSICIÓN POR ORIGEN ──
+  html += `<div class="section"><div class="section-h"><span class="ic">📍</span><span class="t">Composición por Origen</span></div><div class="section-b">`;
+  const origenesOrdenados = Object.entries(origenCount).sort((a,b)=>b[1]-a[1]);
+  origenesOrdenados.forEach(([origen,n],i)=>{
+    const pct = Math.round(n/cabezas*100);
+    const chips = animGrupo.filter(a=>(a.origen||'Sin dato')===origen).map(a=>a.ide);
+    html += `<div class="barra-origen">
+      <div class="barra-origen-top"><span>${origen}</span><b>${pct}% (${n})</b></div>
+      <div class="barra-track" onclick="toggleOrigenDetalle(${i})"><div class="barra-fill" style="width:${pct}%;"></div></div>
+      <div class="barra-detalle" id="origenDet${i}">${chips.join(' · ')}</div>
+    </div>`;
+  });
+  html += `<button class="btn-vermas" onclick="verDetalleAnimales()">Ver los ${cabezas} animales del grupo →</button>`;
+  html += `</div></div>`;
+
+  html += `<div class="footer-note">Sistema de Gestión Ganadera El Prado 1 · San Ignacio de Velasco</div>`;
+
+  document.getElementById('app').innerHTML = html;
+  window._animGrupo = animGrupo; // para el modal de detalle
+}
+
+function toggleOrigenDetalle(i){
+  const el = document.getElementById('origenDet'+i);
+  el.style.display = el.style.display==='block' ? 'none' : 'block';
+}
+
+function verDetalleAnimales(){
+  const arr = window._animGrupo||[];
+  let html = '<table class="detalle"><thead><tr><th>IDE</th><th>F.Ing.</th><th>Origen</th><th>Peso Ing.</th><th>P.Compra</th><th>Últ.Peso</th><th>GMD</th></tr></thead><tbody>';
+  arr.forEach(a=>{
+    html += `<tr>
+      <td class="mn">${String(a.ide).slice(-8)}</td>
+      <td>${fmtFecha(a.fechaIngreso)}</td>
+      <td>${a.origen||'—'}</td>
+      <td>${a.pesoIngreso?a.pesoIngreso+' kg':'—'}</td>
+      <td>${a.precioCompra?'Bs '+fmt(a.precioCompra):'—'}</td>
+      <td>${a._pesoHoy?fmt(a._pesoHoy)+' kg':(a._ultPeso?a._ultPeso+' kg':'—')}</td>
+      <td>${a._gmdR!=null?fmt(a._gmdR,3):'—'}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('tablaDetalle').innerHTML = html;
+  document.getElementById('moDetalle').classList.add('open');
+}
+function cerrarDetalle(){ document.getElementById('moDetalle').classList.remove('open'); }
+
+cargar();
+</script>
+</body>
+</html>
