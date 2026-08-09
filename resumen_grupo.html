@@ -204,6 +204,7 @@ function render(grupo, animales, actividades, lastPes, productos, movimientos){
 
   // ── Historial reciente + producción MS acumulada de la gestión, para ese mismo potrero+parcela ──
   let historialPotrero=[], produccionGestion=null, vecesGestion=0;
+  let produccionGestionAnt=null, vecesGestionAnt=0, gestionAntLabel='';
   if(actualEnt && actualEnt.potrero){
     const mismoPotrero = actividades.filter(x=>
       x.potrero===actualEnt.potrero && x.parcela===actualEnt.parcela && x.fechaIng
@@ -214,6 +215,16 @@ function render(grupo, animales, actividades, lastPes, productos, movimientos){
     vecesGestion = enGestion.length;
     if(enGestion.length){
       produccionGestion = enGestion.reduce((s,x)=>s+(x.kgMsHa||0),0);
+    }
+    // Gestión anterior CERRADA (1 año antes del inicio de la actual, hasta el día previo)
+    const [yIni] = inicioGestion.split('-');
+    const inicioGestionAnt = (parseInt(yIni)-1)+'-08-01';
+    const finGestionAnt = inicioGestion.split('-')[0]+'-07-31';
+    gestionAntLabel = (parseInt(yIni)-1)+'-'+yIni;
+    const enGestionAnt = mismoPotrero.filter(x=>x.fechaIng>=inicioGestionAnt && x.fechaIng<=finGestionAnt);
+    vecesGestionAnt = enGestionAnt.length;
+    if(enGestionAnt.length){
+      produccionGestionAnt = enGestionAnt.reduce((s,x)=>s+(x.kgMsHa||0),0);
     }
   }
 
@@ -290,9 +301,16 @@ function render(grupo, animales, actividades, lastPes, productos, movimientos){
 
   if(produccionGestion!=null){
     html += `<div class="field" style="margin-top:12px;background:rgba(224,184,74,.1);border:1px solid var(--gold);">
-      <div class="l">Producción MS acumulada — Gestión ${gestionInicio(hoy).slice(0,4)}-${(+gestionInicio(hoy).slice(0,4)+1)}</div>
+      <div class="l">Producción MS acumulada — Gestión ${gestionInicio(hoy).slice(0,4)}-${(+gestionInicio(hoy).slice(0,4)+1)} (en curso)</div>
       <div class="v gold" style="font-size:17px;">${fmt(produccionGestion,0)} kg MS/ha</div>
       <div style="font-size:10px;color:var(--t3);margin-top:2px;">Suma real de ${vecesGestion} entrada${vecesGestion!==1?'s':''} a este potrero desde el 1 de agosto</div>
+    </div>`;
+  }
+  if(produccionGestionAnt!=null){
+    html += `<div class="field" style="margin-top:8px;background:rgba(74,159,224,.08);border:1px solid var(--blue);">
+      <div class="l">Producción MS total — Gestión ${gestionAntLabel} (cerrada)</div>
+      <div class="v" style="font-size:17px;color:var(--blue);">${fmt(produccionGestionAnt,0)} kg MS/ha</div>
+      <div style="font-size:10px;color:var(--t3);margin-top:2px;">Suma real de ${vecesGestionAnt} entrada${vecesGestionAnt!==1?'s':''} a este potrero en esa gestión completa</div>
     </div>`;
   }
   html += `</div></div>`;
