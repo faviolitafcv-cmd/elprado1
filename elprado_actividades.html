@@ -1637,11 +1637,28 @@ tr:hover td { background: rgba(255,255,255,.02); }
     <div class="card-title"><span>🏆</span> Ranking de Potreros — Producción de MS Anualizada
       <span style="font-size:10px;color:var(--text3);font-weight:400;margin-left:8px;">Comparación normalizada por descanso, para decisiones de resiembra</span>
     </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
+      <div class="form-group" style="margin:0;">
+        <label style="font-size:10px;">Gestión</label>
+        <select id="rkGestion" onchange="renderRankingPotreros()">
+          <option value="">Todas</option>
+        </select>
+      </div>
+    </div>
+    <div id="rkResumen" style="margin-bottom:16px;"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span>📋</span> Detalle por Potrero
+      <span style="font-size:10px;color:var(--text3);font-weight:400;margin-left:8px;">Dentro de la gestión seleccionada arriba</span>
+    </div>
     <div style="font-size:11px;color:var(--text3);margin-bottom:14px;line-height:1.6;">
-      Este número NO es la suma real de lo que produjo cada potrero — es una estimación:
-      <b>(producción promedio por pase) × (365 días ÷ descanso promedio)</b>, para poder comparar potreros
-      aunque hayan rotado una cantidad distinta de veces en el año. Cuantas menos mediciones tenga un potrero,
-      menos confiable es su número — fijate en la columna "Mediciones" antes de decidir.
+      "Prod. Anualizada" NO es la suma real de lo que produjo cada potrero — es una estimación:
+      <b>(producción promedio por vuelta) × (365 días ÷ descanso promedio)</b>, para poder comparar potreros
+      aunque hayan rotado una cantidad distinta de veces. El promedio se calcula por <b>vuelta de rotación</b>
+      (todas las parcelas visitadas en fechas cercanas), no por medición suelta, y descarta automáticamente
+      datos que se desvían fuerte de sus vecinas de la misma vuelta (🔍 = dato revisado y excluido del promedio,
+      pero sigue existiendo en el registro original).
     </div>
     <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
       <div class="form-group" style="margin:0;">
@@ -1668,13 +1685,13 @@ tr:hover td { background: rgba(255,255,255,.02); }
       <button class="btn btn-secondary btn-sm" style="margin-top:14px;" onclick="abrirConfigEpocas()">⚙ Configurar meses de cada época</button>
     </div>
     <div style="overflow-x:auto;">
-      <table class="tbl" style="width:100%;min-width:900px;">
+      <table class="tbl" style="width:100%;min-width:950px;">
         <thead><tr>
-          <th>POTRERO</th><th>VARIEDAD</th><th>MEDICIONES</th>
-          <th>DESCANSO PROM.</th><th>PROD. PROM/PASE</th><th>ROT. EST./AÑO</th>
+          <th>POTRERO</th><th>VARIEDAD</th><th>CONFIANZA</th><th>VUELTAS</th>
+          <th>DESCANSO PROM.</th><th>PROD. PROM/VUELTA</th><th>ROT. EST./AÑO</th>
           <th>PROD. ANUALIZADA</th><th>TOTAL REAL ACUM.</th><th>VS. MEDIA VARIEDAD</th>
         </tr></thead>
-        <tbody id="rkBody"><tr><td colspan="9" style="text-align:center;color:var(--text3);padding:20px;">Cargando…</td></tr></tbody>
+        <tbody id="rkBody"><tr><td colspan="10" style="text-align:center;color:var(--text3);padding:20px;">Cargando…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -2466,23 +2483,143 @@ function poblarSelectVariedadRanking(){
   sel.dataset.poblado='1';
 }
 
+function poblarSelectGestionRanking(){
+  const sel = document.getElementById('rkGestion');
+  if(!sel || sel.dataset.poblado) return;
+  const acts = getActividades().filter(a=>a.actividad==='MATERIA SECA');
+  const gestiones = [...new Set(acts.map(a=>a.gestion).filter(Boolean))].sort().reverse();
+  gestiones.forEach(g=>{
+    const opt=document.createElement('option'); opt.value=g; opt.textContent=g===getGestionActual()?g+' (en curso)':g;
+    sel.appendChild(opt);
+  });
+  sel.value = getGestionActual();
+  sel.dataset.poblado='1';
+}
+
+// ── Detecta "vueltas" de rotación dentro de un potrero: agrupa mediciones cuyas
+//    fechas están cerca entre sí (misma pasada por todas las parcelas del potrero),
+//    separando cuando aparece un salto de tiempo mucho más grande que los saltos chicos
+//    que veníamos viendo. No usa un número fijo de días — se adapta a cada potrero.
+function detectarVueltas(items){
+  const ordenados = [...items].sort((a,b)=>String(a.fechaIng).localeCompare(String(b.fechaIng)));
+  if(ordenados.length<=1) return [ordenados];
+  const gaps = [];
+  for(let i=1;i<ordenados.length;i++){
+    const d1=new Date(ordenados[i-1].fechaIng+'T12:00:00'), d2=new Date(ordenados[i].fechaIng+'T12:00:00');
+    gaps.push(Math.round((d2-d1)/86400000));
+  }
+  const gapsOrdenados=[...gaps].sort((a,b)=>a-b);
+  const mediana = gapsOrdenados[Math.floor(gapsOrdenados.length/2)] || 1;
+  const umbral = Math.max(mediana*2.5, 5); // salto "grande" = bastante más que lo típico entre parcelas de este potrero
+  const vueltas=[[ordenados[0]]];
+  for(let i=1;i<ordenados.length;i++){
+    if(gaps[i-1] > umbral) vueltas.push([]);
+    vueltas[vueltas.length-1].push(ordenados[i]);
+  }
+  return vueltas;
+}
+
+// ── Filtro de datos raros por rango intercuartílico (IQR): mira dónde se agrupa
+//    la mayoría de los valores, y marca como sospechoso lo que queda muy lejos de ese
+//    grupo — sin dejarse arrastrar por el propio dato extremo (a diferencia de comparar
+//    contra el promedio). Necesita al menos 4 valores para poder aplicarse con sentido;
+//    con menos, no se descarta nada (no hay con qué comparar de forma confiable).
+function filtrarOutliersIQR(items, campo){
+  const valores = items.map(x=>x[campo]).filter(v=>v!=null && v>0);
+  if(valores.length<4) return {validos:items, outliers:[]};
+  const ord=[...valores].sort((a,b)=>a-b);
+  const q1=ord[Math.floor(ord.length*0.25)], q3=ord[Math.floor(ord.length*0.75)];
+  const iqr=q3-q1;
+  const low=q1-1.5*iqr, high=q3+1.5*iqr;
+  const validos=[], outliers=[];
+  items.forEach(x=>{
+    const v=x[campo];
+    if(v==null || v<=0){ validos.push(x); return; } // no aplica el filtro si no tiene el dato
+    if(v<low || v>high) outliers.push(x); else validos.push(x);
+  });
+  return {validos, outliers};
+}
+
+function renderRankingResumen(){
+  const div = document.getElementById('rkResumen');
+  if(!div) return;
+  poblarSelectGestionRanking();
+  const gestionSel = document.getElementById('rkGestion')?.value || '';
+  const epocas = getEpocas();
+
+  let acts = getActividades().filter(a=>a.actividad==='MATERIA SECA' && a.potrero && a.fechaIng && a.kgMsHa!=null);
+  if(gestionSel) acts = acts.filter(a=>a.gestion===gestionSel);
+
+  // Toneladas totales por variedad = TODOS los datos crudos, sumados (kg/ha × ha de cada registro)
+  const porVariedad = {};
+  acts.forEach(a=>{
+    const v = a.variedad||'Sin variedad';
+    if(!porVariedad[v]) porVariedad[v] = {kg:0, n:0};
+    porVariedad[v].kg += (a.kgMsHa||0) * (a.ha||0);
+    porVariedad[v].n++;
+  });
+
+  // Descanso promedio de campo, por época — usando promedio por vuelta (no medición suelta),
+  // descartando outliers dentro de cada vuelta, igual criterio que la tabla de detalle.
+  function descansoPromCampo(epocaKey){
+    const mesesEpoca = epocas[epocaKey]||[];
+    const actsEpoca = acts.filter(a=>mesesEpoca.includes(parseInt(String(a.fechaIng).slice(5,7))));
+    const porPot = {};
+    actsEpoca.forEach(a=>{ (porPot[a.potrero]=porPot[a.potrero]||[]).push(a); });
+    const descansosVuelta=[];
+    Object.values(porPot).forEach(items=>{
+      detectarVueltas(items).forEach(v=>{
+        const {validos} = filtrarOutliersIQR(v,'retorno');
+        const ds = validos.map(x=>x.retorno).filter(x=>x!=null&&x>0);
+        if(ds.length) descansosVuelta.push(ds.reduce((s,x)=>s+x,0)/ds.length);
+      });
+    });
+    return descansosVuelta.length ? descansosVuelta.reduce((s,x)=>s+x,0)/descansosVuelta.length : null;
+  }
+  const descansoLluvia = descansoPromCampo('LLUVIA');
+  const descansoSeca = descansoPromCampo('SECA');
+
+  let html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">';
+  Object.entries(porVariedad).forEach(([v,d])=>{
+    html += `<div style="background:var(--card2);border-radius:8px;padding:12px;">
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;">Producción ${v}</div>
+      <div style="font-size:20px;font-weight:800;color:var(--gold);">${(d.kg/1000).toLocaleString('es-BO',{maximumFractionDigits:1})} ton</div>
+      <div style="font-size:10px;color:var(--text3);margin-top:2px;">Basado en ${d.n} medición${d.n!==1?'es':''} — puede no cubrir el 100% de las parcelas</div>
+    </div>`;
+  });
+  html += `<div style="background:rgba(74,159,224,.08);border:1px solid var(--blue2, #4a9fe0);border-radius:8px;padding:12px;">
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;">🌧 Descanso prom. — Lluvia</div>
+      <div style="font-size:20px;font-weight:800;">${descansoLluvia!=null?Math.round(descansoLluvia)+' días':'—'}</div>
+    </div>
+    <div style="background:rgba(224,184,74,.08);border:1px solid var(--gold);border-radius:8px;padding:12px;">
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;">☀ Descanso prom. — Seca</div>
+      <div style="font-size:20px;font-weight:800;">${descansoSeca!=null?Math.round(descansoSeca)+' días':'—'}</div>
+    </div>`;
+  html += '</div>';
+  if(!Object.keys(porVariedad).length){
+    html = '<div style="color:var(--text3);font-size:12px;">Sin datos de Materia Seca para esta gestión.</div>';
+  }
+  div.innerHTML = html;
+}
+
 function renderRankingPotreros(){
   poblarSelectVariedadRanking();
+  poblarSelectGestionRanking();
+  renderRankingResumen();
   const tbody = document.getElementById('rkBody');
   if(!tbody) return;
+  const gestionSel = document.getElementById('rkGestion')?.value || '';
   const variedadFiltro = document.getElementById('rkVariedad')?.value || '';
   const epocaSel = document.getElementById('rkEpoca')?.value || 'GENERAL';
   const orden = document.getElementById('rkOrden')?.value || 'desc';
   const epocas = getEpocas();
 
   let acts = getActividades().filter(a=>a.actividad==='MATERIA SECA' && a.potrero && a.fechaIng && a.kgMsHa!=null);
+  if(gestionSel) acts = acts.filter(a=>a.gestion===gestionSel);
   if(variedadFiltro) acts = acts.filter(a=>a.variedad===variedadFiltro);
   if(epocaSel!=='GENERAL'){
     const mesesEpoca = epocas[epocaSel]||[];
-    acts = acts.filter(a=>{
-      const mes = parseInt(String(a.fechaIng).slice(5,7));
-      return mesesEpoca.includes(mes);
-    });
+    acts = acts.filter(a=>mesesEpoca.includes(parseInt(String(a.fechaIng).slice(5,7))));
   }
   const diasEpoca = epocaSel==='GENERAL' ? 365 : (epocas[epocaSel]||[]).length*30.4;
 
@@ -2495,17 +2632,30 @@ function renderRankingPotreros(){
   });
 
   const filas = Object.values(porPotrero).map(g=>{
-    const n = g.items.length;
-    const sumProd = g.items.reduce((s,x)=>s+(x.kgMsHa||0),0);
-    const prodProm = n>0 ? sumProd/n : 0;
-    const descansos = g.items.map(x=>x.retorno).filter(x=>x!=null && x>0);
-    const descansoProm = descansos.length>0 ? descansos.reduce((s,x)=>s+x,0)/descansos.length : null;
+    const vueltas = detectarVueltas(g.items);
+    let totalOutliers = 0;
+    const prodPorVuelta=[], descansoPorVuelta=[];
+    vueltas.forEach(v=>{
+      const fProd = filtrarOutliersIQR(v,'kgMsHa');
+      const fDesc = filtrarOutliersIQR(v,'retorno');
+      totalOutliers += fProd.outliers.length + fDesc.outliers.length;
+      const prodVals = fProd.validos.map(x=>x.kgMsHa).filter(x=>x!=null);
+      const descVals = fDesc.validos.map(x=>x.retorno).filter(x=>x!=null&&x>0);
+      if(prodVals.length) prodPorVuelta.push(prodVals.reduce((s,x)=>s+x,0)/prodVals.length);
+      if(descVals.length) descansoPorVuelta.push(descVals.reduce((s,x)=>s+x,0)/descVals.length);
+    });
+    const nMediciones = g.items.length;
+    const nVueltas = vueltas.length;
+    const prodProm = prodPorVuelta.length ? prodPorVuelta.reduce((s,x)=>s+x,0)/prodPorVuelta.length : 0;
+    const descansoProm = descansoPorVuelta.length ? descansoPorVuelta.reduce((s,x)=>s+x,0)/descansoPorVuelta.length : null;
     const rotEst = descansoProm>0 ? diasEpoca/descansoProm : null;
     const prodAnualizada = (rotEst!=null) ? prodProm*rotEst : null;
-    return {potrero:g.potrero, variedad:g.variedad, n, descansoProm, prodProm, rotEst, prodAnualizada, totalReal:sumProd};
+    const totalReal = g.items.reduce((s,x)=>s+(x.kgMsHa||0),0);
+    return {potrero:g.potrero, variedad:g.variedad, nMediciones, nVueltas, totalOutliers,
+      descansoProm, prodProm, rotEst, prodAnualizada, totalReal};
   });
 
-  // Media de la variedad (dentro de lo ya filtrado por época), para marcar arriba/abajo
+  // Media de la variedad (dentro de lo ya filtrado), para marcar arriba/abajo
   const mediasPorVariedad = {};
   filas.forEach(f=>{
     if(f.prodAnualizada==null) return;
@@ -2526,18 +2676,20 @@ function renderRankingPotreros(){
   });
 
   if(!filas.length){
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:20px;">Sin datos para este filtro</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text3);padding:20px;">Sin datos para este filtro</td></tr>';
     return;
   }
 
   tbody.innerHTML = filas.map(f=>{
-    const confianza = f.n<3 ? 'style="color:#f90;"' : '';
+    // Semáforo de confianza: según cantidad de VUELTAS (pasadas de rotación), no mediciones sueltas
+    const conf = f.nVueltas>=6 ? {c:'🟢',t:'var(--green2)'} : f.nVueltas>=3 ? {c:'🟡',t:'#f0973a'} : {c:'🔴',t:'#e05a4a'};
     const vsMediaTxt = f.vsMedia!=null ? (f.vsMedia>=0?'▲ +':'▼ ')+Math.round(f.vsMedia)+'%' : '—';
     const vsMediaColor = f.vsMedia==null ? 'var(--text3)' : f.vsMedia>=0 ? 'var(--green2)' : '#e05a4a';
     return `<tr>
       <td><b>${f.potrero}</b></td>
       <td>${f.variedad||'—'}</td>
-      <td ${confianza}>${f.n}${f.n<3?' ⚠':''}</td>
+      <td style="color:${conf.t};">${conf.c} ${f.nMediciones} med.</td>
+      <td>${f.nVueltas}${f.totalOutliers?' <span title="'+f.totalOutliers+' dato(s) excluido(s) por desviarse de sus vecinos" style="cursor:help;">🔍×'+f.totalOutliers+'</span>':''}</td>
       <td>${f.descansoProm!=null?Math.round(f.descansoProm)+' días':'—'}</td>
       <td>${Math.round(f.prodProm)} kg/ha</td>
       <td>${f.rotEst!=null?f.rotEst.toFixed(1):'—'}</td>
