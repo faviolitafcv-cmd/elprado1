@@ -224,8 +224,9 @@ function render(grupo, animales, actividades, lastPes, productos, movimientos){
   let historialPotrero=[], produccionGestion=null, vecesGestion=0;
   let produccionGestionAnt=null, vecesGestionAnt=0, gestionAntLabel='';
   if(actualEnt && actualEnt.potrero){
+    // Todo el POTRERO (todas sus parcelas), no solo la parcela puntual donde está el grupo ahora
     const mismoPotrero = actividades.filter(x=>
-      x.potrero===actualEnt.potrero && x.parcela===actualEnt.parcela && x.fechaIng
+      x.potrero===actualEnt.potrero && x.fechaIng
     ).sort((a,b)=>(b.fechaIng||'').localeCompare(a.fechaIng||''));
     historialPotrero = mismoPotrero.slice(0,3);
     const inicioGestion = gestionInicio(hoy);
@@ -321,7 +322,7 @@ function render(grupo, animales, actividades, lastPes, productos, movimientos){
   if(historialPotrero.length){
     html += `<div style="margin-top:14px;font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.3px;font-weight:700;">Últimas rotaciones en este potrero</div>`;
     historialPotrero.forEach(x=>{
-      html += `<div class="rotrow"><span class="fecha">${fmtFecha(x.fechaIng)} — ${x.lote||'—'}</span><span class="kgms">${x.kgMsHa!=null?fmt(x.kgMsHa,0)+' kg MS/ha':'—'}</span></div>`;
+      html += `<div class="rotrow"><span class="fecha">${fmtFecha(x.fechaIng)} — Parc. ${x.parcela||'—'} · ${x.lote||'—'}</span><span class="kgms">${x.kgMsHa!=null?fmt(x.kgMsHa,0)+' kg MS/ha':'—'}</span></div>`;
     });
   }
 
