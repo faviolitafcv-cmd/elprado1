@@ -181,6 +181,7 @@ function render(grupo, animales, actividades, lastPes, productos, movimientos){
 
   // ── GMD histórica de la MISMA categoría, en TODO el campo, para comparar ──
   const categoria = animGrupo[0].categoria || null;
+  const tipo = animGrupo[0].tipo || null;
   let sumGmdCat=0,nGmdCat=0;
   if(categoria){
     Object.entries(animales).forEach(([ide,a])=>{
@@ -193,6 +194,23 @@ function render(grupo, animales, actividades, lastPes, productos, movimientos){
     });
   }
   const gmdCatProm = nGmdCat>0 ? sumGmdCat/nGmdCat : null;
+
+  // ── Peso mínimo de venta (mismos valores que Proyecciones) y proyección de fecha ──
+  const PESO_MIN = {'INVERNADA|VAQUILLA':360,'INVERNADA|TORILLO':450,'INVERNADA|TORILLO_ANT':350,'INVERNADA|VACA':380};
+  function getPesoMin(t,c){ if(t==='CRIA-REPRODUCTORES') return null; return PESO_MIN[t+'|'+c]||PESO_MIN['INVERNADA|'+c]||null; }
+  const pesoMinVenta = getPesoMin(tipo, categoria);
+  let estadoVenta=null; // {listo:bool, faltanKg, mesEstimado}
+  if(pesoMinVenta!=null){
+    if(pesoProm>=pesoMinVenta){
+      estadoVenta={listo:true};
+    } else if(gmdProm>0){
+      const faltanKg=pesoMinVenta-pesoProm;
+      const diasFaltan=Math.ceil(faltanKg/gmdProm);
+      const fechaEst=new Date(hoy.getTime()+diasFaltan*86400000);
+      const meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      estadoVenta={listo:false, faltanKg, mesEstimado:meses[fechaEst.getMonth()]+' '+fechaEst.getFullYear()};
+    }
+  }
 
   // ── Actividades de este grupo: potrero actual / potrero de mañana ──
   const actsGrupo = actividades.filter(x=>(x.lote||'')===grupo && x.fechaIng)
@@ -259,12 +277,20 @@ function render(grupo, animales, actividades, lastPes, productos, movimientos){
 
   html += `<div class="header">
     <div class="grupo">${grupo}</div>
+    <div class="sub">${tipo?'<b style="color:var(--text);">'+tipo+'</b>':''}${tipo&&categoria?' · ':''}${categoria||''}</div>
     <div class="sub">Actualizado en vivo · ${new Date().toLocaleDateString('es-BO')}</div>
     <div class="stats3">
       <div class="stat"><div class="v">${cabezas}</div><div class="l">Cabezas</div></div>
       <div class="stat"><div class="v gold">${fmt(pesoProm)} kg</div><div class="l">Peso Prom.</div></div>
       <div class="stat"><div class="v green">${gmdProm!=null?fmt(gmdProm,3):'—'}</div><div class="l">GMD kg/día</div></div>
     </div>
+    ${estadoVenta?estadoVenta.listo
+      ?`<div style="margin-top:12px;padding:10px 12px;background:rgba(109,186,58,.15);border:1px solid var(--green);border-radius:8px;font-size:13px;font-weight:700;color:var(--green);text-align:center;">✅ Listos para la venta — peso mínimo ${pesoMinVenta} kg superado</div>`
+      :`<div style="margin-top:12px;padding:10px 12px;background:rgba(224,184,74,.1);border:1px solid var(--gold);border-radius:8px;font-size:12px;color:var(--text);">
+          Faltan <b style="color:var(--gold);">${fmt(estadoVenta.faltanKg,0)} kg</b> para el peso mínimo de venta (${pesoMinVenta} kg).
+          <br>Venta estimada según GMD histórica: <b style="color:var(--gold);">${estadoVenta.mesEstimado}</b>
+        </div>`
+      :''}
   </div>`;
 
   // ── PRODUCTIVO ──
