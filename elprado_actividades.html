@@ -2547,20 +2547,25 @@ function renderRankingResumen(){
   const gestionSel = document.getElementById('rkGestion')?.value || '';
   const epocas = getEpocas();
 
-  let acts = getActividades().filter(a=>a.actividad==='MATERIA SECA' && a.potrero && a.fechaIng && a.kgMsHa!=null);
-  if(gestionSel) acts = acts.filter(a=>a.gestion===gestionSel);
-
-  // Toneladas totales por variedad = TODOS los datos crudos, sumados (kg/ha × ha de cada registro)
+  // Producción promedio por hectárea, por variedad — usando la misma metodología rigurosa
+  // que la tabla de detalle (promedio anualizado por potrero, por vuelta, sin outliers),
+  // y después promediando esos valores de potrero entre sí (cada potrero pesa igual,
+  // sea grande o chico, porque ya es una tasa "por hectárea", no un total).
+  const filasGeneral = calcularFilasPotreros(gestionSel, '', 'GENERAL');
   const porVariedad = {};
-  acts.forEach(a=>{
-    const v = a.variedad||'Sin variedad';
-    if(!porVariedad[v]) porVariedad[v] = {kg:0, n:0};
-    porVariedad[v].kg += (a.kgMsHa||0) * (a.ha||0);
-    porVariedad[v].n++;
+  filasGeneral.forEach(f=>{
+    if(f.prodAnualizada==null) return;
+    const v = f.variedad||'Sin variedad';
+    if(!porVariedad[v]) porVariedad[v] = {vals:[], nPotreros:0, nMediciones:0};
+    porVariedad[v].vals.push(f.prodAnualizada);
+    porVariedad[v].nPotreros++;
+    porVariedad[v].nMediciones += f.nMediciones;
   });
 
   // Descanso promedio de campo, por época — usando promedio por vuelta (no medición suelta),
   // descartando outliers dentro de cada vuelta, igual criterio que la tabla de detalle.
+  let acts = getActividades().filter(a=>a.actividad==='MATERIA SECA' && a.potrero && a.fechaIng && a.kgMsHa!=null);
+  if(gestionSel) acts = acts.filter(a=>a.gestion===gestionSel);
   function descansoPromCampo(epocaKey){
     const mesesEpoca = epocas[epocaKey]||[];
     const actsEpoca = acts.filter(a=>mesesEpoca.includes(parseInt(String(a.fechaIng).slice(5,7))));
@@ -2581,10 +2586,11 @@ function renderRankingResumen(){
 
   let html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">';
   Object.entries(porVariedad).forEach(([v,d])=>{
+    const prom = d.vals.reduce((s,x)=>s+x,0)/d.vals.length;
     html += `<div style="background:var(--card2);border-radius:8px;padding:12px;">
       <div style="font-size:10px;color:var(--text3);text-transform:uppercase;">Producción ${v}</div>
-      <div style="font-size:20px;font-weight:800;color:var(--gold);">${(d.kg/1000).toLocaleString('es-BO',{maximumFractionDigits:1})} ton</div>
-      <div style="font-size:10px;color:var(--text3);margin-top:2px;">Basado en ${d.n} medición${d.n!==1?'es':''} — puede no cubrir el 100% de las parcelas</div>
+      <div style="font-size:20px;font-weight:800;color:var(--gold);">${Math.round(prom).toLocaleString('es-BO')} kg MS/ha/año</div>
+      <div style="font-size:10px;color:var(--text3);margin-top:2px;">Promedio de ${d.nPotreros} potrero${d.nPotreros!==1?'s':''} — ${d.nMediciones} mediciones en total</div>
     </div>`;
   });
   html += `<div style="background:rgba(74,159,224,.08);border:1px solid var(--blue2, #4a9fe0);border-radius:8px;padding:12px;">
@@ -2602,18 +2608,11 @@ function renderRankingResumen(){
   div.innerHTML = html;
 }
 
-function renderRankingPotreros(){
-  poblarSelectVariedadRanking();
-  poblarSelectGestionRanking();
-  renderRankingResumen();
-  const tbody = document.getElementById('rkBody');
-  if(!tbody) return;
-  const gestionSel = document.getElementById('rkGestion')?.value || '';
-  const variedadFiltro = document.getElementById('rkVariedad')?.value || '';
-  const epocaSel = document.getElementById('rkEpoca')?.value || 'GENERAL';
-  const orden = document.getElementById('rkOrden')?.value || 'desc';
+// ── Calcula, por potrero, el promedio anualizado (por vuelta, sin outliers) ──
+// Reutilizada tanto por el cuadro resumen como por la tabla de detalle, para que
+// ambos usen exactamente la misma metodología y nunca se desincronicen.
+function calcularFilasPotreros(gestionSel, variedadFiltro, epocaSel){
   const epocas = getEpocas();
-
   let acts = getActividades().filter(a=>a.actividad==='MATERIA SECA' && a.potrero && a.fechaIng && a.kgMsHa!=null);
   if(gestionSel) acts = acts.filter(a=>a.gestion===gestionSel);
   if(variedadFiltro) acts = acts.filter(a=>a.variedad===variedadFiltro);
@@ -2631,7 +2630,7 @@ function renderRankingPotreros(){
     porPotrero[key].items.push(a);
   });
 
-  const filas = Object.values(porPotrero).map(g=>{
+  return Object.values(porPotrero).map(g=>{
     const vueltas = detectarVueltas(g.items);
     let totalOutliers = 0;
     const prodPorVuelta=[], descansoPorVuelta=[];
@@ -2654,6 +2653,20 @@ function renderRankingPotreros(){
     return {potrero:g.potrero, variedad:g.variedad, nMediciones, nVueltas, totalOutliers,
       descansoProm, prodProm, rotEst, prodAnualizada, totalReal};
   });
+}
+
+function renderRankingPotreros(){
+  poblarSelectVariedadRanking();
+  poblarSelectGestionRanking();
+  renderRankingResumen();
+  const tbody = document.getElementById('rkBody');
+  if(!tbody) return;
+  const gestionSel = document.getElementById('rkGestion')?.value || '';
+  const variedadFiltro = document.getElementById('rkVariedad')?.value || '';
+  const epocaSel = document.getElementById('rkEpoca')?.value || 'GENERAL';
+  const orden = document.getElementById('rkOrden')?.value || 'desc';
+
+  const filas = calcularFilasPotreros(gestionSel, variedadFiltro, epocaSel);
 
   // Media de la variedad (dentro de lo ya filtrado), para marcar arriba/abajo
   const mediasPorVariedad = {};
