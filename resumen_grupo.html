@@ -175,7 +175,7 @@ function calcularProduccionAnualizada(itemsPotrero, diasVentana){
 }
 
 async function cargar(){
-  const grupo = qs('grupo');
+  const grupo = (qs('grupo')||'').trim();
   const app = document.getElementById('app');
   if(!grupo){
     app.innerHTML = '<div class="error">Falta indicar el grupo en el link (parámetro <code>?grupo=</code>).</div>';
@@ -209,10 +209,11 @@ async function cargar(){
 function render(grupo, animales, actividades, lastPes, productos, movimientos){
   const hoy = new Date();
   const hoyStr = hoy.toISOString().slice(0,10);
+  const grupoNorm = (grupo||'').toUpperCase();
 
   const animGrupo = Object.entries(animales)
     .map(([ide,a])=>({...a,ide}))
-    .filter(a=>a.estado==='ACTIVO' && (a.grupo||'')===grupo);
+    .filter(a=>a.estado==='ACTIVO' && (a.grupo||'').toUpperCase()===grupoNorm);
 
   if(!animGrupo.length){
     document.getElementById('app').innerHTML =
@@ -281,10 +282,10 @@ function render(grupo, animales, actividades, lastPes, productos, movimientos){
   }
 
   // ── Actividades de este grupo: potrero actual / potrero de mañana ──
-  const actsGrupo = actividades.filter(x=>(x.lote||'')===grupo && x.fechaIng)
+  const actsGrupo = actividades.filter(x=>(x.lote||'').toUpperCase()===grupoNorm && x.fechaIng)
     .sort((a,b)=> (b.fechaIng||'').localeCompare(a.fechaIng||''));
   const actualEnt = actsGrupo.find(x=> x.fechaIng<=hoyStr && (!x.fechaSal || x.fechaSal>=hoyStr)) || actsGrupo[0] || null;
-  const futuras = actividades.filter(x=>(x.lote||'')===grupo && x.fechaIng && x.fechaIng>hoyStr)
+  const futuras = actividades.filter(x=>(x.lote||'').toUpperCase()===grupoNorm && x.fechaIng && x.fechaIng>hoyStr)
     .sort((a,b)=>(a.fechaIng||'').localeCompare(b.fechaIng||''));
   const proximaEnt = futuras[0] || null;
 
@@ -324,7 +325,7 @@ function render(grupo, animales, actividades, lastPes, productos, movimientos){
 
   // ── NUTRICIÓN: consumo de sal/suplemento, misma lógica que insumos_elprado1.html ──
   const salidasGrupo = Object.entries(movimientos)
-    .filter(([,m])=>m && m.tipo==='SALIDA' && m.productoId && m.grupo===grupo && m.fecha)
+    .filter(([,m])=>m && m.tipo==='SALIDA' && m.productoId && (m.grupo||'').toUpperCase()===grupoNorm && m.fecha)
     .map(([id,m])=>({id,...m}))
     .sort((a,b)=>a.fecha.localeCompare(b.fecha));
   const porProducto = {};
