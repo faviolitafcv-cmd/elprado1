@@ -103,6 +103,19 @@ function parseFecha(f){
   return null;
 }
 function diffDias(f1,f2){ return Math.round((new Date(f2+'T12:00:00')-new Date(f1+'T12:00:00'))/86400000); }
+// Corrige fechaIngreso cuando día/mes quedaron ambiguos al parsear (ej. "08/10/2025"),
+// detectando si el ingreso "queda después" del último pesaje (imposible) y probando invertir día/mes.
+// Misma lógica que ya usa el Dashboard de inventario_hacienda.html.
+function corregirFechaIngreso(fi, fechaPesaje){
+  if(new Date(fi+'T12:00:00') >= new Date(fechaPesaje+'T12:00:00')){
+    const p = fi.split('-');
+    if(p.length===3){
+      const sw = p[0]+'-'+p[2]+'-'+p[1];
+      if(new Date(sw+'T12:00:00') < new Date(fechaPesaje+'T12:00:00')) return sw;
+    }
+  }
+  return fi;
+}
 function gestionInicio(hoy){
   const y = hoy.getMonth()>=7 ? hoy.getFullYear() : hoy.getFullYear()-1; // mes 7 = agosto (0-index)
   return y+'-08-01';
@@ -216,7 +229,8 @@ function render(grupo, animales, actividades, lastPes, productos, movimientos){
     origenCount[a.origen||'Sin dato']=(origenCount[a.origen||'Sin dato']||0)+1;
     const lp = lastPes[a.ide];
     if(a.pesoIngreso && a.fechaIngreso && lp && lp.peso && lp.fecha){
-      const fi = parseFecha(a.fechaIngreso);
+      let fi = parseFecha(a.fechaIngreso);
+      if(fi) fi = corregirFechaIngreso(fi, lp.fecha);
       const dTot = fi ? diffDias(fi, lp.fecha) : null;
       if(dTot>0){
         const gmdR = (lp.peso-a.pesoIngreso)/dTot;
@@ -240,7 +254,8 @@ function render(grupo, animales, actividades, lastPes, productos, movimientos){
     Object.entries(animales).forEach(([ide,a])=>{
       const lp = lastPes[ide];
       if(a.categoria===categoria && a.pesoIngreso && a.fechaIngreso && lp && lp.peso && lp.fecha){
-        const fi = parseFecha(a.fechaIngreso);
+        let fi = parseFecha(a.fechaIngreso);
+        if(fi) fi = corregirFechaIngreso(fi, lp.fecha);
         const dTot = fi ? diffDias(fi, lp.fecha) : null;
         if(dTot>0){ sumGmdCat += (lp.peso-a.pesoIngreso)/dTot; nGmdCat++; }
       }
