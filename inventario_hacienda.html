@@ -598,7 +598,14 @@ tr:hover td{background:rgba(109,186,58,.04);}
       <!-- MOVIMIENTO INTERNO POR LISTA DE CHIPS -->
       <div id="mvSecInternoChips" style="background:var(--card2);border:1px solid var(--brd);border-radius:8px;padding:14px;margin-bottom:12px;display:none;">
         <div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:1px;margin-bottom:10px;">ANIMALES A MOVER</div>
-        <div style="font-size:11px;color:var(--t2);margin-bottom:8px;">Pegá la lista de chips (uno por línea). Si además los pesaste, pegá los pesos en el mismo orden — es opcional; si lo dejás vacío, el movimiento se hace sin registrar peso nuevo.</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:rgba(224,184,74,.08);border:1px solid var(--gold);border-radius:6px;padding:8px 10px;margin-bottom:12px;">
+          <span style="font-size:11px;color:var(--t2);">¿Movés el grupo completo?</span>
+          <select id="mvGrupoCargarTodo" style="font-size:11px;flex:1;min-width:160px;">
+            <option value="">— Elegí un grupo —</option>
+          </select>
+          <button type="button" class="btn bs btn-sm" onclick="mvCargarGrupoCompleto()">📥 Cargar todos sus chips</button>
+        </div>
+        <div style="font-size:11px;color:var(--t2);margin-bottom:8px;">O pegá la lista de chips a mano (uno por línea) — sirve tanto para mover el grupo completo (con el botón de arriba) como para mover solo una parte. Si además los pesaste, pegá los pesos en el mismo orden — es opcional; si lo dejás vacío, el movimiento se hace sin registrar peso nuevo.</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <div>
             <label style="font-size:11px;font-weight:700;color:var(--t2);display:block;margin-bottom:4px;">📋 Chips (uno por línea) *</label>
@@ -5539,7 +5546,7 @@ function abrirMovimiento(tipo) {
   document.getElementById('mvTipoDisplay').value = tipo;
 
   const grupos = [...new Set(Object.values(animales).filter(a=>a.estado==='ACTIVO'&&a.grupo).map(a=>a.grupo))].sort();
-  ['mvGrupoOrigen','mvGrupoDestino'].forEach(id => {
+  ['mvGrupoOrigen','mvGrupoDestino','mvGrupoCargarTodo'].forEach(id => {
     const sel = document.getElementById(id);
     sel.innerHTML = '<option value="">— Seleccioná —</option>';
     grupos.forEach(g => sel.innerHTML += `<option value="${g}">${g} (${cabezasGrupo(g)} cab.)</option>`);
@@ -5624,6 +5631,20 @@ function mvActualizarGrupoOrigen() {
 }
 
 // ═══ MOVIMIENTO INTERNO POR LISTA DE CHIPS ═══
+function mvCargarGrupoCompleto(){
+  const g = document.getElementById('mvGrupoCargarTodo').value;
+  if(!g){ ntf('Elegí primero el grupo que querés mover completo', true); return; }
+  const ides = Object.values(animales)
+    .filter(a=>a.estado==='ACTIVO' && a.grupo===g)
+    .map(a=>a.ide)
+    .sort();
+  if(!ides.length){ ntf('Ese grupo no tiene animales activos', true); return; }
+  document.getElementById('mvPasteIdes').value = ides.join('\n');
+  document.getElementById('mvPastePesos').value = ''; // sin peso nuevo por defecto; se puede pegar a mano si se pesaron
+  mvProcesarChips();
+  ntf('✅ Se cargaron los '+ides.length+' chips de '+g+' — revisá la vista previa antes de confirmar');
+}
+
 function mvProcesarChips(){
   const idesRaw = document.getElementById('mvPasteIdes').value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
   const pesosRaw = document.getElementById('mvPastePesos').value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
