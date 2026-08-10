@@ -238,23 +238,16 @@ function render(grupo, animales, actividades, lastPes, productos, movimientos){
   // ── Peso proyectado, GMD histórica, por animal ──
   let sumPesoH=0,nPH=0,sumGmd=0,nGmd=0;
   const razaCount={}, origenCount={};
-  const diag = {sinPesoIngresoOFecha:0, sinLastPes:0, sinFechaParseable:0, dTotInvalido:0, ok:0, ejemplos:[]};
   animGrupo.forEach(a=>{
     razaCount[a.raza||'Sin dato']=(razaCount[a.raza||'Sin dato']||0)+1;
     origenCount[a.origen||'Sin dato']=(origenCount[a.origen||'Sin dato']||0)+1;
     const lp = lastPes[a.ide];
-    if(!a.pesoIngreso || !a.fechaIngreso){ diag.sinPesoIngresoOFecha++; return; }
-    if(!lp || !lp.peso || !lp.fecha){
-      diag.sinLastPes++;
-      if(diag.ejemplos.length<3) diag.ejemplos.push({ide:a.ide, motivo:'sin pesaje vinculado (lastPes['+a.ide+'] = '+JSON.stringify(lp)+')', pesoIngreso:a.pesoIngreso, fechaIngreso:a.fechaIngreso});
-      return;
-    }
+    if(!a.pesoIngreso || !a.fechaIngreso || !lp || !lp.peso || !lp.fecha) return;
     let fi = parseFecha(a.fechaIngreso);
-    if(!fi){ diag.sinFechaParseable++; if(diag.ejemplos.length<3) diag.ejemplos.push({ide:a.ide, motivo:'fecha no parseable', fechaIngreso:a.fechaIngreso}); return; }
+    if(!fi) return;
     fi = corregirFechaIngreso(fi, lp.fecha);
     const dTot = diffDias(fi, lp.fecha);
-    if(dTot<=0){ diag.dTotInvalido++; if(diag.ejemplos.length<3) diag.ejemplos.push({ide:a.ide, motivo:'dTot<=0', fechaIngresoOriginal:a.fechaIngreso, fechaIngresoParseada:fi, fechaUltimoPesaje:lp.fecha, dTot}); return; }
-    diag.ok++;
+    if(dTot<=0) return;
     const gmdR = (lp.peso-a.pesoIngreso)/dTot;
     const dExt = Math.max(0, diffDias(lp.fecha, hoyStr));
     const pH = lp.peso + gmdR*dExt;
@@ -262,7 +255,6 @@ function render(grupo, animales, actividades, lastPes, productos, movimientos){
     sumGmd+=gmdR; nGmd++;
     a._pesoHoy = pH; a._gmdR = gmdR; a._ultPeso = lp.peso;
   });
-  window._diagQR = diag; // para inspeccionar en la consola del navegador: window._diagQR
   const cabezas = animGrupo.length;
   const pesoProm = nPH>0 ? sumPesoH/nPH : (animGrupo.reduce((s,a)=>s+(a.pesoIngreso||0),0)/cabezas);
   const gmdProm = nGmd>0 ? sumGmd/nGmd : null;
@@ -388,20 +380,6 @@ function render(grupo, animales, actividades, lastPes, productos, movimientos){
           <br>Venta estimada según GMD histórica: <b style="color:var(--gold);">${estadoVenta.mesEstimado}</b>
         </div>`
       :''}
-  </div>`;
-
-  // ── PANEL DE DIAGNÓSTICO TEMPORAL — sacar una vez resuelto el bug de peso/GMD ──
-  html += `<div class="section" style="border-color:#e05a4a;">
-    <div class="section-h"><span class="ic">🔧</span><span class="t" style="color:#e05a4a;">Diagnóstico temporal</span></div>
-    <div class="section-b" style="font-size:11px;color:var(--t2);line-height:1.7;">
-      Total animales del grupo: <b style="color:var(--text);">${cabezas}</b><br>
-      ✅ Con cálculo OK: <b style="color:var(--green);">${diag.ok}</b><br>
-      ⚠️ Sin peso o fecha de ingreso cargados: <b style="color:var(--orange);">${diag.sinPesoIngresoOFecha}</b><br>
-      ⚠️ Sin pesaje encontrado (lastPes vacío): <b style="color:var(--orange);">${diag.sinLastPes}</b><br>
-      ⚠️ Fecha de ingreso no se pudo interpretar: <b style="color:var(--orange);">${diag.sinFechaParseable}</b><br>
-      ⚠️ Fechas dan un período inválido (dTot≤0): <b style="color:var(--orange);">${diag.dTotInvalido}</b><br>
-      ${diag.ejemplos.length?'<br><b>Ejemplos concretos:</b><br>'+diag.ejemplos.map(e=>'<div style="font-family:monospace;font-size:10px;background:var(--card2);padding:6px;border-radius:4px;margin-top:4px;">'+JSON.stringify(e)+'</div>').join(''):''}
-    </div>
   </div>`;
 
   // ── PRODUCTIVO ──
