@@ -108,6 +108,59 @@ function gestionInicio(hoy){
   return y+'-08-01';
 }
 
+// ── Misma metodología que usa el Ranking de Potreros en elprado_actividades.html ──
+function detectarVueltas(items){
+  const ordenados = [...items].sort((a,b)=>String(a.fechaIng).localeCompare(String(b.fechaIng)));
+  if(ordenados.length<=1) return [ordenados];
+  const gaps = [];
+  for(let i=1;i<ordenados.length;i++){
+    gaps.push(diffDias(ordenados[i-1].fechaIng, ordenados[i].fechaIng));
+  }
+  const gapsOrdenados=[...gaps].sort((a,b)=>a-b);
+  const mediana = gapsOrdenados[Math.floor(gapsOrdenados.length/2)] || 1;
+  const umbral = Math.max(mediana*2.5, 5);
+  const vueltas=[[ordenados[0]]];
+  for(let i=1;i<ordenados.length;i++){
+    if(gaps[i-1] > umbral) vueltas.push([]);
+    vueltas[vueltas.length-1].push(ordenados[i]);
+  }
+  return vueltas;
+}
+function filtrarOutliersIQR(items, campo){
+  const valores = items.map(x=>x[campo]).filter(v=>v!=null && v>0);
+  if(valores.length<4) return {validos:items, outliers:[]};
+  const ord=[...valores].sort((a,b)=>a-b);
+  const q1=ord[Math.floor(ord.length*0.25)], q3=ord[Math.floor(ord.length*0.75)];
+  const iqr=q3-q1, low=q1-1.5*iqr, high=q3+1.5*iqr;
+  const validos=[], outliers=[];
+  items.forEach(x=>{
+    const v=x[campo];
+    if(v==null || v<=0){ validos.push(x); return; }
+    if(v<low || v>high) outliers.push(x); else validos.push(x);
+  });
+  return {validos, outliers};
+}
+// Producción anualizada de un potrero (todas sus parcelas) dentro de un rango de fechas —
+// promedio por vuelta de rotación, sin datos raros, normalizado por el descanso real.
+function calcularProduccionAnualizada(itemsPotrero, diasVentana){
+  if(!itemsPotrero.length) return null;
+  const vueltas = detectarVueltas(itemsPotrero);
+  const prodPorVuelta=[], descansoPorVuelta=[];
+  vueltas.forEach(v=>{
+    const fProd = filtrarOutliersIQR(v,'kgMsHa');
+    const fDesc = filtrarOutliersIQR(v,'retorno');
+    const prodVals = fProd.validos.map(x=>x.kgMsHa).filter(x=>x!=null);
+    const descVals = fDesc.validos.map(x=>x.retorno).filter(x=>x!=null&&x>0);
+    if(prodVals.length) prodPorVuelta.push(prodVals.reduce((s,x)=>s+x,0)/prodVals.length);
+    if(descVals.length) descansoPorVuelta.push(descVals.reduce((s,x)=>s+x,0)/descVals.length);
+  });
+  const prodProm = prodPorVuelta.length ? prodPorVuelta.reduce((s,x)=>s+x,0)/prodPorVuelta.length : null;
+  const descansoProm = descansoPorVuelta.length ? descansoPorVuelta.reduce((s,x)=>s+x,0)/descansoPorVuelta.length : null;
+  if(prodProm==null || !descansoProm) return {prodAnualizada:null, nVueltas:vueltas.length};
+  const rotEst = diasVentana/descansoProm;
+  return {prodAnualizada: prodProm*rotEst, nVueltas: vueltas.length, descansoProm};
+}
+
 async function cargar(){
   const grupo = qs('grupo');
   const app = document.getElementById('app');
@@ -220,20 +273,24 @@ function render(grupo, animales, actividades, lastPes, productos, movimientos){
     .sort((a,b)=>(a.fechaIng||'').localeCompare(b.fechaIng||''));
   const proximaEnt = futuras[0] || null;
 
-  // ── Historial reciente + producción MS acumulada de la gestión, para ese mismo potrero+parcela ──
-  let historialPotrero=[], produccionGestion=null, vecesGestion=0;
-  let produccionGestionAnt=null, vecesGestionAnt=0, gestionAntLabel='';
+  // ── Historial reciente + producción anualizada (misma metodología del Ranking de Potreros) ──
+  let historialPotrero=[];
+  let prodAnualCurso=null, nVueltasCurso=0, sumaRealCurso=null, nMedCurso=0;
+  let prodAnualAnt=null, nVueltasAnt=0, sumaRealAnt=null, nMedAnt=0, gestionAntLabel='';
   if(actualEnt && actualEnt.potrero){
     // Todo el POTRERO (todas sus parcelas), no solo la parcela puntual donde está el grupo ahora
     const mismoPotrero = actividades.filter(x=>
-      x.potrero===actualEnt.potrero && x.fechaIng
+      x.potrero===actualEnt.potrero && x.fechaIng && x.kgMsHa!=null
     ).sort((a,b)=>(b.fechaIng||'').localeCompare(a.fechaIng||''));
     historialPotrero = mismoPotrero.slice(0,3);
     const inicioGestion = gestionInicio(hoy);
     const enGestion = mismoPotrero.filter(x=>x.fechaIng>=inicioGestion && x.fechaIng<=hoyStr);
-    vecesGestion = enGestion.length;
+    nMedCurso = enGestion.length;
     if(enGestion.length){
-      produccionGestion = enGestion.reduce((s,x)=>s+(x.kgMsHa||0),0);
+      const r = calcularProduccionAnualizada(enGestion, 365);
+      prodAnualCurso = r?.prodAnualizada ?? null;
+      nVueltasCurso = r?.nVueltas || 0;
+      sumaRealCurso = enGestion.reduce((s,x)=>s+(x.kgMsHa||0),0);
     }
     // Gestión anterior CERRADA (1 año antes del inicio de la actual, hasta el día previo)
     const [yIni] = inicioGestion.split('-');
@@ -241,9 +298,12 @@ function render(grupo, animales, actividades, lastPes, productos, movimientos){
     const finGestionAnt = inicioGestion.split('-')[0]+'-07-31';
     gestionAntLabel = (parseInt(yIni)-1)+'-'+yIni;
     const enGestionAnt = mismoPotrero.filter(x=>x.fechaIng>=inicioGestionAnt && x.fechaIng<=finGestionAnt);
-    vecesGestionAnt = enGestionAnt.length;
+    nMedAnt = enGestionAnt.length;
     if(enGestionAnt.length){
-      produccionGestionAnt = enGestionAnt.reduce((s,x)=>s+(x.kgMsHa||0),0);
+      const r = calcularProduccionAnualizada(enGestionAnt, 365);
+      prodAnualAnt = r?.prodAnualizada ?? null;
+      nVueltasAnt = r?.nVueltas || 0;
+      sumaRealAnt = enGestionAnt.reduce((s,x)=>s+(x.kgMsHa||0),0);
     }
   }
 
@@ -326,18 +386,18 @@ function render(grupo, animales, actividades, lastPes, productos, movimientos){
     });
   }
 
-  if(produccionGestion!=null){
+  if(prodAnualCurso!=null){
     html += `<div class="field" style="margin-top:12px;background:rgba(224,184,74,.1);border:1px solid var(--gold);">
-      <div class="l">Producción MS acumulada — Gestión ${gestionInicio(hoy).slice(0,4)}-${(+gestionInicio(hoy).slice(0,4)+1)} (en curso)</div>
-      <div class="v gold" style="font-size:17px;">${fmt(produccionGestion,0)} kg MS/ha</div>
-      <div style="font-size:10px;color:var(--t3);margin-top:2px;">Suma real de ${vecesGestion} entrada${vecesGestion!==1?'s':''} a este potrero desde el 1 de agosto</div>
+      <div class="l">Producción Anualizada — Gestión ${gestionInicio(hoy).slice(0,4)}-${(+gestionInicio(hoy).slice(0,4)+1)} (en curso)</div>
+      <div class="v gold" style="font-size:17px;">${fmt(prodAnualCurso,0)} kg MS/ha/año</div>
+      <div style="font-size:10px;color:var(--t3);margin-top:2px;">Estimado con ${nVueltasCurso} vuelta${nVueltasCurso!==1?'s':''} de rotación (${nMedCurso} mediciones) — dato temprano, todavía puede ajustarse. Suma real hasta hoy: ${fmt(sumaRealCurso,0)} kg MS/ha</div>
     </div>`;
   }
-  if(produccionGestionAnt!=null){
+  if(prodAnualAnt!=null){
     html += `<div class="field" style="margin-top:8px;background:rgba(74,159,224,.08);border:1px solid var(--blue);">
-      <div class="l">Producción MS total — Gestión ${gestionAntLabel} (cerrada)</div>
-      <div class="v" style="font-size:17px;color:var(--blue);">${fmt(produccionGestionAnt,0)} kg MS/ha</div>
-      <div style="font-size:10px;color:var(--t3);margin-top:2px;">Suma real de ${vecesGestionAnt} entrada${vecesGestionAnt!==1?'s':''} a este potrero en esa gestión completa</div>
+      <div class="l">Producción Anualizada — Gestión ${gestionAntLabel} (cerrada)</div>
+      <div class="v" style="font-size:17px;color:var(--blue);">${fmt(prodAnualAnt,0)} kg MS/ha/año</div>
+      <div style="font-size:10px;color:var(--t3);margin-top:2px;">Estimado con ${nVueltasAnt} vuelta${nVueltasAnt!==1?'s':''} de rotación (${nMedAnt} mediciones) en esa gestión completa. Suma real: ${fmt(sumaRealAnt,0)} kg MS/ha</div>
     </div>`;
   }
   html += `</div></div>`;
