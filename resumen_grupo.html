@@ -94,12 +94,25 @@ const GRUS = {}; // se completa si hace falta mapear nombre técnico → display
 function qs(name){ return new URLSearchParams(location.search).get(name); }
 function fmt(n,d=0){ if(n==null||isNaN(n)) return '—'; return Number(n).toLocaleString('es-BO',{minimumFractionDigits:d,maximumFractionDigits:d}); }
 function fmtFecha(f){ if(!f) return '—'; const p=String(f).split('-'); if(p.length!==3) return f; return p[2]+'/'+p[1]+'/'+p[0]; }
-function parseFecha(f){
-  if(!f) return null;
-  const s=String(f).trim();
-  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
-  const p=s.split(/[\/\-]/);
-  if(p.length===3){ if(p[2].length===4) return p[2]+'-'+p[1].padStart(2,'0')+'-'+p[0].padStart(2,'0'); }
+function parseFecha(v){
+  try{
+    if(!v) return null;
+    if(typeof v==='string'){
+      v=v.trim();
+      if(/^\d{4}-\d{2}-\d{2}/.test(v)) return v.split('T')[0];
+      const p=v.split('/');
+      if(p.length===3){
+        const n0=parseInt(p[0],10),n1=parseInt(p[1],10),n2=parseInt(p[2],10);
+        let d,m,y;
+        if(p[0].length===4){d=n2;m=n1;y=n0;}
+        else if(n1>12){d=n1;m=n0;y=n2;}
+        else{d=n0;m=n1;y=n2;}
+        if(y<100) y+=2000;
+        return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      }
+      return v.split('T')[0];
+    }
+  }catch(e){}
   return null;
 }
 function diffDias(f1,f2){ return Math.round((new Date(f2+'T12:00:00')-new Date(f1+'T12:00:00'))/86400000); }
