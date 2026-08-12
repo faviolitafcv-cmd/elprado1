@@ -3531,41 +3531,12 @@ function getVentasData(){
 // Margen de una venta completa: suma toda la plata y todos los días, divide al final
 // (método ponderado — no promedia los Bs/día de cada animal suelto, que sesga hacia
 // animales con pocos días de permanencia).
-function verDetalleVenta(ventaId){
-  const v = ventas.find(x=>x.id===ventaId);
-  if(!v){ntf('Venta no encontrada',true);return;}
-  const marg = calcularMargenVenta(ventaId);
-  document.getElementById('dvTitulo').textContent = '💰 Detalle de Venta — '+(v.codigo||'');
-
-  const bsDiaTxt = marg.bsDiaVenta!=null ? 'Bs '+fmt(marg.bsDiaVenta)+'/día' : '—';
-  const bsDiaCol = marg.bsDiaVenta==null ? 'var(--t3)' : marg.bsDiaVenta>=0 ? 'var(--gr)' : 'var(--red)';
-  document.getElementById('dvResumen').innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;">
-      <div class="fm"><label>Destino</label><input readonly value="${v.frigorifico||v.destino||'—'}"></div>
-      <div class="fm"><label>Fecha</label><input readonly value="${fmtFecha(v.fecha)}"></div>
-      <div class="fm"><label>Cabezas</label><input readonly value="${marg.nTotal}"></div>
-      <div class="fm"><label>Margen Bs/día de la venta</label><input readonly style="color:${bsDiaCol};font-weight:700;background:rgba(109,186,58,.08);" value="${bsDiaTxt}"></div>
-    </div>
-    ${marg.nConDatos<marg.nTotal?`<div style="font-size:11px;color:var(--t3);margin-top:8px;">ℹ️ El margen se calculó sobre ${marg.nConDatos} de ${marg.nTotal} animales — al resto le falta precio de compra real cargado, así que no se los incluyó (no se inventa un valor).</div>`:''}
-  `;
-
-  document.getElementById('dvBody').innerHTML = marg.detalle.map(d=>{
-    const bdCol = d.bd==null ? 'var(--t3)' : d.bd>=0 ? 'var(--gr)' : 'var(--red)';
-    return `<tr>
-      <td class="mn" style="font-size:10px;">${d.ide}</td>
-      <td>${d.categoria||'—'}</td>
-      <td>${d.tipo||'—'}</td>
-      <td class="mn">${d.precioCompra!=null?'Bs '+fmt(d.precioCompra):'—'}</td>
-      <td class="mn">${d.pesoIngreso!=null?d.pesoIngreso+' kg':'—'}</td>
-      <td class="mn">${d.precioVenta!=null?'Bs '+fmt(d.precioVenta):'—'}</td>
-      <td class="mn">${d.pesoVenta!=null?d.pesoVenta+' kg':'—'}</td>
-      <td class="mn">${d.dias!=null?d.dias:'—'}</td>
-      <td class="mn">${fmtFecha(d.fechaVenta)}</td>
-      <td class="mn" style="color:${bdCol};font-weight:700;">${d.bd!=null?'Bs '+fmt(d.bd):'—'}</td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="10" class="emp">Sin animales en esta venta</td></tr>';
-
-  document.getElementById('moDetalleV').classList.add('open');
+function filtrarPorVenta(ventaId){
+  const sel = document.getElementById('vfVenta');
+  if(!sel){ntf('No se encontró el filtro de ventas',true);return;}
+  sel.value = ventaId;
+  renderVAnimales();
+  document.getElementById('vfVenta').scrollIntoView({behavior:'smooth', block:'center'});
 }
 
 function calcularMargenVenta(ventaId){
@@ -4863,7 +4834,7 @@ function renderV(){
     const marg=calcularMargenVenta(v.id);
     const bsDiaTxt = marg.bsDiaVenta!=null ? 'Bs '+fmt(marg.bsDiaVenta) : '—';
     const bsDiaCol = marg.bsDiaVenta==null ? 'var(--t3)' : marg.bsDiaVenta>=0 ? 'var(--gr)' : 'var(--red)';
-    return`<tr style="cursor:pointer;" onclick="verDetalleVenta('${v.id}')" title="Ver detalle animal por animal">
+    return`<tr style="cursor:pointer;" onclick="filtrarPorVenta('${v.id}')" title="Ver animales de esta venta">
       <td class="mn" style="font-size:11px;font-weight:700;color:var(--gold);">${v.codigo||'—'}</td>
       <td class="mn" style="font-size:11px;">${fmtFecha(v.fecha)}</td>
       <td style="font-size:11px;"><b>${v.frigorifico||v.destino||'—'}</b></td>
@@ -6212,24 +6183,6 @@ showPg = function(id) { _origShowPg2(id); if(id==='movimientos') renderMovimient
       <div class="fm"><label>Total a Cobrar</label><input id="lvTotalCobrar" readonly style="background:rgba(109,186,58,.1);font-weight:700;color:var(--gr);font-size:14px;"></div>
     </div></div>
     <div class="mf"><button class="btn bs" onclick="cerrar('moLiquidarV')">Cancelar</button><button class="btn bp" id="btnLiquidarV" onclick="guardarLiquidarVenta()">💵 Guardar Liquidación</button></div>
-  </div>
-</div>
-
-<!-- Modal: Detalle de Venta — animal por animal -->
-<div class="mo" id="moDetalleV">
-  <div class="md md-lg" style="max-width:920px;">
-    <div class="mh"><div class="mt" id="dvTitulo">💰 Detalle de Venta</div><button class="mc" onclick="cerrar('moDetalleV')">✕</button></div>
-    <div class="mb">
-      <div id="dvResumen" style="margin-bottom:14px;"></div>
-      <div class="tw" style="max-height:420px;overflow-y:auto;"><table style="width:100%;font-size:12px;">
-        <thead><tr style="position:sticky;top:0;background:var(--card);">
-          <th>Chip</th><th>Categoría</th><th>Tipo</th><th>P. Compra</th><th>Peso Ing.</th>
-          <th>P. Venta</th><th>Peso Venta</th><th>Días</th><th>F. Venta</th><th>Bs/día</th>
-        </tr></thead>
-        <tbody id="dvBody"></tbody>
-      </table></div>
-    </div>
-    <div class="mf"><button class="btn bs" onclick="cerrar('moDetalleV')">Cerrar</button></div>
   </div>
 </div>
 
