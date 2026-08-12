@@ -186,6 +186,7 @@ tr:hover td{background:rgba(109,186,58,.04);}
   <div class="tab" onclick="showPg('consumo')">📈 Consumo Diario</div>
   <div class="tab" onclick="showPg('formulacion')">🧪 Formulación</div>
   <div class="tab" onclick="showPg('productos')">⚙️ Productos</div>
+  <div class="tab" onclick="showPg('evolucion')">📅 Evolución Mensual</div>
 </div>
 
 <!-- ═══════ DASHBOARD ═══════ -->
@@ -347,7 +348,30 @@ tr:hover td{background:rgba(109,186,58,.04);}
   </div>
 </div>
 
-<!-- ═══════ MODAL MOVIMIENTO ═══════ -->
+<!-- ═══════ EVOLUCIÓN MENSUAL POR GESTIÓN ═══════ -->
+<div class="pg" id="pg-evolucion">
+  <div class="card">
+    <div class="ch">
+      <div class="ct">📅 Evolución Mensual del Consumo de Sal</div>
+      <select id="evGestion" onchange="renderEvolucionMensual()" style="font-size:12px;"></select>
+    </div>
+    <div style="font-size:11px;color:var(--t2);padding:10px 16px;line-height:1.6;">
+      g/100kg de peso vivo por día, mes a mes. Cada entrega se cuenta entera en el mes que se registró.
+      El mes en curso muestra el consumo de lo que va del mes hasta hoy.
+      <span style="color:var(--green);">● ≥40 Óptimo</span> &nbsp;
+      <span style="color:#f0973a;">● 30-40 Aceptable</span> &nbsp;
+      <span style="color:var(--red);">● &lt;30 Bajo mínimo</span>
+    </div>
+    <div class="tw"><table id="evTabla">
+      <thead><tr id="evHead"></tr></thead>
+      <tbody id="evBody"></tbody>
+    </table></div>
+  </div>
+  <div class="card" id="evDetalleCard" style="display:none;">
+    <div class="ch"><div class="ct" id="evDetalleTit">Detalle</div><span style="cursor:pointer;color:var(--t3);" onclick="document.getElementById('evDetalleCard').style.display='none';">✕ cerrar</span></div>
+    <div id="evDetalleBody" style="padding:12px 16px;font-size:12px;color:var(--t2);line-height:1.8;"></div>
+  </div>
+</div>
 <div class="mo" id="moMov">
   <div class="md">
     <div class="mh">
@@ -528,18 +552,106 @@ function showPg(id){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('pg-'+id).classList.add('active');
   const tabs = document.querySelectorAll('.tab');
-  const names = ['dash','movimientos','consumo','formulacion','productos'];
+  const names = ['dash','movimientos','consumo','formulacion','productos','evolucion'];
   tabs[names.indexOf(id)]?.classList.add('active');
   if(id==='dash') renderDash();
   if(id==='movimientos') renderMovimientos();
   if(id==='consumo') renderConsumoDetalle();
   if(id==='formulacion') initFormulacion();
   if(id==='productos') renderProductos();
+  if(id==='evolucion') renderEvolucionMensual();
 }
 
 // ═══════════════════════════════════
 // CÁLCULO DE CONSUMO
 // ═══════════════════════════════════
+// ═══════════════════════════════════
+// EVOLUCIÓN MENSUAL POR GESTIÓN
+// ═══════════════════════════════════
+function getGestionDe(fecha){
+  const [y,m] = fecha.split('-').map(Number);
+  return m>=8 ? `${y}-${y+1}` : `${y-1}-${y}`;
+}
+function getGestionActualIns(){
+  const hoy = new Date();
+  return getGestionDe(hoy.toISOString().slice(0,10));
+}
+const MESES_GESTION = ['08','09','10','11','12','01','02','03','04','05','06','07'];
+const MESES_NOMBRE = {'01':'Ene','02':'Feb','03':'Mar','04':'Abr','05':'May','06':'Jun','07':'Jul','08':'Ago','09':'Sep','10':'Oct','11':'Nov','12':'Dic'};
+
+function calcularEvolucionMensual(gestionSel){
+  // Cada entrega (salida) se atribuye ENTERA al mes calendario en que se registró
+  const salidas = Object.entries(_movs)
+    .filter(([,m])=>m.tipo==='SALIDA' && m.productoId && m.grupo && m.fecha)
+    .map(([id,m])=>({id,...m}))
+    .filter(s=>getGestionDe(s.fecha)===gestionSel);
+
+  const gruposActivos = new Set(_grupos.map(g=>g.nombre));
+  const hoyStr = new Date().toISOString().slice(0,10);
+  const mesActualKey = hoyStr.slice(0,7);
+
+  // clave: mesKey (YYYY-MM) -> grupo -> {kgTotal, sumCabPond, sumPesoPond, sumKgPond}
+  const porMesGrupo = {};
+  salidas.forEach(s=>{
+    const mesKey = s.fecha.slice(0,7);
+    if(!porMesGrupo[mesKey]) porMesGrupo[mesKey]={};
+    if(!porMesGrupo[mesKey][s.grupo]) porMesGrupo[mesKey][s.grupo]={kgTotal:0, sumCabPond:0, sumPesoPond:0, sumPond:0, activo:gruposActivos.has(s.grupo)};
+    const kg = parseFloat(s.cantidad)||0;
+    const cab = s.cabezasSnap||0;
+    const peso = s.pesoSnap||0;
+    const g = porMesGrupo[mesKey][s.grupo];
+    g.kgTotal += kg;
+    if(cab>0){ g.sumCabPond += cab*kg; g.sumPesoPond += peso*kg; g.sumPond += kg; }
+  });
+
+  // Meses con datos, en orden de gestión (ago→jul), hasta hoy si es la gestión en curso
+  const [yIni] = gestionSel.split('-');
+  const mesesConDatos = MESES_GESTION
+    .map(mm=>{ const anio = (mm>='08') ? yIni : (parseInt(yIni)+1); return `${anio}-${mm}`; })
+    .filter(mk => porMesGrupo[mk] && Object.keys(porMesGrupo[mk]).length);
+
+  // Todos los grupos que aparecen en la gestión
+  const gruposSet = new Set();
+  Object.values(porMesGrupo).forEach(porGrupo=>Object.keys(porGrupo).forEach(g=>gruposSet.add(g)));
+  const grupos = [...gruposSet].sort();
+
+  function celda(mesKey, grupo){
+    const d = porMesGrupo[mesKey]?.[grupo];
+    if(!d || d.sumPond<=0) return null;
+    const diasMes = mesKey===mesActualKey ? new Date().getDate() : new Date(+mesKey.slice(0,4), +mesKey.slice(5,7), 0).getDate();
+    const cabProm = d.sumCabPond/d.sumPond;
+    const pesoProm = d.sumPesoPond/d.sumPond;
+    const kgDia = d.kgTotal/diasMes;
+    const gCabDia = cabProm>0 ? kgDia/cabProm*1000 : null;
+    const g100kgDia = (cabProm>0&&pesoProm>0) ? kgDia/cabProm/pesoProm*100*1000 : null;
+    let estado='none';
+    if(g100kgDia!=null){ estado = g100kgDia>=40?'ok':g100kgDia>=30?'warn':'low'; }
+    return {kgTotal:d.kgTotal, cabProm, pesoProm, gCabDia, g100kgDia, estado, activo:d.activo};
+  }
+
+  // Fila TOTAL CAMPO: suma de kg y cabezas-ponderadas de TODOS los grupos, por mes
+  function celdaTotal(mesKey){
+    const porGrupo = porMesGrupo[mesKey];
+    if(!porGrupo) return null;
+    let kgTotal=0, sumCabPond=0, sumPesoPond=0, sumPond=0;
+    Object.values(porGrupo).forEach(d=>{
+      kgTotal+=d.kgTotal; sumCabPond+=d.sumCabPond; sumPesoPond+=d.sumPesoPond; sumPond+=d.sumPond;
+    });
+    if(sumPond<=0) return null;
+    const diasMes = mesKey===mesActualKey ? new Date().getDate() : new Date(+mesKey.slice(0,4), +mesKey.slice(5,7), 0).getDate();
+    const cabProm = sumCabPond/sumPond;
+    const pesoProm = sumPesoPond/sumPond;
+    const kgDia = kgTotal/diasMes;
+    const gCabDia = cabProm>0 ? kgDia/cabProm*1000 : null;
+    const g100kgDia = (cabProm>0&&pesoProm>0) ? kgDia/cabProm/pesoProm*100*1000 : null;
+    let estado='none';
+    if(g100kgDia!=null){ estado = g100kgDia>=40?'ok':g100kgDia>=30?'warn':'low'; }
+    return {kgTotal, cabProm, pesoProm, gCabDia, g100kgDia, estado};
+  }
+
+  return {mesesConDatos, grupos, celda, celdaTotal, mesActualKey};
+}
+
 function calcularConsumos(){
   // Obtener todas las salidas ordenadas por fecha asc
   const salidas = Object.entries(_movs)
@@ -626,9 +738,85 @@ function calcularStock(){
 // ═══════════════════════════════════
 // DASHBOARD
 // ═══════════════════════════════════
+function poblarSelectGestionEvolucion(){
+  const sel = document.getElementById('evGestion');
+  const gestiones = new Set();
+  Object.values(_movs).forEach(m=>{ if(m.tipo==='SALIDA'&&m.fecha) gestiones.add(getGestionDe(m.fecha)); });
+  const actual = getGestionActualIns();
+  gestiones.add(actual);
+  const lista = [...gestiones].sort().reverse();
+  const valPrevio = sel.value;
+  sel.innerHTML = lista.map(g=>`<option value="${g}">${g}${g===actual?' (en curso)':''}</option>`).join('');
+  sel.value = lista.includes(valPrevio) ? valPrevio : actual;
+}
+
+function renderEvolucionMensual(){
+  poblarSelectGestionEvolucion();
+  const gestionSel = document.getElementById('evGestion').value;
+  const {mesesConDatos, grupos, celda, celdaTotal, mesActualKey} = calcularEvolucionMensual(gestionSel);
+  const head = document.getElementById('evHead');
+  const body = document.getElementById('evBody');
+  window._evCache = {}; // cache de celdas para el detalle, evita serializar JSON en el HTML
+
+  if(!mesesConDatos.length){
+    head.innerHTML = '<th>GRUPO</th>';
+    body.innerHTML = '<tr><td class="emp"><div class="emp-ic">📅</div>Sin entregas de sal registradas en esta gestión.</td></tr>';
+    return;
+  }
+
+  head.innerHTML = '<th>GRUPO</th>' + mesesConDatos.map(mk=>{
+    const mm = mk.slice(5,7);
+    const esActual = mk===mesActualKey;
+    return `<th style="text-align:center;">${MESES_NOMBRE[mm]}${esActual?' <span style="color:var(--gold);font-size:9px;">(en curso)</span>':''}</th>`;
+  }).join('');
+
+  function pintarCelda(c, mesKey, grupo){
+    if(!c) return '<td style="text-align:center;color:var(--t3);">—</td>';
+    const key = mesKey+'|'+grupo;
+    window._evCache[key] = c;
+    const color = c.estado==='ok'?'var(--green)':c.estado==='warn'?'#f0973a':c.estado==='low'?'var(--red)':'var(--t3)';
+    const val = c.g100kgDia!=null ? fmt(c.g100kgDia,0)+'g' : '—';
+    return `<td style="text-align:center;cursor:pointer;color:${color};font-weight:700;" onclick="verDetalleCelda('${key.replace(/'/g,"\\'")}')">${val}</td>`;
+  }
+
+  body.innerHTML = grupos.map(g=>{
+    const celdas = mesesConDatos.map(mk=>celda(mk,g));
+    const algunaConDato = celdas.find(c=>c);
+    const inactivo = algunaConDato && !algunaConDato.activo;
+    return `<tr>
+      <td><b>${g}</b>${inactivo?' <span style="font-size:9px;color:var(--t3);">(inactivo hoy)</span>':''}</td>
+      ${mesesConDatos.map((mk,i)=>pintarCelda(celdas[i], mk, g)).join('')}
+    </tr>`;
+  }).join('') + `<tr style="border-top:2px solid var(--brd);">
+      <td><b style="color:var(--gold);">TOTAL CAMPO</b></td>
+      ${mesesConDatos.map(mk=>pintarCelda(celdaTotal(mk), mk, '__TOTAL__')).join('')}
+    </tr>`;
+
+  document.getElementById('evDetalleCard').style.display='none';
+}
+
+function verDetalleCelda(key){
+  const c = window._evCache?.[key];
+  if(!c) return;
+  const [mesKey, grupo] = key.split('|');
+  const mm = mesKey.slice(5,7);
+  const card = document.getElementById('evDetalleCard');
+  document.getElementById('evDetalleTit').textContent = (grupo==='__TOTAL__'?'Total Campo':grupo) + ' — ' + MESES_NOMBRE[mm] + ' ' + mesKey.slice(0,4);
+  document.getElementById('evDetalleBody').innerHTML = `
+    Kg totales entregados en el mes: <b style="color:var(--gold);">${fmt(c.kgTotal,1)} kg</b><br>
+    Cabezas promedio (ponderado por entrega): <b>${fmt(c.cabProm,0)}</b><br>
+    Peso promedio (ponderado por entrega): <b>${fmt(c.pesoProm,0)} kg</b><br>
+    g/cabeza/día: <b>${c.gCabDia!=null?fmt(c.gCabDia,1)+' g':'—'}</b><br>
+    g/100kg PV/día: <b>${c.g100kgDia!=null?fmt(c.g100kgDia,1)+' g':'—'}</b>
+  `;
+  card.style.display='';
+  card.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
 function renderDash(){
   const stock = calcularStock();
-  const consumos = calcularConsumos().filter(c=>c.esActual);
+  const gruposActivos = new Set(_grupos.map(g=>g.nombre));
+  const consumos = calcularConsumos().filter(c=>c.esActual && gruposActivos.has(c.grupo));
 
   const numProds   = Object.keys(_prods).length;
   const numGrupos  = new Set(consumos.map(c=>c.grupo)).size;
