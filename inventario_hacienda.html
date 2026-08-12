@@ -431,8 +431,8 @@ tr:hover td{background:rgba(109,186,58,.04);}
   <div class="card" style="margin-bottom:12px;">
     <div class="ch"><div class="ct">💰 Historial de Ventas</div></div>
     <div class="tw"><table>
-      <thead><tr><th>Código</th><th>Fecha</th><th>Destino</th><th>Mercado</th><th>Tipo</th><th>Cabezas</th><th>Kg</th><th>Total Bs</th><th>Bs/kg</th><th>Bs/día</th><th>Estado</th><th></th></tr></thead>
-      <tbody id="vBody"><tr><td colspan="12"><div class="emp"><div class="emp-ic">💰</div>Sin ventas</div></td></tr></tbody>
+      <thead><tr><th>Código</th><th>Fecha</th><th>Destino</th><th>Mercado</th><th>Tipo</th><th>Categoría</th><th>Cabezas</th><th>Kg</th><th>Total Bs</th><th>Bs/kg</th><th>Bs/día</th><th>Estado</th><th></th></tr></thead>
+      <tbody id="vBody"><tr><td colspan="13"><div class="emp"><div class="emp-ic">💰</div>Sin ventas</div></td></tr></tbody>
     </table></div>
   </div>
   <!-- ANIMALES VENDIDOS -->
@@ -4834,12 +4834,15 @@ function renderV(){
     const marg=calcularMargenVenta(v.id);
     const bsDiaTxt = marg.bsDiaVenta!=null ? 'Bs '+fmt(marg.bsDiaVenta) : '—';
     const bsDiaCol = marg.bsDiaVenta==null ? 'var(--t3)' : marg.bsDiaVenta>=0 ? 'var(--gr)' : 'var(--red)';
+    const catsVenta = [...new Set(marg.detalle.map(d=>d.categoria).filter(Boolean))];
+    const catsTxt = catsVenta.length ? catsVenta.join(', ') : '—';
     return`<tr style="cursor:pointer;" onclick="filtrarPorVenta('${v.id}')" title="Ver animales de esta venta">
       <td class="mn" style="font-size:11px;font-weight:700;color:var(--gold);">${v.codigo||'—'}</td>
       <td class="mn" style="font-size:11px;">${fmtFecha(v.fecha)}</td>
       <td style="font-size:11px;"><b>${v.frigorifico||v.destino||'—'}</b></td>
       <td style="font-size:10px;color:var(--t2);">${v.mercado||'—'}</td>
       <td style="font-size:11px;">${v.tipo||'—'}</td>
+      <td style="font-size:11px;color:var(--t2);" title="${catsVenta.length>1?'Venta mixta: '+catsTxt:''}">${catsTxt}</td>
       <td class="mn tg">${cab}${cabT!==cab?'<span style="font-size:9px;color:var(--t3);">/'+cabT+'</span>':''}</td>
       <td class="mn">${v.kgTotal?Math.round(v.kgTotal)+' kg':'—'}${v.kgFaltantes?'<span style="font-size:9px;color:#f90;"> -'+v.kgFaltantes+'</span>':''}</td>
       <td class="mn tgo">${pendienteLiq?'<span style="color:var(--t3);">—</span>':'Bs '+fmt(v.totalCobrar||0)}</td>
