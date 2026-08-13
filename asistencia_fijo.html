@@ -569,12 +569,19 @@ function renderTodo() {
     var diasMes = new Date(anio,mes+1,0).getDate();
     var hoy = new Date(); hoy.setHours(0,0,0,0);
 
-    // Solo mostrar personas que ingresaron antes o durante el mes visible
+    // Solo mostrar personas que ingresaron antes o durante el mes visible,
+    // y que NO tengan un retiro registrado con fecha anterior o igual a ese mes.
     // Comparar strings ISO directamente para evitar problemas de zona horaria
     var ultimoDiaMesISO = anio + '-' + String(mes+1).padStart(2,'0') + '-' + String(new Date(anio,mes+1,0).getDate()).padStart(2,'0');
+    var retiros = JSON.parse(localStorage.getItem('retirosDB')) || [];
+    var ciRetiradosEnMes = {};
+    retiros.forEach(function(r){
+        if (r.ci && r.fecha && r.fecha <= ultimoDiaMesISO) ciRetiradosEnMes[r.ci] = true;
+    });
     var dbFijo = (JSON.parse(localStorage.getItem('personalFijoDB')) || [])
         .filter(function(p){
             if (p.excluirAsistencia) return false;
+            if (ciRetiradosEnMes[p.ci]) return false;
             if (!p.ingreso) return true;
             return p.ingreso <= ultimoDiaMesISO;
         })
@@ -582,6 +589,7 @@ function renderTodo() {
 
     var dbEventual = (JSON.parse(localStorage.getItem('personalEventualDB')) || [])
         .filter(function(p){
+            if (ciRetiradosEnMes[p.ci]) return false;
             if (!p.ingreso) return true;
             return p.ingreso <= ultimoDiaMesISO;
         })
@@ -788,11 +796,17 @@ function renderSaldo() {
     var grid = document.getElementById('grid-saldo');
     grid.innerHTML = '';
     
-    // Filtrar ocultos y excluidos; mostrar solo los que ya ingresaron
+    // Filtrar ocultos y excluidos; mostrar solo los que ya ingresaron y no se retiraron
     var hoyISO = toISO(hoy);
+    var retirosSaldo = JSON.parse(localStorage.getItem('retirosDB')) || [];
+    var ciRetiradosHoy = {};
+    retirosSaldo.forEach(function(r){
+        if (r.ci && r.fecha && r.fecha <= hoyISO) ciRetiradosHoy[r.ci] = true;
+    });
     db = db.filter(function(p) {
         if (ocultos.indexOf(p.ci) >= 0) return false;
         if (p.excluirAsistencia) return false;
+        if (ciRetiradosHoy[p.ci]) return false;
         if (p.ingreso && p.ingreso > hoyISO) return false; // aún no ingresó
         return true;
     });
