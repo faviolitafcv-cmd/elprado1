@@ -160,8 +160,20 @@ localStorage.setItem = function(key, value) {
 <script>
 var meses = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 
-function getPersonalFijo()     { return JSON.parse(localStorage.getItem('personalFijoDB'))     || []; }
-function getPersonalEventual() { return JSON.parse(localStorage.getItem('personalEventualDB')) || []; }
+function getCIsRetirados() {
+    var retiros = JSON.parse(localStorage.getItem('retirosDB')) || [];
+    var mapa = {};
+    retiros.forEach(function(r){ if(r.ci) mapa[r.ci] = true; });
+    return mapa;
+}
+function getPersonalFijo()     {
+    var retirados = getCIsRetirados();
+    return (JSON.parse(localStorage.getItem('personalFijoDB')) || []).filter(function(p){ return !retirados[p.ci]; });
+}
+function getPersonalEventual() {
+    var retirados = getCIsRetirados();
+    return (JSON.parse(localStorage.getItem('personalEventualDB')) || []).filter(function(p){ return !retirados[p.ci]; });
+}
 function getRetiros()          { return JSON.parse(localStorage.getItem('retirosDB'))           || []; }
 
 function getTodos() {
