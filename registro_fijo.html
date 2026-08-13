@@ -31,7 +31,7 @@
 const FB_RRHH_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com/rrhh';
 const FB_RRHH_KEYS = ['personalFijoDB','personalEventualDB','actividadesDB',
   'asistFijoCierres','asistFijoPeriodoInicio','prestamosEventualDB',
-  'retirosDB','saldoOcultos','smn_prado'];
+  'retirosDB','saldoOcultos','smn_prado','cargosOrgExtra'];
 
 async function fbRrhhGet(key) {
   try {
@@ -126,6 +126,7 @@ localStorage.setItem = function(key, value) {
                     <select id="cargo" required>
                         <option value="">Seleccionar cargo...</option>
                     </select>
+                    <button type="button" onclick="agregarCargoNuevo()" style="margin-top:5px;font-size:11px;padding:4px 10px;background:#e8f5e9;border:1px solid #a5d6a7;border-radius:4px;color:#2e7d32;cursor:pointer;">+ Agregar cargo nuevo</button>
                     <small id="cargo-hint" style="color:#888;font-size:11px;margin-top:3px;">Los cargos ya ocupados aparecen deshabilitados</small>
                     <label style="margin-top:8px;display:flex;align-items:center;gap:7px;cursor:pointer;font-weight:normal;font-size:13px;background:#fff3e0;padding:6px 9px;border-radius:5px;border:1px solid #ffcc80;">
                         <input type="checkbox" id="excluir-asistencia" style="width:16px;height:16px;cursor:pointer;">
@@ -440,7 +441,7 @@ localStorage.setItem = function(key, value) {
         }
 
         // ===== ORGANIGRAMA DE CARGOS =====
-        var CARGOS_ORG = [
+        var CARGOS_ORG_BASE = [
             { grupo: 'Dirección', items: ['Accionista', 'Supervisión Externa'] },
             { grupo: 'Gestión Operativa', items: ['Encargada de Campo', 'Jefe de Almacén y Maquinaria', 'Supervisor de Operaciones', 'Capataz'] },
             { grupo: 'Campo - Vaqueros', items: ['Vaquero 1','Vaquero 2','Vaquero 3','Vaquero 4','Vaquero 5','Vaquero 6','Vaquero 7','Vaquero de Reemplazo'] },
@@ -448,12 +449,42 @@ localStorage.setItem = function(key, value) {
             { grupo: 'Alimentación', items: ['Coordinadora de Alimentación','Cocinera Campamento Represa','Cocinera de Reemplazo'] },
             { grupo: 'Otros', items: ['Portero','Portero de Reemplazo','Pasante'] }
         ];
+        function getCargosOrg() {
+            var extra = JSON.parse(localStorage.getItem('cargosOrgExtra')) || {};
+            // Clonar la base y agregarle, dentro de cada grupo, los cargos nuevos que se hayan creado
+            var org = CARGOS_ORG_BASE.map(function(g){ return { grupo: g.grupo, items: g.items.slice() }; });
+            Object.keys(extra).forEach(function(grupoNombre){
+                var g = org.find(function(x){ return x.grupo === grupoNombre; });
+                if(!g) { g = { grupo: grupoNombre, items: [] }; org.push(g); }
+                extra[grupoNombre].forEach(function(item){ if(g.items.indexOf(item) === -1) g.items.push(item); });
+            });
+            return org;
+        }
+        function agregarCargoNuevo() {
+            var grupo = prompt('¿En qué grupo va este cargo?\n(Podés escribir uno nuevo, o uno existente: Dirección, Gestión Operativa, Campo - Vaqueros, Campo - Tractoristas, Alimentación, Otros)');
+            if(!grupo) return;
+            grupo = grupo.trim();
+            if(!grupo) return;
+            var nombre = prompt('Nombre del cargo nuevo:');
+            if(!nombre) return;
+            nombre = nombre.trim();
+            if(!nombre) return;
+            var extra = JSON.parse(localStorage.getItem('cargosOrgExtra')) || {};
+            if(!extra[grupo]) extra[grupo] = [];
+            if(extra[grupo].indexOf(nombre) === -1) extra[grupo].push(nombre);
+            localStorage.setItem('cargosOrgExtra', JSON.stringify(extra));
+            poblarSelectCargo('cargo', document.getElementById('ci') ? document.getElementById('ci').value : '', nombre);
+            alert('✅ Cargo "'+nombre+'" agregado en "'+grupo+'".');
+        }
         function getCargosOcupados(ciActual) {
             var ocupados = [];
             var fijos = JSON.parse(localStorage.getItem('personalFijoDB')) || [];
             var eventuales = JSON.parse(localStorage.getItem('personalEventualDB')) || [];
-            fijos.forEach(function(p) { if(p.cargo && p.ci !== ciActual) ocupados.push(p.cargo); });
-            eventuales.forEach(function(p) { if(p.cargo && p.ci !== ciActual) ocupados.push(p.cargo); });
+            var retiros = JSON.parse(localStorage.getItem('retirosDB')) || [];
+            var ciRetirados = {};
+            retiros.forEach(function(r){ if(r.ci) ciRetirados[r.ci] = true; });
+            fijos.forEach(function(p) { if(p.cargo && p.ci !== ciActual && !ciRetirados[p.ci]) ocupados.push(p.cargo); });
+            eventuales.forEach(function(p) { if(p.cargo && p.ci !== ciActual && !ciRetirados[p.ci]) ocupados.push(p.cargo); });
             return ocupados;
         }
         function poblarSelectCargo(selectId, ciActual, valorActual) {
@@ -461,7 +492,7 @@ localStorage.setItem = function(key, value) {
             if(!sel) return;
             var ocupados = getCargosOcupados(ciActual || '');
             sel.innerHTML = '<option value="">Seleccionar cargo...</option>';
-            CARGOS_ORG.forEach(function(grupo) {
+            getCargosOrg().forEach(function(grupo) {
                 var og = document.createElement('optgroup');
                 og.label = grupo.grupo;
                 grupo.items.forEach(function(item) {
@@ -514,7 +545,7 @@ localStorage.setItem = function(key, value) {
   var FB_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com';
   var RRHH_KEYS = ['personalFijoDB','personalEventualDB','actividadesDB',
     'asistFijoCierres','asistFijoPeriodoInicio','prestamosEventualDB',
-    'retirosDB','saldoOcultos','smn_prado'];
+    'retirosDB','saldoOcultos','smn_prado','cargosOrgExtra'];
 
   function fbWrite(path, val) {
     fetch(FB_URL + path + '.json', {
