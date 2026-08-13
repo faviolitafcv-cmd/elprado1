@@ -75,19 +75,6 @@ localStorage.setItem = function(key, value) {
 // Sincronizar al cargar
 (async function() {
   await syncRrhhFromFirebase();
-  // Corregir vacPendientes negativos causados por error en cierre anterior
-  // Solo aplica si el valor guardado es negativo (no debería serlo nunca)
-  var db = JSON.parse(localStorage.getItem('personalFijoDB')) || [];
-  var needsFix = false;
-  db.forEach(function(p) {
-    if (parseFloat(p.vacPendientes) < 0) {
-      p.vacPendientes = 0;
-      needsFix = true;
-    }
-  });
-  if (needsFix) {
-    localStorage.setItem('personalFijoDB', JSON.stringify(db));
-  }
 })();
 
 </script>
