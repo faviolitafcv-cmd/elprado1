@@ -86,7 +86,7 @@
 const FB_RRHH_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com/rrhh';
 const FB_RRHH_KEYS = ['personalFijoDB','personalEventualDB','actividadesDB',
   'asistFijoCierres','asistFijoPeriodoInicio','prestamosEventualDB',
-  'retirosDB','saldoOcultos','smn_prado'];
+  'retirosDB','saldoOcultos','smn_prado','cargosOrgExtra','orgEstructuraDB'];
 
 async function fbRrhhGet(key) {
   try {
@@ -175,6 +175,46 @@ function getPersonalEventual() {
     return (JSON.parse(localStorage.getItem('personalEventualDB')) || []).filter(function(p){ return !retirados[p.ci]; });
 }
 function getRetiros()          { return JSON.parse(localStorage.getItem('retirosDB'))           || []; }
+
+// ═══════════════════════════════════════
+// ESTRUCTURA EDITABLE DEL ORGANIGRAMA
+// ═══════════════════════════════════════
+// Cada nodo: {id, cargo, parentId, externo}
+// parentId=null y externo=true → se muestra arriba de todo, sin línea de reporte (ej. Accionistas)
+// parentId=null y externo=false → nodo raíz de la jerarquía (ej. Encargada de Campo)
+const ORG_ESTRUCTURA_DEFAULT = [
+  {id:'accionista', cargo:'Accionista', parentId:null, externo:true},
+  {id:'supervision_externa', cargo:'Supervisión Externa', parentId:null, externo:true},
+  {id:'encargada_campo', cargo:'Encargada de Campo', parentId:null, externo:false},
+  {id:'jefe_almacen', cargo:'Jefe de Almacén y Maquinaria', parentId:'encargada_campo', externo:false},
+  {id:'tractorista1', cargo:'Tractorista 1', parentId:'jefe_almacen', externo:false},
+  {id:'tractorista2', cargo:'Tractorista 2', parentId:'jefe_almacen', externo:false},
+  {id:'tractorista3', cargo:'Tractorista 3', parentId:'jefe_almacen', externo:false},
+  {id:'capataz', cargo:'Capataz', parentId:'encargada_campo', externo:false},
+  {id:'vaquero1', cargo:'Vaquero 1', parentId:'capataz', externo:false},
+  {id:'vaquero2', cargo:'Vaquero 2', parentId:'capataz', externo:false},
+  {id:'vaquero3', cargo:'Vaquero 3', parentId:'capataz', externo:false},
+  {id:'vaquero4', cargo:'Vaquero 4', parentId:'capataz', externo:false},
+  {id:'vaquero5', cargo:'Vaquero 5', parentId:'capataz', externo:false},
+  {id:'vaquero6', cargo:'Vaquero 6', parentId:'capataz', externo:false},
+  {id:'vaquero7', cargo:'Vaquero 7', parentId:'capataz', externo:false},
+  {id:'pasante', cargo:'Pasante', parentId:'capataz', externo:false},
+  {id:'supervisor_operaciones', cargo:'Supervisor de Operaciones', parentId:'encargada_campo', externo:false},
+  {id:'portero', cargo:'Portero', parentId:'supervisor_operaciones', externo:false},
+  {id:'coord_alimentacion', cargo:'Coordinadora de Alimentación', parentId:'supervisor_operaciones', externo:false},
+  {id:'cocinera_represa', cargo:'Cocinera Campamento Represa', parentId:'coord_alimentacion', externo:false}
+];
+function getOrgEstructura() {
+  var guardada = JSON.parse(localStorage.getItem('orgEstructuraDB'));
+  return (guardada && guardada.length) ? guardada : ORG_ESTRUCTURA_DEFAULT.map(function(n){ return Object.assign({},n); });
+}
+function guardarOrgEstructura(est) {
+  localStorage.setItem('orgEstructuraDB', JSON.stringify(est));
+}
+function slugify(texto) {
+  return 'nodo_' + texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'') + '_' + Date.now().toString(36).slice(-4);
+}
 
 function getTodos() {
     var fijos = getPersonalFijo().map(function(p) {
@@ -361,269 +401,180 @@ function kpi(label, valor, sub, color) {
 }
 
 // ===================== ORGANIGRAMA =====================
+function abreviarNombreOrg(nombreCompleto) {
+    if(!nombreCompleto) return '-';
+    var partes = nombreCompleto.trim().split(/\s+/);
+    if(partes.length <= 2) return partes.join(' ');
+    return partes[0]+' '+partes[1];
+}
+
+function porCargoUnificadoOrg(cargo, fijos, eventuales) {
+    var fijoMatch = fijos.filter(function(p){ return p.cargo === cargo; })
+        .map(function(p){
+            var n = p.nombreCompleto||p.nombre||((p.nombres||'')+' '+(p.paterno||'')).trim();
+            return { nombre: abreviarNombreOrg(n), esEventual: false };
+        });
+    if(fijoMatch.length) return fijoMatch;
+    return eventuales.filter(function(p){ return p.cargo === cargo; })
+        .map(function(p){ return { nombre: abreviarNombreOrg(p.nombre||'-'), esEventual: true }; });
+}
+
+function nodoBoxHtmlOrg(cargo, personas) {
+    if(!personas.length) {
+        return '<div class="org-nodo" style="border:1.5px solid #c9c9c9;background:#f5f5f5;min-width:150px;max-width:190px;">'
+            +'<div style="color:#888;opacity:0.85;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;">'+cargo+'</div>'
+            +'<div style="color:#999;font-size:13px;">(Vacante)</div>'
+            +'</div>';
+    }
+    return personas.map(function(p) {
+        var border = p.esEventual ? '1.5px dashed #FFB74D' : '1.5px solid #185FA5';
+        var bg     = p.esEventual ? '#FFF8E1' : '#E6F1FB';
+        var color  = p.esEventual ? '#BF360C' : '#0C447C';
+        var badge  = p.esEventual ? '<div style="font-size:9px;background:#FFB74D;color:#BF360C;padding:1px 6px;border-radius:8px;display:inline-block;margin-top:3px;font-weight:bold;">EVENTUAL</div>' : '';
+        return '<div class="org-nodo" style="border:'+border+';background:'+bg+';min-width:150px;max-width:190px;">'
+            +'<div style="color:'+color+';opacity:0.85;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;">'+cargo+'</div>'
+            +'<div style="color:'+color+';font-size:13px;font-weight:bold;">'+p.nombre+'</div>'
+            +badge
+            +'</div>';
+    }).join('');
+}
+
+function renderNodoArbolOrg(nodoId, estructura, fijos, eventuales) {
+    var nodo = estructura.find(function(n){ return n.id===nodoId; });
+    if(!nodo) return '';
+    var personas = porCargoUnificadoOrg(nodo.cargo, fijos, eventuales);
+    var hijos = estructura.filter(function(n){ return n.parentId===nodoId; });
+    var html = '<div style="display:flex;flex-direction:column;align-items:center;">';
+    html += nodoBoxHtmlOrg(nodo.cargo, personas);
+    if(hijos.length) {
+        html += '<div style="width:2px;background:#c5cae9;height:20px;margin:0 auto;"></div>';
+        html += '<div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap;">';
+        hijos.forEach(function(h){ html += renderNodoArbolOrg(h.id, estructura, fijos, eventuales); });
+        html += '</div>';
+    }
+    html += '</div>';
+    return html;
+}
+
 function renderOrganigrama() {
     var fijos = getPersonalFijo();
     var eventuales = getPersonalEventual();
+    var estructura = getOrgEstructura();
     var html = '<h3>Organigrama — Hacienda El Prado 1</h3>';
+    html += '<div style="margin-bottom:14px;"><button onclick="toggleEditorOrg()" id="btn-editor-org" style="background:#1a237e;color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:bold;">✏️ Editar estructura</button></div>';
+    html += '<div id="editor-org-panel" style="display:none;"></div>';
 
-    if(!fijos.length) {
+    if(!fijos.length && !estructura.some(function(n){return n.externo;})) {
         html += '<div class="sin-datos">No hay personal fijo registrado. Registrá el personal desde Registro de Personal Fijo.</div>';
         document.getElementById('panel-organigrama').innerHTML = html;
         return;
     }
 
-    // Abreviar nombre: primer nombre + primer apellido
-    function abreviarNombre(nombreCompleto) {
-        if(!nombreCompleto) return '-';
-        var partes = nombreCompleto.trim().split(/\s+/);
-        if(partes.length === 1) return partes[0];
-        // Asumir formato: NOMBRES PATERNO MATERNO
-        // Tomar primer token como nombre y último token antes del final como apellido
-        if(partes.length === 2) return partes[0]+' '+partes[1];
-        // 3+ palabras: primer nombre + segundo token (primer apellido)
-        return partes[0]+' '+partes[1];
-    }
-
-    // Función para obtener personas por cargo
-    function porCargo(cargo) {
-        return fijos.filter(function(p) {
-            return (p.cargo||'') === cargo;
-        }).map(function(p) {
-            var nombre = p.nombreCompleto || p.nombre || (p.nombres+' '+p.paterno).trim();
-            return abreviarNombre(nombre);
-        });
-    }
-
-    function nodo(cargo, nombres, color, bg, textColor) {
-        if(!nombres || !nombres.length) {
-            nombres = ['(Vacante)'];
-        }
-        return nombres.map(function(n) {
-            return '<div class="org-nodo" style="border-color:'+color+';background:'+bg+';min-width:155px;max-width:195px;">'
-                +'<div class="org-cargo" style="color:'+textColor+';opacity:0.85;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;">'+cargo+'</div>'
-                +'<div class="org-nombre" style="color:'+textColor+';font-size:13px;font-weight:bold;">'+n+'</div>'
-                +'</div>';
-        }).join('');
-    }
-
-    function fila(nodos) {
-        return '<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">'+nodos+'</div>';
-    }
-    function conector() {
-        return '<div style="width:2px;background:#c5cae9;height:22px;margin:0 auto;"></div>';
-    }
-    function lineaH() {
-        return '<div style="height:1px;background:#c5cae9;width:60%;margin:0 auto;"></div>';
-    }
-
-    // Nodo unificado: fijo o eventual por cargo
-    // Retorna {nombre, esEventual} para un cargo dado
-    function porCargoUnificado(cargo) {
-        // Buscar en fijo primero
-        var fijoMatch = fijos.filter(function(p){ return p.cargo === cargo; })
-            .map(function(p){ 
-                var n = p.nombreCompleto||p.nombre||(p.nombres+' '+p.paterno).trim();
-                return { nombre: abreviarNombre(n), esEventual: false }; 
-            });
-        if(fijoMatch.length) return fijoMatch;
-        // Si no hay fijo, buscar en eventual
-        var evMatch = eventuales.filter(function(p){ return p.cargo === cargo; })
-            .map(function(p){ return { nombre: abreviarNombre(p.nombre||'-'), esEventual: true }; });
-        return evMatch;
-    }
-
-    function nodoUnificado(cargo, color, bg, textColor) {
-        var personas = porCargoUnificado(cargo);
-        if(!personas.length) {
-            return '<div class="org-nodo" style="border-color:'+color+';background:'+bg+';min-width:155px;max-width:195px;">'
-                +'<div class="org-cargo" style="color:'+textColor+';opacity:0.85;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;">'+cargo+'</div>'
-                +'<div class="org-nombre" style="color:#999;font-size:13px;">(Vacante)</div>'
-                +'</div>';
-        }
-        return personas.map(function(p) {
-            var bgNodo  = p.esEventual ? '#FFF8E1' : bg;
-            var border  = p.esEventual ? '1px dashed #FFB74D' : '2px solid '+color;
-            var badge   = p.esEventual
-                ? '<div style="font-size:9px;background:#FFB74D;color:#BF360C;padding:1px 6px;border-radius:8px;display:inline-block;margin-top:3px;font-weight:bold;">EN PRUEBA</div>'
-                : '';
-            return '<div class="org-nodo" style="border:'+border+';background:'+bgNodo+';min-width:155px;max-width:195px;">'
-                +'<div class="org-cargo" style="color:'+(p.esEventual?'#E65100':textColor)+';opacity:0.85;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;">'+cargo+'</div>'
-                +'<div class="org-nombre" style="color:'+(p.esEventual?'#BF360C':textColor)+';font-size:13px;font-weight:bold;">'+p.nombre+'</div>'
-                +badge
-                +'</div>';
-        }).join('');
-    }
-
-    // Eventuales por puesto (para reemplazos)
-    function evPorPuesto(puesto) {
-        return eventuales.filter(function(p){ return p.cargo === puesto; })
-            .map(function(p){ return abreviarNombre(p.nombre||'-'); });
-    }
-    function nodosEv(lista, label) {
-        if(!lista.length) return '';
-        label = label || 'Reemplazo';
-        var html2 = '<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:4px;">';
-        lista.forEach(function(n){
-            html2 += '<div style="border:1px dashed #FFB74D;border-radius:8px;padding:5px 8px;background:#FFF8E1;min-width:100px;text-align:center;">'
-                +'<div style="font-size:9px;color:#E65100;text-transform:uppercase;">'+label+'</div>'
-                +'<div style="font-size:11px;font-weight:bold;color:#BF360C;">'+n+'</div>'
-                +'</div>';
-        });
-        html2 += '</div>';
-        return html2;
-    }
-
-    // EXTERNOS
-    var accionistas = porCargo('Accionista');
-    var asesores    = porCargo('Supervisión Externa');
-
-    html += '<div style="display:flex;gap:20px;justify-content:center;margin-bottom:15px;flex-wrap:wrap;">';
-    if(accionistas.length) {
-        html += '<div style="border:1px dashed #B4B2A9;border-radius:8px;padding:10px 16px;background:#F1EFE8;text-align:center;min-width:160px;">'
-            +'<div style="font-size:10px;color:#888;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px;">Accionistas</div>'
-            + accionistas.map(function(n){ return '<div style="font-size:12px;font-weight:bold;color:#444;">'+n+'</div>'; }).join('')
-            +'</div>';
-    }
-    if(asesores.length) {
-        html += '<div style="border:1px dashed #B4B2A9;border-radius:8px;padding:10px 16px;background:#F1EFE8;text-align:center;min-width:160px;">'
-            +'<div style="font-size:10px;color:#888;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px;">Supervisión Externa</div>'
-            + asesores.map(function(n){ return '<div style="font-size:12px;font-weight:bold;color:#444;">'+n+'</div>'; }).join('')
-            +'</div>';
-    }
-    html += '</div>';
-
-    // NIVEL 1 - ENCARGADA DE CAMPO
-    html += fila(nodo('Encargada de Campo', porCargo('Encargada de Campo'), '#0F6E56', '#1D9E75', 'white'));
-    html += conector();
-
-    // LÍNEA Y 3 PILARES
-    html += '<div style="display:flex;gap:0;justify-content:center;">';
-
-    // PILAR 1
-    html += '<div style="display:flex;flex-direction:column;align-items:center;flex:1;">';
-    html += '<div style="height:1px;background:#c5cae9;width:100%;"></div>';
-    html += conector();
-    html += fila(nodo('Jefe de Almacén y Maquinaria', porCargo('Jefe de Almacén y Maquinaria'), '#185FA5', '#E6F1FB', '#0C447C'));
-    html += conector();
-    // Tractoristas — fijo o eventual por cargo
-    html += '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">';
-    ['Tractorista 1','Tractorista 2','Tractorista 3'].forEach(function(c){
-        html += nodoUnificado(c, '#B5D4F4', '#F5F5F5', '#185FA5');
-    });
-    html += '</div>';
-    var evTrac = evPorPuesto('Tractorista de Reemplazo');
-    if(evTrac.length) html += nodosEv(evTrac, 'Reemplazo');
-    html += '</div>';
-
-    // PILAR 2
-    html += '<div style="display:flex;flex-direction:column;align-items:center;flex:1;">';
-    html += '<div style="height:1px;background:#c5cae9;width:100%;"></div>';
-    html += conector();
-    html += fila(nodo('Capataz', porCargo('Capataz'), '#185FA5', '#E6F1FB', '#0C447C'));
-    html += conector();
-    // Vaqueros — fijo o eventual por cargo
-    html += '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">';
-    ['Vaquero 1','Vaquero 2','Vaquero 3','Vaquero 4','Vaquero 5','Vaquero 6','Vaquero 7'].forEach(function(c){
-        html += nodoUnificado(c, '#B5D4F4', '#F5F5F5', '#185FA5');
-    });
-    html += '</div>';
-    var evVaq = evPorPuesto('Vaquero de Reemplazo');
-    if(evVaq.length) html += nodosEv(evVaq, 'Reemplazo');
-    // Pasantes
-    var pasantes = porCargo('Pasante');
-    if(pasantes.length) {
-        html += conector();
-        html += '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">';
-        pasantes.forEach(function(n){
-            html += '<div class="org-nodo" style="border-color:#D3D1C7;background:#F1EFE8;min-width:130px;">'
-                +'<div class="org-cargo" style="color:#888;font-size:10px;text-transform:uppercase;">Pasante</div>'
-                +'<div class="org-nombre" style="color:#444;font-size:12px;">'+n+'</div>'
+    // Fila de externos (sin línea de reporte) — ej. Accionistas, Supervisión Externa
+    var externos = estructura.filter(function(n){ return n.externo; });
+    if(externos.length) {
+        html += '<div style="display:flex;gap:20px;justify-content:center;margin-bottom:15px;flex-wrap:wrap;">';
+        externos.forEach(function(nodo){
+            var personas = porCargoUnificadoOrg(nodo.cargo, fijos, eventuales);
+            var nombres = personas.length ? personas.map(function(p){return p.nombre;}) : ['(Vacante)'];
+            html += '<div style="border:1.5px dashed #B4B2A9;border-radius:8px;padding:10px 16px;background:#F1EFE8;text-align:center;min-width:160px;">'
+                +'<div style="font-size:10px;color:#888;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px;">'+nodo.cargo+'</div>'
+                + nombres.map(function(n){ return '<div style="font-size:12px;font-weight:bold;color:#444;">'+n+'</div>'; }).join('')
                 +'</div>';
         });
         html += '</div>';
     }
+
+    // Raíces de la jerarquía (parentId null, no externo)
+    var raices = estructura.filter(function(n){ return !n.parentId && !n.externo; });
+    html += '<div style="display:flex;gap:24px;justify-content:center;flex-wrap:wrap;">';
+    raices.forEach(function(r){ html += renderNodoArbolOrg(r.id, estructura, fijos, eventuales); });
     html += '</div>';
 
-    // PILAR 3
-    html += '<div style="display:flex;flex-direction:column;align-items:center;flex:1;">';
-    html += '<div style="height:1px;background:#c5cae9;width:100%;"></div>';
-    html += conector();
-    html += fila(nodo('Supervisor de Operaciones', porCargo('Supervisor de Operaciones'), '#185FA5', '#E6F1FB', '#0C447C'));
-    html += conector();
-
-    // Línea horizontal hacia Portero y Coord. Alimentación
-    html += '<div style="display:flex;gap:20px;justify-content:center;align-items:flex-start;flex-wrap:wrap;">';
-
-    // Sub-columna PORTERO
-    html += '<div style="display:flex;flex-direction:column;align-items:center;">';
-    html += nodoUnificado('Portero', '#D3D1C7', '#F5F5F5', '#444441');
-    var evPortero = evPorPuesto('Portero de Reemplazo');
-    if(evPortero.length) {
-        html += '<div style="width:2px;background:#FFB74D;height:16px;margin:0 auto;"></div>';
-        html += nodosEv(evPortero, 'Reemplazo');
-    }
-    html += '</div>';
-
-    // Sub-columna COORD. ALIMENTACIÓN → COCINERA REPRESA → REEMPLAZO
-    html += '<div style="display:flex;flex-direction:column;align-items:center;">';
-    var coordAlim = porCargo('Coordinadora de Alimentación');
-    coordAlim.forEach(function(n){
-        html += '<div class="org-nodo" style="border-color:#F0997B;background:#FAECE7;min-width:130px;">'
-            +'<div class="org-cargo" style="color:#993C1D;font-size:10px;text-transform:uppercase;">Coord. Alimentación</div>'
-            +'<div class="org-nombre" style="color:#712B13;font-size:12px;">'+n+'</div>'
-            +'<div style="font-size:10px;color:#993C1D;margin-top:2px;">Camp. Principal</div>'
-            +'</div>';
-    });
-    if(!coordAlim.length) {
-        html += nodoUnificado('Coordinadora de Alimentación', '#F0997B', '#FAECE7', '#712B13');
-    }
-    // Cocinera Represa debajo de Alfonsina
-    var cocRepresaUnif = porCargoUnificado('Cocinera Campamento Represa');
-    var evCocReemplazo = evPorPuesto('Cocinera de Reemplazo');
-    if(cocRepresaUnif.length || evCocReemplazo.length) {
-        html += '<div style="width:2px;background:#c5cae9;height:16px;margin:0 auto;"></div>';
-        html += nodoUnificado('Cocinera Campamento Represa', '#F5C4B3', '#FFF5F2', '#712B13');
-        if(evCocReemplazo.length) {
-            html += '<div style="width:2px;background:#FFB74D;height:16px;margin:0 auto;"></div>';
-            html += nodosEv(evCocReemplazo, 'Reemplazo');
-        }
-    }
-    html += '</div>';
-
-    html += '</div>'; // fin fila portero + alimentación
-    html += '</div>'; // fin pilar 3
-    html += '</div>'; // fin 3 pilares
-
-    // PERSONAL EVENTUAL - Desarrollo y Mantenimiento (sin puesto fijo asignado)
-    var evDesarrollo = evPorPuesto('Desarrollo');
-    var evMant = evPorPuesto('Mantenimiento');
-    var evSinPuesto = eventuales.filter(function(p){ return !p.cargo; });
-    if(evDesarrollo.length || evMant.length || evSinPuesto.length) {
+    // PERSONAL EVENTUAL sin cargo asignado en la estructura
+    var cargosEnEstructura = estructura.map(function(n){ return n.cargo; });
+    var evSinPuesto = eventuales.filter(function(p){ return !p.cargo || cargosEnEstructura.indexOf(p.cargo) === -1; });
+    if(evSinPuesto.length) {
         html += '<div style="margin-top:25px;border-top:2px dashed #FFB74D;padding-top:15px;">';
-        html += '<h3 style="color:#E65100;border-color:#FFB74D;">Personal Eventual — Desarrollo y Mantenimiento</h3>';
+        html += '<h3 style="color:#E65100;border-color:#FFB74D;">Personal Eventual — Sin puesto en la estructura</h3>';
         html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">';
-        if(evDesarrollo.length) {
-            html += '<div style="background:#FFF3E0;border:1px solid #FFB74D;border-radius:8px;padding:10px 14px;">'
-                +'<div style="font-size:10px;color:#E65100;font-weight:bold;text-transform:uppercase;margin-bottom:4px;">Desarrollo de Campo</div>'
-                + evDesarrollo.map(function(n){ return '<div style="font-size:12px;font-weight:bold;color:#BF360C;">'+n+'</div>'; }).join('')
-                +'</div>';
-        }
-        if(evMant.length) {
-            html += '<div style="background:#FFF3E0;border:1px solid #FFB74D;border-radius:8px;padding:10px 14px;">'
-                +'<div style="font-size:10px;color:#E65100;font-weight:bold;text-transform:uppercase;margin-bottom:4px;">Mantenimiento</div>'
-                + evMant.map(function(n){ return '<div style="font-size:12px;font-weight:bold;color:#BF360C;">'+n+'</div>'; }).join('')
-                +'</div>';
-        }
-        if(evSinPuesto.length) {
-            html += '<div style="background:#F5F5F5;border:1px solid #DDD;border-radius:8px;padding:10px 14px;">'
-                +'<div style="font-size:10px;color:#888;font-weight:bold;text-transform:uppercase;margin-bottom:4px;">Sin puesto asignado</div>'
-                + evSinPuesto.map(function(p){ return '<div style="font-size:12px;color:#555;">'+( p.nombre||'-')+'</div>'; }).join('')
-                +'</div>';
-        }
-        html += '</div></div>';
+        html += '<div style="background:#F5F5F5;border:1px solid #DDD;border-radius:8px;padding:10px 14px;">'
+            + evSinPuesto.map(function(p){ return '<div style="font-size:12px;color:#555;">'+(p.nombre||'-')+(p.cargo?' — '+p.cargo:'')+'</div>'; }).join('')
+            +'</div></div></div>';
     }
 
     document.getElementById('panel-organigrama').innerHTML = html;
+    if(document.getElementById('editor-org-panel') && window._editorOrgAbierto) {
+        renderEditorOrg();
+        document.getElementById('editor-org-panel').style.display = '';
+    }
+}
+
+// ═══════════════════════════════════════
+// EDITOR DE ESTRUCTURA DEL ORGANIGRAMA
+// ═══════════════════════════════════════
+window._editorOrgAbierto = false;
+function toggleEditorOrg() {
+    window._editorOrgAbierto = !window._editorOrgAbierto;
+    document.getElementById('btn-editor-org').textContent = window._editorOrgAbierto ? '✕ Cerrar editor' : '✏️ Editar estructura';
+    var panel = document.getElementById('editor-org-panel');
+    if(window._editorOrgAbierto) { renderEditorOrg(); panel.style.display=''; }
+    else { panel.style.display='none'; }
+}
+function renderEditorOrg() {
+    var estructura = getOrgEstructura();
+    var html = '<div style="background:#fffde7;border:1px solid #fbc02d;border-radius:8px;padding:16px;margin-bottom:20px;">';
+    html += '<h4 style="margin-top:0;color:#795548;">Editar estructura del organigrama</h4>';
+    html += '<table class="tb"><thead><tr><th>Cargo / Nombre del puesto</th><th>Depende de</th><th>Tipo</th><th></th></tr></thead><tbody>';
+    estructura.forEach(function(n, idx){
+        html += '<tr>'
+            +'<td><input type="text" value="'+n.cargo.replace(/"/g,'&quot;')+'" onchange="editarNodoOrg('+idx+',\'cargo\',this.value)" style="width:100%;padding:5px;border:1px solid #ccc;border-radius:4px;"></td>'
+            +'<td><select onchange="editarNodoOrg('+idx+',\'parentId\',this.value)" style="width:100%;padding:5px;border:1px solid #ccc;border-radius:4px;">'
+            +'<option value=""'+(!n.parentId?' selected':'')+'>— Ninguno (nivel superior) —</option>'
+            + estructura.filter(function(o){return o.id!==n.id;}).map(function(o){
+                return '<option value="'+o.id+'"'+(n.parentId===o.id?' selected':'')+'>'+o.cargo+'</option>';
+              }).join('')
+            +'</select></td>'
+            +'<td><label style="font-size:11px;"><input type="checkbox" '+(n.externo?'checked':'')+' onchange="editarNodoOrg('+idx+',\'externo\',this.checked)"> Externo (sin línea)</label></td>'
+            +'<td><button onclick="eliminarNodoOrg('+idx+')" style="background:#d32f2f;color:white;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;">Eliminar</button></td>'
+            +'</tr>';
+    });
+    html += '</tbody></table>';
+    html += '<button onclick="agregarNodoOrg()" style="margin-top:12px;background:#2e7d32;color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:bold;">+ Agregar puesto al organigrama</button>';
+    html += '<div style="font-size:11px;color:#795548;margin-top:10px;">💡 El nombre del cargo tiene que coincidir exactamente con el que elegís en "Registro de Personal Fijo" para que la persona aparezca en su caja.</div>';
+    html += '</div>';
+    document.getElementById('editor-org-panel').innerHTML = html;
+}
+function editarNodoOrg(idx, campo, valor) {
+    var estructura = getOrgEstructura();
+    if(campo==='parentId') valor = valor || null;
+    estructura[idx][campo] = valor;
+    guardarOrgEstructura(estructura);
+    renderOrganigrama();
+}
+function eliminarNodoOrg(idx) {
+    var estructura = getOrgEstructura();
+    var nodo = estructura[idx];
+    if(estructura.some(function(n){return n.parentId===nodo.id;})) {
+        alert('Este puesto tiene otros puestos debajo en el organigrama. Primero movelos o eliminalos a ellos.');
+        return;
+    }
+    if(!confirm('¿Eliminar "'+nodo.cargo+'" del organigrama?')) return;
+    estructura.splice(idx,1);
+    guardarOrgEstructura(estructura);
+    window._editorOrgAbierto = true;
+    renderOrganigrama();
+}
+function agregarNodoOrg() {
+    var nombre = prompt('Nombre del puesto nuevo (tiene que coincidir con el cargo cargado en Registro de Personal):');
+    if(!nombre) return;
+    nombre = nombre.trim();
+    if(!nombre) return;
+    var estructura = getOrgEstructura();
+    estructura.push({id: slugify(nombre), cargo: nombre, parentId: null, externo: false});
+    guardarOrgEstructura(estructura);
+    window._editorOrgAbierto = true;
+    renderOrganigrama();
 }
 
 // ===================== RETIROS =====================
