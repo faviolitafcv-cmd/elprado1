@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Prototipo · Mapa de Potreros · El Prado 1</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+<style>
+:root{
+  --bg:#131f10; --bg2:#1a2a16; --card:#1f3019; --card2:#263d1e;
+  --border:#2e4a22; --border2:#3d6030;
+  --green:#6dba3a; --green2:#5a9e2f; --green-soft:#a8d878;
+  --gold:#c9a227; --gold2:#e8bc40; --red:#e05a4a;
+  --text:#ccddb8; --text2:#8aaa72; --text3:#5a7848;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;height:100%;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}
+#app{display:flex; height:100vh; height:100dvh;}
+#map{flex:1; min-width:0; background:#0a0f08;}
+#panel{
+  width:390px; flex-shrink:0; background:var(--bg2); border-left:1px solid var(--border);
+  overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:12px;
+}
+@media (max-width:880px){
+  #app{flex-direction:column;}
+  #map{height:44vh; flex:none;}
+  #panel{width:100%; border-left:none; border-top:1px solid var(--border); flex:1;}
+}
+h1{font-size:15px; margin:0 0 2px; color:var(--green);}
+.sub{font-size:11.5px; color:var(--text3); margin:0 0 4px; line-height:1.4;}
+.card{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:12px; display:flex; flex-direction:column; gap:9px;}
+.card-title{font-size:12.5px; font-weight:700; color:var(--gold2); text-transform:uppercase; letter-spacing:.3px; display:flex; align-items:center; justify-content:space-between;}
+.badge{font-size:10px; padding:2px 7px; border-radius:20px; background:var(--card2); color:var(--text2); font-weight:600;}
+.badge.on{background:var(--green2); color:#0d1509;}
+label{font-size:11.5px; color:var(--text2); display:block; margin-bottom:3px;}
+input,select{
+  width:100%; background:var(--bg2); border:1px solid var(--border); color:var(--text);
+  padding:8px 9px; border-radius:7px; font-size:13px;
+}
+input:focus,select:focus{outline:none; border-color:var(--green2);}
+.row{display:flex; gap:8px;}
+.row > *{flex:1;}
+button{
+  border:none; border-radius:7px; padding:9px 12px; font-size:12.5px; font-weight:700;
+  cursor:pointer; transition:.15s; font-family:inherit; width:100%;
+}
+.btn-green{background:var(--green2); color:#0d1509;}
+.btn-green:hover{background:var(--green);}
+.btn-outline{background:transparent; border:1px solid var(--border2); color:var(--text);}
+.btn-outline:hover{border-color:var(--green2); color:var(--green-soft);}
+.btn-red{background:transparent; border:1px solid var(--red); color:var(--red);}
+.btn-red:hover{background:var(--red); color:#fff;}
+button:disabled{opacity:.35; cursor:not-allowed;}
+.row button{width:auto; flex:1;}
+.hint{font-size:11px; color:var(--text3); line-height:1.5;}
+.stat{display:flex; justify-content:space-between; font-size:12.5px; padding:2px 0;}
+.stat b{color:var(--green-soft);}
+.banner{border-radius:8px; padding:9px 10px; font-size:12px; line-height:1.5;}
+.banner.warn{background:rgba(232,188,64,.12); border:1px solid var(--gold);color:var(--gold2);}
+.banner.ok{background:rgba(109,186,58,.12); border:1px solid var(--green2); color:var(--green-soft);}
+.banner.info{background:rgba(90,120,72,.15); border:1px solid var(--border2); color:var(--text2);}
+.medidas{background:var(--bg2); border:1px solid var(--border2); border-radius:8px; padding:9px 10px; font-size:12.5px; display:flex; flex-direction:column; gap:3px;}
+.medidas .m-row{display:flex; justify-content:space-between;}
+.medidas .m-row b{color:var(--gold2); font-size:14px;}
+.list-item{background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:12px;}
+.list-item .lihead{display:flex; justify-content:space-between; font-weight:700; color:var(--green-soft); margin-bottom:3px;}
+.dot{width:10px; height:10px; border-radius:3px; display:inline-block; margin-right:6px; vertical-align:middle;}
+#slideWrap{display:none;}
+#slideWrap input[type=range]{accent-color:var(--green2); width:100%;}
+.leaflet-popup-content-wrapper{background:var(--card); color:var(--text); border-radius:8px;}
+.leaflet-popup-tip{background:var(--card);}
+.small{font-size:10.5px; color:var(--text3);}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="map"></div>
+  <div id="panel">
+    <div>
+      <h1>🗺️ Mapa de Potreros</h1>
+      <p class="sub">El Prado 1 · Conectado a tu Firebase real (potreroAreas, potreroGeo)</p>
+    </div>
+
+    <!-- SELECTOR DE POTRERO REAL -->
+    <div class="card" id="cardSelector">
+      <div class="card-title">Potrero <span class="badge" id="badgeFbStatus">conectando…</span></div>
+      <select id="selPotrero" onchange="cambiarPotrero()"><option>Cargando potreros…</option></select>
+      <div class="hint" id="potreroAreaOficial"></div>
+    </div>
+
+    <!-- PASO 1: DIBUJAR POTRERO -->
+    <div class="card" id="cardPotrero">
+      <div class="card-title">Paso 1 · Contorno del potrero <span class="badge" id="badgePotrero">pendiente</span></div>
+      <p class="hint">Ubicá el mapa sobre tu campo y tocá "Dibujar" — cada clic/toque agrega un vértice siguiendo el borde real del potrero, guiándote por la imagen satelital.</p>
+      <div class="row">
+        <button class="btn-green" id="btnDrawStart" onclick="startDrawPotrero()">✏️ Dibujar</button>
+        <button class="btn-outline" id="btnUndo" onclick="undoPoint()" disabled>↩️ Deshacer</button>
+      </div>
+      <div class="row">
+        <button class="btn-green" id="btnFinish" onclick="finishPotrero()" disabled>✅ Cerrar potrero</button>
+        <button class="btn-red" id="btnResetPotrero" onclick="resetPotrero()" disabled>🗑️ Reiniciar</button>
+      </div>
+      <div class="stat"><span>Puntos marcados</span><b id="stPuntos">0</b></div>
+      <div class="stat"><span>Área bruta (contorno)</span><b id="stAreaBruta">—</b></div>
+      <div class="stat"><span>Área útil (pastoreable)</span><b id="stAreaUtil">—</b></div>
+    </div>
+
+    <!-- ZONAS DE EXCLUSIÓN -->
+    <div class="card" id="cardExclusion" style="display:none">
+      <div class="card-title">Zonas a excluir <span class="badge" id="badgeExclCount">0</span></div>
+      <p class="hint">Atajados, monte cerrado, bajíos permanentes. Se restan del área y ninguna franja de parcela va a caer sobre ellas.</p>
+      <div class="row">
+        <button class="btn-outline" id="btnDrawExclStart" onclick="startDrawExclusion()">🚫 Marcar zona a excluir</button>
+        <button class="btn-outline" id="btnUndoExcl" onclick="undoExclPoint()" disabled>↩️ Deshacer</button>
+      </div>
+      <button class="btn-green" id="btnFinishExcl" onclick="finishExclusion()" disabled>✅ Cerrar zona excluida</button>
+      <div id="listaExclusiones" class="hint">Sin zonas excluidas todavía.</div>
+    </div>
+
+    <!-- PASO 2: NUEVA PARCELA -->
+    <div class="card" id="cardParcela" style="display:none">
+      <div class="card-title">Paso 2 · Nueva parcela <span class="badge" id="badgeVuelta">vuelta 1</span></div>
+      <div class="row">
+        <div>
+          <label>Hectáreas necesarias</label>
+          <input type="number" id="fHaNecesaria" step="0.1" placeholder="ej. 3.0" oninput="onHaChange()">
+        </div>
+        <div>
+          <label>Parcela N°</label>
+          <input type="text" id="fParcelaNum" readonly>
+        </div>
+      </div>
+      <div>
+        <label>Lado de inicio de la franja</label>
+        <div class="row">
+          <button class="btn-outline" id="btnPickEdge" onclick="startPickEdge()">📍 Tocar el borde en el mapa</button>
+          <button class="btn-outline" id="btnContinuar" onclick="continuarDesdeUltimoCorte()" disabled>▶️ Continuar desde el corte anterior</button>
+        </div>
+        <div id="edgeInfo" class="hint" style="margin-top:6px">Ningún lado elegido todavía.</div>
+      </div>
+      <div>
+        <label>Forma del corte</label>
+        <div class="row">
+          <button class="btn-outline active" id="btnModoConst" onclick="setModoAncho('CONSTANTE')">📐 Ancho constante</button>
+          <button class="btn-outline" id="btnModoTrap" onclick="setModoAncho('TRAPECIO')">🔺 Seguir el borde real</button>
+        </div>
+        <p class="hint" id="modoHint">Mismo ancho en el lado de inicio y en el lado final — ideal para pasarle una sola medida al armador.</p>
+        <div id="anchoFijoInfo" class="hint"></div>
+      </div>
+      <button class="btn-green" id="btnCortar" onclick="calcularCorte()" disabled>✂️ Calcular corte automático</button>
+      <button class="btn-outline" id="btnUsarResto" onclick="usarResto()">🔚 Cerrar vuelta con el resto (última franja, forma libre)</button>
+
+      <div id="slideWrap">
+        <label>Ajustar profundidad a mano</label>
+        <input type="range" id="cutSlider" min="0" max="1000" value="0" oninput="onSliderMove()">
+      </div>
+
+      <div id="medidasBox"></div>
+      <div id="notaSobrante"></div>
+      <div id="overlapBanner"></div>
+
+      <div class="row" style="display:none" id="rowFechas1">
+        <div><label>Fecha ingreso</label><input type="date" id="fFechaIng"></div>
+        <div><label>Hora</label><input type="time" id="fHoraIng" value="08:00"></div>
+      </div>
+      <div class="row" style="display:none" id="rowFechas2">
+        <div><label>Fecha salida</label><input type="date" id="fFechaSal"></div>
+        <div><label>Hora</label><input type="time" id="fHoraSal" value="08:00"></div>
+      </div>
+
+      <button class="btn-green" id="btnGuardarParcela" onclick="guardarParcela()" style="display:none">💾 Guardar parcela</button>
+    </div>
+
+    <!-- CONFIG -->
+    <div class="card">
+      <div class="card-title">Configuración</div>
+      <div>
+        <label>Umbral de solapamiento para considerar "misma área" (%)</label>
+        <input type="number" id="fUmbral" value="50" min="1" max="100">
+      </div>
+      <button class="btn-outline" onclick="nuevaVuelta()">🔄 Iniciar nueva vuelta (reinicia numeración)</button>
+      <button class="btn-red" onclick="borrarTodo()">🗑️ Borrar toda la demo</button>
+    </div>
+
+    <!-- LISTA -->
+    <div class="card">
+      <div class="card-title">Parcelas registradas <span class="badge" id="badgeCount">0</span></div>
+      <div id="listaParcelas" class="hint">Todavía no hay parcelas guardadas.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+// ESTADO GENERAL
+// ══════════════════════════════════════════════
+const COLORS = ['#6dba3a','#e8bc40','#5aa9e0','#e05a4a','#c96de0','#e08a3a','#3adfc0','#d6e05a'];
+let map, satLayer;
+
+// Potrero
+let potreroLayer = null;
+let potreroLatLngs = [];
+let tempMarkers = [], tempLine = null;
+let potreroClosed = null;   // {latlngs, geojson, areaHa}
+let drawingPotrero = false;
+let potreroUtilGeo = null;  // geojson potrero YA con exclusiones restadas
+
+// Zonas de exclusión
+let drawingExclusion = false;
+let exclPoints = [];
+let exclTempMarkers = [], exclTempLine = null;
+let exclusionZones = [];    // {id, geojson, areaHa, layer}
+
+// Parcelas
+let parcelas = [];
+let vueltaActual = 1;
+
+// Selección de lado / corte
+let pickingEdge = false;
+let selectedEdge = null;    // {a,b,latRef,du,n,edgeLenM,maxDepth}
+let edgeHighlightLayer = null;
+let cutPreview = null;      // {geojson, areaHa, t, anchoInicio, anchoFinal, largo}
+let cutPreviewLayer = null;
+let lastCutEndpoints = null; // {a,b} latlng del último corte guardado, para "continuar"
+let modoAncho = 'CONSTANTE';  // 'CONSTANTE' | 'TRAPECIO'
+let restanteLayer = null;     // resalta visualmente lo que todavía queda libre en la vuelta actual
+let vueltaAnchoFijo = null;   // ancho constante ya definido para TODA la vuelta (se fija en el primer corte)
+let lastCutDir = null;        // dirección de avance del último corte, para que "Continuar" nunca mire para atrás
+
+const STORAGE_KEY = 'ep1_proto_mapa_c1_v2'; // ya no se usa para persistencia, solo referencia
+const FB_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com/elprado1';
+let potreroActual = null; // nombre real del potrero elegido (ej. "B2")
+let potreroAreasOficial = {}; // lo que ya existe en tu sistema real (potreroAreas)
+
+async function fbGet(key){
+  try{ const r = await fetch(FB_URL + '/' + key + '.json'); return await r.json(); }
+  catch(e){ console.warn('Firebase GET falló', key, e); return null; }
+}
+async function fbSet(key, val){
+  try{
+    await fetch(FB_URL + '/' + key + '.json', {
+      method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(val)
+    });
+    return true;
+  }catch(e){ console.warn('Firebase SET falló', key, e); return false; }
+}
+
+// ══════════════════════════════════════════════
+// INIT MAPA
+// ══════════════════════════════════════════════
+function initMap(){
+  map = L.map('map', {zoomControl:true}).setView([-16.3700, -60.9700], 15);
+  satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 20, attribution: 'Esri World Imagery'
+  }).addTo(map);
+  map.on('click', onMapClick);
+}
+
+function onMapClick(e){
+  if(drawingPotrero){
+    potreroLatLngs.push(e.latlng);
+    redrawTempDraw();
+    document.getElementById('stPuntos').textContent = potreroLatLngs.length;
+    document.getElementById('btnFinish').disabled = potreroLatLngs.length < 3;
+    return;
+  }
+  if(drawingExclusion){
+    exclPoints.push(e.latlng);
+    redrawExclTempDraw();
+    document.getElementById('btnFinishExcl').disabled = exclPoints.length < 3;
+    return;
+  }
+  if(pickingEdge){
+    selectEdgeAt(e.latlng);
+    pickingEdge = false;
+    document.getElementById('btnPickEdge').textContent = '📍 Tocar el borde en el mapa';
+    return;
+  }
+}
+
+// ══════════════════════════════════════════════
+// GEOMETRÍA — proyección plana local (metros) para orientación real
+// ══════════════════════════════════════════════
+const EARTH_R = 6371000;
+function d2r(d){ return d*Math.PI/180; }
+function llToXY(ll, latRef){
+  return { x: d2r(ll.lng)*EARTH_R*Math.cos(d2r(latRef)), y: d2r(ll.lat)*EARTH_R };
+}
+function xyToLL(xy, latRef){
+  return { lat: (xy.y/EARTH_R)*180/Math.PI, lng: (xy.x/(EARTH_R*Math.cos(d2r(latRef))))*180/Math.PI };
+}
+function avgLat(latlngs){ return latlngs.reduce((s,p)=>s+p.lat,0)/latlngs.length; }
+function dot(a,b){ return a.x*b.x+a.y*b.y; }
+function centroidOf(latlngs){
+  const c = turf.centroid(llArrayToGeoJSON(latlngs));
+  return { lat:c.geometry.coordinates[1], lng:c.geometry.coordinates[0] };
+}
+function llArrayToGeoJSON(latlngs){
+  const coords = latlngs.map(ll=>[ll.lng, ll.lat]);
+  coords.push(coords[0]);
+  return turf.polygon([coords]);
+}
+function geoJSONToLL(gj){
+  const ring = gj.geometry.coordinates[0];
+  return ring.map(c=>[c[1], c[0]]);
+}
+
+// ══════════════════════════════════════════════
+// PASO 1 — DIBUJAR POTRERO
+// ══════════════════════════════════════════════
+function startDrawPotrero(){
+  drawingPotrero = true;
+  potreroLatLngs = [];
+  clearTempDraw();
+  document.getElementById('btnDrawStart').textContent = '✏️ Dibujando… tocá el mapa';
+  document.getElementById('btnUndo').disabled = false;
+  document.getElementById('btnResetPotrero').disabled = false;
+}
+function redrawTempDraw(){
+  clearTempDrawLayersOnly();
+  potreroLatLngs.forEach(ll=>{
+    tempMarkers.push(L.circleMarker(ll,{radius:5, color:'#e8bc40', fillColor:'#e8bc40', fillOpacity:1}).addTo(map));
+  });
+  if(potreroLatLngs.length>1) tempLine = L.polyline(potreroLatLngs,{color:'#e8bc40', weight:2, dashArray:'5,5'}).addTo(map);
+}
+function clearTempDrawLayersOnly(){
+  tempMarkers.forEach(m=>map.removeLayer(m)); tempMarkers=[];
+  if(tempLine){ map.removeLayer(tempLine); tempLine=null; }
+}
+function clearTempDraw(){
+  clearTempDrawLayersOnly();
+  document.getElementById('stPuntos').textContent = '0';
+  document.getElementById('btnFinish').disabled = true;
+}
+function undoPoint(){
+  if(!drawingPotrero || !potreroLatLngs.length) return;
+  potreroLatLngs.pop();
+  redrawTempDraw();
+  document.getElementById('stPuntos').textContent = potreroLatLngs.length;
+  document.getElementById('btnFinish').disabled = potreroLatLngs.length < 3;
+}
+function finishPotrero(){
+  if(potreroLatLngs.length < 3) return;
+  drawingPotrero = false;
+  clearTempDraw();
+  const gj = llArrayToGeoJSON(potreroLatLngs);
+  const areaHa = turf.area(gj)/10000;
+  potreroClosed = { latlngs: potreroLatLngs.slice(), geojson: gj, areaHa };
+  if(potreroLayer) map.removeLayer(potreroLayer);
+  potreroLayer = L.polygon(potreroLatLngs, {color:'#6dba3a', weight:2.5, fillOpacity:.08}).addTo(map);
+  map.fitBounds(potreroLayer.getBounds(), {padding:[30,30]});
+
+  document.getElementById('btnDrawStart').disabled = true;
+  document.getElementById('btnUndo').disabled = true;
+  document.getElementById('btnFinish').disabled = true;
+  document.getElementById('badgePotrero').textContent = 'cerrado ✓';
+  document.getElementById('badgePotrero').classList.add('on');
+  document.getElementById('stAreaBruta').textContent = areaHa.toFixed(2) + ' ha';
+  document.getElementById('cardExclusion').style.display = 'flex';
+  document.getElementById('cardParcela').style.display = 'flex';
+  recomputeUtil();
+  guardarEnFirebase();
+  actualizarSugerenciaParcela();
+}
+function resetPotrero(){
+  if(!confirm('¿Reiniciar el contorno de "' + potreroActual + '"? Se van a borrar TAMBIÉN de Firebase las parcelas y exclusiones ya guardadas para este potrero.')) return;
+  drawingPotrero = false;
+  clearTempDraw();
+  potreroLatLngs = [];
+  if(potreroLayer){ map.removeLayer(potreroLayer); potreroLayer=null; }
+  potreroClosed = null; potreroUtilGeo = null;
+  parcelas.forEach(p=>{ if(p._layer) map.removeLayer(p._layer); });
+  parcelas = [];
+  exclusionZones.forEach(z=>{ if(z.layer) map.removeLayer(z.layer); });
+  exclusionZones = [];
+  vueltaActual = 1;
+  selectedEdge = null; lastCutEndpoints = null; vueltaAnchoFijo = null; lastCutDir = null;
+  updateAnchoFijoInfo();
+  if(edgeHighlightLayer){ map.removeLayer(edgeHighlightLayer); edgeHighlightLayer=null; }
+  if(restanteLayer){ map.removeLayer(restanteLayer); restanteLayer=null; }
+  document.getElementById('btnDrawStart').disabled = false;
+  document.getElementById('btnResetPotrero').disabled = true;
+  document.getElementById('badgePotrero').textContent = 'pendiente';
+  document.getElementById('badgePotrero').classList.remove('on');
+  document.getElementById('stAreaBruta').textContent = '—';
+  document.getElementById('stAreaUtil').textContent = '—';
+  document.getElementById('cardExclusion').style.display = 'none';
+  document.getElementById('cardParcela').style.display = 'none';
+  renderLista(); renderExclusionList();
+  guardarEnFirebase();
+}
+
+// ══════════════════════════════════════════════
+// ZONAS DE EXCLUSIÓN
+// ══════════════════════════════════════════════
+function startDrawExclusion(){
+  if(!potreroClosed){ alert('Primero cerrá el contorno del potrero.'); return; }
+  drawingExclusion = true;
+  exclPoints = [];
+  clearExclTempDraw();
+  document.getElementById('btnDrawExclStart').textContent = '🚫 Marcando… tocá el mapa';
+  document.getElementById('btnUndoExcl').disabled = false;
+}
+function redrawExclTempDraw(){
+  clearExclTempDrawLayersOnly();
+  exclPoints.forEach(ll=>{ exclTempMarkers.push(L.circleMarker(ll,{radius:5, color:'#e05a4a', fillColor:'#e05a4a', fillOpacity:1}).addTo(map)); });
+  if(exclPoints.length>1) exclTempLine = L.polyline(exclPoints,{color:'#e05a4a', weight:2, dashArray:'4,4'}).addTo(map);
+}
+function clearExclTempDrawLayersOnly(){
+  exclTempMarkers.forEach(m=>map.removeLayer(m)); exclTempMarkers=[];
+  if(exclTempLine){ map.removeLayer(exclTempLine); exclTempLine=null; }
+}
+function clearExclTempDraw(){ clearExclTempDrawLayersOnly(); document.getElementById('btnFinishExcl').disabled = true; }
+function undoExclPoint(){
+  if(!drawingExclusion || !exclPoints.length) return;
+  exclPoints.pop(); redrawExclTempDraw();
+  document.getElementById('btnFinishExcl').disabled = exclPoints.length < 3;
+}
+function finishExclusion(){
+  if(exclPoints.length < 3) return;
+  drawingExclusion = false;
+  clearExclTempDraw();
+  const gj = llArrayToGeoJSON(exclPoints);
+  const areaHa = turf.area(gj)/10000;
+  const layer = L.polygon(exclPoints, {color:'#e05a4a', weight:2, dashArray:'6,3', fillColor:'#e05a4a', fillOpacity:.35}).addTo(map);
+  layer.bindPopup('🚫 Zona excluida<br>' + areaHa.toFixed(2) + ' ha');
+  exclusionZones.push({ id:'z'+Date.now(), geojson:gj, areaHa, layer });
+  document.getElementById('btnDrawExclStart').textContent = '🚫 Marcar zona a excluir';
+  document.getElementById('btnUndoExcl').disabled = true;
+  recomputeUtil(); renderExclusionList(); guardarEnFirebase();
+}
+function eliminarExclusion(id){
+  const idx = exclusionZones.findIndex(z=>z.id===id);
+  if(idx<0) return;
+  map.removeLayer(exclusionZones[idx].layer);
+  exclusionZones.splice(idx,1);
+  recomputeUtil(); renderExclusionList(); guardarEnFirebase();
+}
+function renderExclusionList(){
+  document.getElementById('badgeExclCount').textContent = exclusionZones.length;
+  const box = document.getElementById('listaExclusiones');
+  if(!exclusionZones.length){ box.innerHTML = 'Sin zonas excluidas todavía.'; return; }
+  box.innerHTML = exclusionZones.map(z=>`
+    <div class="list-item" style="margin-bottom:6px; display:flex; justify-content:space-between; align-items:center">
+      <span>🚫 ${z.areaHa.toFixed(2)} ha</span>
+      <button class="btn-red" style="width:auto; padding:4px 8px" onclick="eliminarExclusion('${z.id}')">eliminar</button>
+    </div>`).join('');
+}
+function recomputeUtil(){
+  if(!potreroClosed){ potreroUtilGeo = null; return; }
+  let util = potreroClosed.geojson;
+  exclusionZones.forEach(z=>{
+    try{ const diff = turf.difference(util, z.geojson); if(diff) util = diff; }
+    catch(e){ console.warn('No se pudo restar zona de exclusión', e); }
+  });
+  potreroUtilGeo = util;
+  document.getElementById('stAreaUtil').textContent = (turf.area(potreroUtilGeo)/10000).toFixed(2) + ' ha';
+  checkCortarEnabled();
+}
+
+// ══════════════════════════════════════════════
+// PASO 2 — ELEGIR LADO REAL (no compás) + CORTE
+// ══════════════════════════════════════════════
+function startPickEdge(){
+  if(!potreroClosed){ alert('Primero cerrá el contorno del potrero.'); return; }
+  pickingEdge = true;
+  document.getElementById('btnPickEdge').textContent = '📍 Tocá un borde del potrero…';
+}
+
+function distPointToSegment(p,a,b){
+  const dx=b.x-a.x, dy=b.y-a.y;
+  const len2 = dx*dx+dy*dy;
+  let t = len2>0 ? ((p.x-a.x)*dx+(p.y-a.y)*dy)/len2 : 0;
+  t = Math.max(0, Math.min(1,t));
+  return Math.hypot(p.x-(a.x+t*dx), p.y-(a.y+t*dy));
+}
+
+function selectEdgeAt(clickLatLng){
+  const latRef = avgLat(potreroClosed.latlngs);
+  const clickXY = llToXY(clickLatLng, latRef);
+  const pts = potreroClosed.latlngs;
+  let best=null, bestDist=Infinity;
+  for(let i=0;i<pts.length;i++){
+    const a=pts[i], b=pts[(i+1)%pts.length];
+    const d = distPointToSegment(clickXY, llToXY(a,latRef), llToXY(b,latRef));
+    if(d<bestDist){ bestDist=d; best={a,b}; }
+  }
+  if(!best) return;
+  buildSelectedEdge(best.a, best.b, lastCutDir);
+}
+
+function buildSelectedEdge(A, B, preferredDir){
+  const latRef = avgLat(potreroClosed.latlngs);
+  const Axy = llToXY(A, latRef), Bxy = llToXY(B, latRef);
+  const dlen = Math.hypot(Bxy.x-Axy.x, Bxy.y-Axy.y);
+  if(dlen < 0.5) return; // evita bordes degenerados
+  const du = { x:(Bxy.x-Axy.x)/dlen, y:(Bxy.y-Axy.y)/dlen };
+  let n = { x:-du.y, y:du.x };
+  if(preferredDir){
+    // Ya hay una dirección de avance establecida en esta vuelta (venga de "Continuar" o de volver a
+    // tocar el mapa a mano) — SIEMPRE se hereda, nunca se vuelve a adivinar. Adivinar de nuevo es
+    // lo que causaba el error: lejos del primer borde, cualquier heurística geométrica es ambigua.
+    if(dot(n, preferredDir) < 0) n = { x:-n.x, y:-n.y };
+  } else {
+    // Primer corte de la vuelta: acá SÍ es un borde real del contorno, así que un punto a 1 metro
+    // hacia adentro cae DENTRO del potrero y hacia afuera cae FUERA — señal confiable solo en este caso.
+    const mid = { x:(Axy.x+Bxy.x)/2, y:(Axy.y+Bxy.y)/2 };
+    const testPt = { x: mid.x + n.x*1, y: mid.y + n.y*1 };
+    const testLL = xyToLL(testPt, latRef);
+    let dentro = false;
+    try{ dentro = turf.booleanPointInPolygon([testLL.lng, testLL.lat], potreroClosed.geojson); }catch(e){}
+    if(!dentro) n = { x:-n.x, y:-n.y };
+  }
+
+  let maxT = 0;
+  potreroClosed.latlngs.forEach(ll=>{
+    const P = llToXY(ll, latRef);
+    const t = (P.x-Axy.x)*n.x + (P.y-Axy.y)*n.y;
+    if(t>maxT) maxT = t;
+  });
+
+  selectedEdge = { a:A, b:B, latRef, du, n, edgeLenM: dlen, maxDepth: maxT*1.05 };
+
+  if(edgeHighlightLayer) map.removeLayer(edgeHighlightLayer);
+  edgeHighlightLayer = L.polyline([A,B], {color:'#e8bc40', weight:6, opacity:.95}).addTo(map);
+  document.getElementById('edgeInfo').innerHTML = `Lado elegido: <b style="color:var(--gold2)">${dlen.toFixed(1)} m</b> de largo`;
+  clearCutOnly();
+  checkCortarEnabled();
+}
+
+// ── Área realmente libre (potrero útil menos las parcelas ya cortadas en ESTA vuelta) ──
+function unionDeParcelasVuelta(){
+  const enVuelta = parcelas.filter(p=>p.vuelta===vueltaActual);
+  if(!enVuelta.length) return null;
+  let u = enVuelta[0].geojson;
+  for(let i=1;i<enVuelta.length;i++){
+    try{ const r = turf.union(u, enVuelta[i].geojson); if(r) u = r; }catch(e){}
+  }
+  return u;
+}
+function computeRestanteVuelta(){
+  if(!potreroUtilGeo) return null;
+  const usado = unionDeParcelasVuelta();
+  if(!usado) return potreroUtilGeo;
+  try{ return turf.difference(potreroUtilGeo, usado) || null; }
+  catch(e){ return potreroUtilGeo; }
+}
+// Devuelve los vértices (latlng) del contorno exterior del pedazo más grande de un geojson (Polygon o MultiPolygon)
+function exteriorRingLatLngs(geo){
+  if(!geo) return [];
+  let polys;
+  if(geo.geometry.type==='Polygon') polys=[geo.geometry.coordinates];
+  else if(geo.geometry.type==='MultiPolygon') polys=geo.geometry.coordinates;
+  else return [];
+  let best=null, bestArea=-1;
+  polys.forEach(coords=>{
+    let a=0; try{ a = turf.area(turf.polygon(coords)); }catch(e){}
+    if(a>bestArea){ bestArea=a; best=coords; }
+  });
+  if(!best) return [];
+  return best[0].slice(0,-1).map(c=>L.latLng(c[1], c[0]));
+}
+function renderRestante(){
+  if(restanteLayer){ map.removeLayer(restanteLayer); restanteLayer=null; }
+  if(!potreroClosed || !parcelas.filter(p=>p.vuelta===vueltaActual).length) return;
+  const restante = computeRestanteVuelta();
+  const ring = exteriorRingLatLngs(restante);
+  if(ring.length<3) return;
+  restanteLayer = L.polygon(ring, {color:'#5aa9e0', weight:2, dashArray:'3,6', fill:false}).addTo(map);
+  restanteLayer.bindPopup('🟦 Área todavía libre en esta vuelta');
+}
+
+function continuarDesdeUltimoCorte(){
+  if(!lastCutEndpoints || !potreroUtilGeo) return;
+  const restante = computeRestanteVuelta();
+  const ring = exteriorRingLatLngs(restante);
+  if(ring.length<3){ alert('No queda área libre en este potrero para esta vuelta.'); return; }
+  // Buscar, dentro del contorno de lo que REALMENTE queda libre (no una línea recta imaginaria),
+  // el borde más cercano al punto donde terminó la última parcela — así la próxima franja
+  // se acomoda al ensanche/angostamiento real en vez de seguir una dirección fija para siempre.
+  const refPoint = L.latLng(
+    (lastCutEndpoints.a.lat+lastCutEndpoints.b.lat)/2,
+    (lastCutEndpoints.a.lng+lastCutEndpoints.b.lng)/2
+  );
+  const latRef = avgLat(ring);
+  const refXY = llToXY(refPoint, latRef);
+  let best=null, bestDist=Infinity;
+  for(let i=0;i<ring.length;i++){
+    const A=ring[i], B=ring[(i+1)%ring.length];
+    const d = distPointToSegment(refXY, llToXY(A,latRef), llToXY(B,latRef));
+    if(d<bestDist){ bestDist=d; best={A,B}; }
+  }
+  if(!best) return;
+  buildSelectedEdge(best.A, best.B, lastCutDir);
+}
+
+function checkCortarEnabled(){
+  const ha = parseFloat(document.getElementById('fHaNecesaria').value)||0;
+  const utilHa = potreroUtilGeo ? turf.area(potreroUtilGeo)/10000 : 0;
+  document.getElementById('btnCortar').disabled = !(potreroUtilGeo && selectedEdge && ha>0 && ha<=utilHa*1.02);
+}
+
+// Construye el "medio-plano" (franja) paralelo al lado elegido, desde el borde (t=0) hasta profundidad t
+function buildStripPolygon(t){
+  const { a, latRef, du, n, edgeLenM } = selectedEdge;
+  const A = llToXY(a, latRef);
+  const BIG = Math.max(edgeLenM*4, 500);
+  function pt(tAlong, tPerp){ return { x:A.x+du.x*tAlong+n.x*tPerp, y:A.y+du.y*tAlong+n.y*tPerp }; }
+  const corners = [ pt(-BIG,-5), pt(edgeLenM+BIG,-5), pt(edgeLenM+BIG,t), pt(-BIG,t) ];
+  const ring = corners.map(c=>{ const ll=xyToLL(c,latRef); return [ll.lng, ll.lat]; });
+  ring.push(ring[0]);
+  return turf.polygon([ring]);
+}
+
+function areaAtDepth(t){
+  const strip = buildStripPolygon(t);
+  let clip;
+  try{ clip = turf.intersect(potreroUtilGeo, strip); }catch(e){ return {area:0, geo:null}; }
+  if(!clip) return {area:0, geo:null};
+  return { area: turf.area(clip)/10000, geo: clip };
+}
+
+// Ancho real del potrero a una profundidad t (para pasarle la medida al armador)
+function anchoEnProfundidad(t){
+  const { a, latRef, du, n, edgeLenM } = selectedEdge;
+  const A = llToXY(a, latRef);
+  const BIG = Math.max(edgeLenM*4, 500);
+  function pt(tAlong){ return { x:A.x+du.x*tAlong+n.x*t, y:A.y+du.y*tAlong+n.y*t }; }
+  const p1 = xyToLL(pt(-BIG), latRef), p2 = xyToLL(pt(BIG), latRef);
+  const lineF = turf.lineString([[p1.lng,p1.lat],[p2.lng,p2.lat]]);
+  let boundary, inter;
+  try{
+    boundary = turf.polygonToLine(potreroUtilGeo);
+    inter = turf.lineIntersect(lineF, boundary);
+  }catch(e){ return null; }
+  if(!inter || !inter.features.length) return null;
+  let minProj=Infinity, maxProj=-Infinity, pMin=null, pMax=null;
+  inter.features.forEach(f=>{
+    const [lng,lat] = f.geometry.coordinates;
+    const P = llToXY({lat,lng}, latRef);
+    const proj = (P.x-A.x)*du.x + (P.y-A.y)*du.y;
+    if(proj<minProj){ minProj=proj; pMin={lat,lng}; }
+    if(proj>maxProj){ maxProj=proj; pMax={lat,lng}; }
+  });
+  if(!pMin || !pMax) return null;
+  return { anchoM: turf.distance([pMin.lng,pMin.lat],[pMax.lng,pMax.lat],{units:'meters'}), pMin, pMax };
+}
+
+function updateAnchoFijoInfo(){
+  const el = document.getElementById('anchoFijoInfo');
+  if(!el) return;
+  el.innerHTML = vueltaAnchoFijo
+    ? `📏 Ancho fijo de esta vuelta: <b style="color:var(--gold2)">${vueltaAnchoFijo.toFixed(0)} m</b> (se usa igual en todas las parcelas hasta iniciar otra vuelta)`
+    : '';
+}
+
+function setModoAncho(m){
+  modoAncho = m;
+  document.getElementById('btnModoConst').classList.toggle('active', m==='CONSTANTE');
+  document.getElementById('btnModoTrap').classList.toggle('active', m==='TRAPECIO');
+  document.getElementById('modoHint').textContent = m==='CONSTANTE'
+    ? 'Mismo ancho en el lado de inicio y en el lado final — ideal para pasarle una sola medida al armador.'
+    : 'La franja sigue el ensanche/angostamiento real del potrero — el ancho de inicio y de salida pueden ser distintos.';
+  clearCutOnly();
+}
+
+// Construye un rectángulo (ancho W constante) centrado en el lado elegido, desde el borde hacia adentro L metros
+function buildRectPolygon(W, L){
+  const { a, b, latRef, du, n } = selectedEdge;
+  const Axy = llToXY(a, latRef), Bxy = llToXY(b, latRef);
+  const mid = { x:(Axy.x+Bxy.x)/2, y:(Axy.y+Bxy.y)/2 };
+  function pt(tAlong, tPerp){ return { x: mid.x+du.x*tAlong+n.x*tPerp, y: mid.y+du.y*tAlong+n.y*tPerp }; }
+  const corners = [ pt(-W/2,-0.02), pt(W/2,-0.02), pt(W/2,L), pt(-W/2,L) ];
+  const ring = corners.map(c=>{ const ll=xyToLL(c,latRef); return [ll.lng, ll.lat]; });
+  ring.push(ring[0]);
+  return { poly: turf.polygon([ring]), farA: xyToLL(pt(-W/2,L),latRef), farB: xyToLL(pt(W/2,L),latRef) };
+}
+function rectAtWL(W, L){
+  const built = buildRectPolygon(W, L);
+  let clip;
+  try{ clip = turf.intersect(potreroUtilGeo, built.poly); }catch(e){ return {area:0, geo:null, farA:built.farA, farB:built.farB}; }
+  if(!clip) return {area:0, geo:null, farA:built.farA, farB:built.farB};
+  return { area: turf.area(clip)/10000, geo: clip, farA:built.farA, farB:built.farB };
+}
+// Busca el mayor ancho constante W que entra sin salirse del potrero en una profundidad L, iterando
+function anchoMinimoEnRango(L){
+  const samples = 8;
+  let minW = selectedEdge.edgeLenM;
+  for(let i=0;i<=samples;i++){
+    const t = (L*i)/samples;
+    const info = anchoEnProfundidad(t);
+    if(info && info.anchoM < minW) minW = info.anchoM;
+  }
+  return minW;
+}
+
+function onHaChange(){
+  // Si cambiás las hectáreas, el corte previo (si había uno) queda obsoleto —
+  // se limpia para no mostrar nunca un área que no corresponde a lo que pediste ahora.
+  if(cutPreview) clearCutOnly();
+  checkCortarEnabled();
+}
+
+function calcularCorte(){
+  const targetHa = parseFloat(document.getElementById('fHaNecesaria').value)||0;
+  if(!targetHa || !selectedEdge) return;
+  if(modoAncho === 'CONSTANTE'){
+    // Ancho "escalón hacia abajo": se mantiene mientras el potrero lo sostenga; en cuanto el tramo
+    // elegido es más angosto que el ancho vigente, se reduce a lo que sí entra ahí y queda fijo
+    // en ese nuevo valor — nunca vuelve a subir, para no dejar espacio sin usar del otro lado.
+    let Wlocal = selectedEdge.edgeLenM;
+    let L0 = (targetHa*10000)/Wlocal;
+    for(let iter=0; iter<12; iter++){
+      const minW = anchoMinimoEnRango(L0);
+      if(Math.abs(minW-Wlocal) < 0.1){ Wlocal = minW; break; }
+      Wlocal = Math.max(minW, 1);
+      L0 = (targetHa*10000)/Wlocal;
+    }
+    const anchoAnterior = vueltaAnchoFijo;
+    const W = (vueltaAnchoFijo == null) ? Wlocal : Math.min(vueltaAnchoFijo, Wlocal);
+    const bajo = (anchoAnterior != null && W < anchoAnterior - 0.1);
+    vueltaAnchoFijo = W;
+    updateAnchoFijoInfo();
+    // Bisección fina en profundidad, con el ancho ya definido, para calzar el área pedida
+    let lo=0, hi=selectedEdge.maxDepth*1.3;
+    for(let i=0;i<30;i++){
+      const mid=(lo+hi)/2;
+      const rm = rectAtWL(W, mid);
+      if(rm.area < targetHa) lo=mid; else hi=mid;
+    }
+    let L = (lo+hi)/2;
+    let r = rectAtWL(W, L);
+    const maxPossible = rectAtWL(W, selectedEdge.maxDepth*1.3);
+    const maxL = selectedEdge.maxDepth*1.3;
+    applyCutPreview(r.geo, r.area, L, W, W, Math.round((L/maxL)*1000), r.farA, r.farB);
+    if(bajo){
+      document.getElementById('notaSobrante').innerHTML = `<div class="banner info">📏 El potrero se angostó acá — el ancho bajó de <b>${anchoAnterior.toFixed(0)} m</b> a <b>${W.toFixed(0)} m</b>. Este nuevo ancho queda fijo para las próximas parcelas, hasta que haga falta bajar de nuevo.</div>`;
+    } else if(maxPossible.area < targetHa - 0.03){
+      document.getElementById('notaSobrante').innerHTML = `<div class="banner warn">
+        Con el ancho actual (<b>${W.toFixed(0)} m</b>) el potrero ya no da para ${targetHa.toFixed(2)} ha acá — el máximo posible en este tramo es ${maxPossible.area.toFixed(2)} ha.<br>
+        Puede que este sea tu <b>último tramo</b>: usá "🔚 Cerrar vuelta con el resto" para tomar toda el área irregular que queda.
+      </div>`;
+    } else {
+      mostrarSobrante(targetHa, r.area, W);
+    }
+  } else {
+    let lo=0, hi=selectedEdge.maxDepth;
+    for(let i=0;i<40;i++){ const mid=(lo+hi)/2; if(areaAtDepth(mid).area < targetHa) lo=mid; else hi=mid; }
+    const t=(lo+hi)/2;
+    const { area, geo } = areaAtDepth(t);
+    const info = anchoEnProfundidad(t);
+    applyCutPreview(geo, area, t, selectedEdge.edgeLenM, info?info.anchoM:null, Math.round((t/selectedEdge.maxDepth)*1000),
+      info?L2ll(info.pMin):null, info?L2ll(info.pMax):null);
+    document.getElementById('notaSobrante').innerHTML = '';
+  }
+}
+function L2ll(p){ return {lat:p.lat, lng:p.lng}; }
+
+function mostrarSobrante(targetHa, achievedHa, W){
+  const box = document.getElementById('notaSobrante');
+  const diff = targetHa - achievedHa;
+  if(diff > 0.05){
+    box.innerHTML = `<div class="banner warn">Con ${W.toFixed(0)} m de ancho constante llegás a <b>${achievedHa.toFixed(2)} ha</b> (pediste ${targetHa.toFixed(2)} ha) — el potrero se angosta ahí. La diferencia (${diff.toFixed(2)} ha) queda como sobrante para la próxima parcela, o usá "Seguir el borde real" si preferís completarla igual con ancho variable.</div>`;
+  } else { box.innerHTML=''; }
+}
+
+function onSliderMove(){
+  if(!selectedEdge) return;
+  const pct = parseFloat(document.getElementById('cutSlider').value)/1000;
+  if(modoAncho === 'CONSTANTE'){
+    const maxL = selectedEdge.maxDepth*1.3;
+    const L = pct*maxL;
+    const W = vueltaAnchoFijo || anchoMinimoEnRango(L);
+    const r = rectAtWL(W, L);
+    applyCutPreview(r.geo, r.area, L, W, W, null, r.farA, r.farB);
+    const targetHa = parseFloat(document.getElementById('fHaNecesaria').value)||0;
+    if(targetHa) mostrarSobrante(targetHa, r.area, W);
+  } else {
+    const t = pct*selectedEdge.maxDepth;
+    const { area, geo } = areaAtDepth(t);
+    const info = anchoEnProfundidad(t);
+    applyCutPreview(geo, area, t, selectedEdge.edgeLenM, info?info.anchoM:null, null,
+      info?L2ll(info.pMin):null, info?L2ll(info.pMax):null);
+  }
+}
+
+// Aplica y muestra una previsualización de corte (usada por ambos modos)
+function applyCutPreview(geo, areaHa, t, anchoInicio, anchoFinal, setSliderPct, farA, farB){
+  cutPreview = { geojson:geo, areaHa, t, anchoInicio, anchoFinal, largo:t, finalPts: (farA&&farB)?[farA,farB]:null };
+  renderCutPreview();
+  if(setSliderPct != null){
+    document.getElementById('cutSlider').value = Math.min(1000, Math.max(0, setSliderPct));
+  }
+  document.getElementById('slideWrap').style.display = 'block';
+  renderMedidas(setSliderPct == null);
+  checkOverlap();
+  document.getElementById('rowFechas1').style.display='flex';
+  document.getElementById('rowFechas2').style.display='flex';
+  document.getElementById('btnGuardarParcela').style.display='block';
+  const hoy = new Date().toISOString().split('T')[0];
+  if(!document.getElementById('fFechaIng').value) document.getElementById('fFechaIng').value = hoy;
+  if(!document.getElementById('fFechaSal').value) document.getElementById('fFechaSal').value = hoy;
+}
+
+function usarResto(){
+  if(!potreroUtilGeo){ alert('Primero cerrá el contorno del potrero.'); return; }
+  const restante = computeRestanteVuelta();
+  if(!restante){ alert('No queda área libre en esta vuelta.'); return; }
+  const areaHa = turf.area(restante)/10000;
+  if(areaHa < 0.01){ alert('No queda área libre en esta vuelta.'); return; }
+  if(edgeHighlightLayer){ map.removeLayer(edgeHighlightLayer); edgeHighlightLayer=null; }
+  selectedEdge = null;
+  document.getElementById('edgeInfo').innerHTML = 'Franja de cierre — no requiere lado de inicio.';
+  cutPreview = { geojson: restante, areaHa, t:null, anchoInicio:null, anchoFinal:null, largo:null, esResto:true, finalPts:null };
+  renderCutPreview();
+  document.getElementById('slideWrap').style.display = 'none';
+  renderMedidas(false);
+  checkOverlap();
+  document.getElementById('rowFechas1').style.display='flex';
+  document.getElementById('rowFechas2').style.display='flex';
+  document.getElementById('btnGuardarParcela').style.display='block';
+  const hoy = new Date().toISOString().split('T')[0];
+  if(!document.getElementById('fFechaIng').value) document.getElementById('fFechaIng').value = hoy;
+  if(!document.getElementById('fFechaSal').value) document.getElementById('fFechaSal').value = hoy;
+}
+
+function renderMedidas(manual){
+  const box = document.getElementById('medidasBox');
+  if(!cutPreview){ box.innerHTML=''; return; }
+  if(cutPreview.esResto){
+    box.innerHTML = `
+      <div class="medidas">
+        <div class="m-row"><span>Área</span><b>${cutPreview.areaHa.toFixed(2)} ha</b></div>
+        <div class="small">🔚 Franja de cierre — forma irregular, absorbe todo lo que quedó del potrero en esta vuelta.</div>
+      </div>`;
+    return;
+  }
+  const anchoLine = (modoAncho==='CONSTANTE')
+    ? `<div class="m-row"><span>Ancho (ambos lados)</span><b>${cutPreview.anchoInicio.toFixed(0)} m</b></div>`
+    : `<div class="m-row"><span>Ancho lado inicio</span><b>${cutPreview.anchoInicio.toFixed(0)} m</b></div>
+       <div class="m-row"><span>Ancho lado final</span><b>${cutPreview.anchoFinal? cutPreview.anchoFinal.toFixed(0)+' m':'—'}</b></div>`;
+  box.innerHTML = `
+    <div class="medidas">
+      <div class="m-row"><span>Área</span><b>${cutPreview.areaHa.toFixed(2)} ha</b></div>
+      ${anchoLine}
+      <div class="m-row"><span>Largo (profundidad)</span><b>${cutPreview.largo.toFixed(0)} m</b></div>
+      ${manual?'<div class="small">Ajustado a mano</div>':''}
+    </div>`;
+}
+
+function renderCutPreview(){
+  if(cutPreviewLayer){ map.removeLayer(cutPreviewLayer); cutPreviewLayer=null; }
+  if(!cutPreview || !cutPreview.geojson) return;
+  const latlngs = geoJSONToLL(cutPreview.geojson);
+  cutPreviewLayer = L.polygon(latlngs, {color:'#e8bc40', weight:2, dashArray:'6,4', fillColor:'#e8bc40', fillOpacity:.28}).addTo(map);
+}
+
+function clearCutOnly(){
+  cutPreview = null;
+  if(cutPreviewLayer){ map.removeLayer(cutPreviewLayer); cutPreviewLayer=null; }
+  document.getElementById('slideWrap').style.display='none';
+  document.getElementById('overlapBanner').innerHTML='';
+  document.getElementById('medidasBox').innerHTML='';
+  document.getElementById('notaSobrante').innerHTML='';
+  document.getElementById('rowFechas1').style.display='none';
+  document.getElementById('rowFechas2').style.display='none';
+  document.getElementById('btnGuardarParcela').style.display='none';
+}
+
+// ══════════════════════════════════════════════
+// SOLAPAMIENTO GEOGRÁFICO → DESCANSO REAL
+// ══════════════════════════════════════════════
+function checkOverlap(){
+  const banner = document.getElementById('overlapBanner');
+  if(!cutPreview || !cutPreview.geojson || !parcelas.length){
+    banner.innerHTML = '<div class="banner info">Sin parcelas previas para comparar todavía.</div>';
+    return;
+  }
+  const umbral = parseFloat(document.getElementById('fUmbral').value)||50;
+  let mejor = null;
+  parcelas.forEach(p=>{
+    let inter;
+    try{ inter = turf.intersect(cutPreview.geojson, p.geojson); }catch(e){ inter=null; }
+    if(!inter) return;
+    const interHa = turf.area(inter)/10000;
+    const pctDeLaVieja = (interHa / p.areaHa) * 100;
+    if(pctDeLaVieja >= umbral){
+      if(!mejor || p.fechaSalISO > mejor.p.fechaSalISO) mejor = { p, pctDeLaVieja };
+    }
+  });
+  if(mejor){
+    const fIngNueva = document.getElementById('fFechaIng').value || new Date().toISOString().split('T')[0];
+    const dias = diasEntre(mejor.p.fechaSalISO.split('T')[0], fIngNueva);
+    cutPreview.refParcela = mejor.p; cutPreview.descansoDias = dias;
+    banner.innerHTML = `<div class="banner ok">
+      🔁 Se superpone <b>${mejor.pctDeLaVieja.toFixed(0)}%</b> con <b>Parcela ${mejor.p.num}</b>
+      (salió el ${fmtFecha(mejor.p.fechaSalISO)}).<br>
+      → Descanso real: <b style="font-size:14px">${dias>=0?dias:'—'} días</b> (por área, no por número).
+    </div>`;
+  } else {
+    cutPreview.refParcela = null; cutPreview.descansoDias = null;
+    banner.innerHTML = `<div class="banner warn">⚠️ No se superpone (≥${umbral}%) con ninguna parcela anterior — área nueva.</div>`;
+  }
+}
+function diasEntre(f1,f2){ return Math.round((new Date(f2+'T12:00:00') - new Date(f1+'T12:00:00'))/86400000); }
+function fmtFecha(iso){ const [f]=iso.split('T'); const [y,m,d]=f.split('-'); return d+'/'+m+'/'+y; }
+
+// ══════════════════════════════════════════════
+// GUARDAR PARCELA
+// ══════════════════════════════════════════════
+function actualizarSugerenciaParcela(){
+  const enVuelta = parcelas.filter(p=>p.vuelta===vueltaActual).length;
+  document.getElementById('fParcelaNum').value = enVuelta+1;
+  document.getElementById('badgeVuelta').textContent = 'vuelta ' + vueltaActual;
+}
+
+function guardarParcela(){
+  if(!cutPreview || !cutPreview.geojson){ alert('Primero calculá el corte.'); return; }
+  const fIng = document.getElementById('fFechaIng').value, hIng = document.getElementById('fHoraIng').value;
+  const fSal = document.getElementById('fFechaSal').value, hSal = document.getElementById('fHoraSal').value;
+  if(!fIng || !fSal){ alert('Completá fecha de ingreso y salida.'); return; }
+
+  const num = document.getElementById('fParcelaNum').value;
+  const colorIdx = parcelas.length % COLORS.length;
+  const rec = {
+    id:'p'+Date.now(), num, vuelta:vueltaActual,
+    areaHa: cutPreview.areaHa, geojson: cutPreview.geojson,
+    anchoInicio: cutPreview.anchoInicio, anchoFinal: cutPreview.anchoFinal, largo: cutPreview.largo,
+    esResto: !!cutPreview.esResto,
+    fechaIngISO: fIng+'T'+hIng, fechaSalISO: fSal+'T'+hSal,
+    colorIdx,
+    descansoDias: cutPreview.descansoDias!=null ? cutPreview.descansoDias : null,
+    refParcela: cutPreview.refParcela ? cutPreview.refParcela.num : null
+  };
+
+  const latlngs = geoJSONToLL(rec.geojson);
+  const layer = L.polygon(latlngs, { color:COLORS[colorIdx], weight:2, fillColor:COLORS[colorIdx], fillOpacity:.42 }).addTo(map);
+  const medidasPopup = rec.esResto
+    ? '🔚 Franja de cierre (forma irregular)'
+    : `ancho ${rec.anchoInicio.toFixed(0)} m · largo ${rec.largo.toFixed(0)} m`;
+  layer.bindPopup(`<b>Parcela ${num}</b><br>${rec.areaHa.toFixed(2)} ha · ${medidasPopup}<br>${fmtFecha(rec.fechaIngISO)} → ${fmtFecha(rec.fechaSalISO)}`);
+  rec._layer = layer;
+  parcelas.push(rec);
+
+  if(cutPreview.finalPts) lastCutEndpoints = { a:L.latLng(cutPreview.finalPts[0].lat,cutPreview.finalPts[0].lng), b:L.latLng(cutPreview.finalPts[1].lat,cutPreview.finalPts[1].lng) };
+  document.getElementById('btnContinuar').disabled = !lastCutEndpoints;
+  if(selectedEdge) lastCutDir = selectedEdge.n; // dirección de avance, para que "Continuar" nunca mire para atrás
+  if(edgeHighlightLayer){ map.removeLayer(edgeHighlightLayer); edgeHighlightLayer=null; }
+  selectedEdge = null;
+  document.getElementById('edgeInfo').innerHTML = 'Ningún lado elegido todavía.';
+  document.getElementById('fHaNecesaria').value='';
+  document.getElementById('fFechaIng').value='';
+  document.getElementById('fFechaSal').value='';
+  clearCutOnly();
+  checkCortarEnabled();
+  actualizarSugerenciaParcela();
+  renderLista();
+  renderRestante();
+  guardarEnFirebase();
+}
+
+function nuevaVuelta(){
+  vueltaActual++;
+  vueltaAnchoFijo = null;
+  lastCutDir = null;
+  updateAnchoFijoInfo();
+  actualizarSugerenciaParcela();
+  if(restanteLayer){ map.removeLayer(restanteLayer); restanteLayer=null; }
+  guardarEnFirebase();
+  alert('Nueva vuelta iniciada (solo reinicia la numeración — el historial geográfico se mantiene completo para el cálculo de descanso).');
+}
+
+function renderLista(){
+  const box = document.getElementById('listaParcelas');
+  document.getElementById('badgeCount').textContent = parcelas.length;
+  if(!parcelas.length){ box.innerHTML='Todavía no hay parcelas guardadas.'; return; }
+  box.innerHTML = parcelas.slice().reverse().map(p=>`
+    <div class="list-item" style="margin-bottom:6px">
+      <div class="lihead"><span><span class="dot" style="background:${COLORS[p.colorIdx]}"></span>Parcela ${p.num} · vuelta ${p.vuelta}</span><span>${p.areaHa.toFixed(2)} ha</span></div>
+      <div>${fmtFecha(p.fechaIngISO)} → ${fmtFecha(p.fechaSalISO)}</div>
+      <div class="small">${p.esResto ? '🔚 Franja de cierre (forma irregular)' : `Ancho ${p.anchoInicio.toFixed(0)}→${p.anchoFinal?p.anchoFinal.toFixed(0):'—'} m · Largo ${p.largo.toFixed(0)} m`}</div>
+      ${p.descansoDias!=null
+        ? `<div style="color:var(--green-soft); margin-top:3px">🔁 Reingreso a área de Parcela ${p.refParcela} · descanso real: <b>${p.descansoDias} días</b></div>`
+        : `<div class="small" style="margin-top:3px">Área nueva, sin coincidencia previa</div>`}
+    </div>`).join('');
+}
+
+async function borrarTodo(){
+  if(!potreroActual) return;
+  if(!confirm('¿Borrar TODO lo guardado en Firebase para "' + potreroActual + '" (contorno, exclusiones y parcelas)? Esto no se puede deshacer.')) return;
+  await fbSet('potreroGeo/' + potreroActual, null);
+  location.reload();
+}
+
+// ══════════════════════════════════════════════
+// PERSISTENCIA LOCAL (demo)
+// ══════════════════════════════════════════════
+async function guardarEnFirebase(){
+  if(!potreroActual) return;
+  const data = {
+    potrero: potreroClosed,
+    parcelas: parcelas.map(({_layer, ...rest})=>rest),
+    exclusiones: exclusionZones.map(({layer, ...rest})=>rest),
+    vueltaActual,
+    vueltaAnchoFijo,
+    lastCutEndpoints: lastCutEndpoints ? { a:{lat:lastCutEndpoints.a.lat,lng:lastCutEndpoints.a.lng}, b:{lat:lastCutEndpoints.b.lat,lng:lastCutEndpoints.b.lng} } : null
+  };
+  document.getElementById('badgeFbStatus').textContent = 'guardando…';
+  const ok = await fbSet('potreroGeo/' + potreroActual, data);
+  document.getElementById('badgeFbStatus').textContent = ok ? 'sincronizado ✓' : '⚠️ error al guardar';
+  document.getElementById('badgeFbStatus').classList.toggle('on', !!ok);
+}
+
+function limpiarEstadoEnPantalla(){
+  drawingPotrero=false; drawingExclusion=false; pickingEdge=false;
+  potreroLatLngs=[]; exclPoints=[];
+  clearTempDraw(); clearExclTempDraw();
+  if(potreroLayer){ map.removeLayer(potreroLayer); potreroLayer=null; }
+  if(edgeHighlightLayer){ map.removeLayer(edgeHighlightLayer); edgeHighlightLayer=null; }
+  if(restanteLayer){ map.removeLayer(restanteLayer); restanteLayer=null; }
+  if(cutPreviewLayer){ map.removeLayer(cutPreviewLayer); cutPreviewLayer=null; }
+  parcelas.forEach(p=>{ if(p._layer) map.removeLayer(p._layer); });
+  exclusionZones.forEach(z=>{ if(z.layer) map.removeLayer(z.layer); });
+  parcelas=[]; exclusionZones=[];
+  potreroClosed=null; potreroUtilGeo=null;
+  selectedEdge=null; lastCutEndpoints=null; vueltaAnchoFijo=null; lastCutDir=null;
+  vueltaActual=1;
+  cutPreview=null;
+  document.getElementById('btnDrawStart').disabled = false;
+  document.getElementById('btnUndo').disabled = true;
+  document.getElementById('btnResetPotrero').disabled = true;
+  document.getElementById('badgePotrero').textContent = 'pendiente';
+  document.getElementById('badgePotrero').classList.remove('on');
+  document.getElementById('stAreaBruta').textContent = '—';
+  document.getElementById('stAreaUtil').textContent = '—';
+  document.getElementById('cardExclusion').style.display = 'none';
+  document.getElementById('cardParcela').style.display = 'none';
+  clearCutOnly();
+  renderLista(); renderExclusionList();
+  updateAnchoFijoInfo();
+}
+
+async function cambiarPotrero(){
+  const nombre = document.getElementById('selPotrero').value;
+  if(!nombre) return;
+  potreroActual = nombre;
+  limpiarEstadoEnPantalla();
+  const oficialHa = potreroAreasOficial[nombre];
+  document.getElementById('potreroAreaOficial').innerHTML = oficialHa
+    ? `Según tu sistema (potreroAreas): <b>${oficialHa} ha</b> — al cerrar el contorno acá deberías obtener un número parecido.`
+    : '';
+  document.getElementById('badgeFbStatus').textContent = 'cargando…';
+  const data = await fbGet('potreroGeo/' + nombre);
+  document.getElementById('badgeFbStatus').textContent = 'sincronizado ✓';
+  document.getElementById('badgeFbStatus').classList.add('on');
+  if(!data) return; // potrero todavía sin digitalizar — arranca vacío, listo para dibujar
+
+  if(data.potrero){
+    potreroClosed = data.potrero;
+    potreroLayer = L.polygon(potreroClosed.latlngs, {color:'#6dba3a', weight:2.5, fillOpacity:.08}).addTo(map);
+    map.fitBounds(potreroLayer.getBounds(), {padding:[30,30]});
+    document.getElementById('btnDrawStart').disabled = true;
+    document.getElementById('btnResetPotrero').disabled = false;
+    document.getElementById('badgePotrero').textContent = 'cerrado ✓';
+    document.getElementById('badgePotrero').classList.add('on');
+    document.getElementById('stAreaBruta').textContent = potreroClosed.areaHa.toFixed(2) + ' ha';
+    document.getElementById('cardExclusion').style.display = 'flex';
+    document.getElementById('cardParcela').style.display = 'flex';
+  }
+  vueltaActual = data.vueltaActual || 1;
+  vueltaAnchoFijo = data.vueltaAnchoFijo || null;
+  (data.exclusiones||[]).forEach(z=>{
+    const latlngs = geoJSONToLL(z.geojson);
+    const layer = L.polygon(latlngs, {color:'#e05a4a', weight:2, dashArray:'6,3', fillColor:'#e05a4a', fillOpacity:.35}).addTo(map);
+    layer.bindPopup('🚫 Zona excluida<br>' + z.areaHa.toFixed(2) + ' ha');
+    z.layer = layer;
+    exclusionZones.push(z);
+  });
+  if(potreroClosed) recomputeUtil();
+  (data.parcelas||[]).forEach(p=>{
+    const latlngs = geoJSONToLL(p.geojson);
+    const layer = L.polygon(latlngs, {color:COLORS[p.colorIdx], weight:2, fillColor:COLORS[p.colorIdx], fillOpacity:.42}).addTo(map);
+    layer.bindPopup(`<b>Parcela ${p.num}</b><br>${p.areaHa.toFixed(2)} ha<br>${fmtFecha(p.fechaIngISO)} → ${fmtFecha(p.fechaSalISO)}`);
+    p._layer = layer;
+    parcelas.push(p);
+  });
+  if(data.lastCutEndpoints){
+    lastCutEndpoints = { a:L.latLng(data.lastCutEndpoints.a.lat,data.lastCutEndpoints.a.lng), b:L.latLng(data.lastCutEndpoints.b.lat,data.lastCutEndpoints.b.lng) };
+    document.getElementById('btnContinuar').disabled = false;
+  }
+  actualizarSugerenciaParcela();
+  renderLista(); renderExclusionList();
+  renderRestante();
+  updateAnchoFijoInfo();
+}
+
+async function cargarListaPotreros(){
+  document.getElementById('badgeFbStatus').textContent = 'conectando…';
+  potreroAreasOficial = await fbGet('potreroAreas') || {};
+  const nombres = Object.keys(potreroAreasOficial).sort();
+  const sel = document.getElementById('selPotrero');
+  if(!nombres.length){
+    sel.innerHTML = '<option value="">⚠️ No se pudo leer potreroAreas de Firebase</option>';
+    document.getElementById('badgeFbStatus').textContent = '⚠️ sin conexión';
+    return;
+  }
+  sel.innerHTML = nombres.map(n=>`<option value="${n}">${n} (${potreroAreasOficial[n]} ha oficial)</option>`).join('');
+  document.getElementById('badgeFbStatus').textContent = 'conectado ✓';
+  document.getElementById('badgeFbStatus').classList.add('on');
+  // Arrancamos en B2 si existe, si no en el primero de la lista
+  sel.value = nombres.includes('B2') ? 'B2' : nombres[0];
+  cambiarPotrero();
+}
+
+initMap();
+cargarListaPotreros();
+</script>
+</body>
+</html>
