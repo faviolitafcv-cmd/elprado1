@@ -92,6 +92,14 @@ button:disabled{opacity:.35; cursor:not-allowed;}
 .potrero-label{background:rgba(90,169,224,.85); border:none; color:#0d1509; font-weight:700; font-size:11px; padding:2px 6px; border-radius:5px; box-shadow:none;}
 .potrero-label::before{display:none;}
 .small{font-size:10.5px; color:var(--text3);}
+.cmp-row{display:flex; align-items:center; gap:8px; padding:6px 4px; border-bottom:1px solid var(--border); font-size:12px;}
+.cmp-row input[type=checkbox]{width:auto; accent-color:var(--green2);}
+.cmp-nombre{flex:1; font-weight:700; color:var(--green-soft);}
+.cmp-vals{display:flex; gap:6px; align-items:center; font-size:11.5px;}
+.cmp-old{color:var(--text3);}
+.cmp-new{color:var(--gold2); font-weight:700;}
+.cmp-diff-up{color:var(--green-soft);}
+.cmp-diff-down{color:var(--red);}
 </style>
 </head>
 <body>
@@ -120,6 +128,14 @@ button:disabled{opacity:.35; cursor:not-allowed;}
       <div class="card-title">Vista general del campo <span class="badge" id="badgeOverviewCount">0 potreros</span></div>
       <p class="hint">Muestra en el mapa, como guía celeste (no editable), todos los potreros que ya digitalizaste — así ves los bordes vecinos y no superponés líneas al dibujar el siguiente.</p>
       <button class="btn-outline" id="btnOverview" onclick="toggleOverview()">🗺️ Mostrar todos los potreros dibujados</button>
+    </div>
+
+    <!-- SINCRONIZACIÓN MASIVA -->
+    <div class="card" id="cardSyncMasivo" style="border-color:var(--gold)">
+      <div class="card-title">🔄 Sincronizar todos con potreroAreas</div>
+      <p class="hint">Compará, potrero por potrero, el área que ya tenés cargada en tu sistema de gestión contra la que calculó el mapa — y elegí cuáles actualizar.</p>
+      <button class="btn-outline" id="btnCompararTodos" onclick="compararTodosLosPotreros()">📊 Comparar todos los potreros</button>
+      <div id="comparacionBox"></div>
     </div>
 
     <!-- SELECTOR DE POTRERO REAL -->
@@ -285,6 +301,99 @@ let modoMasivo = true; // ACTIVADO por default: dibujar/cerrar potreros NO toca 
 let overviewOn = false;
 let overviewLayerGroup = L.layerGroup();
 let potreroAreasOficial = {}; // lo que ya existe en tu sistema real (potreroAreas)
+
+async function fbPatch(key, obj){
+  try{
+    await fetch(FB_URL + '/' + key + '.json', {
+      method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(obj)
+    });
+    return true;
+  }catch(e){ console.warn('Firebase PATCH falló', key, e); return false; }
+}
+
+// Recalcula el área útil de un potrero guardado (geometría + exclusiones) SIN cargarlo en el mapa
+function calcularUtilHaDesdeData(data){
+  if(!data || !data.potrero || !data.potrero.geojson) return null;
+  let util = data.potrero.geojson;
+  (data.exclusiones||[]).forEach(z=>{
+    try{ const diff = turf.difference(util, z.geojson); if(diff) util = diff; }
+    catch(e){}
+  });
+  return turf.area(util)/10000;
+}
+
+async function compararTodosLosPotreros(){
+  const btn = document.getElementById('btnCompararTodos');
+  btn.textContent = '⏳ Calculando…';
+  const [todosGeo, todosOficial] = await Promise.all([ fbGet('potreroGeo'), fbGet('potreroAreas') ]);
+  btn.textContent = '📊 Comparar todos los potreros';
+  potreroAreasOficial = todosOficial || {};
+
+  const filas = [];
+  Object.keys(todosGeo||{}).sort().forEach(nombre=>{
+    const utilHa = calcularUtilHaDesdeData(todosGeo[nombre]);
+    if(utilHa == null) return; // todavía sin contorno cerrado
+    const haRedondeada = Math.round(utilHa*100)/100;
+    const actual = potreroAreasOficial[nombre];
+    const diff = actual!=null ? (haRedondeada - actual) : null;
+    filas.push({ nombre, actual, nueva: haRedondeada, diff });
+  });
+
+  if(!filas.length){
+    document.getElementById('comparacionBox').innerHTML = '<p class="hint">Todavía no hay potreros con el contorno cerrado para comparar.</p>';
+    return;
+  }
+
+  const box = document.getElementById('comparacionBox');
+  box.innerHTML = `
+    <p class="hint" style="margin-top:8px">${filas.length} potreros con contorno cerrado. Desmarcá los que NO querés sincronizar (por ejemplo, si la diferencia te parece rara y preferís revisar ese primero).</p>
+    <div style="max-height:320px; overflow-y:auto; border:1px solid var(--border); border-radius:8px; padding:4px 8px; margin:8px 0">
+      ${filas.map(f=>{
+        const diffTxt = f.diff==null ? 'sin dato previo' : (f.diff>=0?'+':'') + f.diff.toFixed(2) + ' ha';
+        const diffClass = f.diff==null ? '' : (f.diff>=0?'cmp-diff-up':'cmp-diff-down');
+        return `<div class="cmp-row">
+          <input type="checkbox" class="chkSync" data-nombre="${f.nombre}" data-valor="${f.nueva}" checked>
+          <span class="cmp-nombre">${f.nombre}</span>
+          <span class="cmp-vals">
+            <span class="cmp-old">${f.actual!=null?f.actual+' ha':'—'}</span> →
+            <span class="cmp-new">${f.nueva} ha</span>
+            <span class="${diffClass}">(${diffTxt})</span>
+          </span>
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="row">
+      <button class="btn-outline" onclick="marcarTodosSync(true)">☑️ Marcar todos</button>
+      <button class="btn-outline" onclick="marcarTodosSync(false)">⬜ Desmarcar todos</button>
+    </div>
+    <button class="btn-green" id="btnConfirmarSyncMasivo" onclick="confirmarSyncMasivo()" style="margin-top:8px">✅ Sincronizar los marcados</button>
+  `;
+}
+
+function marcarTodosSync(val){
+  document.querySelectorAll('.chkSync').forEach(chk=>chk.checked=val);
+}
+
+async function confirmarSyncMasivo(){
+  const checks = Array.from(document.querySelectorAll('.chkSync')).filter(c=>c.checked);
+  if(!checks.length){ alert('No marcaste ningún potrero.'); return; }
+  const ok = confirm(
+    'Vas a actualizar potreroAreas para ' + checks.length + ' potrero(s) de una sola vez.\n' +
+    'Esto afecta Materia Seca, Saldo de HA y Ranking en TODO el sistema, para todos esos potreros.\n\n¿Confirmás?'
+  );
+  if(!ok) return;
+  const patch = {};
+  checks.forEach(c=>{ patch[c.dataset.nombre] = parseFloat(c.dataset.valor); });
+  const btn = document.getElementById('btnConfirmarSyncMasivo');
+  btn.textContent = '⏳ Sincronizando…';
+  const okPatch = await fbPatch('potreroAreas', patch);
+  Object.assign(potreroAreasOficial, patch);
+  btn.textContent = okPatch ? '✅ Listo — ' + checks.length + ' potreros sincronizados' : '⚠️ Hubo un error, reintentá';
+  if(potreroActual && patch[potreroActual]!=null){
+    document.getElementById('potreroAreaOficial').innerHTML = '✅ Área oficial sincronizada: <b>' + patch[potreroActual] + ' ha</b>';
+    autoActualizarOficial = true;
+  }
+}
 
 async function fbGet(key){
   try{ const r = await fetch(FB_URL + '/' + key + '.json'); return await r.json(); }
