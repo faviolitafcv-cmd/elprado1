@@ -149,14 +149,22 @@ button:disabled{opacity:.35; cursor:not-allowed;}
 
     <!-- ZONAS DE EXCLUSIÓN -->
     <div class="card" id="cardExclusion" style="display:none">
-      <div class="card-title">Zonas a excluir <span class="badge" id="badgeExclCount">0</span></div>
-      <p class="hint">Atajados, monte cerrado, bajíos permanentes. Se restan del área y ninguna franja de parcela va a caer sobre ellas.</p>
+      <div class="card-title">Zonas internas <span class="badge" id="badgeExclCount">0</span></div>
+      <p class="hint">Atajados, monte, bajíos (se restan del área) — o callejones/alambrados internos (dividen el potrero en dos lados; las parcelas se cortan apoyadas contra ellos, no los cruzan).</p>
       <div class="row">
-        <button class="btn-outline" id="btnDrawExclStart" onclick="startDrawExclusion()">🚫 Marcar zona a excluir</button>
+        <button class="btn-outline active" id="btnTipoExcl" onclick="setTipoZona('excluida')">🚫 No pastoreable</button>
+        <button class="btn-outline" id="btnTipoCallejon" onclick="setTipoZona('callejon')">🛤️ Callejón</button>
+      </div>
+      <div class="row">
+        <button class="btn-outline" id="btnTipoAlambrado" onclick="setTipoZona('alambrado')">🔗 Alambrado divisorio</button>
+      </div>
+      <p class="hint" id="hintTipoZona">Marcá el contorno de la zona no pastoreable (mínimo 3 puntos).</p>
+      <div class="row">
+        <button class="btn-outline" id="btnDrawExclStart" onclick="startDrawExclusion()">✏️ Marcar zona</button>
         <button class="btn-outline" id="btnUndoExcl" onclick="undoExclPoint()" disabled>↩️ Deshacer</button>
       </div>
-      <button class="btn-green" id="btnFinishExcl" onclick="finishExclusion()" disabled>✅ Cerrar zona excluida</button>
-      <div id="listaExclusiones" class="hint">Sin zonas excluidas todavía.</div>
+      <button class="btn-green" id="btnFinishExcl" onclick="finishExclusion()" disabled>✅ Cerrar zona</button>
+      <div id="listaExclusiones" class="hint">Sin zonas marcadas todavía.</div>
     </div>
 
     <!-- PASO 2: NUEVA PARCELA -->
@@ -339,7 +347,7 @@ function onMapClick(e){
   if(drawingExclusion){
     exclPoints.push(e.latlng);
     redrawExclTempDraw();
-    document.getElementById('btnFinishExcl').disabled = exclPoints.length < 3;
+    document.getElementById('btnFinishExcl').disabled = exclPoints.length < (tipoZonaActual==='alambrado'?2:3);
     return;
   }
   if(pickingEdge){
@@ -465,18 +473,38 @@ function resetPotrero(){
 // ══════════════════════════════════════════════
 // ZONAS DE EXCLUSIÓN
 // ══════════════════════════════════════════════
+let tipoZonaActual = 'excluida'; // 'excluida' | 'callejon' | 'alambrado'
+const COLOR_ZONA = { excluida:'#e05a4a', callejon:'#b08968', alambrado:'#9b9b9b' };
+const ICONO_ZONA = { excluida:'🚫', callejon:'🛤️', alambrado:'🔗' };
+const HINT_ZONA = {
+  excluida: 'Marcá el contorno de la zona no pastoreable (mínimo 3 puntos).',
+  callejon: 'Marcá el contorno del callejón, siguiendo sus dos bordes (mínimo 3 puntos).',
+  alambrado: 'Marcá el recorrido del alambrado tocando 2 o más puntos siguiendo su trazado — no hace falta cerrarlo, es una línea, no resta hectáreas.'
+};
+
+function setTipoZona(t){
+  tipoZonaActual = t;
+  document.getElementById('btnTipoExcl').classList.toggle('active', t==='excluida');
+  document.getElementById('btnTipoCallejon').classList.toggle('active', t==='callejon');
+  document.getElementById('btnTipoAlambrado').classList.toggle('active', t==='alambrado');
+  document.getElementById('hintTipoZona').textContent = HINT_ZONA[t];
+  document.getElementById('btnFinishExcl').textContent = (t==='alambrado') ? '✅ Cerrar alambrado' : '✅ Cerrar zona';
+  document.getElementById('btnFinishExcl').disabled = exclPoints.length < (t==='alambrado'?2:3);
+}
+
 function startDrawExclusion(){
   if(!potreroClosed){ alert('Primero cerrá el contorno del potrero.'); return; }
   drawingExclusion = true;
   exclPoints = [];
   clearExclTempDraw();
-  document.getElementById('btnDrawExclStart').textContent = '🚫 Marcando… tocá el mapa';
+  document.getElementById('btnDrawExclStart').textContent = '✏️ Marcando… tocá el mapa';
   document.getElementById('btnUndoExcl').disabled = false;
 }
 function redrawExclTempDraw(){
   clearExclTempDrawLayersOnly();
-  exclPoints.forEach(ll=>{ exclTempMarkers.push(L.circleMarker(ll,{radius:5, color:'#e05a4a', fillColor:'#e05a4a', fillOpacity:1}).addTo(map)); });
-  if(exclPoints.length>1) exclTempLine = L.polyline(exclPoints,{color:'#e05a4a', weight:2, dashArray:'4,4'}).addTo(map);
+  const c = COLOR_ZONA[tipoZonaActual];
+  exclPoints.forEach(ll=>{ exclTempMarkers.push(L.circleMarker(ll,{radius:5, color:c, fillColor:c, fillOpacity:1}).addTo(map)); });
+  if(exclPoints.length>1) exclTempLine = L.polyline(exclPoints,{color:c, weight:2, dashArray:'4,4'}).addTo(map);
 }
 function clearExclTempDrawLayersOnly(){
   exclTempMarkers.forEach(m=>map.removeLayer(m)); exclTempMarkers=[];
@@ -486,18 +514,37 @@ function clearExclTempDraw(){ clearExclTempDrawLayersOnly(); document.getElement
 function undoExclPoint(){
   if(!drawingExclusion || !exclPoints.length) return;
   exclPoints.pop(); redrawExclTempDraw();
-  document.getElementById('btnFinishExcl').disabled = exclPoints.length < 3;
+  const minPts = (tipoZonaActual==='alambrado') ? 2 : 3;
+  document.getElementById('btnFinishExcl').disabled = exclPoints.length < minPts;
 }
 function finishExclusion(){
-  if(exclPoints.length < 3) return;
+  const tipo = tipoZonaActual;
+  const minPts = (tipo==='alambrado') ? 2 : 3;
+  if(exclPoints.length < minPts) return;
   drawingExclusion = false;
   clearExclTempDraw();
-  const gj = llArrayToGeoJSON(exclPoints);
-  const areaHa = turf.area(gj)/10000;
-  const layer = L.polygon(exclPoints, {color:'#e05a4a', weight:2, dashArray:'6,3', fillColor:'#e05a4a', fillOpacity:.35}).addTo(map);
-  layer.bindPopup('🚫 Zona excluida<br>' + areaHa.toFixed(2) + ' ha');
-  exclusionZones.push({ id:'z'+Date.now(), geojson:gj, areaHa, layer });
-  document.getElementById('btnDrawExclStart').textContent = '🚫 Marcar zona a excluir';
+  const c = COLOR_ZONA[tipo];
+  let gj, areaHa, layer;
+
+  if(tipo === 'alambrado'){
+    // Es una línea, no una zona: la convertimos en una franja finísima (1 m de ancho total)
+    // solo para poder reusar el mismo mecanismo de "resta del área útil" y de selección de borde —
+    // el área que ocupa es prácticamente cero, así que casi no afecta las hectáreas del potrero.
+    const coords = exclPoints.map(ll=>[ll.lng, ll.lat]);
+    const lineGeo = turf.lineString(coords);
+    gj = turf.buffer(lineGeo, 0.5, {units:'meters'});
+    areaHa = turf.area(gj)/10000;
+    layer = L.polyline(exclPoints, {color:c, weight:3}).addTo(map);
+  } else {
+    gj = llArrayToGeoJSON(exclPoints);
+    areaHa = turf.area(gj)/10000;
+    layer = L.polygon(exclPoints, {color:c, weight:2, dashArray:'6,3', fillColor:c, fillOpacity:.35}).addTo(map);
+  }
+
+  const etiqueta = tipo==='callejon' ? '🛤️ Callejón interno' : (tipo==='alambrado' ? '🔗 Alambrado divisorio' : '🚫 Zona excluida');
+  layer.bindPopup(etiqueta + (tipo==='alambrado' ? '' : ('<br>' + areaHa.toFixed(2) + ' ha')));
+  exclusionZones.push({ id:'z'+Date.now(), tipo, geojson:gj, areaHa, layer });
+  document.getElementById('btnDrawExclStart').textContent = '✏️ Marcar zona';
   document.getElementById('btnUndoExcl').disabled = true;
   recomputeUtil(); renderExclusionList(); guardarEnFirebase();
 }
@@ -511,12 +558,16 @@ function eliminarExclusion(id){
 function renderExclusionList(){
   document.getElementById('badgeExclCount').textContent = exclusionZones.length;
   const box = document.getElementById('listaExclusiones');
-  if(!exclusionZones.length){ box.innerHTML = 'Sin zonas excluidas todavía.'; return; }
-  box.innerHTML = exclusionZones.map(z=>`
-    <div class="list-item" style="margin-bottom:6px; display:flex; justify-content:space-between; align-items:center">
-      <span>🚫 ${z.areaHa.toFixed(2)} ha</span>
+  if(!exclusionZones.length){ box.innerHTML = 'Sin zonas marcadas todavía.'; return; }
+  const nombreTipo = { excluida:'Excluida', callejon:'Callejón', alambrado:'Alambrado' };
+  box.innerHTML = exclusionZones.map(z=>{
+    const t = z.tipo || 'excluida';
+    const detalle = t==='alambrado' ? '' : (' · ' + z.areaHa.toFixed(2) + ' ha');
+    return `<div class="list-item" style="margin-bottom:6px; display:flex; justify-content:space-between; align-items:center">
+      <span>${ICONO_ZONA[t]} ${nombreTipo[t]}${detalle}</span>
       <button class="btn-red" style="width:auto; padding:4px 8px" onclick="eliminarExclusion('${z.id}')">eliminar</button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 function recomputeUtil(){
   if(!potreroClosed){ potreroUtilGeo = null; return; }
@@ -662,13 +713,24 @@ function distPointToSegment(p,a,b){
 function selectEdgeAt(clickLatLng){
   const latRef = avgLat(potreroClosed.latlngs);
   const clickXY = llToXY(clickLatLng, latRef);
-  const pts = potreroClosed.latlngs;
   let best=null, bestDist=Infinity;
+  // Bordes del contorno exterior del potrero
+  const pts = potreroClosed.latlngs;
   for(let i=0;i<pts.length;i++){
     const a=pts[i], b=pts[(i+1)%pts.length];
     const d = distPointToSegment(clickXY, llToXY(a,latRef), llToXY(b,latRef));
     if(d<bestDist){ bestDist=d; best={a,b}; }
   }
+  // Bordes de zonas internas (callejones y exclusiones) — así se puede arrancar
+  // una parcela apoyada contra el callejón, de cualquiera de sus dos lados
+  exclusionZones.forEach(z=>{
+    const ring = geoJSONToLL(z.geojson).map(c=>L.latLng(c[0], c[1]));
+    for(let i=0;i<ring.length;i++){
+      const a=ring[i], b=ring[(i+1)%ring.length];
+      const d = distPointToSegment(clickXY, llToXY(a,latRef), llToXY(b,latRef));
+      if(d<bestDist){ bestDist=d; best={a,b}; }
+    }
+  });
   if(!best) return;
   buildSelectedEdge(best.a, best.b, lastCutDir);
 }
@@ -1258,8 +1320,12 @@ async function cambiarPotrero(){
   vueltaAnchoFijo = data.vueltaAnchoFijo || null;
   (data.exclusiones||[]).forEach(z=>{
     const latlngs = geoJSONToLL(z.geojson);
-    const layer = L.polygon(latlngs, {color:'#e05a4a', weight:2, dashArray:'6,3', fillColor:'#e05a4a', fillOpacity:.35}).addTo(map);
-    layer.bindPopup('🚫 Zona excluida<br>' + z.areaHa.toFixed(2) + ' ha');
+    const tipo = z.tipo || 'excluida';
+    const c = COLOR_ZONA[tipo];
+    const layer = L.polygon(latlngs, {color:c, weight:2, dashArray:'6,3', fillColor:c, fillOpacity:.35}).addTo(map);
+    const etiqueta = tipo==='callejon' ? '🛤️ Callejón interno' : (tipo==='alambrado' ? '🔗 Alambrado divisorio' : '🚫 Zona excluida');
+    layer.bindPopup(etiqueta + (tipo==='alambrado' ? '' : ('<br>' + z.areaHa.toFixed(2) + ' ha')));
+    z.tipo = tipo;
     z.layer = layer;
     exclusionZones.push(z);
   });
