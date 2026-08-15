@@ -443,6 +443,7 @@ tr:hover td{background:rgba(109,186,58,.04);}
       <button class="btn bs btn-sm" onclick="descargarPlantillaVenta()" style="border-color:var(--gold);color:var(--gold);">📥 Plantilla</button>
       <button class="btn bs btn-sm" onclick="openImportVentasHist()" style="border-color:var(--gr);color:var(--gr);">📤 Importar Históricas</button>
       <button class="btn bs btn-sm" id="btnLimpiarBajasHuerfanas" onclick="limpiarBajasHuerfanas()" style="display:none;border-color:#e05a4a;color:#e05a4a;" title="Borra registros de baja que quedaron de ventas ya eliminadas">🧹 Limpiar huérfanas</button>
+      <button class="btn bs btn-sm" id="btnRepararSinBaja" onclick="repararAnimalesSinBaja()" style="display:none;border-color:#e05a4a;color:#e05a4a;" title="Devuelve a Activo cualquier animal vendido/muerto que no tenga un registro de baja real">🩺 Reparar sin baja</button>
     </div>
     <div class="fr" style="padding:8px 14px;gap:8px;flex-wrap:wrap;">
       <select id="vfVenta" onchange="renderVAnimales()" style="font-size:12px;"><option value="">Todas las ventas</option></select>
@@ -504,9 +505,7 @@ tr:hover td{background:rgba(109,186,58,.04);}
   <!-- BOTONES DE TIPO -->
   <div class="ar">
     <button class="btn bp" onclick="abrirMovimiento('COMPRA')">📥 Compra</button>
-    <button class="btn bp" style="background:var(--green3);" onclick="abrirMovimiento('VENTA')">💰 Venta</button>
     <button class="btn bg-btn" onclick="abrirMovimiento('INTERNO')">🔄 Movimiento Interno</button>
-    <button class="btn bd" onclick="abrirMovimiento('BAJA')">📤 Baja</button>
     <div class="sp"></div>
     <select id="mvFiltTipo" onchange="renderMovimientos()" style="background:var(--card2);border:1px solid var(--brd);color:var(--text);padding:7px 9px;border-radius:5px;font-size:12px;">
       <option value="">Todos los tipos</option>
@@ -4811,6 +4810,33 @@ async function saveVenta(){
   finally{if(btn){btn.disabled=false;btn.textContent='💰 Registrar Venta';}}
 }
 
+// Reparación general: cualquier animal marcado VENDIDO o MUERTO que NO tenga
+// un registro de baja real que lo respalde — sin importar cómo haya llegado a ese
+// estado. Esta es la red de seguridad final, más amplia que "limpiar huérfanas"
+// (que solo mira desde el lado de las bajas ya creadas).
+async function repararAnimalesSinBaja(){
+  if(sessionStorage.getItem('ep_rol')!=='ADMIN'){ntf('Solo el administrador puede hacer esto',true);return;}
+  const idesConBaja=new Set(bajas.map(b=>b.ide));
+  const sospechosos=Object.values(animales).filter(a=>
+    (a.estado==='VENDIDO'||a.estado==='MUERTO'||a.estado==='EN VENTA') && !idesConBaja.has(a.ide)
+  );
+  if(!sospechosos.length){ntf('No se encontraron animales en este estado sin baja real — todo en orden');return;}
+  const detalle=sospechosos.slice(0,15).map(a=>a.ide+' ('+a.estado+', grupo: '+(a.grupo||'—')+')').join('\n');
+  if(!confirm('Se encontraron '+sospechosos.length+' animal(es) marcados como VENDIDO/MUERTO sin ningún registro de baja real que lo respalde:\n\n'+detalle+(sospechosos.length>15?'\n...':'')+
+    '\n\nEsto pasa cuando un animal quedó "colgado" por un problema técnico (por ejemplo, una venta eliminada antes de tiempo). Se van a devolver todos a ACTIVO. ¿Continuar?')) return;
+  const upd={};
+  sospechosos.forEach(a=>{
+    upd['animales/'+a.ide+'/estado']='ACTIVO';
+    upd['animales/'+a.ide+'/ventaId']=null;
+  });
+  try{
+    await fbPatch('',upd);
+    sospechosos.forEach(a=>{ animales[a.ide].estado='ACTIVO'; delete animales[a.ide].ventaId; });
+    renderDash();renderA();renderVAnimales();
+    ntf('✅ '+sospechosos.length+' animal(es) reparado(s) y devuelto(s) a Activo');
+  }catch(e){ntf('Error: '+e.message,true);}
+}
+
 // Limpieza única: registros de "baja" tipo VENTA que quedaron apuntando a una venta
 // que ya no existe (por ejemplo, ventas eliminadas antes de que este fix existiera).
 // Además de borrar el registro huérfano, devuelve el animal a ACTIVO — porque si su
@@ -4919,6 +4945,8 @@ function renderV(){
 function renderVAnimales(){
   const btnLimp=document.getElementById('btnLimpiarBajasHuerfanas');
   if(btnLimp) btnLimp.style.display = sessionStorage.getItem('ep_rol')==='ADMIN' ? '' : 'none';
+  const btnRep=document.getElementById('btnRepararSinBaja');
+  if(btnRep) btnRep.style.display = sessionStorage.getItem('ep_rol')==='ADMIN' ? '' : 'none';
   const vf=document.getElementById('vfVenta')?.value||'';
   const tp=document.getElementById('vfTipo')?.value||'';
   const ct=document.getElementById('vfCat')?.value||'';
@@ -5959,6 +5987,14 @@ async function guardarMovimiento() {
   const tipo  = _mvTipo;
   const fecha = document.getElementById('mvFecha').value;
   if(!fecha) { ntf('Ingresá la fecha', true); return; }
+
+  // ═══ VENTA y BAJA ya no se procesan desde acá — elegían animales al azar y no
+  // dejaban registro de baja. Usar la pestaña Ventas (venta detallada) o Bajas (venta
+  // rápida / muerte individual), que sí registran cada animal correctamente. ═══
+  if(tipo === 'VENTA' || tipo === 'BAJA'){
+    ntf('Para Venta o Baja, usá la pestaña correspondiente (Ventas / Bajas) — este modal rápido ya no las procesa', true);
+    return;
+  }
 
   // ═══ MOVIMIENTO INTERNO POR LISTA DE CHIPS (reemplaza la lógica de "cantidad" para este tipo) ═══
   if(tipo === 'INTERNO'){
