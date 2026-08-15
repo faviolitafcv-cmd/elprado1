@@ -84,11 +84,19 @@ button:disabled{opacity:.35; cursor:not-allowed;}
       <p class="sub">El Prado 1 · Conectado a tu Firebase real (potreroAreas, potreroGeo)</p>
     </div>
 
+    <!-- MODO SEGURO PARA DIGITALIZAR TODO EL CAMPO -->
+    <div class="card" id="cardModoMasivo" style="border-color:var(--gold)">
+      <div class="card-title">🛡️ Modo dibujo masivo <span class="badge on" id="badgeModoMasivo">ACTIVADO</span></div>
+      <p class="hint">Mientras esté activado, dibujar y cerrar potreros <b>NO toca potreroAreas</b> — ni te pregunta, ni actualiza nada. Ideal para mapear todo el campo tranquilo, sin riesgo. Cuando quieras que un potrero puntual empiece a mandar como oficial, apagalo acá o usá "Sincronizar ahora" abajo.</p>
+      <button class="btn-outline" id="btnToggleModoMasivo" onclick="toggleModoMasivo()">🔓 Desactivar (permitir sincronizar)</button>
+    </div>
+
     <!-- SELECTOR DE POTRERO REAL -->
     <div class="card" id="cardSelector">
       <div class="card-title">Potrero <span class="badge" id="badgeFbStatus">conectando…</span></div>
       <select id="selPotrero" onchange="cambiarPotrero()"><option>Cargando potreros…</option></select>
       <div class="hint" id="potreroAreaOficial"></div>
+      <button class="btn-outline" id="btnSyncManual" onclick="sincronizarManual()" style="display:none">🔄 Sincronizar este potrero con potreroAreas ahora</button>
     </div>
 
     <!-- PASO 1: DIBUJAR POTRERO -->
@@ -233,6 +241,8 @@ let lastCutDir = null;        // dirección de avance del último corte, para qu
 const STORAGE_KEY = 'ep1_proto_mapa_c1_v2'; // ya no se usa para persistencia, solo referencia
 const FB_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com/elprado1';
 let potreroActual = null; // nombre real del potrero elegido (ej. "B2")
+let autoActualizarOficial = null; // null=no preguntado todavía · true/false=decisión del usuario para este potrero
+let modoMasivo = true; // ACTIVADO por default: dibujar/cerrar potreros NO toca potreroAreas hasta que vos lo decidas
 let potreroAreasOficial = {}; // lo que ya existe en tu sistema real (potreroAreas)
 
 async function fbGet(key){
@@ -457,8 +467,73 @@ function recomputeUtil(){
     catch(e){ console.warn('No se pudo restar zona de exclusión', e); }
   });
   potreroUtilGeo = util;
-  document.getElementById('stAreaUtil').textContent = (turf.area(potreroUtilGeo)/10000).toFixed(2) + ' ha';
+  const utilHa = turf.area(potreroUtilGeo)/10000;
+  document.getElementById('stAreaUtil').textContent = utilHa.toFixed(2) + ' ha';
   checkCortarEnabled();
+  manejarSincronizacionOficial(utilHa);
+}
+
+// El mapa es la fuente oficial: al cerrar el contorno (y cada vez que cambian las exclusiones),
+// el área ÚTIL actualiza potreroAreas de verdad en Firebase. Se pregunta una sola vez por potrero.
+// EXCEPTO si el modo dibujo masivo está activado: ahí nunca se toca potreroAreas ni se pregunta nada.
+async function manejarSincronizacionOficial(utilHa){
+  if(!potreroActual) return;
+  if(modoMasivo){
+    document.getElementById('btnSyncManual').style.display = 'block';
+    return; // no preguntar, no escribir — modo seguro
+  }
+  if(autoActualizarOficial === null){
+    const actual = potreroAreasOficial[potreroActual];
+    const haRedondeada = Math.round(utilHa*100)/100;
+    const msg = 'El mapa calcula ' + haRedondeada + ' ha (útil) para "' + potreroActual + '".\n' +
+      'Tu sistema hoy tiene cargado: ' + (actual!=null ? actual+' ha' : 'sin dato') + '.\n\n' +
+      '¿Confirmás que de ahora en más el MAPA sea la fuente oficial (potreroAreas) para este potrero?\n' +
+      'Esto afecta Materia Seca, Saldo de HA y Ranking de Potreros en el resto del sistema.';
+    autoActualizarOficial = confirm(msg);
+  }
+  if(autoActualizarOficial) await actualizarPotreroAreasOficial(utilHa);
+}
+
+function toggleModoMasivo(){
+  if(!modoMasivo){
+    modoMasivo = true;
+  } else {
+    if(!confirm('¿Desactivar el modo dibujo masivo?\n\nA partir de ahora, cerrar el contorno de un potrero (o cambiar sus exclusiones) va a poder actualizar potreroAreas de verdad, previa confirmación tuya.')) return;
+    modoMasivo = false;
+  }
+  actualizarUIModoMasivo();
+}
+function actualizarUIModoMasivo(){
+  const badge = document.getElementById('badgeModoMasivo');
+  const btn = document.getElementById('btnToggleModoMasivo');
+  badge.textContent = modoMasivo ? 'ACTIVADO' : 'desactivado';
+  badge.classList.toggle('on', modoMasivo);
+  btn.textContent = modoMasivo ? '🔓 Desactivar (permitir sincronizar)' : '🛡️ Reactivar modo seguro';
+  document.getElementById('btnSyncManual').style.display = (modoMasivo && potreroUtilGeo) ? 'block' : 'none';
+}
+
+async function sincronizarManual(){
+  if(!potreroActual || !potreroUtilGeo) return;
+  const utilHa = turf.area(potreroUtilGeo)/10000;
+  const actual = potreroAreasOficial[potreroActual];
+  const haRedondeada = Math.round(utilHa*100)/100;
+  const ok = confirm(
+    'Vas a actualizar potreroAreas de "' + potreroActual + '" a mano.\n' +
+    'Mapa: ' + haRedondeada + ' ha · Sistema actual: ' + (actual!=null?actual+' ha':'sin dato') + '\n\n' +
+    'Esto afecta Materia Seca, Saldo de HA y Ranking. ¿Confirmás?'
+  );
+  if(!ok) return;
+  await actualizarPotreroAreasOficial(utilHa);
+  autoActualizarOficial = true; // de acá en más, este potrero puntual sí sincroniza si el modo masivo se apaga
+}
+
+async function actualizarPotreroAreasOficial(ha){
+  if(!potreroActual) return;
+  const haRedondeada = Math.round(ha*100)/100;
+  await fbSet('potreroAreas/' + potreroActual, haRedondeada);
+  potreroAreasOficial[potreroActual] = haRedondeada;
+  document.getElementById('potreroAreaOficial').innerHTML =
+    '✅ Área oficial (potreroAreas) sincronizada: <b>' + haRedondeada + ' ha</b> — el mapa es la fuente de este número.';
 }
 
 // ══════════════════════════════════════════════
@@ -1016,6 +1091,7 @@ async function guardarEnFirebase(){
 
 function limpiarEstadoEnPantalla(){
   drawingPotrero=false; drawingExclusion=false; pickingEdge=false;
+  autoActualizarOficial=null;
   potreroLatLngs=[]; exclPoints=[];
   clearTempDraw(); clearExclTempDraw();
   if(potreroLayer){ map.removeLayer(potreroLayer); potreroLayer=null; }
@@ -1029,6 +1105,7 @@ function limpiarEstadoEnPantalla(){
   selectedEdge=null; lastCutEndpoints=null; vueltaAnchoFijo=null; lastCutDir=null;
   vueltaActual=1;
   cutPreview=null;
+  document.getElementById('btnSyncManual').style.display = 'none';
   document.getElementById('btnDrawStart').disabled = false;
   document.getElementById('btnUndo').disabled = true;
   document.getElementById('btnResetPotrero').disabled = true;
@@ -1079,7 +1156,7 @@ async function cambiarPotrero(){
     z.layer = layer;
     exclusionZones.push(z);
   });
-  if(potreroClosed) recomputeUtil();
+  if(potreroClosed){ autoActualizarOficial = true; recomputeUtil(); }
   (data.parcelas||[]).forEach(p=>{
     const latlngs = geoJSONToLL(p.geojson);
     const layer = L.polygon(latlngs, {color:COLORS[p.colorIdx], weight:2, fillColor:COLORS[p.colorIdx], fillOpacity:.42}).addTo(map);
@@ -1116,6 +1193,7 @@ async function cargarListaPotreros(){
 }
 
 initMap();
+actualizarUIModoMasivo();
 cargarListaPotreros();
 </script>
 </body>
