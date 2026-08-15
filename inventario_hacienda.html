@@ -442,6 +442,7 @@ tr:hover td{background:rgba(109,186,58,.04);}
       <span id="vAnimCounter" style="font-size:12px;color:var(--t2);margin-right:auto;"></span>
       <button class="btn bs btn-sm" onclick="descargarPlantillaVenta()" style="border-color:var(--gold);color:var(--gold);">📥 Plantilla</button>
       <button class="btn bs btn-sm" onclick="openImportVentasHist()" style="border-color:var(--gr);color:var(--gr);">📤 Importar Históricas</button>
+      <button class="btn bs btn-sm" id="btnLimpiarBajasHuerfanas" onclick="limpiarBajasHuerfanas()" style="display:none;border-color:#e05a4a;color:#e05a4a;" title="Borra registros de baja que quedaron de ventas ya eliminadas">🧹 Limpiar huérfanas</button>
     </div>
     <div class="fr" style="padding:8px 14px;gap:8px;flex-wrap:wrap;">
       <select id="vfVenta" onchange="renderVAnimales()" style="font-size:12px;"><option value="">Todas las ventas</option></select>
@@ -4770,6 +4771,7 @@ async function saveVenta(){
     transporte:trans,totalCobrar,precioKg:precKg,estado,usuario,liquidada,
     categorias:usaCategorias?catResumen:null};
   const updates={};updates['ventas/'+vId]=ventaObj;
+  const nuevasBajas=[];
   for(const a of _ventaAnimales){
     let precA,pesoVenta,catAnimal=null,desbAnimal=0;
     if(usaCategorias){
@@ -4785,22 +4787,48 @@ async function saveVenta(){
     const bid='b_'+a.ide+'_'+fecha.replace(/-/g,'');
     updates['animales/'+a.ide+'/estado']='VENDIDO';
     updates['animales/'+a.ide+'/ventaId']=vId;
-    updates['bajas/'+bid]={id:bid,ide:a.ide,tipo:'VENTA',fecha,
+    const bajaObj={id:bid,ide:a.ide,tipo:'VENTA',fecha,
       pesoVenta,precioVenta:precA,destino:dest,ventaId:vId,
       categoriaAnimal:animales[a.ide]?.categoria||null,
       grupoAnimal:animales[a.ide]?.grupo||null,
       origenAnimal:animales[a.ide]?.origen||null,usuario};
+    updates['bajas/'+bid]=bajaObj;
+    nuevasBajas.push(bajaObj);
     if(animales[a.ide]){animales[a.ide].estado='VENDIDO';animales[a.ide].ventaId=vId;}
   }
   try{
     await fbPatch('',updates);
     ventas.unshift(ventaObj);
+    nuevasBajas.forEach(b=>{
+      const idx=bajas.findIndex(x=>x.id===b.id);
+      if(idx>=0) bajas[idx]=b; else bajas.unshift(b);
+    });
     cerrar('moV2');renderDash();renderA();renderV();
     if(estado==='ABIERTA')ntf('⚠️ Venta '+codigo+' ABIERTA — faltan '+noEnc.length+' animales',true);
     else if(!liquidada)ntf('✅ Venta '+codigo+' registrada — animales dados de baja. ⏳ Falta liquidar el precio');
     else ntf('✅ Venta '+codigo+' cerrada — '+_ventaAnimales.length+' animales');
   }catch(e){ntf('Error: '+e.message,true);}
   finally{if(btn){btn.disabled=false;btn.textContent='💰 Registrar Venta';}}
+}
+
+// Limpieza única: registros de "baja" tipo VENTA que quedaron apuntando a una venta
+// que ya no existe (por ejemplo, ventas eliminadas antes de que este fix existiera).
+async function limpiarBajasHuerfanas(){
+  if(sessionStorage.getItem('ep_rol')!=='ADMIN'){ntf('Solo el administrador puede hacer esto',true);return;}
+  const ventaIds=new Set(ventas.map(v=>v.id));
+  const huerfanas=bajas.filter(b=>b.tipo==='VENTA' && b.ventaId && !ventaIds.has(b.ventaId));
+  if(!huerfanas.length){ntf('No hay registros huérfanos — todo está en orden');return;}
+  const detalle=huerfanas.slice(0,10).map(b=>b.ide).join(', ')+(huerfanas.length>10?'...':'');
+  if(!confirm('Se encontraron '+huerfanas.length+' registro(s) de baja huérfanos (de ventas ya eliminadas):\n\n'+detalle+'\n\nSe van a borrar estos registros. Los animales correspondientes NO se tocan (ya deberían estar ACTIVOS). ¿Continuar?')) return;
+  const upd={};
+  huerfanas.forEach(b=>{ upd['bajas/'+b.id]=null; });
+  try{
+    await fbPatch('',upd);
+    const idsBorrados=new Set(huerfanas.map(b=>b.id));
+    bajas=bajas.filter(b=>!idsBorrados.has(b.id));
+    renderVAnimales();renderDash();
+    ntf('✅ '+huerfanas.length+' registro(s) huérfano(s) eliminado(s)');
+  }catch(e){ntf('Error: '+e.message,true);}
 }
 
 async function eliminarVenta(vId){
@@ -4810,13 +4838,17 @@ async function eliminarVenta(vId){
   if(!confirm('¿Eliminar venta '+v.codigo+'? Los animales volverán a ACTIVO.')) return;
   try{
     const upd={};upd['ventas/'+vId]=null;
-    bajas.filter(b=>b.ventaId===vId&&b.tipo==='VENTA').forEach(b=>{
+    const bjs = bajas.filter(b=>b.ventaId===vId&&b.tipo==='VENTA');
+    bjs.forEach(b=>{
       upd['animales/'+b.ide+'/estado']='ACTIVO';upd['animales/'+b.ide+'/ventaId']=null;
+      upd['bajas/'+b.id]=null; // borrar el registro de baja huérfano, para que no siga apareciendo en Animales Vendidos
       if(animales[b.ide]){animales[b.ide].estado='ACTIVO';delete animales[b.ide].ventaId;}
     });
     await fbPatch('',upd);
     ventas=ventas.filter(x=>x.id!==vId);
-    renderV();renderDash();renderA();ntf('✅ Venta eliminada');
+    const idsBorrados=new Set(bjs.map(b=>b.id));
+    bajas=bajas.filter(b=>!idsBorrados.has(b.id));
+    renderV();renderVAnimales();renderDash();renderA();ntf('✅ Venta eliminada — '+bjs.length+' animal(es) de vuelta a Activo');
   }catch(e){ntf('Error: '+e.message,true);}
 }
 
@@ -4869,6 +4901,8 @@ function renderV(){
 }
 
 function renderVAnimales(){
+  const btnLimp=document.getElementById('btnLimpiarBajasHuerfanas');
+  if(btnLimp) btnLimp.style.display = sessionStorage.getItem('ep_rol')==='ADMIN' ? '' : 'none';
   const vf=document.getElementById('vfVenta')?.value||'';
   const tp=document.getElementById('vfTipo')?.value||'';
   const ct=document.getElementById('vfCat')?.value||'';
