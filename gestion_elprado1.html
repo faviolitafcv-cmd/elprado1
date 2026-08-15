@@ -66,6 +66,8 @@ html,body{height:100%;font-family:'Segoe UI',Arial,sans-serif;overflow:hidden}
 .mod-pasturas{border-top:3px solid #6dba3a}
 .mod-pasturas .modulo-tag{background:rgba(109,186,58,.2);color:#a8d878;border:1px solid rgba(109,186,58,.3)}
 .mod-stock .modulo-tag{background:rgba(74,154,186,.2);color:#7ec8e3;border:1px solid rgba(74,154,186,.3)}
+.mod-mapa{border-top:3px solid #5aa9e0}
+.mod-mapa .modulo-tag{background:rgba(90,169,224,.2);color:#8fcaf0;border:1px solid rgba(90,169,224,.3)}
 
 .footer-txt{color:rgba(255,255,255,.3);font-size:10px;letter-spacing:2px}
 
@@ -166,6 +168,19 @@ html,body{height:100%;font-family:'Segoe UI',Arial,sans-serif;overflow:hidden}
         </div>
       </div>
 
+      <!-- MÓDULO MAPA DE POTREROS -->
+      <div class="modulo-card mod-mapa" onclick="abrirModulo('mapa')">
+        <div class="modulo-icono">🗺️</div>
+        <div class="modulo-tag">MAPA SATELITAL</div>
+        <div class="modulo-nombre">Mapa de Potreros</div>
+        <div class="modulo-desc">Contorno real, parcelas y ancho para los armadores</div>
+        <div class="modulo-submods">
+          <span class="submod">Dibujar potrero</span>
+          <span class="submod">Cortar parcela</span>
+          <span class="submod">Zonas excluidas</span>
+        </div>
+      </div>
+
       <!-- MÓDULO INSUMOS -->
       <div class="modulo-card mod-stock" onclick="abrirModulo('insumos')" style="border-color:rgba(201,162,39,.3);">
         <div class="modulo-icono">🧂</div>
@@ -247,6 +262,10 @@ const MODULOS = {
   stock: {
     nombre: 'Stock de Hacienda — Inventario',
     archivo: 'inventario_hacienda.html'
+  },
+  mapa: {
+    nombre: '🗺️ Mapa de Potreros — El Prado 1',
+    archivo: 'mapa_potreros.html'
   },
   insumos: {
     nombre: 'Insumos & Nutrición',
