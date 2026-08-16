@@ -213,6 +213,10 @@ button:disabled{opacity:.35; cursor:not-allowed;}
           <button class="btn-outline" id="btnPickEdge" onclick="startPickEdge()">📍 Tocar el borde en el mapa</button>
           <button class="btn-outline" id="btnContinuar" onclick="continuarDesdeUltimoCorte()" disabled>▶️ Continuar desde el corte anterior</button>
         </div>
+        <div id="avisoReparar" style="display:none;margin-top:6px">
+          <div class="banner warn">Esta vuelta tiene una parcela guardada antes del arreglo — le falta un dato para poder "Continuar" automático.</div>
+          <button class="btn-outline" onclick="repararUltimaParcela()" style="margin-top:6px">🔧 Reparar y habilitar Continuar</button>
+        </div>
         <div id="edgeInfo" class="hint" style="margin-top:6px">Ningún lado elegido todavía.</div>
       </div>
       <div>
@@ -994,6 +998,56 @@ function continuarDesdeUltimoCorte(){
   buildSelectedEdge(best.A, best.B, lastCutDir);
 }
 
+// Repara una parcela guardada ANTES de que existiera finalPts: reconstruye el borde lejano
+// buscando, de los 4 lados de su propio dibujo, el que está MÁS LEJOS del contorno del potrero
+// (el lado de arranque siempre queda pegado al contorno; el lado lejano es el que buscamos).
+async function repararUltimaParcela(){
+  const candidatos = parcelas.filter(p => p.vuelta === vueltaActual && !p.esResto && !p.finalPts && !p.pendiente);
+  if(!candidatos.length){ alert('No encontré ninguna parcela para reparar en esta vuelta.'); return; }
+  const p = candidatos[candidatos.length - 1];
+  const latRef = avgLat(potreroClosed.latlngs);
+  const ringLL = geoJSONToLL(p.geojson).map(c => L.latLng(c[0], c[1]));
+  const potPts = potreroClosed.latlngs;
+
+  let mejorEdge = null, mejorDist = -1;
+  for(let i=0;i<ringLL.length;i++){
+    const a = ringLL[i], b = ringLL[(i+1)%ringLL.length];
+    const mid = L.latLng((a.lat+b.lat)/2, (a.lng+b.lng)/2);
+    let minDistAlPotrero = Infinity;
+    for(let j=0;j<potPts.length;j++){
+      const pa = potPts[j], pb = potPts[(j+1)%potPts.length];
+      const d = distPointToSegment(llToXY(mid,latRef), llToXY(pa,latRef), llToXY(pb,latRef));
+      if(d < minDistAlPotrero) minDistAlPotrero = d;
+    }
+    if(minDistAlPotrero > mejorDist){ mejorDist = minDistAlPotrero; mejorEdge = {a,b}; }
+  }
+  if(!mejorEdge){ alert('No se pudo calcular el borde lejano de esa parcela.'); return; }
+
+  const finalPts = [ {lat:mejorEdge.a.lat, lng:mejorEdge.a.lng}, {lat:mejorEdge.b.lat, lng:mejorEdge.b.lng} ];
+  const ok = await repararParcelaEnFirebase(potreroActual, p.id, finalPts);
+  if(!ok){ alert('⚠️ No se pudo guardar la reparación. Probá de nuevo, o por esta vez tocá el borde a mano.'); return; }
+
+  p.finalPts = finalPts;
+  lastCutEndpoints = { a:L.latLng(finalPts[0].lat,finalPts[0].lng), b:L.latLng(finalPts[1].lat,finalPts[1].lng) };
+  vueltaAnchoFijo = p.anchoInicio || null;
+  lastCutDir = inferDireccionDesdeParcela(p, latRef);
+  document.getElementById('btnContinuar').disabled = false;
+  document.getElementById('avisoReparar').style.display = 'none';
+  alert('✅ Reparado — ya podés usar "Continuar desde el corte anterior".');
+}
+
+async function repararParcelaEnFirebase(potrero, parcelaId, finalPts){
+  try{
+    const data = await fbGet('potreroGeo/' + potrero) || {};
+    const arr = data.parcelas || [];
+    const idx = arr.findIndex(x => x.id === parcelaId);
+    if(idx < 0) return false;
+    arr[idx].finalPts = finalPts;
+    await fbSet('potreroGeo/' + potrero + '/parcelas', arr);
+    return true;
+  }catch(e){ console.warn('No se pudo reparar la parcela en Firebase', e); return false; }
+}
+
 function checkCortarEnabled(){
   const ha = parseFloat(document.getElementById('fHaNecesaria').value)||0;
   const utilHa = potreroUtilGeo ? turf.area(potreroUtilGeo)/10000 : 0;
@@ -1597,6 +1651,11 @@ async function cambiarPotrero(){
     const latRefTmp = avgLat(potreroClosed.latlngs);
     lastCutDir = inferDireccionDesdeParcela(ultima, latRefTmp);
     document.getElementById('btnContinuar').disabled = false;
+    document.getElementById('avisoReparar').style.display = 'none';
+  } else {
+    // ¿Hay alguna parcela de esta vuelta que simplemente le falte el dato (guardada antes del arreglo)?
+    const sinFinalPts = parcelas.filter(p => p.vuelta === vueltaActual && !p.esResto && !p.finalPts);
+    document.getElementById('avisoReparar').style.display = sinFinalPts.length ? 'block' : 'none';
   }
   updateAnchoFijoInfo();
   actualizarSugerenciaParcela();
