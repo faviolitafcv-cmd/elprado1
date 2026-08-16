@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>El Prado 1 — Campo</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <style>
 :root {
   --bg:#0f1a0b; --bg2:#162010; --card:#1c2916; --card2:#223218;
@@ -76,6 +78,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 .dia-turno{font-size:10px;font-weight:700;color:var(--gold2);margin-top:2px;}
 .dia-ancho{font-size:10px;color:var(--blue);margin-top:1px;}
 .dia-vacio{font-size:11px;color:var(--text3);}
+.potrero-label-v{background:rgba(90,169,224,.85); border:none; color:#0d1509; font-weight:700; font-size:10px; padding:2px 5px; border-radius:5px; box-shadow:none;}
+.potrero-label-v::before{display:none;}
 
 /* TABLA ARMADORES */
 .arm-card{background:var(--card);border:1px solid var(--border);border-radius:10px;
@@ -248,10 +252,10 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
     </div>
 
     <div class="rol-btn gold" onclick="irA('pagPublica')">
-      <div class="rol-icon">👁</div>
+      <div class="rol-icon">🚶</div>
       <div class="rol-info">
-        <div class="rol-nombre">Visualización</div>
-        <div class="rol-desc">Ayer · Hoy · Mañana — todos los grupos</div>
+        <div class="rol-nombre">Visitas</div>
+        <div class="rol-desc">Recorrido: mapa en vivo + Ayer · Hoy · Mañana</div>
       </div>
       <div class="rol-arr">›</div>
     </div>
@@ -320,14 +324,33 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 </div>
 
 <!-- ══════════════════════════════════
-     PAG PÚBLICA
+     PAG VISITAS (antes "PAG PÚBLICA")
 ══════════════════════════════════ -->
 <div id="pagPublica" class="pag">
   <div class="sec-header">
-    <div class="sec-titulo">👁 VISUALIZACIÓN — Estado del campo</div>
+    <div class="sec-titulo">🚶 VISITAS — Recorrido del campo</div>
     <button class="btn-refresh" onclick="refrescar('publica')">↻</button>
   </div>
-  <div id="listaPublica"></div>
+  <div style="display:flex;gap:8px;margin-bottom:12px;">
+    <button onclick="setSubVisitas('semana')" id="subVisitasSemanaBtn"
+      style="flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;background:var(--green2);color:white;border:none;">
+      📅 Semana
+    </button>
+    <button onclick="setSubVisitas('mapa')" id="subVisitasMapaBtn"
+      style="flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;background:var(--card2);color:var(--text2);border:1px solid var(--border);">
+      🗺️ Mapa
+    </button>
+  </div>
+  <div id="subVisitasSemana">
+    <div id="listaPublica"></div>
+  </div>
+  <div id="subVisitasMapa" style="display:none;">
+    <div id="visitasMapWrap" style="position:relative;height:60vh;min-height:380px;border-radius:12px;overflow:hidden;border:1px solid var(--border);">
+      <div id="visitasMap" style="width:100%;height:100%;"></div>
+      <div id="gpsEstado" style="position:absolute;top:8px;left:8px;z-index:1000;background:rgba(15,26,11,.9);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:11px;color:var(--text2);">📡 activando GPS…</div>
+    </div>
+    <div id="visitasMapLista" style="margin-top:10px;"></div>
+  </div>
 </div>
 
 <!-- ══════════════════════════════════
@@ -439,6 +462,7 @@ const getActs    = () => asArr(getData('actividades', []));
 const getGrupos  = () => asArr(getData('grupos', []));
 const getPedidos = () => asArr(getData('pedidos', []));
 const setPedidos = p  => setData('pedidos', p);
+const getPotreroGeo = () => getData('potreroGeo', {});
 const uuid = () => Date.now().toString(36) + Math.random().toString(36).substr(2,5);
 
 // ══════════════════════════════════════════════
@@ -789,11 +813,15 @@ function renderPublica() {
   const dias   = [sumarDias(hoy,-1), hoy, sumarDias(hoy,1)];
   const lbls   = ['Ayer','Hoy','Mañana'];
   const acts   = getActs();
-  const grupos = getGrupos();
+  const todosGrupos = getGrupos();
+
+  // Solo grupos que tienen AL MENOS un registro activo en estos 3 días — nada de
+  // mostrar grupos configurados que todavía no tienen parcela/aforo real detrás.
+  const grupos = todosGrupos.filter(g => dias.some(d => getRegDia(acts, g, d)));
 
   if(!grupos.length) {
     document.getElementById('listaPublica').innerHTML =
-      '<div class="vacio">Sin grupos configurados</div>'; return;
+      '<div class="vacio">Ningún grupo con parcela registrada en estos días</div>'; return;
   }
 
   const html = grupos.map(g => {
@@ -825,6 +853,131 @@ function renderPublica() {
   }).join('');
 
   document.getElementById('listaPublica').innerHTML = html;
+}
+
+// ══════════════════════════════════════════════
+// SUB-PESTAÑAS DE VISITAS (Semana / Mapa)
+// ══════════════════════════════════════════════
+let _visitasMapIniciado = false;
+let _visitasMap = null, _gpsMarker = null, _gpsCirculo = null, _gpsWatchId = null;
+
+function setSubVisitas(sub){
+  const btnS = document.getElementById('subVisitasSemanaBtn');
+  const btnM = document.getElementById('subVisitasMapaBtn');
+  document.getElementById('subVisitasSemana').style.display = sub==='semana' ? 'block':'none';
+  document.getElementById('subVisitasMapa').style.display   = sub==='mapa'   ? 'block':'none';
+  btnS.style.background = sub==='semana' ? 'var(--green2)' : 'var(--card2)';
+  btnS.style.color      = sub==='semana' ? 'white' : 'var(--text2)';
+  btnM.style.background = sub==='mapa' ? 'var(--green2)' : 'var(--card2)';
+  btnM.style.color      = sub==='mapa' ? 'white' : 'var(--text2)';
+  if(sub==='mapa'){
+    if(!_visitasMapIniciado){ initVisitasMap(); _visitasMapIniciado = true; }
+    else { setTimeout(()=> _visitasMap && _visitasMap.invalidateSize(), 50); }
+  }
+}
+
+function geoJSONToLLv(gj){
+  const ring = gj.geometry.coordinates[0];
+  return ring.map(c=>[c[1], c[0]]);
+}
+function fmtSlashV(f){ if(!f) return '—'; const [y,m,d]=f.split('-'); return d+'/'+m+'/'+y; }
+
+function initVisitasMap(){
+  _visitasMap = L.map('visitasMap', {zoomControl:true}).setView([-16.3700, -60.9700], 15);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 20, attribution: 'Esri World Imagery'
+  }).addTo(_visitasMap);
+  renderVisitasOcupacion();
+  iniciarGpsEnVivo();
+}
+
+// Pinta el fondo de todos los potreros + resalta en rojo dónde hay animales HOY
+function renderVisitasOcupacion(){
+  if(!_visitasMap) return;
+  const hoy = new Date().toISOString().split('T')[0];
+  const potreroGeoObj = getPotreroGeo() || {};
+  const acts = getActs().filter(a => a.actividad==='MATERIA SECA' && a.fechaIng && a.fechaIng<=hoy && (a.fechaSal ? a.fechaSal>=hoy : a.fechaIng===hoy));
+
+  let boundsAcum = null;
+  const listaHtml = [];
+
+  Object.keys(potreroGeoObj).forEach(nombre=>{
+    const data = potreroGeoObj[nombre];
+    if(!data || !data.potrero || !data.potrero.latlngs) return;
+    const layer = L.polygon(data.potrero.latlngs, {
+      color:'#5aa9e0', weight:1.5, opacity:.6, fillOpacity:.03, dashArray:'4,4', interactive:false
+    }).addTo(_visitasMap);
+    layer.bindTooltip(nombre, {permanent:true, direction:'center', className:'potrero-label-v'});
+    const b = layer.getBounds();
+    boundsAcum = boundsAcum ? boundsAcum.extend(b) : L.latLngBounds(b.getSouthWest(), b.getNorthEast());
+  });
+  if(boundsAcum) _visitasMap.fitBounds(boundsAcum, {padding:[24,24]});
+
+  acts.forEach(a=>{
+    const data = potreroGeoObj[a.potrero];
+    let parcelaGeo = null;
+    if(data && data.parcelas && data.parcelas.length){
+      if(a.mapaParcelaId) parcelaGeo = data.parcelas.find(p=>p.id===a.mapaParcelaId);
+      if(!parcelaGeo && a.parcela){
+        const cand = data.parcelas.filter(p=>String(p.num)===String(a.parcela));
+        if(cand.length) parcelaGeo = cand[cand.length-1];
+      }
+    }
+    if(parcelaGeo){
+      const ll = geoJSONToLLv(parcelaGeo.geojson);
+      const layer = L.polygon(ll, {color:'#e05a4a', weight:2.5, fillColor:'#e05a4a', fillOpacity:.55}).addTo(_visitasMap);
+      layer.bindPopup(`<b>🐄 ${a.lote||'—'}</b><br>${a.potrero} · Parcela ${a.parcela}<br>Ingresó ${fmtSlashV(a.fechaIng)}`);
+    } else if(data && data.potrero && data.potrero.latlngs){
+      L.polygon(data.potrero.latlngs, {color:'#e05a4a', weight:2.5, fillColor:'#e05a4a', fillOpacity:.22, dashArray:'2,6'})
+        .addTo(_visitasMap)
+        .bindPopup(`<b>🐄 ${a.lote||'—'}</b><br>${a.potrero} · Parcela ${a.parcela} (potrero completo, parcela sin dibujar)<br>Ingresó ${fmtSlashV(a.fechaIng)}`);
+    }
+    listaHtml.push(`<div class="pub-row"><div class="pub-row-header">
+      <div class="grupo-nombre-tag">🐄 ${a.lote||'—'}</div>
+      <div class="grupo-tipo-tag">${a.potrero||'—'} · P${a.parcela||'—'}</div>
+    </div></div>`);
+  });
+
+  document.getElementById('visitasMapLista').innerHTML = listaHtml.length
+    ? listaHtml.join('')
+    : '<div class="vacio">Ningún grupo activo hoy</div>';
+}
+
+// GPS en vivo: punto azul + círculo de precisión que se mueven solos mientras caminás.
+// Si no hay permiso o el celular no tiene GPS, el mapa sigue funcionando igual, sin el punto.
+function iniciarGpsEnVivo(){
+  const estadoEl = document.getElementById('gpsEstado');
+  if(!navigator.geolocation){
+    estadoEl.textContent = '📡 este celular no tiene GPS disponible';
+    return;
+  }
+  _gpsWatchId = navigator.geolocation.watchPosition(
+    pos => {
+      const { latitude, longitude, accuracy } = pos.coords;
+      estadoEl.textContent = '📡 GPS activo (±' + Math.round(accuracy) + ' m)';
+      estadoEl.style.color = 'var(--green-soft)';
+      if(!_gpsMarker){
+        _gpsMarker = L.circleMarker([latitude, longitude], {
+          radius:8, color:'#fff', weight:2, fillColor:'#4a9fff', fillOpacity:1
+        }).addTo(_visitasMap);
+        _gpsCirculo = L.circle([latitude, longitude], {
+          radius:accuracy, color:'#4a9fff', weight:1, fillColor:'#4a9fff', fillOpacity:.12
+        }).addTo(_visitasMap);
+        _visitasMap.setView([latitude, longitude], 17);
+      } else {
+        _gpsMarker.setLatLng([latitude, longitude]);
+        _gpsCirculo.setLatLng([latitude, longitude]);
+        _gpsCirculo.setRadius(accuracy);
+      }
+    },
+    err => {
+      estadoEl.textContent = err.code===1
+        ? '📡 sin permiso de ubicación — activalo en el navegador si querés verte en el mapa'
+        : '📡 no se pudo obtener tu ubicación';
+      estadoEl.style.color = 'var(--gold2)';
+    },
+    { enableHighAccuracy:true, maximumAge:5000, timeout:15000 }
+  );
 }
 
 // ══════════════════════════════════════════════
@@ -1027,7 +1180,7 @@ async function refrescar(vista) {
   if(vista==='vaqueros')        renderVaqueros();
   if(vista==='armadores')       renderArmadores(false);
   if(vista==='armadoresGrupo')  renderArmadoresGrupo(_armGrupoActual, false);
-  if(vista==='publica')         renderPublica();
+  if(vista==='publica')         { renderPublica(); if(_visitasMap) renderVisitasOcupacion(); }
   notifV('✓ Datos actualizados');
 }
 
@@ -1069,6 +1222,7 @@ function notifV(msg, error=false) {
   setInterval(async()=>{
     await syncFB();
     renderVaqueros(); renderArmadores(false); renderPublica();
+    if(_visitasMap) renderVisitasOcupacion();
     if(paginaActual==='pagCapataz') renderCapataz();
     if(paginaActual==='pagArmadoresGrupo' && _armGrupoActual) renderArmadoresGrupo(_armGrupoActual, false);
   }, 5*60*1000);
