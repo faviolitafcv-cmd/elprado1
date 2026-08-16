@@ -875,6 +875,9 @@ tr:hover td { background: rgba(255,255,255,.02); }
             <div class="calc-label">HA necesarias (AUTO)</div>
             <div class="calc-badge" id="cHA">—</div>
             <input type="hidden" id="fHA">
+            <button type="button" id="btnIrAlMapa" onclick="irAlMapaPotreros()" style="display:none;margin-top:8px;background:var(--green2);color:#0d1509;border:none;padding:7px 12px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">
+              🗺️ Cortar esta parcela en el Mapa
+            </button>
           </div>
           <div class="form-group" id="grpHAmanual" style="display:none">
             <label>HA de la parcela (fija)</label>
@@ -3131,6 +3134,7 @@ function onPotreroChange() {
     aplicarFechaMinIngreso();
     sugerirProximaParcela();
     actualizarSaldoHA();
+    calcMS();
   }
 }
 
@@ -3669,6 +3673,9 @@ function calcMS() {
     document.getElementById('fHA').value = ha > 0 ? ha.toFixed(4) : '';
     document.getElementById('cHA').textContent = ha > 0 ? fmt(ha,2)+' ha' : '—';
     document.getElementById('grpHASobrante').style.display = 'none';
+    const potreroSel = document.getElementById('fPotrero')?.value;
+    const btnMapa = document.getElementById('btnIrAlMapa');
+    if(btnMapa) btnMapa.style.display = (ha > 0 && potreroSel) ? 'block' : 'none';
   } else {
     haManual = parseFloat(document.getElementById('fHAManual').value)||0;
     ha = haManual;
@@ -3695,6 +3702,15 @@ function calcMS() {
   document.getElementById('cDiasMV').textContent = diasMv>0 ? fmt(diasMv,1)+' días' : '—';
   document.getElementById('cConsumo').textContent= consumo>0 ? fmt(consumo*100,2)+'%' : '—';
   if(modoDim === 'REGULAR') calcDim();
+}
+
+// Abre el Mapa de Potreros con el potrero y las hectáreas ya calculadas acá, listo para cortar la franja.
+function irAlMapaPotreros(){
+  const potrero = document.getElementById('fPotrero')?.value;
+  const ha = document.getElementById('fHA')?.value;
+  if(!potrero || !ha) return;
+  const url = 'mapa_potreros.html?potrero=' + encodeURIComponent(potrero) + '&ha=' + encodeURIComponent(parseFloat(ha).toFixed(2));
+  window.open(url, '_blank');
 }
 
 // ═══════════════════════════════════════

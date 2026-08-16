@@ -1485,9 +1485,31 @@ async function cargarListaPotreros(){
   sel.innerHTML = nombres.map(n=>`<option value="${n}">${n} (${potreroAreasOficial[n]} ha oficial)</option>`).join('');
   document.getElementById('badgeFbStatus').textContent = 'conectado ✓';
   document.getElementById('badgeFbStatus').classList.add('on');
-  // Arrancamos en B2 si existe, si no en el primero de la lista
-  sel.value = nombres.includes('B2') ? 'B2' : nombres[0];
-  cambiarPotrero();
+
+  // Si venimos enlazados desde el registro de aforo (elprado_actividades.html), usar ESE potrero
+  // y precargar directamente las hectáreas que ya calculó el formulario de Materia Seca.
+  const params = new URLSearchParams(window.location.search);
+  const potreroURL = params.get('potrero');
+  const haURL = params.get('ha');
+
+  if(potreroURL && nombres.includes(potreroURL)){
+    sel.value = potreroURL;
+    await cambiarPotrero();
+    if(haURL){
+      const fHa = document.getElementById('fHaNecesaria');
+      if(fHa) fHa.value = haURL;
+      const banner = document.createElement('div');
+      banner.className = 'banner ok';
+      banner.style.margin = '0 0 8px';
+      banner.innerHTML = '📋 Vino desde el registro de aforo: <b>' + potreroURL + '</b> necesita <b>' + haURL + ' ha</b>. Elegí el lado de inicio (o "Continuar") y calculá el corte.';
+      const cardParcela = document.getElementById('cardParcela');
+      if(cardParcela) cardParcela.insertBefore(banner, cardParcela.children[1] || null);
+    }
+  } else {
+    // Arrancamos en B2 si existe, si no en el primero de la lista
+    sel.value = nombres.includes('B2') ? 'B2' : nombres[0];
+    cambiarPotrero();
+  }
 }
 
 initMap();
