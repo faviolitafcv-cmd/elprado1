@@ -1304,6 +1304,8 @@ function activarModoSimple(nombrePotrero){
   const cardResumen = document.getElementById('cardResumenPotrero');
   cardResumen.style.display = 'flex';
   document.getElementById('resumenNombre').textContent = nombrePotrero;
+  const btnG = document.getElementById('btnGuardarParcela');
+  if(btnG) btnG.textContent = '✅ Finalizar y enviar al aforo';
   actualizarResumenHa();
 }
 
@@ -1351,15 +1353,19 @@ function guardarParcela(){
     fechaIngISO: fIng+'T'+hIng, fechaSalISO: fSal+'T'+hSal,
     colorIdx,
     descansoDias: cutPreview.descansoDias!=null ? cutPreview.descansoDias : null,
-    refParcela: cutPreview.refParcela ? cutPreview.refParcela.num : null
+    refParcela: cutPreview.refParcela ? cutPreview.refParcela.num : null,
+    pendiente: modoEnlazado // true = todavía no está confirmada en Firebase, espera al guardado del aforo
   };
 
   const latlngs = geoJSONToLL(rec.geojson);
-  const layer = L.polygon(latlngs, { color:COLORS[colorIdx], weight:2, fillColor:COLORS[colorIdx], fillOpacity:.42 }).addTo(map);
+  const layer = L.polygon(latlngs, {
+    color:COLORS[colorIdx], weight:2, fillColor:COLORS[colorIdx],
+    fillOpacity:.42, dashArray: rec.pendiente ? '5,5' : null
+  }).addTo(map);
   const medidasPopup = rec.esResto
     ? '🔚 Franja de cierre (forma irregular)'
     : `ancho ${rec.anchoInicio.toFixed(0)} m · largo ${rec.largo.toFixed(0)} m`;
-  layer.bindPopup(`<b>Parcela ${num}</b><br>${rec.areaHa.toFixed(2)} ha · ${medidasPopup}<br>${fmtFecha(rec.fechaIngISO)} → ${fmtFecha(rec.fechaSalISO)}`);
+  layer.bindPopup(`<b>Parcela ${num}</b>${rec.pendiente?' · ⏳ pendiente de confirmar':''}<br>${rec.areaHa.toFixed(2)} ha · ${medidasPopup}<br>${fmtFecha(rec.fechaIngISO)} → ${fmtFecha(rec.fechaSalISO)}`);
   rec._layer = layer;
   parcelas.push(rec);
 
@@ -1379,15 +1385,27 @@ function guardarParcela(){
   actualizarSugerenciaParcela();
   renderLista();
   renderRestante();
-  guardarEnFirebase();
 
-  // Si vinimos enlazados desde el registro de aforo, mandamos el ancho de vuelta
-  // para que se complete solo en el formulario — sin que lo tengas que tipear de nuevo.
-  if(modoEnlazado && window.opener && rec.anchoInicio){
+  if(modoEnlazado && window.opener){
+    // NO se escribe nada en Firebase todavía — se manda el paquete completo a la pestaña
+    // del aforo, y recién queda confirmado de verdad cuando ahí apretás "Guardar Registro".
+    const recParaEnviar = Object.assign({}, rec);
+    delete recParaEnviar._layer;
     try{
-      window.opener.recibirAnchoDesdeElMapa(rec.anchoInicio);
-      window.opener.focus();
-    }catch(e){ console.warn('No se pudo enviar el ancho al aforo', e); }
+      window.opener.recibirParcelaCompleta(recParaEnviar, potreroActual);
+      const cardParcela = document.getElementById('cardParcela');
+      let aviso = document.getElementById('avisoPendiente');
+      if(!aviso){
+        aviso = document.createElement('div');
+        aviso.id = 'avisoPendiente';
+        aviso.className = 'banner ok';
+        aviso.style.marginTop = '8px';
+        cardParcela.appendChild(aviso);
+      }
+      aviso.innerHTML = '✅ Parcela lista y enviada. <b>Volvé a la pestaña del aforo</b>, completá lo que falte y guardá el registro ahí — recién en ese momento queda confirmada de verdad. (Se ve punteada en el mapa mientras tanto.)';
+    }catch(e){ console.warn('No se pudo enviar la parcela al aforo', e); }
+  } else {
+    guardarEnFirebase();
   }
 }
 
@@ -1414,7 +1432,24 @@ function renderLista(){
       ${p.descansoDias!=null
         ? `<div style="color:var(--green-soft); margin-top:3px">🔁 Reingreso a área de Parcela ${p.refParcela} · descanso real: <b>${p.descansoDias} días</b></div>`
         : `<div class="small" style="margin-top:3px">Área nueva, sin coincidencia previa</div>`}
+      <button class="btn-red" style="width:auto; padding:3px 8px; margin-top:5px; font-size:10.5px" onclick="eliminarParcela('${p.id}')">🗑️ eliminar (si no tiene aforo real detrás)</button>
     </div>`).join('');
+}
+
+function eliminarParcela(id){
+  const idx = parcelas.findIndex(p=>p.id===id);
+  if(idx<0) return;
+  const p = parcelas[idx];
+  const msg = p.pendiente
+    ? '¿Descartar esta parcela pendiente? Todavía no se guardó en ningún lado, es segura de borrar.'
+    : '¿Eliminar esta parcela del mapa? Usalo solo si NO tiene un registro de aforo real asociado.';
+  if(!confirm(msg)) return;
+  if(p._layer) map.removeLayer(p._layer);
+  parcelas.splice(idx,1);
+  renderLista();
+  renderRestante();
+  actualizarSugerenciaParcela();
+  if(!p.pendiente) guardarEnFirebase();
 }
 
 async function borrarTodo(){

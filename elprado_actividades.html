@@ -3725,19 +3725,50 @@ function irAlMapaPotreros(){
   qs.set('horaIng', horaIng);
   qs.set('horaSal', horaSal);
 
-  window.open('mapa_potreros.html?' + qs.toString(), '_blank');
+  window.open('mapa_potreros.html?' + qs.toString(), 'mapaPotrerosElPrado1');
 }
 
 // El mapa llama a esto (window.opener.recibirAnchoDesdeElMapa) al guardar una parcela,
 // para completar el ancho acá sin que lo tengas que tipear de nuevo.
-function recibirAnchoDesdeElMapa(anchoM){
+let mapaParcelaCompletaPendiente = null; // {potrero, parcela} — objeto COMPLETO esperando a que guardes el aforo acá
+
+// El mapa llama a esto cuando terminaste de dibujar y tocaste "Finalizar y enviar al aforo".
+// Todavía NO se escribe nada en Firebase acá — solo se completa el campo "Ancho" y queda
+// la parcela en memoria, esperando a que vos apretés "Guardar Registro" en este formulario.
+function recibirParcelaCompleta(parcela, potrero){
   const fAncho = document.getElementById('fAncho');
-  if(!fAncho) return;
-  if(modoDim !== 'REGULAR' && typeof setModoDim === 'function') setModoDim('REGULAR');
-  fAncho.value = Math.round(anchoM);
-  calcDim();
-  fAncho.style.outline = '2px solid var(--green2)';
-  setTimeout(()=>{ fAncho.style.outline = ''; }, 2000);
+  if(fAncho && parcela.anchoInicio){
+    if(modoDim !== 'REGULAR' && typeof setModoDim === 'function') setModoDim('REGULAR');
+    fAncho.value = Math.round(parcela.anchoInicio);
+    calcDim();
+    fAncho.style.outline = '2px solid var(--green2)';
+    setTimeout(()=>{ fAncho.style.outline = ''; }, 2000);
+  }
+  mapaParcelaCompletaPendiente = { potrero, parcela };
+  if(typeof notif === 'function') notif('📐 Parcela lista — completá el aforo y guardá para confirmarla');
+}
+
+// Recién ACÁ, cuando el registro de aforo se guarda de verdad, se escribe la geometría
+// en Firebase (potreroGeo/{potrero}/parcelas). Si nunca guardás el aforo, esto nunca se llama
+// y no queda ninguna parcela huérfana dando vueltas.
+async function comitParcelaAlMapa(potrero, parcela){
+  try{
+    const data = await fbGet('potreroGeo/' + potrero) || {};
+    const parcelasActuales = data.parcelas || [];
+    const limpia = Object.assign({}, parcela); delete limpia.pendiente;
+    parcelasActuales.push(limpia);
+    await fbSet('potreroGeo/' + potrero + '/parcelas', parcelasActuales);
+  }catch(e){ console.warn('No se pudo confirmar la parcela en el mapa', e); }
+}
+
+async function eliminarParcelaDelMapaFirebase(potrero, parcelaId){
+  try{
+    const data = await fbGet('potreroGeo/' + potrero);
+    if(!data || !data.parcelas) return;
+    const nuevas = data.parcelas.filter(p => p.id !== parcelaId);
+    if(nuevas.length === data.parcelas.length) return; // no estaba, nada que hacer
+    await fbSet('potreroGeo/' + potrero + '/parcelas', nuevas);
+  }catch(e){ console.warn('No se pudo limpiar la parcela del mapa', e); }
 }
 
 // ═══════════════════════════════════════
@@ -3852,9 +3883,13 @@ function guardarActividad() {
   }
   // Verificar si es edición
   const editId = document.getElementById('formComun').dataset.editId;
+  let mapaParcelaIdVieja = null;
   if(editId) {
     // Borrar el registro viejo
-    let acts = getActividades().filter(a => a.id !== editId);
+    const actsPrev = getActividades();
+    const regViejo = actsPrev.find(a => a.id === editId);
+    if(regViejo) mapaParcelaIdVieja = regViejo.mapaParcelaId || null;
+    let acts = actsPrev.filter(a => a.id !== editId);
     setData('actividades', acts);
     // Limpiar el plan generado por ese registro
     let plan = getPlan().filter(p => p.autoDesdeMS && p.id !== editId);
@@ -3931,7 +3966,16 @@ function guardarActividad() {
         return isNaN(cL) ? null : cL;
       })(),
       consumoPorcReg: parseFloat(document.getElementById('fConsumoPorc').value)||3.0,
+      mapaParcelaId: (mapaParcelaCompletaPendiente && mapaParcelaCompletaPendiente.potrero===potrero) ? mapaParcelaCompletaPendiente.parcela.id : null,
     });
+    if(mapaParcelaCompletaPendiente && mapaParcelaCompletaPendiente.potrero===potrero){
+      // Recién ahora, al guardar de verdad el registro, se confirma la geometría en el mapa.
+      comitParcelaAlMapa(potrero, mapaParcelaCompletaPendiente.parcela);
+      mapaParcelaCompletaPendiente = null; // ya quedó asociada al registro, deja de ser "pendiente"
+    }
+    if(mapaParcelaIdVieja && mapaParcelaIdVieja !== rec.mapaParcelaId) {
+      eliminarParcelaDelMapaFirebase(potrero, mapaParcelaIdVieja);
+    }
   }
   else if(actActual === 'INGRESO HDA') {
     if(!parcela) { notif('Ingresá el número/nombre de parcela', true); return; }
@@ -4359,6 +4403,12 @@ function borrarActividad(id) {
   if(!confirm('¿Eliminar este registro?')) return;
   const nuevas = acts.filter(a => a.id !== id);
   setData('actividades', nuevas);
+
+  // Si este registro tenía una parcela dibujada en el Mapa de Potreros, la borramos también ahí
+  // (si no, queda una franja pintada en el mapa sin ningún aforo real detrás).
+  if(reg.mapaParcelaId && reg.potrero) {
+    eliminarParcelaDelMapaFirebase(reg.potrero, reg.mapaParcelaId);
+  }
 
   // ── Limpiar entradas del plan generadas desde este registro ──
   const planLimpio = getPlan().filter(p => {
