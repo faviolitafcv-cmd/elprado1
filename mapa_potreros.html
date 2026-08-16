@@ -117,6 +117,16 @@ button:disabled{opacity:.35; cursor:not-allowed;}
     </div>
 
     <!-- MODO SEGURO PARA DIGITALIZAR TODO EL CAMPO -->
+    <!-- RESUMEN COMPACTO — solo visible en modo enlazado (desde el registro de aforo) -->
+    <div class="card" id="cardResumenPotrero" style="display:none">
+      <div class="card-title">Potrero</div>
+      <div class="medidas">
+        <div class="m-row"><span>Nombre</span><b id="resumenNombre">—</b></div>
+        <div class="m-row"><span>Hectáreas pastoreables</span><b id="resumenHa">—</b></div>
+      </div>
+      <button class="btn-outline" onclick="toggleAvanzado()" style="margin-top:8px">⚙️ Herramientas avanzadas del potrero</button>
+    </div>
+
     <div class="card" id="cardModoMasivo" style="border-color:var(--gold)">
       <div class="card-title">🛡️ Modo dibujo masivo <span class="badge on" id="badgeModoMasivo">ACTIVADO</span></div>
       <p class="hint">Mientras esté activado, dibujar y cerrar potreros <b>NO toca potreroAreas</b> — ni te pregunta, ni actualiza nada. Ideal para mapear todo el campo tranquilo, sin riesgo. Cuando quieras que un potrero puntual empiece a mandar como oficial, apagalo acá o usá "Sincronizar ahora" abajo.</p>
@@ -701,6 +711,7 @@ function recomputeUtil(){
   potreroUtilGeo = util;
   const utilHa = turf.area(potreroUtilGeo)/10000;
   document.getElementById('stAreaUtil').textContent = utilHa.toFixed(2) + ' ha';
+  actualizarResumenHa();
   checkCortarEnabled();
   manejarSincronizacionOficial(utilHa);
 }
@@ -1283,6 +1294,38 @@ function diasEntre(f1,f2){ return Math.round((new Date(f2+'T12:00:00') - new Dat
 function fmtFecha(iso){ const [f]=iso.split('T'); const [y,m,d]=f.split('-'); return d+'/'+m+'/'+y; }
 function fmtFechaSlash(f){ const [y,m,d]=f.split('-'); return d+'/'+m+'/'+y; }
 
+const TARJETAS_AVANZADAS = ['cardModoMasivo','cardOverview','cardSyncMasivo','cardSelector','cardPotrero','cardExclusion'];
+
+function activarModoSimple(nombrePotrero){
+  TARJETAS_AVANZADAS.forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.style.display = 'none';
+  });
+  const cardResumen = document.getElementById('cardResumenPotrero');
+  cardResumen.style.display = 'flex';
+  document.getElementById('resumenNombre').textContent = nombrePotrero;
+  actualizarResumenHa();
+}
+
+function actualizarResumenHa(){
+  const el = document.getElementById('resumenHa');
+  if(!el) return;
+  el.textContent = potreroUtilGeo ? (turf.area(potreroUtilGeo)/10000).toFixed(2) + ' ha' : '—';
+}
+
+function toggleAvanzado(){
+  const yaVisibles = document.getElementById('cardSelector').style.display !== 'none';
+  TARJETAS_AVANZADAS.forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    if(id === 'cardExclusion'){
+      el.style.display = yaVisibles ? 'none' : (potreroClosed ? 'flex' : 'none');
+    } else {
+      el.style.display = yaVisibles ? 'none' : 'flex';
+    }
+  });
+}
+
 // ══════════════════════════════════════════════
 // GUARDAR PARCELA
 // ══════════════════════════════════════════════
@@ -1536,6 +1579,7 @@ async function cargarListaPotreros(){
         bloqueFechas.style.display = 'block';
         bloqueFechas.innerHTML = '📅 Ingreso ' + fmtFechaSlash(fechaIngURL) + ' → Salida ' + fmtFechaSlash(fechaSalURL) + ' <span class="small">(tomado del registro de aforo)</span>';
       }
+      activarModoSimple(potreroURL);
     }
     const banner = document.createElement('div');
     banner.className = 'banner ok';
