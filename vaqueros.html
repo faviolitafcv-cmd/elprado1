@@ -80,6 +80,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 .dia-vacio{font-size:11px;color:var(--text3);}
 .potrero-label-v{background:rgba(90,169,224,.85); border:none; color:#0d1509; font-weight:700; font-size:10px; padding:2px 5px; border-radius:5px; box-shadow:none;}
 .potrero-label-v::before{display:none;}
+.ocup-label-v{background:rgba(224,90,74,.95); border:none; color:#fff; font-weight:800; font-size:10.5px; padding:3px 6px; border-radius:5px; box-shadow:0 1px 6px rgba(0,0,0,.5);}
+.ocup-label-v::before{display:none;}
 
 /* TABLA ARMADORES */
 .arm-card{background:var(--card);border:1px solid var(--border);border-radius:10px;
@@ -193,6 +195,31 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);
   z-index:999;align-items:center;justify-content:center;}
 .modal-bg.open{display:flex;}
+
+/* FICHA POTRERO — hoja deslizante desde abajo */
+.sheet-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:998;padding:0;}
+.sheet-bg.open{display:flex;align-items:flex-end;justify-content:center;}
+.sheet-box{background:var(--card);border-radius:16px 16px 0 0;max-width:520px;width:100%;
+  max-height:85vh;display:flex;flex-direction:column;}
+.sheet-h{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.sheet-h .t{font-weight:800;font-size:16px;color:var(--white);}
+.sheet-h .x{font-size:20px;color:var(--text2);cursor:pointer;padding:4px 8px;}
+.sheet-b{overflow-y:auto;padding:12px 16px 20px;}
+.ficha-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;}
+.ficha-stat{background:var(--card2);border-radius:10px;padding:9px 6px;text-align:center;}
+.ficha-stat .v{font-size:16px;font-weight:800;color:var(--white);}
+.ficha-stat .l{font-size:9px;color:var(--text3);margin-top:2px;text-transform:uppercase;}
+.ficha-sec-t{font-size:11px;color:var(--gold2);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin:14px 0 6px;}
+.ficha-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.ficha-row:last-child{border-bottom:none;}
+.ficha-row .fecha{color:var(--text2);}
+.ficha-row .val{color:var(--gold2);font-weight:700;}
+.ficha-prod{background:rgba(224,184,74,.1);border:1px solid var(--gold);border-radius:10px;padding:10px 12px;margin-bottom:8px;}
+.ficha-prod.ant{background:rgba(91,143,255,.08);border-color:var(--blue);}
+.ficha-prod .l{font-size:10px;color:var(--text3);}
+.ficha-prod .v{font-size:17px;font-weight:800;color:var(--gold2);margin-top:2px;}
+.ficha-prod.ant .v{color:var(--blue);}
+.ficha-prod .d{font-size:10px;color:var(--text3);margin-top:2px;}
 .modal-box{background:var(--card);border:1px solid var(--border2);border-radius:14px;
   padding:26px 22px;width:290px;text-align:center;}
 
@@ -422,6 +449,17 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
   </div>
 </div>
 
+<!-- FICHA DE POTRERO (Visitas → Mapa) -->
+<div class="sheet-bg" id="sheetPotrero">
+  <div class="sheet-box">
+    <div class="sheet-h">
+      <div class="t" id="fichaPotreroTitulo">🌾 Potrero</div>
+      <div class="x" onclick="cerrarFichaPotrero()">✕</div>
+    </div>
+    <div class="sheet-b" id="fichaPotreroBody"></div>
+  </div>
+</div>
+
 <div id="notifV"></div>
 
 <script>
@@ -472,6 +510,76 @@ const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov'
 const DIAS  = ['Do','Lu','Ma','Mi','Ju','Vi','Sa'];
 function sumarDias(f, n) {
   const d = new Date(f+'T12:00:00'); d.setDate(d.getDate()+n); return d.toISOString().split('T')[0];
+}
+function diffDias(f1,f2){ return Math.round((new Date(f2+'T12:00:00')-new Date(f1+'T12:00:00'))/86400000); }
+
+// ── Misma metodología que usa el Ranking de Potreros / resumen_grupo.html ──
+function gestionInicio(hoy){
+  const y = hoy.getMonth()>=7 ? hoy.getFullYear() : hoy.getFullYear()-1; // mes 7 = agosto (0-index)
+  return y+'-08-01';
+}
+function detectarVueltas(items){
+  const ordenados = [...items].sort((a,b)=>String(a.fechaIng).localeCompare(String(b.fechaIng)));
+  if(ordenados.length<=1) return [ordenados];
+  const gaps = [];
+  for(let i=1;i<ordenados.length;i++) gaps.push(diffDias(ordenados[i-1].fechaIng, ordenados[i].fechaIng));
+  const gapsOrdenados=[...gaps].sort((a,b)=>a-b);
+  const mediana = gapsOrdenados[Math.floor(gapsOrdenados.length/2)] || 1;
+  const umbral = Math.max(mediana*2.5, 5);
+  const vueltas=[[ordenados[0]]];
+  for(let i=1;i<ordenados.length;i++){
+    if(gaps[i-1] > umbral) vueltas.push([]);
+    vueltas[vueltas.length-1].push(ordenados[i]);
+  }
+  return vueltas;
+}
+function filtrarOutliersIQR(items, campo){
+  const valores = items.map(x=>x[campo]).filter(v=>v!=null && v>0);
+  if(valores.length<4) return {validos:items, outliers:[]};
+  const ord=[...valores].sort((a,b)=>a-b);
+  const q1=ord[Math.floor(ord.length*0.25)], q3=ord[Math.floor(ord.length*0.75)];
+  const iqr=q3-q1, low=q1-1.5*iqr, high=q3+1.5*iqr;
+  const validos=[], outliers=[];
+  items.forEach(x=>{
+    const v=x[campo];
+    if(v==null || v<=0){ validos.push(x); return; }
+    if(v<low || v>high) outliers.push(x); else validos.push(x);
+  });
+  return {validos, outliers};
+}
+function calcularProduccionAnualizada(itemsPotrero, diasVentana){
+  if(!itemsPotrero.length) return null;
+  const vueltas = detectarVueltas(itemsPotrero);
+  const prodPorVuelta=[], descansoPorVuelta=[];
+  vueltas.forEach(v=>{
+    const fProd = filtrarOutliersIQR(v,'kgMsHa');
+    const fDesc = filtrarOutliersIQR(v,'retorno');
+    const prodVals = fProd.validos.map(x=>x.kgMsHa).filter(x=>x!=null);
+    const descVals = fDesc.validos.map(x=>x.retorno).filter(x=>x!=null&&x>0);
+    if(prodVals.length) prodPorVuelta.push(prodVals.reduce((s,x)=>s+x,0)/prodVals.length);
+    if(descVals.length) descansoPorVuelta.push(descVals.reduce((s,x)=>s+x,0)/descVals.length);
+  });
+  const prodProm = prodPorVuelta.length ? prodPorVuelta.reduce((s,x)=>s+x,0)/prodPorVuelta.length : null;
+  const descansoProm = descansoPorVuelta.length ? descansoPorVuelta.reduce((s,x)=>s+x,0)/descansoPorVuelta.length : null;
+  if(prodProm==null || !descansoProm) return {prodAnualizada:null, nVueltas:vueltas.length};
+  const rotEst = diasVentana/descansoProm;
+  return {prodAnualizada: prodProm*rotEst, nVueltas: vueltas.length, descansoProm};
+}
+const POTREROS_BASE_V = {
+  BRACHIARIA: ['A6','A7','A8','A9','D1','D2','D3','D4','D5','D6','D7','D8','D9','D10',
+    'D6-N','D6-S','D7-N','D7-S','D8-A','D8-B','D8-C','D9-N','D9-S',
+    '1NN','1SN','1NP','1SP','2NP','2NN','2SN','2SP','3NP','3NN','3SN','3SP',
+    '4NP','4NN','4SN','4SP','CABALLO'],
+  PANICUM: ['A1','A2','A3','A4','A5','B1','B2','B3','B4','B5','B6','B7',
+    'B8','B8-A','B8-B','B9','B9-A','B9-B',
+    'C1','C2','C3','C4','C5','C6','C7','C8','C9','C10','C11','D11','D12','ENTRADA']
+};
+function getVariedadV(potrero){
+  const cfg = getData('potreroConfig', {});
+  if(cfg[potrero]?.variedad) return cfg[potrero].variedad;
+  if(POTREROS_BASE_V.BRACHIARIA.includes(potrero)) return 'BRACHIARIA';
+  if(POTREROS_BASE_V.PANICUM.includes(potrero)) return 'PANICUM';
+  return null;
 }
 function fmtC(f) {
   const d = new Date(f+'T12:00:00');
@@ -905,9 +1013,10 @@ function renderVisitasOcupacion(){
     const data = potreroGeoObj[nombre];
     if(!data || !data.potrero || !data.potrero.latlngs) return;
     const layer = L.polygon(data.potrero.latlngs, {
-      color:'#5aa9e0', weight:1.5, opacity:.6, fillOpacity:.03, dashArray:'4,4', interactive:false
+      color:'#5aa9e0', weight:1.5, opacity:.6, fillOpacity:.03, dashArray:'4,4'
     }).addTo(_visitasMap);
     layer.bindTooltip(nombre, {permanent:true, direction:'center', className:'potrero-label-v'});
+    layer.on('click', () => abrirFichaPotrero(nombre));
     const b = layer.getBounds();
     boundsAcum = boundsAcum ? boundsAcum.extend(b) : L.latLngBounds(b.getSouthWest(), b.getNorthEast());
   });
@@ -926,11 +1035,13 @@ function renderVisitasOcupacion(){
     if(parcelaGeo){
       const ll = geoJSONToLLv(parcelaGeo.geojson);
       const layer = L.polygon(ll, {color:'#e05a4a', weight:2.5, fillColor:'#e05a4a', fillOpacity:.55}).addTo(_visitasMap);
-      layer.bindPopup(`<b>🐄 ${a.lote||'—'}</b><br>${a.potrero} · Parcela ${a.parcela}<br>Ingresó ${fmtSlashV(a.fechaIng)}`);
+      layer.bindTooltip('🐄 '+(a.lote||'—'), {permanent:true, direction:'center', className:'ocup-label-v'});
+      layer.on('click', () => abrirFichaPotrero(a.potrero));
     } else if(data && data.potrero && data.potrero.latlngs){
       L.polygon(data.potrero.latlngs, {color:'#e05a4a', weight:2.5, fillColor:'#e05a4a', fillOpacity:.22, dashArray:'2,6'})
         .addTo(_visitasMap)
-        .bindPopup(`<b>🐄 ${a.lote||'—'}</b><br>${a.potrero} · Parcela ${a.parcela} (potrero completo, parcela sin dibujar)<br>Ingresó ${fmtSlashV(a.fechaIng)}`);
+        .bindTooltip('🐄 '+(a.lote||'—')+' (potrero completo)', {permanent:true, direction:'center', className:'ocup-label-v'})
+        .on('click', () => abrirFichaPotrero(a.potrero));
     }
     listaHtml.push(`<div class="pub-row"><div class="pub-row-header">
       <div class="grupo-nombre-tag">🐄 ${a.lote||'—'}</div>
@@ -979,6 +1090,120 @@ function iniciarGpsEnVivo(){
     { enableHighAccuracy:true, maximumAge:5000, timeout:15000 }
   );
 }
+
+// ══════════════════════════════════════════════
+// FICHA DE POTRERO (al tocar en el mapa de Visitas)
+// ══════════════════════════════════════════════
+const TIPOS_MECANIZACION = ['ROLO','DESBROZAR','SIEMBRA','FUM. HERBICIDA','FUM. INSECTICIDA','QUEMA'];
+
+function abrirFichaPotrero(nombre){
+  const hoy = new Date();
+  const hoyStr = hoy.toISOString().split('T')[0];
+  const acts = getActs();
+  const potreroAreas = getData('potreroAreas', {});
+
+  // Todas las actividades de Materia Seca de este potrero (todas sus parcelas), más recientes primero
+  const msPotrero = acts.filter(a => a.potrero===nombre && a.actividad==='MATERIA SECA' && a.fechaIng && a.kgMsHa!=null)
+    .sort((a,b)=>(b.fechaIng||'').localeCompare(a.fechaIng||''));
+
+  const ultimas = msPotrero.slice(0,4);
+  const ultimoRegistro = msPotrero[0] || null;
+
+  // Descanso: el de la última entrada + promedio histórico (misma metodología del Ranking)
+  const inicioGestion = gestionInicio(hoy);
+  const enGestionActual = msPotrero.filter(x=>x.fechaIng>=inicioGestion && x.fechaIng<=hoyStr);
+  let prodAnualCurso=null, nVueltasCurso=0, sumaRealCurso=0, descansoPromCurso=null;
+  if(enGestionActual.length){
+    const r = calcularProduccionAnualizada(enGestionActual, 365);
+    prodAnualCurso = r?.prodAnualizada ?? null;
+    nVueltasCurso = r?.nVueltas || 0;
+    descansoPromCurso = r?.descansoProm ?? null;
+    sumaRealCurso = enGestionActual.reduce((s,x)=>s+(x.kgMsHa||0),0);
+  }
+
+  const [yIni] = inicioGestion.split('-');
+  const inicioGestionAnt = (parseInt(yIni)-1)+'-08-01';
+  const finGestionAnt = inicioGestion.split('-')[0]+'-07-31';
+  const gestionAntLabel = (parseInt(yIni)-1)+'-'+yIni;
+  const enGestionAnt = msPotrero.filter(x=>x.fechaIng>=inicioGestionAnt && x.fechaIng<=finGestionAnt);
+  let prodAnualAnt=null, nVueltasAnt=0, sumaRealAnt=0;
+  if(enGestionAnt.length){
+    const r = calcularProduccionAnualizada(enGestionAnt, 365);
+    prodAnualAnt = r?.prodAnualizada ?? null;
+    nVueltasAnt = r?.nVueltas || 0;
+    sumaRealAnt = enGestionAnt.reduce((s,x)=>s+(x.kgMsHa||0),0);
+  }
+
+  // Días de descanso HASTA HOY: desde la última salida registrada en este potrero
+  const conSalida = msPotrero.filter(x=>x.fechaSal).sort((a,b)=>(b.fechaSal||'').localeCompare(a.fechaSal||''));
+  const descansoHastaHoy = conSalida.length ? diffDias(conSalida[0].fechaSal, hoyStr) : null;
+
+  // Mecanización reciente (rolo, desbroce, siembra, fumigación, quema) en este potrero
+  const mecan = acts.filter(a => a.potrero===nombre && TIPOS_MECANIZACION.includes(a.actividad) && a.fecha)
+    .sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''))
+    .slice(0,4);
+
+  const variedad = getVariedadV(nombre);
+  const ha = potreroAreas[nombre];
+
+  document.getElementById('fichaPotreroTitulo').textContent = '🌾 Potrero ' + nombre;
+
+  let html = '';
+  html += `<div class="ficha-stats">
+    <div class="ficha-stat"><div class="v">${ha!=null?fmt2(ha):'—'}</div><div class="l">Hectáreas</div></div>
+    <div class="ficha-stat"><div class="v" style="font-size:12px;">${variedad||'—'}</div><div class="l">Variedad</div></div>
+    <div class="ficha-stat"><div class="v">${descansoHastaHoy!=null?descansoHastaHoy:'—'}</div><div class="l">Días descanso</div></div>
+  </div>`;
+
+  if(ultimoRegistro){
+    html += `<div class="ficha-sec-t">📋 Último aforo</div>
+      <div class="ficha-row"><span class="fecha">${fmtSlashV(ultimoRegistro.fechaIng)} — Parc. ${ultimoRegistro.parcela||'—'} · ${ultimoRegistro.lote||'—'}</span><span class="val">${fmt0(ultimoRegistro.kgMsHa)} kg MS/ha</span></div>`;
+  }
+
+  if(prodAnualCurso!=null || prodAnualAnt!=null){
+    html += `<div class="ficha-sec-t">🌾 Producción anualizada</div>`;
+    if(prodAnualCurso!=null){
+      html += `<div class="ficha-prod">
+        <div class="l">Gestión ${yIni}-${parseInt(yIni)+1} (en curso)</div>
+        <div class="v">${fmt0(prodAnualCurso)} kg MS/ha/año</div>
+        <div class="d">${nVueltasCurso} vuelta${nVueltasCurso!==1?'s':''} · suma real hasta hoy: ${fmt0(sumaRealCurso)} kg MS/ha</div>
+      </div>`;
+    }
+    if(prodAnualAnt!=null){
+      html += `<div class="ficha-prod ant">
+        <div class="l">Gestión ${gestionAntLabel} (cerrada)</div>
+        <div class="v">${fmt0(prodAnualAnt)} kg MS/ha/año</div>
+        <div class="d">${nVueltasAnt} vuelta${nVueltasAnt!==1?'s':''} · suma real: ${fmt0(sumaRealAnt)} kg MS/ha</div>
+      </div>`;
+    }
+  }
+
+  if(descansoPromCurso!=null){
+    html += `<div class="ficha-row"><span class="fecha">Descanso promedio (esta gestión)</span><span class="val">${fmt0(descansoPromCurso)} días</span></div>`;
+  }
+
+  if(ultimas.length){
+    html += `<div class="ficha-sec-t">🔁 Últimas rotaciones</div>`;
+    ultimas.forEach(x=>{
+      html += `<div class="ficha-row"><span class="fecha">${fmtSlashV(x.fechaIng)} — Parc. ${x.parcela||'—'} · ${x.lote||'—'}</span><span class="val">${fmt0(x.kgMsHa)} kg MS/ha</span></div>`;
+    });
+  } else {
+    html += `<div class="ficha-sec-t">🔁 Últimas rotaciones</div><div style="color:var(--text3);font-size:12px;">Sin registros de aforo todavía en este potrero.</div>`;
+  }
+
+  if(mecan.length){
+    html += `<div class="ficha-sec-t">🚜 Mecanización reciente</div>`;
+    mecan.forEach(x=>{
+      html += `<div class="ficha-row"><span class="fecha">${fmtSlashV(x.fecha)}</span><span class="val">${x.actividad}</span></div>`;
+    });
+  }
+
+  document.getElementById('fichaPotreroBody').innerHTML = html;
+  document.getElementById('sheetPotrero').classList.add('open');
+}
+function cerrarFichaPotrero(){ document.getElementById('sheetPotrero').classList.remove('open'); }
+function fmt0(n){ return (n==null||isNaN(n)) ? '—' : Math.round(n).toLocaleString('es-BO'); }
+function fmt2(n){ return (n==null||isNaN(n)) ? '—' : Number(n).toLocaleString('es-BO',{minimumFractionDigits:1,maximumFractionDigits:1}); }
 
 // ══════════════════════════════════════════════
 // DETALLE GRUPO (overlay)
