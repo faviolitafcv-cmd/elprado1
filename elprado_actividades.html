@@ -3704,13 +3704,40 @@ function calcMS() {
   if(modoDim === 'REGULAR') calcDim();
 }
 
-// Abre el Mapa de Potreros con el potrero y las hectáreas ya calculadas acá, listo para cortar la franja.
+// Abre el Mapa de Potreros con el potrero, las hectáreas y las fechas ya cargadas acá,
+// listo para cortar la franja sin volver a pedir datos que ya tenemos.
 function irAlMapaPotreros(){
   const potrero = document.getElementById('fPotrero')?.value;
   const ha = document.getElementById('fHA')?.value;
   if(!potrero || !ha) return;
-  const url = 'mapa_potreros.html?potrero=' + encodeURIComponent(potrero) + '&ha=' + encodeURIComponent(parseFloat(ha).toFixed(2));
-  window.open(url, '_blank');
+  const fechaIng = document.getElementById('fFechaIng')?.value || '';
+  const fechaSal = document.getElementById('fFechaSal')?.value || '';
+  const horaIngRaw = document.getElementById('fHoraIng')?.value || '';
+  const horaSalRaw = document.getElementById('fHoraSal')?.value || '';
+  const horaIng = horaIngRaw === 'TARDE' ? '16:00' : '08:00';
+  const horaSal = horaSalRaw === 'TARDE' ? '16:00' : '08:00';
+
+  const qs = new URLSearchParams({
+    potrero, ha: parseFloat(ha).toFixed(2)
+  });
+  if(fechaIng) qs.set('fechaIng', fechaIng);
+  if(fechaSal) qs.set('fechaSal', fechaSal);
+  qs.set('horaIng', horaIng);
+  qs.set('horaSal', horaSal);
+
+  window.open('mapa_potreros.html?' + qs.toString(), '_blank');
+}
+
+// El mapa llama a esto (window.opener.recibirAnchoDesdeElMapa) al guardar una parcela,
+// para completar el ancho acá sin que lo tengas que tipear de nuevo.
+function recibirAnchoDesdeElMapa(anchoM){
+  const fAncho = document.getElementById('fAncho');
+  if(!fAncho) return;
+  if(modoDim !== 'REGULAR' && typeof setModoDim === 'function') setModoDim('REGULAR');
+  fAncho.value = Math.round(anchoM);
+  calcDim();
+  fAncho.style.outline = '2px solid var(--green2)';
+  setTimeout(()=>{ fAncho.style.outline = ''; }, 2000);
 }
 
 // ═══════════════════════════════════════

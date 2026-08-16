@@ -234,6 +234,7 @@ button:disabled{opacity:.35; cursor:not-allowed;}
         <div><label>Fecha salida</label><input type="date" id="fFechaSal"></div>
         <div><label>Hora</label><input type="time" id="fHoraSal" value="08:00"></div>
       </div>
+      <div class="hint" id="bloqueFechasInfo" style="display:none"></div>
 
       <button class="btn-green" id="btnGuardarParcela" onclick="guardarParcela()" style="display:none">💾 Guardar parcela</button>
     </div>
@@ -297,6 +298,7 @@ let lastCutDir = null;        // dirección de avance del último corte, para qu
 const STORAGE_KEY = 'ep1_proto_mapa_c1_v2'; // ya no se usa para persistencia, solo referencia
 const FB_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com/elprado1';
 let potreroActual = null; // nombre real del potrero elegido (ej. "B2")
+let modoEnlazado = false; // true cuando venimos con ?potrero=&ha= desde el registro de aforo
 let autoActualizarOficial = null; // null=no preguntado todavía · true/false=decisión del usuario para este potrero
 let modoMasivo = true; // ACTIVADO por default: dibujar/cerrar potreros NO toca potreroAreas hasta que vos lo decidas
 let overviewOn = false;
@@ -1165,12 +1167,14 @@ function applyCutPreview(geo, areaHa, t, anchoInicio, anchoFinal, setSliderPct, 
   document.getElementById('slideWrap').style.display = 'block';
   renderMedidas(setSliderPct == null);
   checkOverlap();
-  document.getElementById('rowFechas1').style.display='flex';
-  document.getElementById('rowFechas2').style.display='flex';
+  if(!modoEnlazado){
+    document.getElementById('rowFechas1').style.display='flex';
+    document.getElementById('rowFechas2').style.display='flex';
+    const hoy = new Date().toISOString().split('T')[0];
+    if(!document.getElementById('fFechaIng').value) document.getElementById('fFechaIng').value = hoy;
+    if(!document.getElementById('fFechaSal').value) document.getElementById('fFechaSal').value = hoy;
+  }
   document.getElementById('btnGuardarParcela').style.display='block';
-  const hoy = new Date().toISOString().split('T')[0];
-  if(!document.getElementById('fFechaIng').value) document.getElementById('fFechaIng').value = hoy;
-  if(!document.getElementById('fFechaSal').value) document.getElementById('fFechaSal').value = hoy;
 }
 
 function usarResto(){
@@ -1187,12 +1191,14 @@ function usarResto(){
   document.getElementById('slideWrap').style.display = 'none';
   renderMedidas(false);
   checkOverlap();
-  document.getElementById('rowFechas1').style.display='flex';
-  document.getElementById('rowFechas2').style.display='flex';
+  if(!modoEnlazado){
+    document.getElementById('rowFechas1').style.display='flex';
+    document.getElementById('rowFechas2').style.display='flex';
+    const hoy = new Date().toISOString().split('T')[0];
+    if(!document.getElementById('fFechaIng').value) document.getElementById('fFechaIng').value = hoy;
+    if(!document.getElementById('fFechaSal').value) document.getElementById('fFechaSal').value = hoy;
+  }
   document.getElementById('btnGuardarParcela').style.display='block';
-  const hoy = new Date().toISOString().split('T')[0];
-  if(!document.getElementById('fFechaIng').value) document.getElementById('fFechaIng').value = hoy;
-  if(!document.getElementById('fFechaSal').value) document.getElementById('fFechaSal').value = hoy;
 }
 
 function renderMedidas(manual){
@@ -1275,6 +1281,7 @@ function checkOverlap(){
 }
 function diasEntre(f1,f2){ return Math.round((new Date(f2+'T12:00:00') - new Date(f1+'T12:00:00'))/86400000); }
 function fmtFecha(iso){ const [f]=iso.split('T'); const [y,m,d]=f.split('-'); return d+'/'+m+'/'+y; }
+function fmtFechaSlash(f){ const [y,m,d]=f.split('-'); return d+'/'+m+'/'+y; }
 
 // ══════════════════════════════════════════════
 // GUARDAR PARCELA
@@ -1320,14 +1327,25 @@ function guardarParcela(){
   selectedEdge = null;
   document.getElementById('edgeInfo').innerHTML = 'Ningún lado elegido todavía.';
   document.getElementById('fHaNecesaria').value='';
-  document.getElementById('fFechaIng').value='';
-  document.getElementById('fFechaSal').value='';
+  if(!modoEnlazado){
+    document.getElementById('fFechaIng').value='';
+    document.getElementById('fFechaSal').value='';
+  }
   clearCutOnly();
   checkCortarEnabled();
   actualizarSugerenciaParcela();
   renderLista();
   renderRestante();
   guardarEnFirebase();
+
+  // Si vinimos enlazados desde el registro de aforo, mandamos el ancho de vuelta
+  // para que se complete solo en el formulario — sin que lo tengas que tipear de nuevo.
+  if(modoEnlazado && window.opener && rec.anchoInicio){
+    try{
+      window.opener.recibirAnchoDesdeElMapa(rec.anchoInicio);
+      window.opener.focus();
+    }catch(e){ console.warn('No se pudo enviar el ancho al aforo', e); }
+  }
 }
 
 function nuevaVuelta(){
@@ -1487,24 +1505,44 @@ async function cargarListaPotreros(){
   document.getElementById('badgeFbStatus').classList.add('on');
 
   // Si venimos enlazados desde el registro de aforo (elprado_actividades.html), usar ESE potrero
-  // y precargar directamente las hectáreas que ya calculó el formulario de Materia Seca.
+  // y precargar directamente las hectáreas y fechas que ya cargó el formulario de Materia Seca —
+  // acá NO se vuelven a pedir, ya están registradas allá.
   const params = new URLSearchParams(window.location.search);
   const potreroURL = params.get('potrero');
   const haURL = params.get('ha');
+  const fechaIngURL = params.get('fechaIng');
+  const fechaSalURL = params.get('fechaSal');
+  const horaIngURL = params.get('horaIng') || '08:00';
+  const horaSalURL = params.get('horaSal') || '08:00';
 
   if(potreroURL && nombres.includes(potreroURL)){
+    modoEnlazado = !!window.opener; // solo activa el "modo enlazado" si de verdad hay una pestaña que lo abrió
     sel.value = potreroURL;
     await cambiarPotrero();
     if(haURL){
       const fHa = document.getElementById('fHaNecesaria');
       if(fHa) fHa.value = haURL;
-      const banner = document.createElement('div');
-      banner.className = 'banner ok';
-      banner.style.margin = '0 0 8px';
-      banner.innerHTML = '📋 Vino desde el registro de aforo: <b>' + potreroURL + '</b> necesita <b>' + haURL + ' ha</b>. Elegí el lado de inicio (o "Continuar") y calculá el corte.';
-      const cardParcela = document.getElementById('cardParcela');
-      if(cardParcela) cardParcela.insertBefore(banner, cardParcela.children[1] || null);
     }
+    if(modoEnlazado){
+      // Ocultamos por completo la tarjeta de fechas de la parcela: ya están en el aforo.
+      document.getElementById('fFechaIng').value = fechaIngURL || '';
+      document.getElementById('fHoraIng').value = horaIngURL;
+      document.getElementById('fFechaSal').value = fechaSalURL || '';
+      document.getElementById('fHoraSal').value = horaSalURL;
+      document.getElementById('rowFechas1').style.display = 'none';
+      document.getElementById('rowFechas2').style.display = 'none';
+      const bloqueFechas = document.getElementById('bloqueFechasInfo');
+      if(bloqueFechas && fechaIngURL && fechaSalURL){
+        bloqueFechas.style.display = 'block';
+        bloqueFechas.innerHTML = '📅 Ingreso ' + fmtFechaSlash(fechaIngURL) + ' → Salida ' + fmtFechaSlash(fechaSalURL) + ' <span class="small">(tomado del registro de aforo)</span>';
+      }
+    }
+    const banner = document.createElement('div');
+    banner.className = 'banner ok';
+    banner.style.margin = '0 0 8px';
+    banner.innerHTML = '📋 Vino desde el registro de aforo: <b>' + potreroURL + '</b> necesita <b>' + haURL + ' ha</b>. Elegí el lado de inicio (o "Continuar"), calculá el corte y guardá — el ancho vuelve solo al formulario de aforo.';
+    const cardParcela = document.getElementById('cardParcela');
+    if(cardParcela) cardParcela.insertBefore(banner, cardParcela.children[1] || null);
   } else {
     // Arrancamos en B2 si existe, si no en el primero de la lista
     sel.value = nombres.includes('B2') ? 'B2' : nombres[0];
