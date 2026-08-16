@@ -126,6 +126,7 @@ button:disabled{opacity:.35; cursor:not-allowed;}
     <!-- VISTA GENERAL DE TODO EL CAMPO -->
     <div class="card" id="cardOverview">
       <div class="card-title">Vista general del campo <span class="badge" id="badgeOverviewCount">0 potreros</span></div>
+      <div class="hint" id="totalHaOverview"></div>
       <p class="hint">Muestra en el mapa, como guía celeste (no editable), todos los potreros que ya digitalizaste — así ves los bordes vecinos y no superponés líneas al dibujar el siguiente.</p>
       <button class="btn-outline" id="btnOverview" onclick="toggleOverview()">🗺️ Mostrar todos los potreros dibujados</button>
     </div>
@@ -345,7 +346,17 @@ async function compararTodosLosPotreros(){
   }
 
   const box = document.getElementById('comparacionBox');
+  const totalActual = filas.reduce((s,f)=>s+(f.actual||0), 0);
+  const totalNueva = filas.reduce((s,f)=>s+f.nueva, 0);
+  const totalDiff = totalNueva - totalActual;
+  const sinDatoPrevio = filas.filter(f=>f.actual==null).length;
   box.innerHTML = `
+    <div class="medidas" style="margin-top:8px">
+      <div class="m-row"><span>Total actual (potreroAreas)</span><b>${totalActual.toFixed(2)} ha${sinDatoPrevio?' *':''}</b></div>
+      <div class="m-row"><span>Total según el mapa</span><b style="color:var(--gold2)">${totalNueva.toFixed(2)} ha</b></div>
+      <div class="m-row"><span>Diferencia total</span><b style="color:${totalDiff>=0?'var(--green-soft)':'var(--red)'}">${totalDiff>=0?'+':''}${totalDiff.toFixed(2)} ha</b></div>
+      ${sinDatoPrevio ? `<div class="small">* ${sinDatoPrevio} potrero(s) sin área previa cargada, no suman en "Total actual"</div>` : ''}
+    </div>
     <p class="hint" style="margin-top:8px">${filas.length} potreros con contorno cerrado. Desmarcá los que NO querés sincronizar (por ejemplo, si la diferencia te parece rara y preferís revisar ese primero).</p>
     <div style="max-height:320px; overflow-y:auto; border:1px solid var(--border); border-radius:8px; padding:4px 8px; margin:8px 0">
       ${filas.map(f=>{
@@ -732,15 +743,19 @@ async function toggleOverview(){
     overviewLayerGroup.clearLayers();
     overviewOn = false;
     btn.textContent = '🗺️ Mostrar todos los potreros dibujados';
+    document.getElementById('totalHaOverview').innerHTML = '';
     return;
   }
   btn.textContent = '⏳ Cargando todos los potreros…';
   const todos = await fbGet('potreroGeo') || {};
   overviewLayerGroup.clearLayers();
   let count = 0;
+  let totalHa = 0;
   Object.keys(todos).forEach(nombre=>{
     const data = todos[nombre];
     if(!data || !data.potrero || !data.potrero.latlngs) return;
+    const utilHa = calcularUtilHaDesdeData(data);
+    if(utilHa != null) totalHa += utilHa;
     const isActual = nombre === potreroActual;
     const layer = L.polygon(data.potrero.latlngs, {
       color: isActual ? '#6dba3a' : '#5aa9e0',
@@ -758,6 +773,7 @@ async function toggleOverview(){
   });
   overviewLayerGroup.addTo(map);
   document.getElementById('badgeOverviewCount').textContent = count + ' potrero' + (count===1?'':'s');
+  document.getElementById('totalHaOverview').innerHTML = '📐 Total del campo (según el mapa): <b style="color:var(--gold2)">' + totalHa.toFixed(2) + ' ha</b>';
   overviewOn = true;
   btn.textContent = '🙈 Ocultar guía de todos los potreros';
 }
