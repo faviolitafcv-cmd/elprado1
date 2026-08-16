@@ -181,6 +181,18 @@ html,body{height:100%;font-family:'Segoe UI',Arial,sans-serif;overflow:hidden}
         </div>
       </div>
 
+      <!-- MÓDULO MAPA DE OCUPACIÓN -->
+      <div class="modulo-card mod-mapa" onclick="abrirModulo('ocupacion')">
+        <div class="modulo-icono">📍</div>
+        <div class="modulo-tag">UBICACIÓN EN VIVO</div>
+        <div class="modulo-nombre">Dónde están los animales</div>
+        <div class="modulo-desc">Mapa del campo con la parcela ocupada hoy resaltada</div>
+        <div class="modulo-submods">
+          <span class="submod">Ver hoy</span>
+          <span class="submod">Ver otra fecha</span>
+        </div>
+      </div>
+
       <!-- MÓDULO INSUMOS -->
       <div class="modulo-card mod-stock" onclick="abrirModulo('insumos')" style="border-color:rgba(201,162,39,.3);">
         <div class="modulo-icono">🧂</div>
@@ -266,6 +278,10 @@ const MODULOS = {
   mapa: {
     nombre: '🗺️ Mapa de Potreros — El Prado 1',
     archivo: 'mapa_potreros.html'
+  },
+  ocupacion: {
+    nombre: '📍 Dónde están los animales — El Prado 1',
+    archivo: 'mapa_ocupacion.html'
   },
   insumos: {
     nombre: 'Insumos & Nutrición',
