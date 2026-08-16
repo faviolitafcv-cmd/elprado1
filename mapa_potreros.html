@@ -502,6 +502,22 @@ function xyToLL(xy, latRef){
   return { lat: (xy.y/EARTH_R)*180/Math.PI, lng: (xy.x/(EARTH_R*Math.cos(d2r(latRef))))*180/Math.PI };
 }
 function avgLat(latlngs){ return latlngs.reduce((s,p)=>s+p.lat,0)/latlngs.length; }
+
+// Deduce hacia dónde "avanzaba" un corte ya guardado, mirando su propia geometría —
+// necesario para reconstruir lastCutDir después de recargar la página (ya no vive solo en memoria).
+function inferDireccionDesdeParcela(p, latRef){
+  if(!p.finalPts) return null;
+  try{
+    const farMid = { lat:(p.finalPts[0].lat+p.finalPts[1].lat)/2, lng:(p.finalPts[0].lng+p.finalPts[1].lng)/2 };
+    const centroid = turf.centroid(p.geojson).geometry.coordinates; // [lng,lat]
+    const a = llToXY({lat:centroid[1], lng:centroid[0]}, latRef);
+    const b = llToXY(farMid, latRef);
+    const dx=b.x-a.x, dy=b.y-a.y;
+    const len = Math.hypot(dx,dy);
+    if(len < 0.5) return null;
+    return { x:dx/len, y:dy/len };
+  }catch(e){ return null; }
+}
 function dot(a,b){ return a.x*b.x+a.y*b.y; }
 function centroidOf(latlngs){
   const c = turf.centroid(llArrayToGeoJSON(latlngs));
@@ -1361,7 +1377,8 @@ function guardarParcela(){
     colorIdx,
     descansoDias: cutPreview.descansoDias!=null ? cutPreview.descansoDias : null,
     refParcela: cutPreview.refParcela ? cutPreview.refParcela.num : null,
-    pendiente: modoEnlazado // true = todavía no está confirmada en Firebase, espera al guardado del aforo
+    pendiente: modoEnlazado, // true = todavía no está confirmada en Firebase, espera al guardado del aforo
+    finalPts: cutPreview.finalPts || null // dónde terminó el corte — necesario para poder "Continuar" después
   };
 
   const latlngs = geoJSONToLL(rec.geojson);
@@ -1545,7 +1562,7 @@ async function cambiarPotrero(){
     document.getElementById('cardParcela').style.display = 'flex';
   }
   vueltaActual = data.vueltaActual || 1;
-  vueltaAnchoFijo = data.vueltaAnchoFijo || null;
+  vueltaAnchoFijo = null; // se reconstruye abajo, desde la última parcela real (más confiable)
   (data.exclusiones||[]).forEach(z=>{
     const latlngs = geoJSONToLL(z.geojson);
     const tipo = z.tipo || 'excluida';
@@ -1560,15 +1577,28 @@ async function cambiarPotrero(){
   if(potreroClosed){ autoActualizarOficial = true; recomputeUtil(); }
   (data.parcelas||[]).forEach(p=>{
     const latlngs = geoJSONToLL(p.geojson);
-    const layer = L.polygon(latlngs, {color:COLORS[p.colorIdx], weight:2, fillColor:COLORS[p.colorIdx], fillOpacity:.42}).addTo(map);
-    layer.bindPopup(`<b>Parcela ${p.num}</b><br>${p.areaHa.toFixed(2)} ha<br>${fmtFecha(p.fechaIngISO)} → ${fmtFecha(p.fechaSalISO)}`);
+    const layer = L.polygon(latlngs, {
+      color:COLORS[p.colorIdx], weight:2, fillColor:COLORS[p.colorIdx],
+      fillOpacity:.42, dashArray: p.pendiente ? '5,5' : null
+    }).addTo(map);
+    layer.bindPopup(`<b>Parcela ${p.num}</b>${p.pendiente?' · ⏳ pendiente':''}<br>${p.areaHa.toFixed(2)} ha<br>${fmtFecha(p.fechaIngISO)} → ${fmtFecha(p.fechaSalISO)}`);
     p._layer = layer;
     parcelas.push(p);
   });
-  if(data.lastCutEndpoints){
-    lastCutEndpoints = { a:L.latLng(data.lastCutEndpoints.a.lat,data.lastCutEndpoints.a.lng), b:L.latLng(data.lastCutEndpoints.b.lat,data.lastCutEndpoints.b.lng) };
+
+  // Reconstruir "Continuar" y el ancho fijo desde la ÚLTIMA parcela real de la vuelta actual
+  // (no de un campo aparte — así funciona igual sin importar si la parcela se guardó directo
+  // acá o quedó confirmada más tarde desde el registro de aforo).
+  const deLaVuelta = parcelas.filter(p => p.vuelta === vueltaActual && !p.esResto && p.finalPts);
+  if(deLaVuelta.length){
+    const ultima = deLaVuelta[deLaVuelta.length - 1];
+    lastCutEndpoints = { a:L.latLng(ultima.finalPts[0].lat,ultima.finalPts[0].lng), b:L.latLng(ultima.finalPts[1].lat,ultima.finalPts[1].lng) };
+    vueltaAnchoFijo = ultima.anchoInicio || null;
+    const latRefTmp = avgLat(potreroClosed.latlngs);
+    lastCutDir = inferDireccionDesdeParcela(ultima, latRefTmp);
     document.getElementById('btnContinuar').disabled = false;
   }
+  updateAnchoFijoInfo();
   actualizarSugerenciaParcela();
   renderLista(); renderExclusionList();
   renderRestante();
