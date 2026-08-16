@@ -3733,19 +3733,34 @@ function irAlMapaPotreros(){
 let mapaParcelaCompletaPendiente = null; // {potrero, parcela} — objeto COMPLETO esperando a que guardes el aforo acá
 
 // El mapa llama a esto cuando terminaste de dibujar y tocaste "Finalizar y enviar al aforo".
-// Todavía NO se escribe nada en Firebase acá — solo se completa el campo "Ancho" y queda
-// la parcela en memoria, esperando a que vos apretés "Guardar Registro" en este formulario.
+// Todavía NO se escribe nada en Firebase acá — pero SÍ sincronizamos ancho, largo y área
+// con los valores REALES que salieron del dibujo (no dejamos que el aforo los recalcule
+// con la hectárea vieja que había antes de ir al mapa — el dibujo manda).
 function recibirParcelaCompleta(parcela, potrero){
-  const fAncho = document.getElementById('fAncho');
-  if(fAncho && parcela.anchoInicio){
-    if(modoDim !== 'REGULAR' && typeof setModoDim === 'function') setModoDim('REGULAR');
-    fAncho.value = Math.round(parcela.anchoInicio);
-    calcDim();
-    fAncho.style.outline = '2px solid var(--green2)';
-    setTimeout(()=>{ fAncho.style.outline = ''; }, 2000);
+  if(!parcela.esResto && parcela.anchoInicio && parcela.largo){
+    // Ancho + largo reales del corte → modo IRREGULAR (ya no hace falta que el aforo derive el largo)
+    if(typeof setModoDim === 'function') setModoDim('IRREGULAR');
+    document.getElementById('fAncho').value = Math.round(parcela.anchoInicio);
+    document.getElementById('fLargoManual').value = Math.round(parcela.largo);
+    if(typeof setModoHA === 'function') setModoHA('MANUAL');
+    document.getElementById('fHAManual').value = parcela.areaHa.toFixed(2);
+    calcDim(); // IRREGULAR: recalcula área desde ancho×largo (coincide con el área real) y dispara calcMS()
+  } else {
+    // Franja de cierre irregular: no hay un ancho único — modo Parcela fija (solo HA), sin tocar calcDim()
+    if(typeof setModoDim === 'function') setModoDim('FIJA');
+    document.getElementById('fHAFija').value = parcela.areaHa.toFixed(2);
+    if(typeof calcDimFija === 'function') calcDimFija();
   }
+
+  ['fAncho','fLargoManual','fHAManual','fHAFija'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.style.outline = '2px solid var(--green2)';
+    setTimeout(()=>{ el.style.outline = ''; }, 2000);
+  });
+
   mapaParcelaCompletaPendiente = { potrero, parcela };
-  if(typeof notif === 'function') notif('📐 Parcela lista — completá el aforo y guardá para confirmarla');
+  if(typeof notif === 'function') notif('📐 Parcela lista — ancho, largo y área ya están sincronizados con el dibujo');
 }
 
 // Recién ACÁ, cuando el registro de aforo se guarda de verdad, se escribe la geometría

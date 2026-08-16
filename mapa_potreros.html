@@ -1101,7 +1101,11 @@ function calcularCorte(){
       L0 = (targetHa*10000)/Wlocal;
     }
     const anchoAnterior = vueltaAnchoFijo;
-    const W = (vueltaAnchoFijo == null) ? Wlocal : Math.min(vueltaAnchoFijo, Wlocal);
+    let W = (vueltaAnchoFijo == null) ? Wlocal : Math.min(vueltaAnchoFijo, Wlocal);
+    // Redondeamos el ancho hacia ABAJO al múltiplo de 10 más cercano — así el armador siempre
+    // recibe un número redondo, y nos aseguramos de que sigue entrando en el potrero (nunca de más).
+    W = Math.floor(W/10)*10;
+    if(W < 10) W = Math.max(10, Math.floor(Wlocal));
     const bajo = (anchoAnterior != null && W < anchoAnterior - 0.1);
     vueltaAnchoFijo = W;
     updateAnchoFijoInfo();
@@ -1113,6 +1117,9 @@ function calcularCorte(){
       if(rm.area < targetHa) lo=mid; else hi=mid;
     }
     let L = (lo+hi)/2;
+    // Redondeamos el largo al múltiplo de 10 más cercano — el área final se recalcula con
+    // el ancho y el largo YA redondos, para que lo que ves y lo que se guarda sea lo mismo.
+    L = Math.max(10, Math.round(L/10)*10);
     let r = rectAtWL(W, L);
     const maxPossible = rectAtWL(W, selectedEdge.maxDepth*1.3);
     const maxL = selectedEdge.maxDepth*1.3;
@@ -1153,8 +1160,8 @@ function onSliderMove(){
   const pct = parseFloat(document.getElementById('cutSlider').value)/1000;
   if(modoAncho === 'CONSTANTE'){
     const maxL = selectedEdge.maxDepth*1.3;
-    const L = pct*maxL;
-    const W = vueltaAnchoFijo || anchoMinimoEnRango(L);
+    let L = Math.max(10, Math.round((pct*maxL)/10)*10); // siempre múltiplos de 10, cómodo para el armador
+    const W = vueltaAnchoFijo || Math.max(10, Math.floor(anchoMinimoEnRango(L)/10)*10);
     const r = rectAtWL(W, L);
     applyCutPreview(r.geo, r.area, L, W, W, null, r.farA, r.farB);
     const targetHa = parseFloat(document.getElementById('fHaNecesaria').value)||0;
