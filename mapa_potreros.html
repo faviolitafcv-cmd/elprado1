@@ -207,7 +207,7 @@ button:disabled{opacity:.35; cursor:not-allowed;}
           <input type="text" id="fParcelaNum" readonly>
         </div>
       </div>
-      <div>
+      <div id="bloqueLadoInicio">
         <label>Lado de inicio de la franja</label>
         <div class="row">
           <button class="btn-outline" id="btnPickEdge" onclick="startPickEdge()">📍 Tocar el borde en el mapa</button>
@@ -225,10 +225,18 @@ button:disabled{opacity:.35; cursor:not-allowed;}
           <button class="btn-outline active" id="btnModoConst" onclick="setModoAncho('CONSTANTE')">📐 Ancho constante</button>
           <button class="btn-outline" id="btnModoTrap" onclick="setModoAncho('TRAPECIO')">🔺 Seguir el borde real</button>
         </div>
+        <button class="btn-outline" id="btnModoManual" onclick="setModoAncho('MANUAL')" style="margin-top:6px">✏️ Dibujar la forma a mano</button>
         <p class="hint" id="modoHint">Mismo ancho en el lado de inicio y en el lado final — ideal para pasarle una sola medida al armador.</p>
         <div id="anchoFijoInfo" class="hint"></div>
       </div>
       <button class="btn-green" id="btnCortar" onclick="calcularCorte()" disabled>✂️ Calcular corte automático</button>
+      <div id="bloqueManual" style="display:none">
+        <div class="row">
+          <button class="btn-green" id="btnManDraw" onclick="startDrawParcelaManual()">✏️ Dibujar</button>
+          <button class="btn-outline" id="btnManUndo" onclick="undoParcelaManualPoint()" disabled>↩️ Deshacer</button>
+        </div>
+        <button class="btn-green" id="btnManCerrar" onclick="cerrarParcelaManual()" disabled style="margin-top:6px">✅ Cerrar forma (mínimo 3 puntos)</button>
+      </div>
       <button class="btn-outline" id="btnUsarResto" onclick="usarResto()">🔚 Cerrar vuelta con el resto (última franja, forma libre)</button>
 
       <div id="slideWrap">
@@ -484,6 +492,12 @@ function onMapClick(e){
     exclPoints.push(e.latlng);
     redrawExclTempDraw();
     document.getElementById('btnFinishExcl').disabled = exclPoints.length < (tipoZonaActual==='alambrado'?2:3);
+    return;
+  }
+  if(drawingParcelaManual){
+    parcelaManualPoints.push(e.latlng);
+    redrawParcelaManualTemp();
+    document.getElementById('btnManCerrar').disabled = parcelaManualPoints.length < 3;
     return;
   }
   if(pickingEdge){
@@ -1002,7 +1016,7 @@ function continuarDesdeUltimoCorte(){
 // buscando, de los 4 lados de su propio dibujo, el que está MÁS LEJOS del contorno del potrero
 // (el lado de arranque siempre queda pegado al contorno; el lado lejano es el que buscamos).
 async function repararUltimaParcela(){
-  const candidatos = parcelas.filter(p => p.vuelta === vueltaActual && !p.esResto && !p.finalPts && !p.pendiente);
+  const candidatos = parcelas.filter(p => p.vuelta === vueltaActual && !p.esResto && !p.esManual && !p.finalPts && !p.pendiente);
   if(!candidatos.length){ alert('No encontré ninguna parcela para reparar en esta vuelta.'); return; }
   const p = candidatos[candidatos.length - 1];
   const latRef = avgLat(potreroClosed.latlngs);
@@ -1112,10 +1126,84 @@ function setModoAncho(m){
   modoAncho = m;
   document.getElementById('btnModoConst').classList.toggle('active', m==='CONSTANTE');
   document.getElementById('btnModoTrap').classList.toggle('active', m==='TRAPECIO');
+  document.getElementById('btnModoManual').classList.toggle('active', m==='MANUAL');
   document.getElementById('modoHint').textContent = m==='CONSTANTE'
     ? 'Mismo ancho en el lado de inicio y en el lado final — ideal para pasarle una sola medida al armador.'
-    : 'La franja sigue el ensanche/angostamiento real del potrero — el ancho de inicio y de salida pueden ser distintos.';
+    : m==='TRAPECIO'
+    ? 'La franja sigue el ensanche/angostamiento real del potrero — el ancho de inicio y de salida pueden ser distintos.'
+    : 'Dibujás la forma vos mismo, punto por punto — ideal para potreros con islas de monte/atajados o formas muy irregulares.';
+  document.getElementById('bloqueLadoInicio').style.display = m==='MANUAL' ? 'none' : 'block';
+  document.getElementById('btnCortar').style.display = m==='MANUAL' ? 'none' : 'block';
+  document.getElementById('bloqueManual').style.display = m==='MANUAL' ? 'block' : 'none';
   clearCutOnly();
+  if(m==='MANUAL') checkCortarEnabled();
+}
+
+// ══════════════════════════════════════════════
+// MODO MANUAL — dibujar la parcela punto por punto
+// ══════════════════════════════════════════════
+let drawingParcelaManual = false;
+let parcelaManualPoints = [];
+let manualTempMarkers = [], manualTempLine = null;
+
+function startDrawParcelaManual(){
+  if(!potreroUtilGeo){ alert('Primero cerrá el contorno del potrero.'); return; }
+  drawingParcelaManual = true;
+  parcelaManualPoints = [];
+  clearParcelaManualTemp();
+  document.getElementById('btnManDraw').textContent = '✏️ Dibujando… tocá el mapa';
+  document.getElementById('btnManUndo').disabled = false;
+}
+function redrawParcelaManualTemp(){
+  clearParcelaManualTempLayersOnly();
+  parcelaManualPoints.forEach(ll=>{
+    manualTempMarkers.push(L.circleMarker(ll,{radius:5, color:'#e8bc40', fillColor:'#e8bc40', fillOpacity:1}).addTo(map));
+  });
+  if(parcelaManualPoints.length>1) manualTempLine = L.polyline(parcelaManualPoints,{color:'#e8bc40', weight:2, dashArray:'5,5'}).addTo(map);
+}
+function clearParcelaManualTempLayersOnly(){
+  manualTempMarkers.forEach(m=>map.removeLayer(m)); manualTempMarkers=[];
+  if(manualTempLine){ map.removeLayer(manualTempLine); manualTempLine=null; }
+}
+function clearParcelaManualTemp(){
+  clearParcelaManualTempLayersOnly();
+  document.getElementById('btnManCerrar').disabled = true;
+}
+function undoParcelaManualPoint(){
+  if(!drawingParcelaManual || !parcelaManualPoints.length) return;
+  parcelaManualPoints.pop();
+  redrawParcelaManualTemp();
+  document.getElementById('btnManCerrar').disabled = parcelaManualPoints.length < 3;
+}
+function cerrarParcelaManual(){
+  if(parcelaManualPoints.length < 3) return;
+  drawingParcelaManual = false;
+  clearParcelaManualTemp();
+  document.getElementById('btnManDraw').textContent = '✏️ Dibujar';
+  document.getElementById('btnManUndo').disabled = true;
+
+  const gj = llArrayToGeoJSON(parcelaManualPoints);
+  let clip;
+  try{ clip = turf.intersect(potreroUtilGeo, gj); }catch(e){ clip = null; }
+  if(!clip){ alert('Esa forma no cae dentro del potrero — probá de nuevo.'); return; }
+  const areaHa = turf.area(clip)/10000;
+
+  cutPreview = { geojson: clip, areaHa, t:null, anchoInicio:null, anchoFinal:null, largo:null, esManual:true, finalPts:null };
+  renderCutPreview();
+  document.getElementById('medidasBox').innerHTML = `
+    <div class="medidas">
+      <div class="m-row"><span>Área dibujada</span><b>${areaHa.toFixed(2)} ha</b></div>
+      <div class="small">✏️ Forma manual — recortada automáticamente al borde real del potrero y a las zonas excluidas.</div>
+    </div>`;
+  checkOverlap();
+  document.getElementById('rowFechas1').style.display = modoEnlazado ? 'none' : 'flex';
+  document.getElementById('rowFechas2').style.display = modoEnlazado ? 'none' : 'flex';
+  document.getElementById('btnGuardarParcela').style.display = 'block';
+  const hoy = new Date().toISOString().split('T')[0];
+  if(!modoEnlazado){
+    if(!document.getElementById('fFechaIng').value) document.getElementById('fFechaIng').value = hoy;
+    if(!document.getElementById('fFechaSal').value) document.getElementById('fFechaSal').value = hoy;
+  }
 }
 
 // Construye un rectángulo (ancho W constante) centrado en el lado elegido, desde el borde hacia adentro L metros
@@ -1427,6 +1515,7 @@ function guardarParcela(){
     areaHa: cutPreview.areaHa, geojson: cutPreview.geojson,
     anchoInicio: cutPreview.anchoInicio, anchoFinal: cutPreview.anchoFinal, largo: cutPreview.largo,
     esResto: !!cutPreview.esResto,
+    esManual: !!cutPreview.esManual,
     fechaIngISO: fIng+'T'+hIng, fechaSalISO: fSal+'T'+hSal,
     colorIdx,
     descansoDias: cutPreview.descansoDias!=null ? cutPreview.descansoDias : null,
@@ -1442,6 +1531,8 @@ function guardarParcela(){
   }).addTo(map);
   const medidasPopup = rec.esResto
     ? '🔚 Franja de cierre (forma irregular)'
+    : rec.esManual
+    ? '✏️ Forma dibujada a mano'
     : `ancho ${rec.anchoInicio.toFixed(0)} m · largo ${rec.largo.toFixed(0)} m`;
   layer.bindPopup(`<b>Parcela ${num}</b>${rec.pendiente?' · ⏳ pendiente de confirmar':''}<br>${rec.areaHa.toFixed(2)} ha · ${medidasPopup}<br>${fmtFecha(rec.fechaIngISO)} → ${fmtFecha(rec.fechaSalISO)}`);
   rec._layer = layer;
@@ -1506,7 +1597,7 @@ function renderLista(){
     <div class="list-item" style="margin-bottom:6px">
       <div class="lihead"><span><span class="dot" style="background:${COLORS[p.colorIdx]}"></span>Parcela ${p.num} · vuelta ${p.vuelta}</span><span>${p.areaHa.toFixed(2)} ha</span></div>
       <div>${fmtFecha(p.fechaIngISO)} → ${fmtFecha(p.fechaSalISO)}</div>
-      <div class="small">${p.esResto ? '🔚 Franja de cierre (forma irregular)' : `Ancho ${p.anchoInicio.toFixed(0)}→${p.anchoFinal?p.anchoFinal.toFixed(0):'—'} m · Largo ${p.largo.toFixed(0)} m`}</div>
+      <div class="small">${p.esResto ? '🔚 Franja de cierre (forma irregular)' : p.esManual ? '✏️ Forma dibujada a mano' : `Ancho ${p.anchoInicio.toFixed(0)}→${p.anchoFinal?p.anchoFinal.toFixed(0):'—'} m · Largo ${p.largo.toFixed(0)} m`}</div>
       ${p.descansoDias!=null
         ? `<div style="color:var(--green-soft); margin-top:3px">🔁 Reingreso a área de Parcela ${p.refParcela} · descanso real: <b>${p.descansoDias} días</b></div>`
         : `<div class="small" style="margin-top:3px">Área nueva, sin coincidencia previa</div>`}
@@ -1654,7 +1745,7 @@ async function cambiarPotrero(){
     document.getElementById('avisoReparar').style.display = 'none';
   } else {
     // ¿Hay alguna parcela de esta vuelta que simplemente le falte el dato (guardada antes del arreglo)?
-    const sinFinalPts = parcelas.filter(p => p.vuelta === vueltaActual && !p.esResto && !p.finalPts);
+    const sinFinalPts = parcelas.filter(p => p.vuelta === vueltaActual && !p.esResto && !p.esManual && !p.finalPts);
     document.getElementById('avisoReparar').style.display = sinFinalPts.length ? 'block' : 'none';
   }
   updateAnchoFijoInfo();
