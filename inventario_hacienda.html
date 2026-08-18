@@ -1162,12 +1162,52 @@ tr:hover td{background:rgba(109,186,58,.04);}
           <input id="cPrecKg" type="text" readonly style="background:rgba(109,186,58,.1);font-weight:700;color:var(--gr);">
         </div>
 
-        <div class="sep" style="grid-column:1/-1;">Animales del Lote — Planilla de Balanza</div>
-        <div class="fm" style="grid-column:1/-1;">
-          <label>Subí el Excel de la balanza (se lee: IDE, Peso, Raza, Categoría, Clasificación)</label>
-          <input type="file" id="cXls" accept=".xls,.xlsx" style="font-size:12px;margin-top:4px;" onchange="readCompraXls(this.files[0])">
+        <div class="sep" style="grid-column:1/-1;">Animales del Lote</div>
+        <div style="grid-column:1/-1;display:flex;gap:8px;margin-bottom:8px;">
+          <button type="button" id="cModoXlsBtn" onclick="switchCompraModo('xls')"
+            style="flex:1;padding:8px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;background:var(--gr);color:#0d1509;border:none;">
+            📎 Subir Excel
+          </button>
+          <button type="button" id="cModoManBtn" onclick="switchCompraModo('man')"
+            style="flex:1;padding:8px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;background:var(--card2);color:var(--t2);border:1px solid var(--brd);">
+            ✏️ Manual / Pegar
+          </button>
         </div>
-        <div id="cXlsPrev" style="grid-column:1/-1;font-size:12px;color:var(--t2);"></div>
+
+        <div id="cModoXls" style="grid-column:1/-1;">
+          <div class="fm" style="grid-column:1/-1;">
+            <label>Subí el Excel de la balanza (se lee: IDE, Peso, Raza, Categoría, Grupo)</label>
+            <input type="file" id="cXls" accept=".xls,.xlsx" style="font-size:12px;margin-top:4px;" onchange="readCompraXls(this.files[0])">
+          </div>
+          <div id="cXlsPrev" style="grid-column:1/-1;font-size:12px;color:var(--t2);"></div>
+        </div>
+
+        <div id="cModoMan" style="grid-column:1/-1;display:none;">
+          <div class="fm" style="grid-column:1/-1;">
+            <label>Pegá varias filas de una (desde Excel: IDE, Raza, Peso, Grupo — separado por tabulador o coma, una fila por línea)</label>
+            <textarea id="cPegado" rows="4" placeholder="68000000000001	Nelore	380	VAQ. CABEZA
+68000000000002	Brahman	365	VAQ. CUERPO"
+              style="width:100%;font-size:12px;font-family:monospace;background:var(--card2);border:1px solid var(--brd);border-radius:6px;color:var(--text);padding:8px;margin-top:4px;"></textarea>
+            <button type="button" class="btn bs" style="margin-top:6px;font-size:12px;" onclick="procesarPegadoCompra()">⬇️ Agregar filas pegadas</button>
+          </div>
+          <div style="grid-column:1/-1;overflow-x:auto;margin-top:8px;">
+            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+              <thead>
+                <tr style="border-bottom:1px solid var(--brd);color:var(--t2);text-align:left;">
+                  <th style="padding:4px;">IDE *</th>
+                  <th style="padding:4px;">Raza</th>
+                  <th style="padding:4px;">Categoría</th>
+                  <th style="padding:4px;">Peso (kg) *</th>
+                  <th style="padding:4px;">Grupo</th>
+                  <th style="padding:4px;"></th>
+                </tr>
+              </thead>
+              <tbody id="cTablaManual"></tbody>
+            </table>
+          </div>
+          <button type="button" class="btn bs" style="margin-top:8px;font-size:12px;" onclick="agregarFilaManual()">+ Agregar fila</button>
+          <div id="cManResumen" style="font-size:12px;color:var(--t2);margin-top:8px;"></div>
+        </div>
       </div>
     </div>
     <div class="mf">
@@ -2945,7 +2985,8 @@ function renderP(){
 
 // ═══════════ COMPRAS ═══════════
 // ═══════════ COMPRAS ═══════════
-let _compraAnimales = []; // animales del Excel de compra
+let _compraAnimales = []; // animales del lote (desde Excel o carga manual)
+let _manualRows = [];     // filas de la tabla manual, en paralelo a _compraAnimales
 
 function calcGestion(){
   const hoy = new Date();
@@ -2961,8 +3002,13 @@ function genCodigoCompra(){
 
 function openC(){
   _compraAnimales = [];
+  _manualRows = [];
   document.getElementById('cXlsPrev').innerHTML = '';
   document.getElementById('cXls').value = '';
+  document.getElementById('cPegado').value = '';
+  document.getElementById('cManResumen').innerHTML = '';
+  switchCompraModo('xls');
+  renderTablaManual();
   ['cF','cOri','cMun','cComNombre'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
@@ -2973,6 +3019,101 @@ function openC(){
   document.getElementById('cPrecKg').value = '';
   document.getElementById('cF').value = new Date().toISOString().split('T')[0];
   document.getElementById('moC').classList.add('open');
+}
+
+function switchCompraModo(modo){
+  const btnX = document.getElementById('cModoXlsBtn'), btnM = document.getElementById('cModoManBtn');
+  document.getElementById('cModoXls').style.display = modo==='xls' ? 'block':'none';
+  document.getElementById('cModoMan').style.display = modo==='man' ? 'block':'none';
+  btnX.style.background = modo==='xls' ? 'var(--gr)' : 'var(--card2)';
+  btnX.style.color      = modo==='xls' ? '#0d1509' : 'var(--t2)';
+  btnM.style.background = modo==='man' ? 'var(--gr)' : 'var(--card2)';
+  btnM.style.color      = modo==='man' ? '#0d1509' : 'var(--t2)';
+}
+
+// ── Carga manual: pegar varias filas de una vez (tipo Excel copiado) ──
+function procesarPegadoCompra(){
+  const raw = document.getElementById('cPegado').value.trim();
+  if(!raw){ ntf('Pegá al menos una fila antes de procesar', true); return; }
+  const lineas = raw.split('\n').map(l=>l.trim()).filter(Boolean);
+  let agregadas = 0;
+  lineas.forEach(linea=>{
+    const partes = linea.includes('\t') ? linea.split('\t') : linea.split(',');
+    const ide = (partes[0]||'').trim();
+    if(!ide) return;
+    const raza = (partes[1]||'').trim();
+    const peso = parseFloat(String(partes[2]||'').replace(',','.'))||0;
+    const grupoRaw = (partes[3]||'').trim().toUpperCase();
+    const grupo = GRU_ORD.includes(grupoRaw) ? grupoRaw : null;
+    _manualRows.push({ ide, raza: raza||null, categoria:null, peso, grupo });
+    agregadas++;
+  });
+  document.getElementById('cPegado').value = '';
+  renderTablaManual();
+  ntf('✅ '+agregadas+' fila(s) agregada(s) — revisá el Grupo de cada una');
+}
+
+function agregarFilaManual(){
+  _manualRows.push({ ide:'', raza:null, categoria:null, peso:0, grupo:null });
+  renderTablaManual();
+}
+
+function eliminarFilaManual(idx){
+  _manualRows.splice(idx,1);
+  renderTablaManual();
+}
+
+function actualizarFilaManual(idx, campo, valor){
+  if(!_manualRows[idx]) return;
+  if(campo==='peso') _manualRows[idx][campo] = parseFloat(valor)||0;
+  else _manualRows[idx][campo] = valor || null;
+  sincronizarManualConCompra();
+}
+
+function renderTablaManual(){
+  const tbody = document.getElementById('cTablaManual');
+  const opcionesGrupo = ['<option value="">— Sin grupo —</option>']
+    .concat(GRU_ORD.map(g=>`<option value="${g}">${g}</option>`)).join('');
+  const opcionesCat = ['<option value="">—</option>']
+    .concat(CAT_ORD.map(c=>`<option value="${c}">${c}</option>`)).join('');
+
+  tbody.innerHTML = _manualRows.map((r,i)=>`
+    <tr style="border-bottom:1px solid var(--brd);">
+      <td style="padding:3px;"><input value="${r.ide||''}" oninput="actualizarFilaManual(${i},'ide',this.value)"
+        style="width:130px;font-size:11px;padding:4px;background:var(--card2);border:1px solid var(--brd);border-radius:4px;color:var(--text);" placeholder="N° chip"></td>
+      <td style="padding:3px;"><input value="${r.raza||''}" oninput="actualizarFilaManual(${i},'raza',this.value)"
+        style="width:90px;font-size:11px;padding:4px;background:var(--card2);border:1px solid var(--brd);border-radius:4px;color:var(--text);" placeholder="Nelore..."></td>
+      <td style="padding:3px;"><select onchange="actualizarFilaManual(${i},'categoria',this.value)"
+        style="font-size:11px;padding:4px;background:var(--card2);border:1px solid var(--brd);border-radius:4px;color:var(--text);">${opcionesCat}</select></td>
+      <td style="padding:3px;"><input type="number" step="0.1" value="${r.peso||''}" oninput="actualizarFilaManual(${i},'peso',this.value)"
+        style="width:70px;font-size:11px;padding:4px;background:var(--card2);border:1px solid var(--brd);border-radius:4px;color:var(--text);" placeholder="0.0"></td>
+      <td style="padding:3px;"><select onchange="actualizarFilaManual(${i},'grupo',this.value)"
+        style="font-size:11px;padding:4px;background:var(--card2);border:1px solid var(--brd);border-radius:4px;color:var(--text);max-width:130px;">${opcionesGrupo}</select></td>
+      <td style="padding:3px;"><button type="button" onclick="eliminarFilaManual(${i})" style="background:none;border:none;color:var(--rd);cursor:pointer;font-size:14px;">🗑</button></td>
+    </tr>`).join('');
+
+  // Preseleccionar cada <select> con su valor guardado (más confiable que armar el string con "selected")
+  _manualRows.forEach((r,i)=>{
+    const row = tbody.children[i];
+    if(!row) return;
+    const selects = row.querySelectorAll('select');
+    if(selects[0]) selects[0].value = r.categoria || '';
+    if(selects[1]) selects[1].value = r.grupo || '';
+  });
+
+  sincronizarManualConCompra();
+}
+
+function sincronizarManualConCompra(){
+  _compraAnimales = _manualRows.filter(r=>r.ide && r.peso>0);
+  const kgTot = _compraAnimales.reduce((s,a)=>s+a.peso,0);
+  document.getElementById('cKgTot').value = kgTot>0 ? kgTot.toFixed(1) : '';
+  calcCompra();
+  const sinGrupo = _compraAnimales.filter(a=>!a.grupo).length;
+  document.getElementById('cManResumen').innerHTML = _compraAnimales.length
+    ? `✅ ${_compraAnimales.length} animal(es) listos · Kg total: <strong>${kgTot.toFixed(1)} kg</strong>` +
+      (sinGrupo ? ` · <span style="color:var(--am,#e8bc40)">⚠️ ${sinGrupo} sin grupo asignado</span>` : '')
+    : '';
 }
 
 function calcCompra(){
@@ -3000,11 +3141,12 @@ function readCompraXls(file){
       const cp   = hdr.findIndex(h=>h==='PESO'||h.includes('PESO'));
       const cr   = hdr.findIndex(h=>h==='RAZA');
       const ccat = hdr.findIndex(h=>h.includes('CATEG'));
-      const ccl  = hdr.findIndex(h=>h.includes('CLASF')||h.includes('CLASIF'));
+      const cg   = hdr.findIndex(h=>h==='GRUPO'||h.includes('GRUPO'));
       if(ci<0||cp<0){ntf('No se encontraron columnas IDE/Peso',true);return;}
 
       _compraAnimales = [];
       const noEnc = [];
+      const gruposNoValidos = new Set();
       for(let i=1;i<rows.length;i++){
         const r=rows[i];
         if(!r||!r[ci]) continue;
@@ -3012,12 +3154,15 @@ function readCompraXls(file){
         if(!ide||ide==='undefined') continue;
         const peso = parseFloat(String(r[cp]||0).replace(',','.'));
         if(isNaN(peso)||peso<=0) continue;
+        const grupoRaw = cg>=0&&r[cg] ? String(r[cg]).trim().toUpperCase() : null;
+        const grupo = grupoRaw && GRU_ORD.includes(grupoRaw) ? grupoRaw : null;
+        if(grupoRaw && !grupo) gruposNoValidos.add(grupoRaw);
         _compraAnimales.push({
           ide,
           peso,
           raza:  cr>=0&&r[cr]  ? String(r[cr]).trim()  : null,
           categoria: ccat>=0&&r[ccat] ? String(r[ccat]).trim() : null,
-          grupo: ccl>=0&&r[ccl] ? String(r[ccl]).trim() : null,
+          grupo,
         });
       }
 
@@ -3033,6 +3178,7 @@ function readCompraXls(file){
           <div style="font-size:11px;color:var(--t3);margin-top:4px;">
             Grupos: ${[...new Set(_compraAnimales.map(a=>a.grupo).filter(Boolean))].join(', ')||'—'}
           </div>
+          ${gruposNoValidos.size ? `<div style="font-size:11px;color:var(--am,#e8bc40);margin-top:4px;">⚠️ No reconocidos (se dejaron sin grupo): ${[...gruposNoValidos].join(', ')}</div>` : ''}
         </div>`;
     }catch(err){
       ntf('Error leyendo Excel: '+err.message,true);
@@ -3056,7 +3202,7 @@ async function saveC(){
     ntf('Completá fecha, origen, tipo y precio bruto',true); return;
   }
   if(!_compraAnimales.length){
-    ntf('Subí el Excel de la balanza con los animales',true); return;
+    ntf('Agregá los animales del lote (Excel o carga manual)',true); return;
   }
 
   const totalPagar = bruto + com + trans;
