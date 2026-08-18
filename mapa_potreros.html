@@ -235,6 +235,7 @@ button:disabled{opacity:.35; cursor:not-allowed;}
           <button class="btn-green" id="btnManDraw" onclick="startDrawParcelaManual()">✏️ Dibujar</button>
           <button class="btn-outline" id="btnManUndo" onclick="undoParcelaManualPoint()" disabled>↩️ Deshacer</button>
         </div>
+        <div id="manDibujoInfo" class="hint" style="margin-top:6px"></div>
         <button class="btn-green" id="btnManCerrar" onclick="cerrarParcelaManual()" disabled style="margin-top:6px">✅ Cerrar forma (mínimo 3 puntos)</button>
       </div>
       <button class="btn-outline" id="btnUsarResto" onclick="usarResto()">🔚 Cerrar vuelta con el resto (última franja, forma libre)</button>
@@ -1159,7 +1160,43 @@ function redrawParcelaManualTemp(){
   parcelaManualPoints.forEach(ll=>{
     manualTempMarkers.push(L.circleMarker(ll,{radius:5, color:'#e8bc40', fillColor:'#e8bc40', fillOpacity:1}).addTo(map));
   });
-  if(parcelaManualPoints.length>1) manualTempLine = L.polyline(parcelaManualPoints,{color:'#e8bc40', weight:2, dashArray:'5,5'}).addTo(map);
+  if(parcelaManualPoints.length>1){
+    manualTempLine = L.polyline(parcelaManualPoints,{color:'#e8bc40', weight:2, dashArray:'5,5'}).addTo(map);
+    // Distancia de cada tramo, flotando sobre el punto medio de ese segmento
+    for(let i=1;i<parcelaManualPoints.length;i++){
+      const a = parcelaManualPoints[i-1], b = parcelaManualPoints[i];
+      const dist = turf.distance([a.lng,a.lat],[b.lng,b.lat],{units:'meters'});
+      const mid = L.latLng((a.lat+b.lat)/2, (a.lng+b.lng)/2);
+      const lbl = L.marker(mid, {
+        icon: L.divIcon({className:'', html:`<div style="background:rgba(232,188,64,.92);color:#0d1509;font-weight:800;font-size:10.5px;padding:2px 6px;border-radius:5px;white-space:nowrap;transform:translate(-50%,-50%);">${Math.round(dist)} m</div>`, iconSize:[0,0]}),
+        interactive:false
+      }).addTo(map);
+      manualTempMarkers.push(lbl);
+    }
+  }
+  actualizarInfoDibujoManual();
+}
+function actualizarInfoDibujoManual(){
+  const info = document.getElementById('manDibujoInfo');
+  if(!info) return;
+  const n = parcelaManualPoints.length;
+  if(n < 2){ info.innerHTML = n===1 ? 'Marcá el próximo punto…' : ''; return; }
+  const a = parcelaManualPoints[n-2], b = parcelaManualPoints[n-1];
+  const ultimoTramo = turf.distance([a.lng,a.lat],[b.lng,b.lat],{units:'meters'});
+  let perim = 0;
+  for(let i=1;i<n;i++){
+    const p1=parcelaManualPoints[i-1], p2=parcelaManualPoints[i];
+    perim += turf.distance([p1.lng,p1.lat],[p2.lng,p2.lat],{units:'meters'});
+  }
+  let areaTxt = '';
+  if(n >= 3){
+    try{
+      const gj = llArrayToGeoJSON(parcelaManualPoints);
+      const areaHa = turf.area(gj)/10000;
+      areaTxt = ` · <b style="color:var(--gold2)">Área acumulada: ${areaHa.toFixed(2)} ha</b>`;
+    }catch(e){}
+  }
+  info.innerHTML = `📏 Último tramo: <b>${Math.round(ultimoTramo)} m</b> · Perímetro: ${Math.round(perim)} m${areaTxt}`;
 }
 function clearParcelaManualTempLayersOnly(){
   manualTempMarkers.forEach(m=>map.removeLayer(m)); manualTempMarkers=[];
@@ -1168,6 +1205,8 @@ function clearParcelaManualTempLayersOnly(){
 function clearParcelaManualTemp(){
   clearParcelaManualTempLayersOnly();
   document.getElementById('btnManCerrar').disabled = true;
+  const info = document.getElementById('manDibujoInfo');
+  if(info) info.innerHTML = '';
 }
 function undoParcelaManualPoint(){
   if(!drawingParcelaManual || !parcelaManualPoints.length) return;
