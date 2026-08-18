@@ -1190,6 +1190,24 @@ tr:hover td{background:rgba(109,186,58,.04);}
               style="width:100%;font-size:12px;font-family:monospace;background:var(--card2);border:1px solid var(--brd);border-radius:6px;color:var(--text);padding:8px;margin-top:4px;"></textarea>
             <button type="button" class="btn bs" style="margin-top:6px;font-size:12px;" onclick="procesarPegadoCompra()">⬇️ Agregar filas pegadas</button>
           </div>
+
+          <div id="cAplicarTodos" style="grid-column:1/-1;display:none;background:rgba(109,186,58,.07);border:1px solid var(--brd2);border-radius:8px;padding:10px;margin-top:8px;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;">
+            <div>
+              <label style="font-size:11px;color:var(--t2);display:block;margin-bottom:3px;">Categoría para todo el lote</label>
+              <div style="display:flex;gap:6px;">
+                <select id="cCatTodos" style="font-size:12px;padding:6px;background:var(--card2);border:1px solid var(--brd);border-radius:6px;color:var(--text);"></select>
+                <button type="button" class="btn bs" style="font-size:11px;padding:6px 10px;" onclick="aplicarCategoriaATodos()">Aplicar a todas</button>
+              </div>
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--t2);display:block;margin-bottom:3px;">Grupo para todo el lote</label>
+              <div style="display:flex;gap:6px;">
+                <select id="cGrupoTodos" style="font-size:12px;padding:6px;background:var(--card2);border:1px solid var(--brd);border-radius:6px;color:var(--text);"></select>
+                <button type="button" class="btn bs" style="font-size:11px;padding:6px 10px;" onclick="aplicarGrupoATodos()">Aplicar a todas</button>
+              </div>
+            </div>
+          </div>
+
           <div style="grid-column:1/-1;overflow-x:auto;margin-top:8px;">
             <table style="width:100%;border-collapse:collapse;font-size:12px;">
               <thead>
@@ -3077,6 +3095,13 @@ function renderTablaManual(){
   const opcionesCat = ['<option value="">—</option>']
     .concat(CAT_ORD.map(c=>`<option value="${c}">${c}</option>`)).join('');
 
+  const barraTodos = document.getElementById('cAplicarTodos');
+  barraTodos.style.display = _manualRows.length ? 'flex' : 'none';
+  if(_manualRows.length){
+    document.getElementById('cCatTodos').innerHTML = opcionesCat;
+    document.getElementById('cGrupoTodos').innerHTML = opcionesGrupo;
+  }
+
   tbody.innerHTML = _manualRows.map((r,i)=>`
     <tr style="border-bottom:1px solid var(--brd);">
       <td style="padding:3px;"><input value="${r.ide||''}" oninput="actualizarFilaManual(${i},'ide',this.value)"
@@ -3102,6 +3127,24 @@ function renderTablaManual(){
   });
 
   sincronizarManualConCompra();
+}
+
+function aplicarCategoriaATodos(){
+  const val = document.getElementById('cCatTodos').value;
+  if(!val){ ntf('Elegí una categoría primero', true); return; }
+  if(!_manualRows.length) return;
+  _manualRows.forEach(r => r.categoria = val);
+  renderTablaManual();
+  ntf('✅ Categoría "'+val+'" aplicada a '+_manualRows.length+' fila(s)');
+}
+
+function aplicarGrupoATodos(){
+  const val = document.getElementById('cGrupoTodos').value;
+  if(!val){ ntf('Elegí un grupo primero', true); return; }
+  if(!_manualRows.length) return;
+  _manualRows.forEach(r => r.grupo = val);
+  renderTablaManual();
+  ntf('✅ Grupo "'+val+'" aplicado a '+_manualRows.length+' fila(s)');
 }
 
 function sincronizarManualConCompra(){
