@@ -2063,9 +2063,9 @@ function renderDash(){
           gmap[g].sumGmd+=gmdR;gmap[g].nGmd++;
           gmap[g].sumPeso+=lpa.peso;gmap[g].nPeso++;
           const dsd=Math.max(0,Math.round((hoy_d-new Date(lpa.fecha+'T12:00:00'))/86400000));
-          gmap[g].sumPesoProy+=(lpa.peso+gmdR*dsd);
-          // Calcular rentabilidades individuales
           const pesoHoyAnim=lpa.peso+gmdR*dsd;
+          gmap[g].sumPesoProy+=pesoHoyAnim;gmap[g].nPesoProy=(gmap[g].nPesoProy||0)+1;
+          // Calcular rentabilidades individuales
           const diasCampoA=dTot+dsd;
           if(diasCampoA>0&&pesoHoyAnim>0){
             const catA=a.categoria||'';
@@ -2083,8 +2083,19 @@ function renderDash(){
               gmap[g].nInd2++;
             }
           }
+        } else {
+          // Pesaje el mismo día del ingreso (o antes, dato raro): no se puede calcular GMD,
+          // pero el peso en sí es válido — lo usamos igual como referencia.
+          gmap[g].sumPeso+=lpa.peso;gmap[g].nPeso++;
+          gmap[g].sumPesoProy+=lpa.peso;gmap[g].nPesoProy=(gmap[g].nPesoProy||0)+1;
         }
       }
+    } else if(a.pesoIngreso){
+      // Todavía no tiene ningún pesaje posterior — usamos el peso de ingreso como referencia.
+      // No hay forma de calcular GMD todavía (hace falta al menos dos mediciones en el tiempo),
+      // así que ese dato queda en "—" hasta la primera pesada real.
+      gmap[g].sumPeso+=a.pesoIngreso;gmap[g].nPeso++;
+      gmap[g].sumPesoProy+=a.pesoIngreso;gmap[g].nPesoProy=(gmap[g].nPesoProy||0)+1;
     }
   });
   const rows_d=Object.values(gmap).sort((a,b)=>(GRU_ORD.indexOf(a.grupo||'')-GRU_ORD.indexOf(b.grupo||''))||(a.grupo||'').localeCompare(b.grupo||''));
@@ -2093,7 +2104,7 @@ function renderDash(){
   else{tbody_d.innerHTML=rows_d.map(g=>{
     const gmd=g.nGmd>0?(g.sumGmd/g.nGmd).toFixed(3):null;
     const pesoU=g.nPeso>0?Math.round(g.sumPeso/g.nPeso):null;
-    const pesoH=g.nGmd>0?Math.round(g.sumPesoProy/g.nGmd):null;
+    const pesoH=g.nPesoProy>0?Math.round(g.sumPesoProy/g.nPesoProy):null;
     const origStr=[...g.origenes].slice(0,4).join(', ')+(g.origenes.size>4?'...':'');
     const gCol=gmd!=null?(parseFloat(gmd)>=0.8?'var(--green)':parseFloat(gmd)>=0.5?'var(--gold)':'var(--red)'):'var(--t2)';
     const ind1=g.nInd1>0?Math.round(g.sumInd1/g.nInd1*100)/100:null;
