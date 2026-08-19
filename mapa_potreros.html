@@ -263,6 +263,15 @@ button:disabled{opacity:.35; cursor:not-allowed;}
       <button class="btn-green" id="btnGuardarParcela" onclick="guardarParcela()" style="display:none">💾 Guardar parcela</button>
     </div>
 
+    <!-- REGLA / MEDIR DISTANCIAS -->
+    <div class="card" id="cardRegla">
+      <div class="card-title">📏 Medir distancias</div>
+      <p class="hint">Tocá dos puntos en el mapa (se pegan al borde más cercano, como al dibujar) y te digo la distancia — usalo las veces que quieras, para el lado que necesites pasarle al armador.</p>
+      <button class="btn-outline" id="btnReglaToggle" onclick="toggleRegla()">📏 Empezar a medir</button>
+      <div id="reglaLista" class="hint" style="margin-top:6px"></div>
+      <button class="btn-red" id="btnReglaLimpiar" onclick="limpiarMediciones()" style="display:none;margin-top:6px">🗑️ Borrar medidas</button>
+    </div>
+
     <!-- CONFIG -->
     <div class="card">
       <div class="card-title">Configuración</div>
@@ -483,6 +492,10 @@ async function guardarInicioCampo(){
 }
 
 function onMapClick(e){
+  if(midiendo){
+    clickRegla(e.latlng);
+    return;
+  }
   if(drawingPotrero){
     potreroLatLngs.push(e.latlng);
     redrawTempDraw();
@@ -1633,6 +1646,68 @@ function checkOverlap(){
 }
 function diasEntre(f1,f2){ return Math.round((new Date(f2+'T12:00:00') - new Date(f1+'T12:00:00'))/86400000); }
 function fmtFecha(iso){ const [f]=iso.split('T'); const [y,m,d]=f.split('-'); return d+'/'+m+'/'+y; }
+
+// ══════════════════════════════════════════════
+// REGLA — medir distancias sueltas entre dos puntos, con imán al borde más cercano
+// ══════════════════════════════════════════════
+let midiendo = false;
+let reglaPuntoA = null;
+let reglaLineaTemp = null;
+let mediciones = []; // {a, b, dist, layer, label}
+
+function toggleRegla(){
+  if(!potreroClosed){ alert('Primero cerrá el contorno del potrero.'); return; }
+  midiendo = !midiendo;
+  reglaPuntoA = null;
+  if(reglaLineaTemp){ map.removeLayer(reglaLineaTemp); reglaLineaTemp=null; }
+  document.getElementById('btnReglaToggle').textContent = midiendo ? '✕ Terminar de medir' : '📏 Empezar a medir';
+  document.getElementById('btnReglaToggle').classList.toggle('active', midiendo);
+}
+
+function clickRegla(latlng){
+  const snapped = snapPoint(latlng);
+  if(!reglaPuntoA){
+    reglaPuntoA = snapped;
+    reglaLineaTemp = L.circleMarker(snapped, {radius:6, color:'#5aa9e0', fillColor:'#5aa9e0', fillOpacity:1}).addTo(map);
+    return;
+  }
+  const dist = turf.distance([reglaPuntoA.lng,reglaPuntoA.lat],[snapped.lng,snapped.lat],{units:'meters'});
+  if(reglaLineaTemp){ map.removeLayer(reglaLineaTemp); reglaLineaTemp=null; }
+  const mid = L.latLng((reglaPuntoA.lat+snapped.lat)/2, (reglaPuntoA.lng+snapped.lng)/2);
+  const layer = L.polyline([reglaPuntoA, snapped], {color:'#5aa9e0', weight:3}).addTo(map);
+  const label = L.marker(mid, {
+    icon: L.divIcon({className:'', html:`<div style="background:rgba(90,169,224,.95);color:#fff;font-weight:800;font-size:11px;padding:3px 7px;border-radius:5px;white-space:nowrap;transform:translate(-50%,-50%);box-shadow:0 1px 6px rgba(0,0,0,.5);">${Math.round(dist)} m</div>`, iconSize:[0,0]}),
+    interactive:false
+  }).addTo(map);
+  mediciones.push({ a:reglaPuntoA, b:snapped, dist, layer, label });
+  reglaPuntoA = null;
+  renderMediciones();
+}
+
+function renderMediciones(){
+  const box = document.getElementById('reglaLista');
+  document.getElementById('btnReglaLimpiar').style.display = mediciones.length ? 'block' : 'none';
+  if(!mediciones.length){ box.innerHTML=''; return; }
+  box.innerHTML = mediciones.map((m,i)=>`
+    <div class="m-row" style="padding:3px 0">
+      <span>Medida ${i+1}</span>
+      <span><b style="color:var(--gold2)">${Math.round(m.dist)} m</b> <button onclick="eliminarMedicion(${i})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;margin-left:6px;">✕</button></span>
+    </div>`).join('');
+}
+
+function eliminarMedicion(i){
+  const m = mediciones[i];
+  if(!m) return;
+  map.removeLayer(m.layer); map.removeLayer(m.label);
+  mediciones.splice(i,1);
+  renderMediciones();
+}
+
+function limpiarMediciones(){
+  mediciones.forEach(m=>{ map.removeLayer(m.layer); map.removeLayer(m.label); });
+  mediciones = [];
+  renderMediciones();
+}
 function fmtFechaSlash(f){ const [y,m,d]=f.split('-'); return d+'/'+m+'/'+y; }
 
 // Mide cada lado del perímetro de una forma dibujada a mano — con su dirección aproximada
@@ -1659,11 +1734,9 @@ function renderMedidasLadosManual(geojson){
   const lados = calcularMedidasLados(geojson);
   if(!lados.length) return '';
   const perim = lados.reduce((s,l)=>s+l.dist, 0);
-  const filas = lados.map((l,i)=>`<div class="m-row"><span>Lado ${i+1} (${l.dir})</span><b>${Math.round(l.dist)} m</b></div>`).join('');
   return `<div class="medidas" style="margin-top:8px">
-    <div style="font-size:11px;color:var(--gold2);font-weight:700;text-transform:uppercase;margin-bottom:2px;">📏 Medidas para el armador (cada lado del perímetro)</div>
-    ${filas}
-    <div class="m-row" style="border-top:1px solid var(--border2);padding-top:4px;margin-top:2px;"><span>Perímetro total</span><b>${Math.round(perim)} m</b></div>
+    <div class="m-row"><span>Perímetro total</span><b>${Math.round(perim)} m</b></div>
+    <div class="small">Usá "📏 Medir distancias" más abajo para sacar la medida exacta de cualquier lado que necesites pasarle al armador.</div>
   </div>`;
 }
 
