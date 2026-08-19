@@ -1291,7 +1291,7 @@ function cerrarParcelaManual(){
     <div class="medidas">
       <div class="m-row"><span>Área dibujada</span><b>${areaHa.toFixed(2)} ha</b></div>
       <div class="small">✏️ Forma manual — recortada automáticamente al borde real del potrero y a las zonas excluidas.</div>
-    </div>`;
+    </div>` + renderMedidasLadosManual(clip);
   checkOverlap();
 
   const target = parseFloat(document.getElementById('fHaNecesaria').value)||0;
@@ -1377,7 +1377,7 @@ function ajustarFormaManualAlObjetivo(direccion){
     <div class="medidas">
       <div class="m-row"><span>Área ajustada</span><b>${areaFinal.toFixed(2)} ha</b></div>
       <div class="small">✏️ Forma manual, estirada hacia el ${NOMBRES[direccion]} y pegada al borde real (el lado opuesto quedó fijo) para acercarse a las ${target.toFixed(2)} ha pedidas.</div>
-    </div>`;
+    </div>` + renderMedidasLadosManual(clipFinal);
   document.getElementById('notaSobrante').innerHTML = '';
   checkOverlap();
 }
@@ -1634,6 +1634,38 @@ function checkOverlap(){
 function diasEntre(f1,f2){ return Math.round((new Date(f2+'T12:00:00') - new Date(f1+'T12:00:00'))/86400000); }
 function fmtFecha(iso){ const [f]=iso.split('T'); const [y,m,d]=f.split('-'); return d+'/'+m+'/'+y; }
 function fmtFechaSlash(f){ const [y,m,d]=f.split('-'); return d+'/'+m+'/'+y; }
+
+// Mide cada lado del perímetro de una forma dibujada a mano — con su dirección aproximada
+// (Norte/Noreste/Este/...) — para poder pasarle esas medidas al armador lado por lado.
+function bearingToCompass(b){
+  const dirs = ['Norte','Noreste','Este','Sureste','Sur','Suroeste','Oeste','Noroeste'];
+  const idx = Math.round(((b+360)%360)/45)%8;
+  return dirs[idx];
+}
+function calcularMedidasLados(geojson){
+  let ring;
+  try{ ring = geojson.geometry.coordinates[0]; }catch(e){ return []; }
+  const lados = [];
+  for(let i=0;i<ring.length-1;i++){
+    const a = ring[i], b = ring[i+1];
+    const dist = turf.distance(a, b, {units:'meters'});
+    if(dist < 2) continue; // ignoramos lados microscópicos (ruido de redondeo del recorte)
+    const bearing = turf.bearing(a, b);
+    lados.push({ dist, dir: bearingToCompass(bearing) });
+  }
+  return lados;
+}
+function renderMedidasLadosManual(geojson){
+  const lados = calcularMedidasLados(geojson);
+  if(!lados.length) return '';
+  const perim = lados.reduce((s,l)=>s+l.dist, 0);
+  const filas = lados.map((l,i)=>`<div class="m-row"><span>Lado ${i+1} (${l.dir})</span><b>${Math.round(l.dist)} m</b></div>`).join('');
+  return `<div class="medidas" style="margin-top:8px">
+    <div style="font-size:11px;color:var(--gold2);font-weight:700;text-transform:uppercase;margin-bottom:2px;">📏 Medidas para el armador (cada lado del perímetro)</div>
+    ${filas}
+    <div class="m-row" style="border-top:1px solid var(--border2);padding-top:4px;margin-top:2px;"><span>Perímetro total</span><b>${Math.round(perim)} m</b></div>
+  </div>`;
+}
 
 const TARJETAS_AVANZADAS = ['cardModoMasivo','cardOverview','cardSyncMasivo','cardSelector','cardPotrero','cardExclusion'];
 
