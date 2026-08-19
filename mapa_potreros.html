@@ -1337,8 +1337,8 @@ function ajustarFormaManualAlObjetivo(direccion){
   if(direccion==='E'){ ancla = Math.min(...lngs); eje='lng'; }
   if(direccion==='O'){ ancla = Math.max(...lngs); eje='lng'; }
 
-  function conFactor(f){
-    const estirados = ultimoDibujoManualRaw.map(ll=>{
+  function construirEstirados(f){
+    return ultimoDibujoManualRaw.map(ll=>{
       if(eje==='lat'){
         const nuevaLat = ancla + (ll.lat - ancla)*f;
         return L.latLng(nuevaLat, ll.lng);
@@ -1347,26 +1347,36 @@ function ajustarFormaManualAlObjetivo(direccion){
         return L.latLng(ll.lat, nuevaLng);
       }
     });
-    const gj = llArrayToGeoJSON(estirados);
+  }
+  function areaConFactor(f){
+    const gj = llArrayToGeoJSON(construirEstirados(f));
     let clip; try{ clip = turf.intersect(potreroUtilGeo, gj); }catch(e){ clip=null; }
-    return { area: clip ? turf.area(clip)/10000 : 0, geo: clip };
+    return clip ? turf.area(clip)/10000 : 0;
   }
 
   let lo=0.05, hi=6;
   for(let i=0;i<30;i++){
     const mid=(lo+hi)/2;
-    if(conFactor(mid).area < target) lo=mid; else hi=mid;
+    if(areaConFactor(mid) < target) lo=mid; else hi=mid;
   }
-  const resultado = conFactor((lo+hi)/2);
-  if(!resultado.geo){ alert('No se pudo ajustar automáticamente hacia ese lado — probá otra dirección o dibujá de nuevo.'); return; }
+  const fFinal = (lo+hi)/2;
+
+  // Con el factor ya encontrado, aplicamos el imán a cada punto estirado — así los que
+  // quedaron cerca del borde real (aunque sea diagonal) se pegan solos, sin dejar huecos.
+  const estiradosImantados = construirEstirados(fFinal).map(ll => snapPoint(ll));
+  const gjFinal = llArrayToGeoJSON(estiradosImantados);
+  let clipFinal;
+  try{ clipFinal = turf.intersect(potreroUtilGeo, gjFinal); }catch(e){ clipFinal = null; }
+  if(!clipFinal){ alert('No se pudo ajustar automáticamente hacia ese lado — probá otra dirección o dibujá de nuevo.'); return; }
+  const areaFinal = turf.area(clipFinal)/10000;
 
   const NOMBRES = {N:'norte', S:'sur', E:'este', O:'oeste'};
-  cutPreview = { geojson: resultado.geo, areaHa: resultado.area, t:null, anchoInicio:null, anchoFinal:null, largo:null, esManual:true, finalPts:null };
+  cutPreview = { geojson: clipFinal, areaHa: areaFinal, t:null, anchoInicio:null, anchoFinal:null, largo:null, esManual:true, finalPts:null };
   renderCutPreview();
   document.getElementById('medidasBox').innerHTML = `
     <div class="medidas">
-      <div class="m-row"><span>Área ajustada</span><b>${resultado.area.toFixed(2)} ha</b></div>
-      <div class="small">✏️ Forma manual, estirada hacia el ${NOMBRES[direccion]} (el lado opuesto quedó fijo) para acercarse a las ${target.toFixed(2)} ha pedidas.</div>
+      <div class="m-row"><span>Área ajustada</span><b>${areaFinal.toFixed(2)} ha</b></div>
+      <div class="small">✏️ Forma manual, estirada hacia el ${NOMBRES[direccion]} y pegada al borde real (el lado opuesto quedó fijo) para acercarse a las ${target.toFixed(2)} ha pedidas.</div>
     </div>`;
   document.getElementById('notaSobrante').innerHTML = '';
   checkOverlap();
