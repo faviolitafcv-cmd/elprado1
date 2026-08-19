@@ -100,6 +100,7 @@ button:disabled{opacity:.35; cursor:not-allowed;}
 .cmp-new{color:var(--gold2); font-weight:700;}
 .cmp-diff-up{color:var(--green-soft);}
 .cmp-diff-down{color:var(--red);}
+.grid4{display:grid; grid-template-columns:1fr 1fr; gap:6px;}
 </style>
 </head>
 <body>
@@ -1297,8 +1298,14 @@ function cerrarParcelaManual(){
   const notaBox = document.getElementById('notaSobrante');
   if(target>0 && Math.abs(target-areaHa)>0.05){
     notaBox.innerHTML = `<div class="banner warn">
-      Dibujaste <b>${areaHa.toFixed(2)} ha</b>, pero necesitás <b>${target.toFixed(2)} ha</b>.
-      <button class="btn-outline" style="margin-top:6px;width:100%" onclick="ajustarFormaManualAlObjetivo()">🔧 Ajustar automáticamente a ${target.toFixed(2)} ha</button>
+      Dibujaste <b>${areaHa.toFixed(2)} ha</b>, pero necesitás <b>${target.toFixed(2)} ha</b>.<br>
+      Elegí hacia qué lado ${areaHa<target?'agrandar':'achicar'} — el lado opuesto queda fijo, para no invadir otra parcela:
+      <div class="grid4" style="margin-top:6px">
+        <button class="btn-outline" onclick="ajustarFormaManualAlObjetivo('N')">⬆️ Norte</button>
+        <button class="btn-outline" onclick="ajustarFormaManualAlObjetivo('S')">⬇️ Sur</button>
+        <button class="btn-outline" onclick="ajustarFormaManualAlObjetivo('E')">➡️ Este</button>
+        <button class="btn-outline" onclick="ajustarFormaManualAlObjetivo('O')">⬅️ Oeste</button>
+      </div>
     </div>`;
   } else {
     notaBox.innerHTML = '';
@@ -1314,41 +1321,52 @@ function cerrarParcelaManual(){
   }
 }
 
-// Agranda/achica la forma dibujada, en proporción desde su propio centro, hasta calzar
-// justo con las hectáreas pedidas — sin tener que deshacer y volver a dibujar todo de nuevo.
-function ajustarFormaManualAlObjetivo(){
+// Agranda/achica la forma dibujada hacia UN SOLO lado (Norte/Sur/Este/Oeste) — el lado opuesto
+// queda anclado, fijo, para no crecer nunca sobre una parcela vecina ya armada.
+function ajustarFormaManualAlObjetivo(direccion){
   const target = parseFloat(document.getElementById('fHaNecesaria').value)||0;
   if(!target || !ultimoDibujoManualRaw || !potreroClosed) return;
-  const latRef = avgLat(potreroClosed.latlngs);
-  const centroidCoords = turf.centroid(llArrayToGeoJSON(ultimoDibujoManualRaw)).geometry.coordinates; // [lng,lat]
-  const cXY = llToXY(L.latLng(centroidCoords[1], centroidCoords[0]), latRef);
+
+  // Norte/Sur mueven la latitud; Este/Oeste mueven la longitud. El ancla es el lado OPUESTO
+  // a la dirección de crecimiento (si crezco al norte, el sur queda fijo, y viceversa).
+  const lats = ultimoDibujoManualRaw.map(ll=>ll.lat);
+  const lngs = ultimoDibujoManualRaw.map(ll=>ll.lng);
+  let ancla, eje; // eje: 'lat' o 'lng'
+  if(direccion==='N'){ ancla = Math.min(...lats); eje='lat'; }
+  if(direccion==='S'){ ancla = Math.max(...lats); eje='lat'; }
+  if(direccion==='E'){ ancla = Math.min(...lngs); eje='lng'; }
+  if(direccion==='O'){ ancla = Math.max(...lngs); eje='lng'; }
 
   function conFactor(f){
-    const escalados = ultimoDibujoManualRaw.map(ll=>{
-      const p = llToXY(ll, latRef);
-      const nx = cXY.x + (p.x-cXY.x)*f, ny = cXY.y + (p.y-cXY.y)*f;
-      const o = xyToLL({x:nx, y:ny}, latRef);
-      return L.latLng(o.lat, o.lng);
+    const estirados = ultimoDibujoManualRaw.map(ll=>{
+      if(eje==='lat'){
+        const nuevaLat = ancla + (ll.lat - ancla)*f;
+        return L.latLng(nuevaLat, ll.lng);
+      } else {
+        const nuevaLng = ancla + (ll.lng - ancla)*f;
+        return L.latLng(ll.lat, nuevaLng);
+      }
     });
-    const gj = llArrayToGeoJSON(escalados);
+    const gj = llArrayToGeoJSON(estirados);
     let clip; try{ clip = turf.intersect(potreroUtilGeo, gj); }catch(e){ clip=null; }
     return { area: clip ? turf.area(clip)/10000 : 0, geo: clip };
   }
 
-  let lo=0.05, hi=4;
+  let lo=0.05, hi=6;
   for(let i=0;i<30;i++){
     const mid=(lo+hi)/2;
     if(conFactor(mid).area < target) lo=mid; else hi=mid;
   }
   const resultado = conFactor((lo+hi)/2);
-  if(!resultado.geo){ alert('No se pudo ajustar automáticamente esa forma. Probá dibujarla de nuevo.'); return; }
+  if(!resultado.geo){ alert('No se pudo ajustar automáticamente hacia ese lado — probá otra dirección o dibujá de nuevo.'); return; }
 
+  const NOMBRES = {N:'norte', S:'sur', E:'este', O:'oeste'};
   cutPreview = { geojson: resultado.geo, areaHa: resultado.area, t:null, anchoInicio:null, anchoFinal:null, largo:null, esManual:true, finalPts:null };
   renderCutPreview();
   document.getElementById('medidasBox').innerHTML = `
     <div class="medidas">
       <div class="m-row"><span>Área ajustada</span><b>${resultado.area.toFixed(2)} ha</b></div>
-      <div class="small">✏️ Forma manual, escalada automáticamente desde su centro para acercarse a las ${target.toFixed(2)} ha pedidas.</div>
+      <div class="small">✏️ Forma manual, estirada hacia el ${NOMBRES[direccion]} (el lado opuesto quedó fijo) para acercarse a las ${target.toFixed(2)} ha pedidas.</div>
     </div>`;
   document.getElementById('notaSobrante').innerHTML = '';
   checkOverlap();
