@@ -496,7 +496,9 @@ function onMapClick(e){
     return;
   }
   if(drawingParcelaManual){
-    parcelaManualPoints.push(e.latlng);
+    const snapped = snapPoint(e.latlng);
+    parcelaManualPoints.push(snapped);
+    if(manualPreviewLine){ map.removeLayer(manualPreviewLine); manualPreviewLine=null; }
     redrawParcelaManualTemp();
     document.getElementById('btnManCerrar').disabled = parcelaManualPoints.length < 3;
     return;
@@ -1125,6 +1127,7 @@ function updateAnchoFijoInfo(){
 
 function setModoAncho(m){
   modoAncho = m;
+  if(m!=='MANUAL' && drawingParcelaManual){ detenerDibujoManual(); clearParcelaManualTemp(); parcelaManualPoints=[]; document.getElementById('btnManDraw').textContent='✏️ Dibujar'; }
   document.getElementById('btnModoConst').classList.toggle('active', m==='CONSTANTE');
   document.getElementById('btnModoTrap').classList.toggle('active', m==='TRAPECIO');
   document.getElementById('btnModoManual').classList.toggle('active', m==='MANUAL');
@@ -1146,6 +1149,19 @@ function setModoAncho(m){
 let drawingParcelaManual = false;
 let parcelaManualPoints = [];
 let manualTempMarkers = [], manualTempLine = null;
+let manualPreviewLine = null;
+let ultimoDibujoManualRaw = null;
+
+function onManualMouseMove(e){
+  if(!drawingParcelaManual || !parcelaManualPoints.length) return;
+  const last = parcelaManualPoints[parcelaManualPoints.length-1];
+  const snapped = snapPoint(e.latlng);
+  if(manualPreviewLine) map.removeLayer(manualPreviewLine);
+  manualPreviewLine = L.polyline([last, snapped], {color:'#e8bc40', weight:2, dashArray:'2,7', opacity:.75}).addTo(map);
+  const dist = turf.distance([last.lng,last.lat],[snapped.lng,snapped.lat],{units:'meters'});
+  const info = document.getElementById('manDibujoInfo');
+  if(info) info.innerHTML = '📏 Hasta el cursor: <b>'+Math.round(dist)+' m</b> (tocá para colocar el punto)';
+}
 
 function startDrawParcelaManual(){
   if(!potreroUtilGeo){ alert('Primero cerrá el contorno del potrero.'); return; }
@@ -1154,7 +1170,46 @@ function startDrawParcelaManual(){
   clearParcelaManualTemp();
   document.getElementById('btnManDraw').textContent = '✏️ Dibujando… tocá el mapa';
   document.getElementById('btnManUndo').disabled = false;
+  map.on('mousemove', onManualMouseMove);
 }
+function detenerDibujoManual(){
+  drawingParcelaManual = false;
+  map.off('mousemove', onManualMouseMove);
+  if(manualPreviewLine){ map.removeLayer(manualPreviewLine); manualPreviewLine=null; }
+}
+// ── Imán a bordes cercanos: si tocás cerca del contorno del potrero, una zona excluida
+// o una parcela ya dibujada, el punto se pega exacto a esa línea (sin dejar huecos) ──
+function snapCandidateRings(){
+  const rings = [];
+  if(potreroClosed) rings.push(potreroClosed.latlngs);
+  exclusionZones.forEach(z=>{ try{ rings.push(geoJSONToLL(z.geojson).map(c=>L.latLng(c[0],c[1]))); }catch(e){} });
+  parcelas.forEach(p=>{ if(p.geojson){ try{ rings.push(geoJSONToLL(p.geojson).map(c=>L.latLng(c[0],c[1]))); }catch(e){} } });
+  return rings;
+}
+function closestPointOnSegmentPx(p,a,b){
+  const dx=b.x-a.x, dy=b.y-a.y;
+  const len2=dx*dx+dy*dy;
+  let t = len2>0 ? ((p.x-a.x)*dx+(p.y-a.y)*dy)/len2 : 0;
+  t = Math.max(0,Math.min(1,t));
+  return L.point(a.x+t*dx, a.y+t*dy);
+}
+function snapPoint(latlng){
+  const UMBRAL_PX = 16;
+  const clickPt = map.latLngToContainerPoint(latlng);
+  let best=null, bestDist=Infinity;
+  snapCandidateRings().forEach(ring=>{
+    for(let i=0;i<ring.length;i++){
+      const a = map.latLngToContainerPoint(ring[i]);
+      const b = map.latLngToContainerPoint(ring[(i+1)%ring.length]);
+      const proj = closestPointOnSegmentPx(clickPt, a, b);
+      const d = clickPt.distanceTo(proj);
+      if(d<bestDist){ bestDist=d; best=proj; }
+    }
+  });
+  if(best && bestDist<=UMBRAL_PX) return map.containerPointToLatLng(best);
+  return latlng;
+}
+
 function redrawParcelaManualTemp(){
   clearParcelaManualTempLayersOnly();
   parcelaManualPoints.forEach(ll=>{
@@ -1211,17 +1266,19 @@ function clearParcelaManualTemp(){
 function undoParcelaManualPoint(){
   if(!drawingParcelaManual || !parcelaManualPoints.length) return;
   parcelaManualPoints.pop();
+  if(manualPreviewLine){ map.removeLayer(manualPreviewLine); manualPreviewLine=null; }
   redrawParcelaManualTemp();
   document.getElementById('btnManCerrar').disabled = parcelaManualPoints.length < 3;
 }
 function cerrarParcelaManual(){
   if(parcelaManualPoints.length < 3) return;
-  drawingParcelaManual = false;
+  detenerDibujoManual();
   clearParcelaManualTemp();
   document.getElementById('btnManDraw').textContent = '✏️ Dibujar';
   document.getElementById('btnManUndo').disabled = true;
 
-  const gj = llArrayToGeoJSON(parcelaManualPoints);
+  ultimoDibujoManualRaw = parcelaManualPoints.slice();
+  const gj = llArrayToGeoJSON(ultimoDibujoManualRaw);
   let clip;
   try{ clip = turf.intersect(potreroUtilGeo, gj); }catch(e){ clip = null; }
   if(!clip){ alert('Esa forma no cae dentro del potrero — probá de nuevo.'); return; }
@@ -1235,6 +1292,18 @@ function cerrarParcelaManual(){
       <div class="small">✏️ Forma manual — recortada automáticamente al borde real del potrero y a las zonas excluidas.</div>
     </div>`;
   checkOverlap();
+
+  const target = parseFloat(document.getElementById('fHaNecesaria').value)||0;
+  const notaBox = document.getElementById('notaSobrante');
+  if(target>0 && Math.abs(target-areaHa)>0.05){
+    notaBox.innerHTML = `<div class="banner warn">
+      Dibujaste <b>${areaHa.toFixed(2)} ha</b>, pero necesitás <b>${target.toFixed(2)} ha</b>.
+      <button class="btn-outline" style="margin-top:6px;width:100%" onclick="ajustarFormaManualAlObjetivo()">🔧 Ajustar automáticamente a ${target.toFixed(2)} ha</button>
+    </div>`;
+  } else {
+    notaBox.innerHTML = '';
+  }
+
   document.getElementById('rowFechas1').style.display = modoEnlazado ? 'none' : 'flex';
   document.getElementById('rowFechas2').style.display = modoEnlazado ? 'none' : 'flex';
   document.getElementById('btnGuardarParcela').style.display = 'block';
@@ -1243,6 +1312,46 @@ function cerrarParcelaManual(){
     if(!document.getElementById('fFechaIng').value) document.getElementById('fFechaIng').value = hoy;
     if(!document.getElementById('fFechaSal').value) document.getElementById('fFechaSal').value = hoy;
   }
+}
+
+// Agranda/achica la forma dibujada, en proporción desde su propio centro, hasta calzar
+// justo con las hectáreas pedidas — sin tener que deshacer y volver a dibujar todo de nuevo.
+function ajustarFormaManualAlObjetivo(){
+  const target = parseFloat(document.getElementById('fHaNecesaria').value)||0;
+  if(!target || !ultimoDibujoManualRaw || !potreroClosed) return;
+  const latRef = avgLat(potreroClosed.latlngs);
+  const centroidCoords = turf.centroid(llArrayToGeoJSON(ultimoDibujoManualRaw)).geometry.coordinates; // [lng,lat]
+  const cXY = llToXY(L.latLng(centroidCoords[1], centroidCoords[0]), latRef);
+
+  function conFactor(f){
+    const escalados = ultimoDibujoManualRaw.map(ll=>{
+      const p = llToXY(ll, latRef);
+      const nx = cXY.x + (p.x-cXY.x)*f, ny = cXY.y + (p.y-cXY.y)*f;
+      const o = xyToLL({x:nx, y:ny}, latRef);
+      return L.latLng(o.lat, o.lng);
+    });
+    const gj = llArrayToGeoJSON(escalados);
+    let clip; try{ clip = turf.intersect(potreroUtilGeo, gj); }catch(e){ clip=null; }
+    return { area: clip ? turf.area(clip)/10000 : 0, geo: clip };
+  }
+
+  let lo=0.05, hi=4;
+  for(let i=0;i<30;i++){
+    const mid=(lo+hi)/2;
+    if(conFactor(mid).area < target) lo=mid; else hi=mid;
+  }
+  const resultado = conFactor((lo+hi)/2);
+  if(!resultado.geo){ alert('No se pudo ajustar automáticamente esa forma. Probá dibujarla de nuevo.'); return; }
+
+  cutPreview = { geojson: resultado.geo, areaHa: resultado.area, t:null, anchoInicio:null, anchoFinal:null, largo:null, esManual:true, finalPts:null };
+  renderCutPreview();
+  document.getElementById('medidasBox').innerHTML = `
+    <div class="medidas">
+      <div class="m-row"><span>Área ajustada</span><b>${resultado.area.toFixed(2)} ha</b></div>
+      <div class="small">✏️ Forma manual, escalada automáticamente desde su centro para acercarse a las ${target.toFixed(2)} ha pedidas.</div>
+    </div>`;
+  document.getElementById('notaSobrante').innerHTML = '';
+  checkOverlap();
 }
 
 // Construye un rectángulo (ancho W constante) centrado en el lado elegido, desde el borde hacia adentro L metros
