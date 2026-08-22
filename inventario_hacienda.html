@@ -354,6 +354,7 @@ tr:hover td{background:rgba(109,186,58,.04);}
   <div class="ar">
     <button class="btn bp" onclick="openImport()">📥 Importar desde Balanza (.xls)</button>
     <button class="btn bs" onclick="openPM()">+ Pesaje Manual</button>
+    <button class="btn bs" onclick="openPMasivo()">✏️ Pesaje Manual Masivo (pegar)</button>
   </div>
 
   <div class="card">
@@ -1125,6 +1126,56 @@ tr:hover td{background:rgba(109,186,58,.04);}
     <div class="mf">
       <button class="btn bs" onclick="cerrar('moPM')">Cancelar</button>
       <button class="btn bp" onclick="savePM()">💾 Guardar Pesaje</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Pesaje Manual Masivo -->
+<div class="mo" id="moPMasivo">
+  <div class="md md-lg" style="max-width:680px;">
+    <div class="mh"><div class="mt">✏️ Pesaje Manual Masivo (pegar)</div><button class="mc" onclick="cerrar('moPMasivo')">✕</button></div>
+    <div class="mb">
+      <div class="fg">
+        <div class="fm"><label>Grupo a controlar *</label>
+          <select id="pmasGrupo" onchange="actualizarFaltantesPreview()">
+            <option value="">— Elegí un grupo —</option>
+          </select>
+        </div>
+        <div class="fm"><label>Fecha del control *</label><input id="pmasFecha" type="date"></div>
+      </div>
+      <div class="fm" style="margin-top:8px;">
+        <label>Pegá IDE y Peso (desde Excel: dos columnas separadas por tabulador o coma, una fila por animal)</label>
+        <textarea id="pmasPegado" rows="4" placeholder="68000000000001	385.5
+68000000000002	410"
+          style="width:100%;font-size:12px;font-family:monospace;background:var(--card2);border:1px solid var(--brd);border-radius:6px;color:var(--text);padding:8px;margin-top:4px;"></textarea>
+        <button type="button" class="btn bs" style="margin-top:6px;font-size:12px;" onclick="procesarPegadoPesaje()">⬇️ Agregar filas pegadas</button>
+      </div>
+
+      <div style="overflow-x:auto;margin-top:10px;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--brd);color:var(--t2);text-align:left;">
+              <th style="padding:4px;">IDE</th>
+              <th style="padding:4px;">Peso (kg) *</th>
+              <th style="padding:4px;">Estado</th>
+              <th style="padding:4px;"></th>
+            </tr>
+          </thead>
+          <tbody id="pmasTabla"></tbody>
+        </table>
+      </div>
+      <button type="button" class="btn bs" style="margin-top:8px;font-size:12px;" onclick="agregarFilaPesajeManual()">+ Agregar fila</button>
+      <div id="pmasResumen" style="font-size:12px;color:var(--t2);margin-top:8px;"></div>
+
+      <div id="pmasFaltantesBox" style="display:none;margin-top:12px;padding:10px;background:rgba(232,188,64,.08);border:1px solid var(--am,#e8bc40);border-radius:8px;">
+        <div style="font-weight:700;color:var(--am,#e8bc40);margin-bottom:4px;" id="pmasFaltantesTitulo"></div>
+        <div id="pmasFaltantesLista" style="font-size:11px;color:var(--t2);max-height:120px;overflow-y:auto;"></div>
+        <button type="button" class="btn bs" style="margin-top:8px;font-size:12px;" onclick="exportarFaltantes()">⬇️ Exportar faltantes a Excel</button>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn bs" onclick="cerrar('moPMasivo')">Cancelar</button>
+      <button class="btn bp" onclick="guardarPesajeMasivo()">💾 Guardar Control de Pesaje</button>
     </div>
   </div>
 </div>
@@ -2951,6 +3002,152 @@ async function savePM(){
     cerrar('moPM'); renderDash(); renderP();
     ntf('✅ Pesaje registrado'+(migro?' — Animal migró a '+GRUS[gruFinal]:''));
   }catch(e){ntf('Error: '+e.message,true);}
+}
+
+// ══════════════════════════════════════════════
+// PESAJE MANUAL MASIVO (pegar IDE + Peso, y detectar quién falta del grupo)
+// ══════════════════════════════════════════════
+let _pesajeManualRows = [];
+let _ultimosFaltantes = [];
+
+function openPMasivo(){
+  _pesajeManualRows = [];
+  _ultimosFaltantes = [];
+  document.getElementById('pmasGrupo').innerHTML = '<option value="">— Elegí un grupo —</option>' +
+    GRU_ORD.map(g=>`<option value="${g}">${GRUS[g]||g}</option>`).join('');
+  document.getElementById('pmasFecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('pmasPegado').value = '';
+  document.getElementById('pmasFaltantesBox').style.display = 'none';
+  renderTablaPesajeManual();
+  document.getElementById('moPMasivo').classList.add('open');
+}
+
+function procesarPegadoPesaje(){
+  const raw = document.getElementById('pmasPegado').value.trim();
+  if(!raw){ ntf('Pegá al menos una fila antes de procesar', true); return; }
+  const lineas = raw.split('\n').map(l=>l.trim()).filter(Boolean);
+  let agregadas = 0;
+  lineas.forEach(linea=>{
+    const partes = linea.includes('\t') ? linea.split('\t') : linea.split(',');
+    const ide = (partes[0]||'').trim();
+    if(!ide) return;
+    const peso = parseFloat(String(partes[1]||'').replace(',','.'))||0;
+    _pesajeManualRows.push({ ide, peso });
+    agregadas++;
+  });
+  document.getElementById('pmasPegado').value = '';
+  renderTablaPesajeManual();
+  ntf('✅ '+agregadas+' fila(s) agregada(s)');
+}
+
+function agregarFilaPesajeManual(){
+  _pesajeManualRows.push({ ide:'', peso:0 });
+  renderTablaPesajeManual();
+}
+
+function eliminarFilaPesajeManual(idx){
+  _pesajeManualRows.splice(idx,1);
+  renderTablaPesajeManual();
+}
+
+function actualizarFilaPesajeManual(idx, campo, valor){
+  if(!_pesajeManualRows[idx]) return;
+  _pesajeManualRows[idx][campo] = campo==='peso' ? (parseFloat(valor)||0) : valor;
+  renderTablaPesajeManual();
+}
+
+function renderTablaPesajeManual(){
+  const tbody = document.getElementById('pmasTabla');
+  tbody.innerHTML = _pesajeManualRows.map((r,i)=>{
+    const existe = !!animales[r.ide];
+    const estado = !r.ide ? '' : existe ? '<span style="color:var(--gs,#6dba3a)">✓ existe</span>' : '<span style="color:var(--red)">⚠️ no encontrado</span>';
+    return `<tr style="border-bottom:1px solid var(--brd);">
+      <td style="padding:3px;"><input value="${r.ide||''}" oninput="actualizarFilaPesajeManual(${i},'ide',this.value)"
+        style="width:150px;font-size:11px;padding:4px;background:var(--card2);border:1px solid var(--brd);border-radius:4px;color:var(--text);" placeholder="N° chip"></td>
+      <td style="padding:3px;"><input type="number" step="0.1" value="${r.peso||''}" oninput="actualizarFilaPesajeManual(${i},'peso',this.value)"
+        style="width:80px;font-size:11px;padding:4px;background:var(--card2);border:1px solid var(--brd);border-radius:4px;color:var(--text);" placeholder="0.0"></td>
+      <td style="padding:3px;font-size:11px;">${estado}</td>
+      <td style="padding:3px;"><button type="button" onclick="eliminarFilaPesajeManual(${i})" style="background:none;border:none;color:var(--rd);cursor:pointer;font-size:14px;">🗑</button></td>
+    </tr>`;
+  }).join('');
+
+  const validas = _pesajeManualRows.filter(r=>r.ide && animales[r.ide] && r.peso>0);
+  const noEnc = _pesajeManualRows.filter(r=>r.ide && !animales[r.ide]).length;
+  document.getElementById('pmasResumen').innerHTML = _pesajeManualRows.length
+    ? `${validas.length} listo(s) para guardar` + (noEnc?` · <span style="color:var(--red)">⚠️ ${noEnc} IDE no encontrado(s) en el sistema</span>`:'')
+    : '';
+  actualizarFaltantesPreview();
+}
+
+// Compara la lista pegada contra TODOS los animales activos del grupo elegido,
+// y muestra cuáles todavía no aparecieron en este control.
+function actualizarFaltantesPreview(){
+  const grupo = document.getElementById('pmasGrupo')?.value;
+  const box = document.getElementById('pmasFaltantesBox');
+  if(!grupo || !_pesajeManualRows.length){ box.style.display='none'; return; }
+  const idesControlados = new Set(_pesajeManualRows.filter(r=>r.ide).map(r=>r.ide));
+  const delGrupo = Object.values(animales).filter(a=>a.estado==='ACTIVO'&&a.grupo===grupo);
+  _ultimosFaltantes = delGrupo.filter(a=>!idesControlados.has(a.ide));
+
+  if(!delGrupo.length){ box.style.display='none'; return; }
+  box.style.display = 'block';
+  document.getElementById('pmasFaltantesTitulo').textContent =
+    `⚠️ Faltan ${_ultimosFaltantes.length} de ${delGrupo.length} animales de "${GRUS[grupo]||grupo}"`;
+  document.getElementById('pmasFaltantesLista').innerHTML = _ultimosFaltantes.slice(0,30).map(a=>
+    `<div>${a.ide} · ${a.raza||'—'} · ${a.categoria||'—'}</div>`
+  ).join('') + (_ultimosFaltantes.length>30 ? `<div style="margin-top:4px;color:var(--t3)">…y ${_ultimosFaltantes.length-30} más (exportá el Excel para verlos todos)</div>` : '');
+}
+
+function exportarFaltantes(){
+  if(!_ultimosFaltantes.length){ ntf('No hay faltantes para exportar', true); return; }
+  const rows=[['IDE','Raza','Categoría','Grupo','Origen','Peso Últ. Conocido'],
+    ..._ultimosFaltantes.map(a=>{
+      const ultP = pesajes.find(p=>String(p.ide)===a.ide);
+      return [a.ide, a.raza||'', a.categoria||'', GRUS[a.grupo]||a.grupo, a.origen||'', ultP?ultP.peso:a.pesoIngreso];
+    })];
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Faltantes');
+  XLSX.writeFile(wb,'animales_faltantes_'+(document.getElementById('pmasGrupo').value||'grupo')+'.xlsx');
+}
+
+// Guarda todos los pesajes válidos de una sola vez (un único fbPatch, no uno por animal)
+async function guardarPesajeMasivo(){
+  const fecha = document.getElementById('pmasFecha').value;
+  if(!fecha){ ntf('Elegí la fecha del control', true); return; }
+  const validas = _pesajeManualRows.filter(r=>r.ide && animales[r.ide] && r.peso>0);
+  if(!validas.length){ ntf('No hay filas válidas para guardar (IDE existente + peso)', true); return; }
+
+  const grupoNvoGlobal = document.getElementById('pmasGrupo')?.value || '';
+  const upd = {};
+  const nuevosPesajes = [];
+  let migraciones = 0;
+
+  validas.forEach(r=>{
+    const a = animales[r.ide];
+    const ultP = pesajes.find(p=>String(p.ide)===r.ide);
+    const pAnt = ultP ? ultP.peso : a.pesoIngreso;
+    const fAnt = ultP ? ultP.fecha : a.fechaIngreso;
+    const dias = Math.max(1, Math.floor((new Date(fecha+'T12:00:00')-new Date(fAnt+'T12:00:00'))/86400000));
+    const gmd = Math.round(((r.peso-pAnt)/dias)*1000)/1000;
+    // Si elegiste un grupo de control y el animal está en otro, no lo migramos solo — el
+    // "grupo a controlar" acá es SOLO para detectar faltantes, no cambia el grupo de nadie.
+    const gruFinal = a.grupo;
+    const pid = 'p_'+r.ide+'_'+fecha.replace(/-/g,'')+'_masivo';
+    const p = { id:pid, ide:r.ide, fecha, peso:r.peso, gmd, pesoAnterior:pAnt, diasDesde:dias,
+      grupoAnterior:a.grupo, grupoNuevo:gruFinal, migro:false, fuente:'MANUAL_MASIVO', origen:a.origen, usuario };
+    upd['pesajes/'+pid] = p;
+    nuevosPesajes.push(p);
+  });
+
+  try{
+    await fbPatch('', upd);
+    nuevosPesajes.forEach(p=>pesajes.unshift(p));
+    pesajes.sort((a,b)=>b.fecha.localeCompare(a.fecha));
+    cerrar('moPMasivo');
+    renderDash(); renderP();
+    ntf(`✅ ${nuevosPesajes.length} pesaje(s) registrados` + (grupoNvoGlobal && _ultimosFaltantes.length ? ` · quedaron ${_ultimosFaltantes.length} sin controlar` : ''));
+  }catch(e){ ntf('Error: '+e.message, true); }
 }
 
 // ═══════════ PESAJES PAGE ═══════════
