@@ -147,7 +147,7 @@ button:disabled{opacity:.35; cursor:not-allowed;}
       <button class="btn-outline" id="btnVerAnimales" onclick="toggleVerAnimalesAhora()" style="margin-top:6px">🐄 Ver dónde están los animales ahora</button>
       <button class="btn-outline" id="btnVerDescanso" onclick="toggleVerDescansoTodos()" style="margin-top:6px">😴 Ver descanso de todos los potreros</button>
       <div id="leyendaDescanso" class="hint" style="display:none;margin-top:6px">
-        🔴 Recién salido (freno biológico) · 🟢 En su punto óptimo · 🟠 Pasado de punto
+        🔴 Recién salido (freno biológico) · 🟢 En su punto óptimo · 🟠 Pasado de punto · ⚪ Ocupado ahora (sin contar descanso)
       </div>
 
       <div id="detallePotreroBox" style="display:none;margin-top:8px;border:1px solid var(--border2);border-radius:8px;padding:10px;background:var(--bg2)">
@@ -1856,24 +1856,51 @@ async function renderVistaDescansoTodos(){
   const potreroConfig = await fbGet('potreroConfig') || {};
   const hoy = new Date().toISOString().split('T')[0];
 
+  // La fuente real del historial de rotación es "actividades" (el registro completo de
+  // aforos) — no solo lo dibujado en este mapa nuevo, que todavía no cubre todos los potreros.
+  const acts = await fbGet('actividades') || {};
+  const msActs = Object.values(acts).filter(a => a.actividad==='MATERIA SECA' && a.potrero && a.fechaIng);
+  const ultimaSalidaPorPotrero = {};   // último fechaSal registrado, sea del pasado o de hoy/futuro
+  const ocupadoAhoraPorPotrero = {};   // true si HOY cae dentro de algún ingreso→salida activo
+  msActs.forEach(a=>{
+    const fIng = a.fechaIng, fSal = a.fechaSal || a.fechaIng;
+    if(!ultimaSalidaPorPotrero[a.potrero] || fSal > ultimaSalidaPorPotrero[a.potrero]) ultimaSalidaPorPotrero[a.potrero] = fSal;
+    if(fIng<=hoy && fSal>=hoy) ocupadoAhoraPorPotrero[a.potrero] = true;
+  });
+
+  // Unimos los nombres de potreroGeo (para tener el dibujo) con los que aparecen en actividades
+  // (para no perdernos ninguno que todavía no fue digitalizado en el mapa nuevo).
+  const nombresConDibujo = new Set(Object.keys(todos));
   let boundsAcum = null;
-  Object.keys(todos).forEach(nombre=>{
+  let sinDibujo = 0;
+
+  nombresConDibujo.forEach(nombre=>{
     const data = todos[nombre];
     if(!data || !data.potrero || !data.potrero.latlngs) return;
-    const ultimaSalida = ultimaSalidaVueltaReciente(data);
+    const ocupadoAhora = !!ocupadoAhoraPorPotrero[nombre];
+    const ultimaSalida = ultimaSalidaPorPotrero[nombre] || null;
     const variedad = getVariedadMapa(nombre, potreroConfig);
-    let color = '#5aa9e0', texto = nombre, dias = null;
-    if(ultimaSalida){
-      dias = diasEntre(ultimaSalida, hoy);
+
+    let color = '#5aa9e0', texto = nombre;
+    if(ocupadoAhora){
+      color = '#8a8a8a';
+      texto = nombre + ' · 🐄 ocupado';
+    } else if(ultimaSalida){
+      const dias = diasEntre(ultimaSalida, hoy);
       const estado = estadoDescanso(dias, variedad, hoy);
       color = colorEstadoDescanso(estado);
       texto = nombre + ' · ' + dias + 'd';
     }
-    const layer = L.polygon(data.potrero.latlngs, { color, weight:2, opacity:.9, fillColor:color, fillOpacity: ultimaSalida?.28:.04, dashArray: ultimaSalida?null:'4,4' }).addTo(estadoLayerGroup);
+
+    const layer = L.polygon(data.potrero.latlngs, { color, weight:2, opacity:.9, fillColor:color, fillOpacity: (ultimaSalida||ocupadoAhora)?.28:.04, dashArray: (ultimaSalida||ocupadoAhora)?null:'4,4' }).addTo(estadoLayerGroup);
     const labelHtml = `<div style="background:${color};color:#0d1509;font-weight:800;font-size:11px;padding:2px 6px;border-radius:5px;white-space:nowrap;">${texto}</div>`;
     layer.bindTooltip(labelHtml, {permanent:true, direction:'center', className:'potrero-label-dinamico'});
-    if(ultimaSalida){
-      layer.bindPopup(`<b>${nombre}</b> (${variedad})<br>Última salida: ${fmtFechaSlash(ultimaSalida)}<br>Descanso: <b>${dias} días</b>`);
+    if(ocupadoAhora){
+      layer.bindPopup(`<b>${nombre}</b> (${variedad})<br>🐄 Tiene animales ahora mismo — el descanso empieza a contar recién cuando salgan.`);
+    } else if(ultimaSalida){
+      layer.bindPopup(`<b>${nombre}</b> (${variedad})<br>Última salida: ${fmtFechaSlash(ultimaSalida)}<br>Descanso: <b>${diasEntre(ultimaSalida,hoy)} días</b>`);
+    } else {
+      sinDibujo++;
     }
     const b = layer.getBounds();
     boundsAcum = boundsAcum ? boundsAcum.extend(b) : L.latLngBounds(b.getSouthWest(), b.getNorthEast());
