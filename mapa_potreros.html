@@ -91,6 +91,8 @@ button:disabled{opacity:.35; cursor:not-allowed;}
 .leaflet-popup-tip{background:var(--card);}
 .potrero-label{background:rgba(90,169,224,.85); border:none; color:#0d1509; font-weight:700; font-size:11px; padding:2px 6px; border-radius:5px; box-shadow:none;}
 .potrero-label::before{display:none;}
+.ocup-label-v{background:rgba(224,90,74,.95); border:none; color:#fff; font-weight:800; font-size:11px; padding:3px 6px; border-radius:5px; box-shadow:0 1px 6px rgba(0,0,0,.5);}
+.ocup-label-v::before{display:none;}
 .small{font-size:10.5px; color:var(--text3);}
 .cmp-row{display:flex; align-items:center; gap:8px; padding:6px 4px; border-bottom:1px solid var(--border); font-size:12px;}
 .cmp-row input[type=checkbox]{width:auto; accent-color:var(--green2);}
@@ -138,8 +140,24 @@ button:disabled{opacity:.35; cursor:not-allowed;}
     <div class="card" id="cardOverview">
       <div class="card-title">Vista general del campo <span class="badge" id="badgeOverviewCount">0 potreros</span></div>
       <div class="hint" id="totalHaOverview"></div>
-      <p class="hint">Muestra en el mapa, como guía celeste (no editable), todos los potreros que ya digitalizaste — así ves los bordes vecinos y no superponés líneas al dibujar el siguiente.</p>
+      <p class="hint">Muestra en el mapa, como guía celeste (no editable), todos los potreros que ya digitalizaste — así ves los bordes vecinos y no superponés líneas al dibujar el siguiente. <b>Tocá cualquier potrero</b> para ver sus parcelas ya registradas.</p>
       <button class="btn-outline" id="btnOverview" onclick="toggleOverview()">🗺️ Mostrar todos los potreros dibujados</button>
+
+      <div id="detallePotreroBox" style="display:none;margin-top:8px;border:1px solid var(--border2);border-radius:8px;padding:10px;background:var(--bg2)">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div id="detallePotreroNombre" style="font-weight:700;color:var(--gold2)"></div>
+          <button class="btn-red" style="width:auto;padding:3px 8px;font-size:11px" onclick="ocultarParcelasPotrero()">✕ Cerrar</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin:6px 0;font-size:12px;">
+          <span>Desde hace</span>
+          <button class="btn-outline" style="width:auto;padding:2px 8px" onclick="cambiarDiasDetalle(-1)">−</button>
+          <b id="detalleDiasValor">7</b>
+          <button class="btn-outline" style="width:auto;padding:2px 8px" onclick="cambiarDiasDetalle(1)">+</button>
+          <span>días</span>
+        </div>
+        <div id="detallePotreroResumen" class="hint"></div>
+        <div id="detallePotreroLista" style="margin-top:6px;max-height:220px;overflow-y:auto"></div>
+      </div>
     </div>
 
     <!-- SINCRONIZACIÓN MASIVA -->
@@ -338,6 +356,8 @@ let autoActualizarOficial = null; // null=no preguntado todavía · true/false=d
 let modoMasivo = true; // ACTIVADO por default: dibujar/cerrar potreros NO toca potreroAreas hasta que vos lo decidas
 let overviewOn = false;
 let overviewLayerGroup = L.layerGroup();
+let detalleParcelasLayerGroup = L.layerGroup();
+let potreroDetalleActual = null; // nombre del potrero cuyo detalle está mostrado ahora
 let potreroAreasOficial = {}; // lo que ya existe en tu sistema real (potreroAreas)
 
 async function fbPatch(key, obj){
@@ -802,6 +822,8 @@ function toggleModoMasivo(){
 // ══════════════════════════════════════════════
 // VISTA GENERAL — todos los potreros ya dibujados, como guía celeste no editable
 // ══════════════════════════════════════════════
+let _todosPotrerosCache = {}; // último fetch de potreroGeo completo, para no re-descargar al tocar un potrero
+
 async function toggleOverview(){
   const btn = document.getElementById('btnOverview');
   if(overviewOn){
@@ -810,10 +832,12 @@ async function toggleOverview(){
     overviewOn = false;
     btn.textContent = '🗺️ Mostrar todos los potreros dibujados';
     document.getElementById('totalHaOverview').innerHTML = '';
+    ocultarParcelasPotrero();
     return;
   }
   btn.textContent = '⏳ Cargando todos los potreros…';
   const todos = await fbGet('potreroGeo') || {};
+  _todosPotrerosCache = todos;
   overviewLayerGroup.clearLayers();
   let count = 0;
   let totalHa = 0;
@@ -827,12 +851,12 @@ async function toggleOverview(){
       color: isActual ? '#6dba3a' : '#5aa9e0',
       weight: isActual ? 0 : 2,
       opacity: .85,
-      fillOpacity: isActual ? 0 : .05,
-      interactive: false,
+      fillOpacity: isActual ? 0 : .07,
       dashArray: isActual ? null : '4,4'
     });
     if(!isActual){
       layer.bindTooltip(nombre, {permanent:true, direction:'center', className:'potrero-label'});
+      layer.on('click', () => mostrarParcelasPotrero(nombre));
     }
     layer.addTo(overviewLayerGroup);
     count++;
@@ -1802,6 +1826,96 @@ function actualizarResumenHa(){
   const el = document.getElementById('resumenHa');
   if(!el) return;
   el.textContent = potreroUtilGeo ? (turf.area(potreroUtilGeo)/10000).toFixed(2) + ' ha' : '—';
+}
+
+// ══════════════════════════════════════════════
+// DETALLE DE PARCELAS AL TOCAR UN POTRERO EN LA VISTA GENERAL
+// ══════════════════════════════════════════════
+let diasHaciaAtrasDetalle = 7; // por defecto — ajustable con el selector que aparece
+
+function geoJSONToLLdet(gj){
+  const ring = gj.geometry.coordinates[0];
+  return ring.map(c=>[c[1], c[0]]);
+}
+
+function mostrarParcelasPotrero(nombre){
+  potreroDetalleActual = nombre;
+  renderDetalleParcelasPotrero();
+}
+
+function renderDetalleParcelasPotrero(){
+  const nombre = potreroDetalleActual;
+  detalleParcelasLayerGroup.clearLayers();
+  if(!nombre){ detalleParcelasLayerGroup.remove(); document.getElementById('detallePotreroBox').style.display='none'; return; }
+
+  const data = _todosPotrerosCache[nombre];
+  const hoy = new Date().toISOString().split('T')[0];
+  const fechaDesde = sumarDiasSimple(hoy, -diasHaciaAtrasDetalle);
+
+  const box = document.getElementById('detallePotreroBox');
+  box.style.display = 'block';
+  document.getElementById('detallePotreroNombre').textContent = '📋 ' + nombre;
+
+  if(!data || !data.parcelas || !data.parcelas.length){
+    document.getElementById('detallePotreroLista').innerHTML = '<div class="hint">Este potrero todavía no tiene ninguna parcela registrada.</div>';
+    detalleParcelasLayerGroup.addTo(map);
+    return;
+  }
+
+  // Sin límite hacia adelante — mostramos tanto lo ya pastoreado reciente como lo planificado a futuro,
+  // solo recortamos hacia atrás (para no ensuciar la vista con parcelas de hace un mes).
+  const enVentana = data.parcelas.filter(p => (p.fechaIngISO||'').split('T')[0] >= fechaDesde);
+  const ocupadaAhoraNum = [];
+
+  const filas = enVentana
+    .slice()
+    .sort((a,b)=> (a.fechaIngISO||'').localeCompare(b.fechaIngISO||''))
+    .map(p=>{
+      const fIng = (p.fechaIngISO||'').split('T')[0];
+      const fSal = (p.fechaSalISO||'').split('T')[0];
+      const ocupadaAhora = fIng && fSal && fIng<=hoy && fSal>=hoy;
+      if(ocupadaAhora) ocupadaAhoraNum.push(p.num);
+      const color = ocupadaAhora ? '#e05a4a' : '#5aa9e0';
+      if(p.geojson){
+        const ll = geoJSONToLLdet(p.geojson);
+        const layer = L.polygon(ll, { color, weight:2, fillColor:color, fillOpacity: ocupadaAhora?.55:.3 }).addTo(detalleParcelasLayerGroup);
+        layer.bindTooltip('P'+p.num + (ocupadaAhora?' 🐄':''), {permanent:true, direction:'center', className: ocupadaAhora?'ocup-label-v':'potrero-label'});
+      }
+      return `<div class="ficha-row" style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:11.5px;">
+        <span>${ocupadaAhora?'🐄 ':''}Parcela ${p.num} <span class="small">(${p.areaHa?.toFixed(2)||'—'} ha)</span></span>
+        <span style="color:${ocupadaAhora?'var(--red)':'var(--text2)'}">${fmtFechaSlash(fIng)} → ${fmtFechaSlash(fSal)}</span>
+      </div>`;
+    }).join('');
+
+  document.getElementById('detallePotreroLista').innerHTML = filas || '<div class="hint">Ninguna parcela dentro de este rango de fechas — probá ampliar los días.</div>';
+  document.getElementById('detallePotreroResumen').innerHTML =
+    `${enVentana.length} parcela(s) desde el ${fmtFechaSlash(fechaDesde)}` +
+    (ocupadaAhoraNum.length ? ` · 🐄 ocupada ahora: Parcela ${ocupadaAhoraNum.join(', ')}` : ' · Ninguna ocupada hoy');
+
+  detalleParcelasLayerGroup.addTo(map);
+  if(data.potrero && data.potrero.latlngs){
+    map.fitBounds(L.polygon(data.potrero.latlngs).getBounds(), {padding:[30,30]});
+  }
+}
+
+function cambiarDiasDetalle(delta){
+  diasHaciaAtrasDetalle = Math.max(1, diasHaciaAtrasDetalle + delta);
+  document.getElementById('detalleDiasValor').textContent = diasHaciaAtrasDetalle;
+  renderDetalleParcelasPotrero();
+}
+
+function ocultarParcelasPotrero(){
+  potreroDetalleActual = null;
+  detalleParcelasLayerGroup.clearLayers();
+  detalleParcelasLayerGroup.remove();
+  const box = document.getElementById('detallePotreroBox');
+  if(box) box.style.display = 'none';
+}
+
+function sumarDiasSimple(f, n){
+  const d = new Date(f+'T12:00:00');
+  d.setDate(d.getDate()+n);
+  return d.toISOString().split('T')[0];
 }
 
 function toggleAvanzado(){
