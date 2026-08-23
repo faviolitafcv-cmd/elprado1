@@ -1206,8 +1206,8 @@ function closestPointOnSegmentPx(p,a,b){
   t = Math.max(0,Math.min(1,t));
   return L.point(a.x+t*dx, a.y+t*dy);
 }
-function snapPoint(latlng){
-  const UMBRAL_PX = 16;
+function snapPoint(latlng, umbralPx){
+  const UMBRAL_PX = umbralPx || 16;
   const clickPt = map.latLngToContainerPoint(latlng);
   let best=null, bestDist=Infinity;
   snapCandidateRings().forEach(ring=>{
@@ -1303,7 +1303,9 @@ function cerrarParcelaManual(){
     <div class="medidas">
       <div class="m-row"><span>Área dibujada</span><b>${areaHa.toFixed(2)} ha</b></div>
       <div class="small">✏️ Forma manual — recortada automáticamente al borde real del potrero y a las zonas excluidas.</div>
-    </div>` + renderMedidasLadosManual(clip);
+    </div>
+    <button class="btn-outline" style="margin-top:6px;width:100%" onclick="repegarUltimoDibujo()">🧲 Pegar los bordes sueltos al contorno real</button>
+    ` + renderMedidasLadosManual(clip);
   checkOverlap();
 
   const target = parseFloat(document.getElementById('fHaNecesaria').value)||0;
@@ -1389,9 +1391,51 @@ function ajustarFormaManualAlObjetivo(direccion){
     <div class="medidas">
       <div class="m-row"><span>Área ajustada</span><b>${areaFinal.toFixed(2)} ha</b></div>
       <div class="small">✏️ Forma manual, estirada hacia el ${NOMBRES[direccion]} y pegada al borde real (el lado opuesto quedó fijo) para acercarse a las ${target.toFixed(2)} ha pedidas.</div>
-    </div>` + renderMedidasLadosManual(clipFinal);
+    </div>
+    <button class="btn-outline" style="margin-top:6px;width:100%" onclick="repegarUltimoDibujo()">🧲 Pegar los bordes sueltos al contorno real</button>
+    ` + renderMedidasLadosManual(clipFinal);
   document.getElementById('notaSobrante').innerHTML = '';
   checkOverlap();
+}
+
+// Vuelve a pegar CADA punto del último dibujo manual al borde real (potrero, zonas excluidas
+// o parcelas ya cortadas) con un margen más amplio que el del imán normal al dibujar — para
+// cuando dibujaste "al ojo" con poco zoom y algún punto quedó corto sin llegar al borde
+// (el recorte automático solo saca lo que se pasa PARA AFUERA, nunca estira lo que quedó corto).
+function repegarUltimoDibujo(){
+  if(!ultimoDibujoManualRaw || !potreroClosed){ alert('No hay ningún dibujo manual reciente para repegar.'); return; }
+  const UMBRAL_GENEROSO_PX = 45;
+  const repegados = ultimoDibujoManualRaw.map(ll => snapPoint(ll, UMBRAL_GENEROSO_PX));
+  const gj = llArrayToGeoJSON(repegados);
+  let clip;
+  try{ clip = turf.intersect(getRestanteActual(), gj); }catch(e){ clip = null; }
+  if(!clip){ alert('No se pudo recalcular después de repegar — probá dibujar de nuevo.'); return; }
+  ultimoDibujoManualRaw = repegados; // el ajuste direccional, si lo usás después, parte de esta versión ya pegada
+  const areaHa = turf.area(clip)/10000;
+  cutPreview = { geojson: clip, areaHa, t:null, anchoInicio:null, anchoFinal:null, largo:null, esManual:true, finalPts:null };
+  renderCutPreview();
+  document.getElementById('medidasBox').innerHTML = `
+    <div class="medidas">
+      <div class="m-row"><span>Área (repegada)</span><b>${areaHa.toFixed(2)} ha</b></div>
+      <div class="small">🧲 Cada punto se volvió a pegar al borde real más cercano — ya no deberían quedar espacios sueltos.</div>
+    </div>
+    <button class="btn-outline" style="margin-top:6px;width:100%" onclick="repegarUltimoDibujo()">🧲 Pegar los bordes sueltos al contorno real</button>
+    ` + renderMedidasLadosManual(clip);
+  checkOverlap();
+  const target = parseFloat(document.getElementById('fHaNecesaria').value)||0;
+  if(target>0 && Math.abs(target-areaHa)>0.05){
+    document.getElementById('notaSobrante').innerHTML = `<div class="banner warn">
+      Ahora da <b>${areaHa.toFixed(2)} ha</b>, necesitás <b>${target.toFixed(2)} ha</b>.<br>
+      <div class="grid4" style="margin-top:6px">
+        <button class="btn-outline" onclick="ajustarFormaManualAlObjetivo('N')">⬆️ Norte</button>
+        <button class="btn-outline" onclick="ajustarFormaManualAlObjetivo('S')">⬇️ Sur</button>
+        <button class="btn-outline" onclick="ajustarFormaManualAlObjetivo('E')">➡️ Este</button>
+        <button class="btn-outline" onclick="ajustarFormaManualAlObjetivo('O')">⬅️ Oeste</button>
+      </div>
+    </div>`;
+  } else {
+    document.getElementById('notaSobrante').innerHTML = '';
+  }
 }
 
 // Construye un rectángulo (ancho W constante) centrado en el lado elegido, desde el borde hacia adentro L metros
