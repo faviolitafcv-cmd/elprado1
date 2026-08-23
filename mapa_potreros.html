@@ -286,6 +286,7 @@ button:disabled{opacity:.35; cursor:not-allowed;}
       <div class="card-title">📏 Medir distancias</div>
       <p class="hint">Tocá dos puntos en el mapa (se pegan al borde más cercano, como al dibujar) y te digo la distancia — usalo las veces que quieras, para el lado que necesites pasarle al armador.</p>
       <button class="btn-outline" id="btnReglaToggle" onclick="toggleRegla()">📏 Empezar a medir</button>
+      <div id="reglaPreviewInfo" class="hint" style="margin-top:6px;color:var(--gold2)"></div>
       <div id="reglaLista" class="hint" style="margin-top:6px"></div>
       <button class="btn-red" id="btnReglaLimpiar" onclick="limpiarMediciones()" style="display:none;margin-top:6px">🗑️ Borrar medidas</button>
     </div>
@@ -485,6 +486,9 @@ async function initMap(){
     maxZoom: 20, attribution: 'Esri World Imagery'
   }).addTo(map);
   map.on('click', onMapClick);
+  // Mientras estás midiendo, si el clic cae sobre una parcela ya dibujada, su cartel de info
+  // se abriría encima y taparía la medida — lo cerramos automático para que no estorbe.
+  map.on('popupopen', function(){ if(midiendo) map.closePopup(); });
   const inicio = await fbGet('mapaInicio');
   if(inicio && inicio.lat && inicio.lng){
     map.setView([inicio.lat, inicio.lng], inicio.zoom || 16);
@@ -1720,6 +1724,7 @@ function fmtFecha(iso){ const [f]=iso.split('T'); const [y,m,d]=f.split('-'); re
 let midiendo = false;
 let reglaPuntoA = null;
 let reglaLineaTemp = null;
+let reglaPreviewLinea = null;
 let mediciones = []; // {a, b, dist, layer, label}
 
 function toggleRegla(){
@@ -1727,8 +1732,24 @@ function toggleRegla(){
   midiendo = !midiendo;
   reglaPuntoA = null;
   if(reglaLineaTemp){ map.removeLayer(reglaLineaTemp); reglaLineaTemp=null; }
+  if(reglaPreviewLinea){ map.removeLayer(reglaPreviewLinea); reglaPreviewLinea=null; }
   document.getElementById('btnReglaToggle').textContent = midiendo ? '✕ Terminar de medir' : '📏 Empezar a medir';
   document.getElementById('btnReglaToggle').classList.toggle('active', midiendo);
+  if(midiendo){ map.on('mousemove', onReglaMouseMove); }
+  else { map.off('mousemove', onReglaMouseMove); }
+}
+
+// Vista previa en vivo: mientras te alejás del primer punto (con el mouse, o el dedo antes
+// de soltar en algunos celulares), la línea y la medida te van siguiendo, como al dibujar.
+function onReglaMouseMove(e){
+  if(!midiendo || !reglaPuntoA) return;
+  const snapped = snapPoint(e.latlng);
+  if(reglaPreviewLinea) map.removeLayer(reglaPreviewLinea);
+  reglaPreviewLinea = L.polyline([reglaPuntoA, snapped], {color:'#5aa9e0', weight:2, dashArray:'2,7', opacity:.8}).addTo(map);
+  const dist = turf.distance([reglaPuntoA.lng,reglaPuntoA.lat],[snapped.lng,snapped.lat],{units:'meters'});
+  const box = document.getElementById('reglaLista');
+  box.dataset.preview = Math.round(dist);
+  document.getElementById('reglaPreviewInfo').innerHTML = '📏 Hasta el cursor: <b>'+Math.round(dist)+' m</b> (tocá para fijar la medida)';
 }
 
 function clickRegla(latlng){
@@ -1740,6 +1761,8 @@ function clickRegla(latlng){
   }
   const dist = turf.distance([reglaPuntoA.lng,reglaPuntoA.lat],[snapped.lng,snapped.lat],{units:'meters'});
   if(reglaLineaTemp){ map.removeLayer(reglaLineaTemp); reglaLineaTemp=null; }
+  if(reglaPreviewLinea){ map.removeLayer(reglaPreviewLinea); reglaPreviewLinea=null; }
+  document.getElementById('reglaPreviewInfo').innerHTML = '';
   const mid = L.latLng((reglaPuntoA.lat+snapped.lat)/2, (reglaPuntoA.lng+snapped.lng)/2);
   const layer = L.polyline([reglaPuntoA, snapped], {color:'#5aa9e0', weight:3}).addTo(map);
   const label = L.marker(mid, {
