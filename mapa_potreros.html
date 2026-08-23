@@ -902,20 +902,13 @@ function distPointToSegment(p,a,b){
 }
 
 function selectEdgeAt(clickLatLng){
+  const restante = getRestanteActual();
+  const rings = allRingsLatLngs(restante);
+  if(!rings.length) return;
   const latRef = avgLat(potreroClosed.latlngs);
   const clickXY = llToXY(clickLatLng, latRef);
   let best=null, bestDist=Infinity;
-  // Bordes del contorno exterior del potrero
-  const pts = potreroClosed.latlngs;
-  for(let i=0;i<pts.length;i++){
-    const a=pts[i], b=pts[(i+1)%pts.length];
-    const d = distPointToSegment(clickXY, llToXY(a,latRef), llToXY(b,latRef));
-    if(d<bestDist){ bestDist=d; best={a,b}; }
-  }
-  // Bordes de zonas internas (callejones y exclusiones) — así se puede arrancar
-  // una parcela apoyada contra el callejón, de cualquiera de sus dos lados
-  exclusionZones.forEach(z=>{
-    const ring = geoJSONToLL(z.geojson).map(c=>L.latLng(c[0], c[1]));
+  rings.forEach(ring=>{
     for(let i=0;i<ring.length;i++){
       const a=ring[i], b=ring[(i+1)%ring.length];
       const d = distPointToSegment(clickXY, llToXY(a,latRef), llToXY(b,latRef));
@@ -923,31 +916,28 @@ function selectEdgeAt(clickLatLng){
     }
   });
   if(!best) return;
-  buildSelectedEdge(best.a, best.b, lastCutDir);
+  buildSelectedEdge(best.a, best.b);
 }
 
-function buildSelectedEdge(A, B, preferredDir){
+function buildSelectedEdge(A, B){
   const latRef = avgLat(potreroClosed.latlngs);
   const Axy = llToXY(A, latRef), Bxy = llToXY(B, latRef);
   const dlen = Math.hypot(Bxy.x-Axy.x, Bxy.y-Axy.y);
   if(dlen < 0.5) return; // evita bordes degenerados
   const du = { x:(Bxy.x-Axy.x)/dlen, y:(Bxy.y-Axy.y)/dlen };
   let n = { x:-du.y, y:du.x };
-  if(preferredDir){
-    // Ya hay una dirección de avance establecida en esta vuelta (venga de "Continuar" o de volver a
-    // tocar el mapa a mano) — SIEMPRE se hereda, nunca se vuelve a adivinar. Adivinar de nuevo es
-    // lo que causaba el error: lejos del primer borde, cualquier heurística geométrica es ambigua.
-    if(dot(n, preferredDir) < 0) n = { x:-n.x, y:-n.y };
-  } else {
-    // Primer corte de la vuelta: acá SÍ es un borde real del contorno, así que un punto a 1 metro
-    // hacia adentro cae DENTRO del potrero y hacia afuera cae FUERA — señal confiable solo en este caso.
-    const mid = { x:(Axy.x+Bxy.x)/2, y:(Axy.y+Bxy.y)/2 };
-    const testPt = { x: mid.x + n.x*1, y: mid.y + n.y*1 };
-    const testLL = xyToLL(testPt, latRef);
-    let dentro = false;
-    try{ dentro = turf.booleanPointInPolygon([testLL.lng, testLL.lat], potreroClosed.geojson); }catch(e){}
-    if(!dentro) n = { x:-n.x, y:-n.y };
-  }
+
+  // "¿Hacia adónde está el área libre?" — se pregunta SIEMPRE de la misma forma, sin
+  // heredar ninguna dirección de vueltas anteriores: un punto a 1 metro en un sentido u
+  // otro, y nos fijamos de qué lado cae dentro de lo que REALMENTE queda libre ahora
+  // (getRestanteActual) — funciona igual para el primer corte, para "Continuar", o para
+  // arrancar un frente nuevo del lado que sea (incluso el opuesto a donde veníamos).
+  const mid = { x:(Axy.x+Bxy.x)/2, y:(Axy.y+Bxy.y)/2 };
+  const testPt = { x: mid.x + n.x*1, y: mid.y + n.y*1 };
+  const testLL = xyToLL(testPt, latRef);
+  let dentro = false;
+  try{ dentro = turf.booleanPointInPolygon([testLL.lng, testLL.lat], getRestanteActual()); }catch(e){}
+  if(!dentro) n = { x:-n.x, y:-n.y };
 
   let maxT = 0;
   potreroClosed.latlngs.forEach(ll=>{
@@ -982,6 +972,30 @@ function computeRestanteVuelta(){
   try{ return turf.difference(potreroUtilGeo, usado) || null; }
   catch(e){ return potreroUtilGeo; }
 }
+// Fuente ÚNICA de verdad: lo que realmente queda libre AHORA MISMO en esta vuelta.
+// Todo corte nuevo (automático, manual, "el resto") se recorta contra ESTO — así es
+// matemáticamente imposible que una parcela nueva se superponga con una ya guardada,
+// sin importar qué tan preciso haya sido el clic al elegir el borde.
+function getRestanteActual(){
+  return computeRestanteVuelta() || potreroUtilGeo;
+}
+// Todos los anillos (contorno exterior + huecos, como atajados o zonas ya usadas) de un
+// geojson (Polygon o MultiPolygon) — para poder elegir como borde de inicio cualquier
+// línea que hoy esté expuesta, no solo el contorno original del potrero.
+function allRingsLatLngs(geo){
+  if(!geo) return [];
+  let polys;
+  if(geo.geometry.type==='Polygon') polys=[geo.geometry.coordinates];
+  else if(geo.geometry.type==='MultiPolygon') polys=geo.geometry.coordinates;
+  else return [];
+  const rings = [];
+  polys.forEach(coordsSet=>{
+    coordsSet.forEach(ring=>{
+      if(ring.length>=4) rings.push(ring.slice(0,-1).map(c=>L.latLng(c[1], c[0])));
+    });
+  });
+  return rings;
+}
 // Devuelve los vértices (latlng) del contorno exterior del pedazo más grande de un geojson (Polygon o MultiPolygon)
 function exteriorRingLatLngs(geo){
   if(!geo) return [];
@@ -1008,27 +1022,10 @@ function renderRestante(){
 }
 
 function continuarDesdeUltimoCorte(){
-  if(!lastCutEndpoints || !potreroUtilGeo) return;
-  const restante = computeRestanteVuelta();
-  const ring = exteriorRingLatLngs(restante);
-  if(ring.length<3){ alert('No queda área libre en este potrero para esta vuelta.'); return; }
-  // Buscar, dentro del contorno de lo que REALMENTE queda libre (no una línea recta imaginaria),
-  // el borde más cercano al punto donde terminó la última parcela — así la próxima franja
-  // se acomoda al ensanche/angostamiento real en vez de seguir una dirección fija para siempre.
-  const refPoint = L.latLng(
-    (lastCutEndpoints.a.lat+lastCutEndpoints.b.lat)/2,
-    (lastCutEndpoints.a.lng+lastCutEndpoints.b.lng)/2
-  );
-  const latRef = avgLat(ring);
-  const refXY = llToXY(refPoint, latRef);
-  let best=null, bestDist=Infinity;
-  for(let i=0;i<ring.length;i++){
-    const A=ring[i], B=ring[(i+1)%ring.length];
-    const d = distPointToSegment(refXY, llToXY(A,latRef), llToXY(B,latRef));
-    if(d<bestDist){ bestDist=d; best={A,B}; }
-  }
-  if(!best) return;
-  buildSelectedEdge(best.A, best.B, lastCutDir);
+  if(!lastCutEndpoints) return;
+  // Acá SÍ usamos el punto exacto guardado, directo — es más preciso que buscar de nuevo,
+  // y de todas formas el corte queda protegido por getRestanteActual() más abajo.
+  buildSelectedEdge(lastCutEndpoints.a, lastCutEndpoints.b);
 }
 
 // Repara una parcela guardada ANTES de que existiera finalPts: reconstruye el borde lejano
@@ -1102,7 +1099,7 @@ function buildStripPolygon(t){
 function areaAtDepth(t){
   const strip = buildStripPolygon(t);
   let clip;
-  try{ clip = turf.intersect(potreroUtilGeo, strip); }catch(e){ return {area:0, geo:null}; }
+  try{ clip = turf.intersect(getRestanteActual(), strip); }catch(e){ return {area:0, geo:null}; }
   if(!clip) return {area:0, geo:null};
   return { area: turf.area(clip)/10000, geo: clip };
 }
@@ -1296,7 +1293,7 @@ function cerrarParcelaManual(){
   ultimoDibujoManualRaw = parcelaManualPoints.slice();
   const gj = llArrayToGeoJSON(ultimoDibujoManualRaw);
   let clip;
-  try{ clip = turf.intersect(potreroUtilGeo, gj); }catch(e){ clip = null; }
+  try{ clip = turf.intersect(getRestanteActual(), gj); }catch(e){ clip = null; }
   if(!clip){ alert('Esa forma no cae dentro del potrero — probá de nuevo.'); return; }
   const areaHa = turf.area(clip)/10000;
 
@@ -1365,7 +1362,7 @@ function ajustarFormaManualAlObjetivo(direccion){
   }
   function areaConFactor(f){
     const gj = llArrayToGeoJSON(construirEstirados(f));
-    let clip; try{ clip = turf.intersect(potreroUtilGeo, gj); }catch(e){ clip=null; }
+    let clip; try{ clip = turf.intersect(getRestanteActual(), gj); }catch(e){ clip=null; }
     return clip ? turf.area(clip)/10000 : 0;
   }
 
@@ -1381,7 +1378,7 @@ function ajustarFormaManualAlObjetivo(direccion){
   const estiradosImantados = construirEstirados(fFinal).map(ll => snapPoint(ll));
   const gjFinal = llArrayToGeoJSON(estiradosImantados);
   let clipFinal;
-  try{ clipFinal = turf.intersect(potreroUtilGeo, gjFinal); }catch(e){ clipFinal = null; }
+  try{ clipFinal = turf.intersect(getRestanteActual(), gjFinal); }catch(e){ clipFinal = null; }
   if(!clipFinal){ alert('No se pudo ajustar automáticamente hacia ese lado — probá otra dirección o dibujá de nuevo.'); return; }
   const areaFinal = turf.area(clipFinal)/10000;
 
@@ -1411,7 +1408,7 @@ function buildRectPolygon(W, L){
 function rectAtWL(W, L){
   const built = buildRectPolygon(W, L);
   let clip;
-  try{ clip = turf.intersect(potreroUtilGeo, built.poly); }catch(e){ return {area:0, geo:null, farA:built.farA, farB:built.farB}; }
+  try{ clip = turf.intersect(getRestanteActual(), built.poly); }catch(e){ return {area:0, geo:null, farA:built.farA, farB:built.farB}; }
   if(!clip) return {area:0, geo:null, farA:built.farA, farB:built.farB};
   return { area: turf.area(clip)/10000, geo: clip, farA:built.farA, farB:built.farB };
 }
