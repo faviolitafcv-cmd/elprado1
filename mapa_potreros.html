@@ -286,6 +286,8 @@ button:disabled{opacity:.35; cursor:not-allowed;}
     <!-- LISTA -->
     <div class="card">
       <div class="card-title">Parcelas registradas <span class="badge" id="badgeCount">0</span></div>
+      <button class="btn-outline" onclick="verificarSolapamientos()">🔍 Verificar solapamientos entre parcelas</button>
+      <div id="resultadoSolapamiento"></div>
       <div id="listaParcelas" class="hint">Todavía no hay parcelas guardadas.</div>
     </div>
   </div>
@@ -1868,6 +1870,37 @@ function nuevaVuelta(){
   if(restanteLayer){ map.removeLayer(restanteLayer); restanteLayer=null; }
   guardarEnFirebase();
   alert('Nueva vuelta iniciada (solo reinicia la numeración — el historial geográfico se mantiene completo para el cálculo de descanso).');
+}
+
+// Calcula, de verdad (no a ojo), si hay superposición real entre las parcelas de ESTA vuelta.
+// Comparar parcelas de vueltas distintas es normal (reingreso a la misma área) — acá solo
+// nos importa la vuelta actual, donde nunca debería haber dos parcelas pisándose.
+function verificarSolapamientos(){
+  const box = document.getElementById('resultadoSolapamiento');
+  const enVuelta = parcelas.filter(p => p.vuelta === vueltaActual && p.geojson);
+  if(enVuelta.length < 2){
+    box.innerHTML = '<div class="banner info">Necesitás al menos 2 parcelas en esta vuelta para comparar.</div>';
+    return;
+  }
+  const problemas = [];
+  for(let i=0;i<enVuelta.length;i++){
+    for(let j=i+1;j<enVuelta.length;j++){
+      let inter;
+      try{ inter = turf.intersect(enVuelta[i].geojson, enVuelta[j].geojson); }catch(e){ inter = null; }
+      if(!inter) continue;
+      const areaInterHa = turf.area(inter)/10000;
+      if(areaInterHa > 0.01){ // ignoramos ruido de precisión menor a 100 m²
+        problemas.push({ a: enVuelta[i].num, b: enVuelta[j].num, area: areaInterHa });
+      }
+    }
+  }
+  if(!problemas.length){
+    box.innerHTML = `<div class="banner ok">✅ Revisé las ${enVuelta.length} parcelas de la vuelta ${vueltaActual} — ninguna se superpone con otra.</div>`;
+  } else {
+    box.innerHTML = `<div class="banner warn">⚠️ Encontré ${problemas.length} superposición(es):<br>` +
+      problemas.map(p=>`Parcela ${p.a} ↔ Parcela ${p.b}: se pisan en ${p.area.toFixed(3)} ha`).join('<br>') +
+      `</div>`;
+  }
 }
 
 function renderLista(){
