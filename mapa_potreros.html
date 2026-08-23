@@ -93,6 +93,8 @@ button:disabled{opacity:.35; cursor:not-allowed;}
 .potrero-label::before{display:none;}
 .ocup-label-v{background:rgba(224,90,74,.95); border:none; color:#fff; font-weight:800; font-size:11px; padding:3px 6px; border-radius:5px; box-shadow:0 1px 6px rgba(0,0,0,.5);}
 .ocup-label-v::before{display:none;}
+.potrero-label-dinamico{background:transparent!important; border:none!important; box-shadow:none!important; padding:0!important;}
+.potrero-label-dinamico::before{display:none;}
 .small{font-size:10.5px; color:var(--text3);}
 .cmp-row{display:flex; align-items:center; gap:8px; padding:6px 4px; border-bottom:1px solid var(--border); font-size:12px;}
 .cmp-row input[type=checkbox]{width:auto; accent-color:var(--green2);}
@@ -142,6 +144,11 @@ button:disabled{opacity:.35; cursor:not-allowed;}
       <div class="hint" id="totalHaOverview"></div>
       <p class="hint">Muestra en el mapa, como guía celeste (no editable), todos los potreros que ya digitalizaste — así ves los bordes vecinos y no superponés líneas al dibujar el siguiente. <b>Tocá cualquier potrero</b> para ver sus parcelas ya registradas.</p>
       <button class="btn-outline" id="btnOverview" onclick="toggleOverview()">🗺️ Mostrar todos los potreros dibujados</button>
+      <button class="btn-outline" id="btnVerAnimales" onclick="toggleVerAnimalesAhora()" style="margin-top:6px">🐄 Ver dónde están los animales ahora</button>
+      <button class="btn-outline" id="btnVerDescanso" onclick="toggleVerDescansoTodos()" style="margin-top:6px">😴 Ver descanso de todos los potreros</button>
+      <div id="leyendaDescanso" class="hint" style="display:none;margin-top:6px">
+        🔴 Recién salido (freno biológico) · 🟢 En su punto óptimo · 🟠 Pasado de punto
+      </div>
 
       <div id="detallePotreroBox" style="display:none;margin-top:8px;border:1px solid var(--border2);border-radius:8px;padding:10px;background:var(--bg2)">
         <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -1716,6 +1723,167 @@ function checkOverlap(){
   }
 }
 function diasEntre(f1,f2){ return Math.round((new Date(f2+'T12:00:00') - new Date(f1+'T12:00:00'))/86400000); }
+
+// ── Umbrales de descanso reales, por variedad y época del año ──
+// Verano (nov-abr): rango fijo. Seca (may-oct): el mínimo óptimo sube progresivamente
+// mes a mes (interpolación lineal entre el valor de mayo y el de octubre).
+const POTREROS_BASE_MAPA = {
+  BRACHIARIA: ['A6','A7','A8','A9','D1','D2','D3','D4','D5','D6','D7','D8','D9','D10',
+    'D6-N','D6-S','D7-N','D7-S','D8-A','D8-B','D8-C','D9-N','D9-S',
+    '1NN','1SN','1NP','1SP','2NP','2NN','2SN','2SP','3NP','3NN','3SN','3SP',
+    '4NP','4NN','4SN','4SP','CABALLO'],
+  PANICUM: ['A1','A2','A3','A4','A5','B1','B2','B3','B4','B5','B6','B7',
+    'B8','B8-A','B8-B','B9','B9-A','B9-B',
+    'C1','C2','C3','C4','C5','C6','C7','C8','C9','C10','C11','D11','D12','ENTRADA']
+};
+function getVariedadMapa(nombre, potreroConfigCache){
+  const cfg = potreroConfigCache || {};
+  if(cfg[nombre]?.variedad) return cfg[nombre].variedad;
+  if(POTREROS_BASE_MAPA.BRACHIARIA.includes(nombre)) return 'BRACHIARIA';
+  if(POTREROS_BASE_MAPA.PANICUM.includes(nombre)) return 'PANICUM';
+  return 'BRACHIARIA';
+}
+function umbralDescanso(variedad, fechaISO){
+  const mes = parseInt(fechaISO.split('-')[1], 10); // 1-12
+  const esSeca = [5,6,7,8,9,10].includes(mes);
+  const esPanicum = (variedad||'').toUpperCase().includes('PANICUM');
+  if(!esSeca){
+    // Verano: nov-abr
+    return esPanicum ? { malo:16, pasadoDesde:23 } : { malo:19, pasadoDesde:25 };
+  }
+  // Seca: mayo(1)→octubre(6), interpolación lineal del mínimo óptimo
+  const idx = (mes - 5) / 5; // 0 en mayo, 1 en octubre
+  const minOpt = esPanicum ? (30 + (42-30)*idx) : (35 + (50-35)*idx);
+  return { malo: Math.round(minOpt), pasadoDesde: null }; // sin techo definido en seca
+}
+function estadoDescanso(dias, variedad, fechaISO){
+  const u = umbralDescanso(variedad, fechaISO);
+  if(dias < u.malo) return 'malo';
+  if(u.pasadoDesde!=null && dias >= u.pasadoDesde) return 'pasado';
+  return 'optimo';
+}
+function colorEstadoDescanso(estado){
+  return estado==='malo' ? '#e05a4a' : estado==='pasado' ? '#e08a3a' : '#6dba3a';
+}
+// Fecha de la ÚLTIMA salida real de un potrero (la más tardía entre TODAS las parcelas
+// de su vuelta más reciente) — así un potrero dividido en 3 parcelas cuenta el descanso
+// desde que salió la última, no desde que se vació la primera.
+function ultimaSalidaVueltaReciente(data){
+  if(!data || !data.parcelas || !data.parcelas.length) return null;
+  const maxVuelta = Math.max(...data.parcelas.map(p=>p.vuelta||1));
+  const deLaUltima = data.parcelas.filter(p=>(p.vuelta||1)===maxVuelta && p.fechaSalISO);
+  if(!deLaUltima.length) return null;
+  const fechas = deLaUltima.map(p=>p.fechaSalISO.split('T')[0]).sort();
+  return fechas[fechas.length-1];
+}
+
+let estadoLayerGroup = L.layerGroup();
+let modoVistaEstado = null; // null | 'animales' | 'descanso'
+
+async function toggleVerAnimalesAhora(){
+  if(modoVistaEstado==='animales'){ apagarVistaEstado(); return; }
+  await renderVistaAnimalesAhora();
+}
+async function toggleVerDescansoTodos(){
+  if(modoVistaEstado==='descanso'){ apagarVistaEstado(); return; }
+  await renderVistaDescansoTodos();
+}
+function apagarVistaEstado(){
+  modoVistaEstado = null;
+  estadoLayerGroup.clearLayers();
+  estadoLayerGroup.remove();
+  document.getElementById('btnVerAnimales').classList.remove('active');
+  document.getElementById('btnVerDescanso').classList.remove('active');
+  document.getElementById('leyendaDescanso').style.display = 'none';
+  document.getElementById('btnVerAnimales').textContent = '🐄 Ver dónde están los animales ahora';
+  document.getElementById('btnVerDescanso').textContent = '😴 Ver descanso de todos los potreros';
+}
+
+async function renderVistaAnimalesAhora(){
+  apagarVistaEstado();
+  modoVistaEstado = 'animales';
+  document.getElementById('btnVerAnimales').classList.add('active');
+  document.getElementById('btnVerAnimales').textContent = '⏳ Cargando…';
+  const todos = Object.keys(_todosPotrerosCache).length ? _todosPotrerosCache : (_todosPotrerosCache = await fbGet('potreroGeo') || {});
+  const acts = await fbGet('actividades') || {};
+  const actArr = Object.values(acts);
+  const hoy = new Date().toISOString().split('T')[0];
+  const activas = actArr.filter(a => a.actividad==='MATERIA SECA' && a.fechaIng && a.fechaIng<=hoy && (a.fechaSal ? a.fechaSal>=hoy : a.fechaIng===hoy));
+
+  let boundsAcum = null;
+  Object.keys(todos).forEach(nombre=>{
+    const data = todos[nombre];
+    if(!data || !data.potrero || !data.potrero.latlngs) return;
+    const layer = L.polygon(data.potrero.latlngs, { color:'#5aa9e0', weight:1.5, opacity:.5, fillOpacity:.04, dashArray:'4,4' }).addTo(estadoLayerGroup);
+    layer.bindTooltip(nombre, {permanent:true, direction:'center', className:'potrero-label'});
+    const b = layer.getBounds();
+    boundsAcum = boundsAcum ? boundsAcum.extend(b) : L.latLngBounds(b.getSouthWest(), b.getNorthEast());
+  });
+
+  activas.forEach(a=>{
+    const data = todos[a.potrero];
+    if(!data) return;
+    let parcelaGeo = null;
+    if(data.parcelas && data.parcelas.length){
+      if(a.mapaParcelaId) parcelaGeo = data.parcelas.find(p=>p.id===a.mapaParcelaId);
+      if(!parcelaGeo && a.parcela){
+        const cand = data.parcelas.filter(p=>String(p.num)===String(a.parcela));
+        if(cand.length) parcelaGeo = cand[cand.length-1];
+      }
+    }
+    if(parcelaGeo && parcelaGeo.geojson){
+      const ll = geoJSONToLL(parcelaGeo.geojson);
+      const layer = L.polygon(ll, { color:'#e05a4a', weight:2.5, fillColor:'#e05a4a', fillOpacity:.6 }).addTo(estadoLayerGroup);
+      layer.bindTooltip('🐄 '+(a.lote||'—'), {permanent:true, direction:'center', className:'ocup-label-v'});
+    } else if(data.potrero && data.potrero.latlngs){
+      L.polygon(data.potrero.latlngs, { color:'#e05a4a', weight:2.5, fillColor:'#e05a4a', fillOpacity:.3, dashArray:'2,6' })
+        .addTo(estadoLayerGroup)
+        .bindTooltip('🐄 '+(a.lote||'—')+' (potrero)', {permanent:true, direction:'center', className:'ocup-label-v'});
+    }
+  });
+
+  estadoLayerGroup.addTo(map);
+  if(boundsAcum) map.fitBounds(boundsAcum, {padding:[24,24]});
+  document.getElementById('btnVerAnimales').textContent = '✕ Ocultar animales ahora';
+}
+
+async function renderVistaDescansoTodos(){
+  apagarVistaEstado();
+  modoVistaEstado = 'descanso';
+  document.getElementById('btnVerDescanso').classList.add('active');
+  document.getElementById('btnVerDescanso').textContent = '⏳ Cargando…';
+  const todos = Object.keys(_todosPotrerosCache).length ? _todosPotrerosCache : (_todosPotrerosCache = await fbGet('potreroGeo') || {});
+  const potreroConfig = await fbGet('potreroConfig') || {};
+  const hoy = new Date().toISOString().split('T')[0];
+
+  let boundsAcum = null;
+  Object.keys(todos).forEach(nombre=>{
+    const data = todos[nombre];
+    if(!data || !data.potrero || !data.potrero.latlngs) return;
+    const ultimaSalida = ultimaSalidaVueltaReciente(data);
+    const variedad = getVariedadMapa(nombre, potreroConfig);
+    let color = '#5aa9e0', texto = nombre, dias = null;
+    if(ultimaSalida){
+      dias = diasEntre(ultimaSalida, hoy);
+      const estado = estadoDescanso(dias, variedad, hoy);
+      color = colorEstadoDescanso(estado);
+      texto = nombre + ' · ' + dias + 'd';
+    }
+    const layer = L.polygon(data.potrero.latlngs, { color, weight:2, opacity:.9, fillColor:color, fillOpacity: ultimaSalida?.28:.04, dashArray: ultimaSalida?null:'4,4' }).addTo(estadoLayerGroup);
+    const labelHtml = `<div style="background:${color};color:#0d1509;font-weight:800;font-size:11px;padding:2px 6px;border-radius:5px;white-space:nowrap;">${texto}</div>`;
+    layer.bindTooltip(labelHtml, {permanent:true, direction:'center', className:'potrero-label-dinamico'});
+    if(ultimaSalida){
+      layer.bindPopup(`<b>${nombre}</b> (${variedad})<br>Última salida: ${fmtFechaSlash(ultimaSalida)}<br>Descanso: <b>${dias} días</b>`);
+    }
+    const b = layer.getBounds();
+    boundsAcum = boundsAcum ? boundsAcum.extend(b) : L.latLngBounds(b.getSouthWest(), b.getNorthEast());
+  });
+
+  estadoLayerGroup.addTo(map);
+  if(boundsAcum) map.fitBounds(boundsAcum, {padding:[24,24]});
+  document.getElementById('leyendaDescanso').style.display = 'block';
+  document.getElementById('btnVerDescanso').textContent = '✕ Ocultar descanso';
+}
 function fmtFecha(iso){ const [f]=iso.split('T'); const [y,m,d]=f.split('-'); return d+'/'+m+'/'+y; }
 
 // ══════════════════════════════════════════════
