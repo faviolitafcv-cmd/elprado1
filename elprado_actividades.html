@@ -7239,7 +7239,7 @@ function renderCargaPotencialMensual(){
   const box = document.getElementById('infCargaPotencial');
   try{
     const pctConsumo = parseFloat(document.getElementById('infPctConsumo')?.value) || 0.025;
-    const todasMS = getActs().filter(a => a.actividad==='MATERIA SECA');
+    const todasMS = getActividades().filter(a => a.actividad==='MATERIA SECA');
     const validos = todasMS.filter(a => a.fechaIng && a.ha>0 && a.kgMsHa!=null);
     const descartados = todasMS.length - validos.length;
 
