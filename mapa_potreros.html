@@ -285,6 +285,22 @@ button:disabled{opacity:.35; cursor:not-allowed;}
       </div>
       <div class="hint" id="bloqueFechasInfo" style="display:none"></div>
 
+      <div id="ndviBox" style="display:none;margin-top:6px">
+        <button class="btn-outline" onclick="consultarNDVIParcela()">🛰️ Consultar NDVI de esta parcela</button>
+        <div id="ndviResultado" class="hint" style="margin-top:4px"></div>
+        <div class="row" style="margin-top:6px">
+          <div>
+            <label style="font-size:11px">📷 Foto Muestra 1</label>
+            <input type="file" accept="image/*" capture="environment" id="fotoMuestra1Input" onchange="cargarFotoMuestra(1,this.files[0])" style="font-size:10.5px">
+            <img id="fotoMuestra1Preview" style="display:none;max-width:100%;border-radius:6px;margin-top:4px">
+          </div>
+          <div>
+            <label style="font-size:11px">📷 Foto Muestra 2</label>
+            <input type="file" accept="image/*" capture="environment" id="fotoMuestra2Input" onchange="cargarFotoMuestra(2,this.files[0])" style="font-size:10.5px">
+            <img id="fotoMuestra2Preview" style="display:none;max-width:100%;border-radius:6px;margin-top:4px">
+          </div>
+        </div>
+      </div>
       <button class="btn-green" id="btnGuardarParcela" onclick="guardarParcela()" style="display:none">💾 Guardar parcela</button>
     </div>
 
@@ -358,6 +374,155 @@ let lastCutDir = null;        // dirección de avance del último corte, para qu
 
 const STORAGE_KEY = 'ep1_proto_mapa_c1_v2'; // ya no se usa para persistencia, solo referencia
 const FB_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com/elprado1';
+
+// ══════════════════════════════════════════════
+// NDVI — Sentinel Hub / Copernicus Data Space Ecosystem
+// NOTA: estas claves quedan visibles en el código público (decisión consciente, sin plan
+// Blaze todavía). La cuenta de Sentinel Hub no tiene ninguna tarjeta cargada — el peor caso
+// si alguien las usa de más es que se gaste la cuota gratis del mes, nunca un cobro real.
+// ══════════════════════════════════════════════
+const SENTINEL_CLIENT_ID = 'sh-0751db9c-2781-4fa3-914b-c2887ab9e2cc';
+const SENTINEL_CLIENT_SECRET = 'xqiC9JUr8agt8XcjZUiPsOxMXNIzWrX3';
+let _sentinelToken = null, _sentinelTokenExp = 0;
+
+async function obtenerTokenSentinel(){
+  if(_sentinelToken && Date.now() < _sentinelTokenExp) return _sentinelToken;
+  const resp = await fetch('https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: SENTINEL_CLIENT_ID,
+      client_secret: SENTINEL_CLIENT_SECRET
+    })
+  });
+  if(!resp.ok) throw new Error('No se pudo autenticar con Sentinel Hub (revisá las claves)');
+  const data = await resp.json();
+  _sentinelToken = data.access_token;
+  _sentinelTokenExp = Date.now() + (data.expires_in - 60) * 1000; // renovar 1 min antes de que expire
+  return _sentinelToken;
+}
+
+// Evalscript: calcula NDVI y descarta píxeles con nubes, sombra de nube, cirrus o nieve
+// (usando la Scene Classification de Sentinel-2 L2A) para no ensuciar el promedio.
+const NDVI_EVALSCRIPT = `//VERSION=3
+function setup() {
+  return {
+    input: [{ bands: ["B04","B08","SCL","dataMask"] }],
+    output: [
+      { id: "ndvi", bands: 1, sampleType: "FLOAT32" },
+      { id: "dataMask", bands: 1 }
+    ]
+  };
+}
+function evaluatePixel(s) {
+  let ndvi = (s.B08 - s.B04) / (s.B08 + s.B04 + 1e-6);
+  let nuboso = [3,8,9,10,11].includes(s.SCL);
+  let valido = s.dataMask === 1 && !nuboso;
+  return { ndvi: [ndvi], dataMask: [valido ? 1 : 0] };
+}`;
+
+// Comprime una foto antes de guardarla (para no explotar el tamaño de la base de datos) —
+// la achica a un ancho máximo razonable y la convierte a JPEG de calidad media.
+function comprimirImagenABase64(file, maxAncho, calidad){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      const img = new Image();
+      img.onload = ()=>{
+        let w = img.width, h = img.height;
+        if(w > maxAncho){ h = Math.round(h * maxAncho/w); w = maxAncho; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', calidad));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function cargarFotoMuestra(n, file){
+  if(!file || !cutPreview) return;
+  const prev = document.getElementById('fotoMuestra'+n+'Preview');
+  try{
+    const b64 = await comprimirImagenABase64(file, 900, 0.65);
+    cutPreview['foto'+n] = b64;
+    prev.src = b64; prev.style.display = 'block';
+  }catch(e){ alert('No se pudo cargar esa foto, probá de nuevo.'); }
+}
+
+async function consultarNDVIParcela(){
+  if(!cutPreview || !cutPreview.geojson){ alert('Primero calculá o dibujá el corte.'); return; }
+  const box = document.getElementById('ndviResultado');
+  box.innerHTML = '⏳ Consultando el satélite día por día (puede tardar unos segundos)…';
+  try{
+    const token = await obtenerTokenSentinel();
+    // Ancla la búsqueda a la fecha REAL de ingreso de esta parcela (no a "hoy").
+    const fechaRefStr = document.getElementById('fFechaIng').value || new Date().toISOString().split('T')[0];
+    const fechaRef = new Date(fechaRefStr + 'T12:00:00');
+    const VENTANA_DIAS = 15; // para cada lado — el satélite pasa cada ~5 días, así cubrimos varios pasadas de sobra
+    const desde = new Date(fechaRef.getTime() - VENTANA_DIAS*86400000);
+    const hasta = new Date(fechaRef.getTime() + VENTANA_DIAS*86400000);
+    const hoyReal = new Date();
+    const hastaLimitado = hasta > hoyReal ? hoyReal : hasta; // nunca pedimos imágenes del futuro real
+    // Pedimos UN resultado POR DÍA (no un solo promedio) — así sabemos exactamente qué día
+    // terminó aportando los datos, y podemos elegir el más cercano a la fecha real, sea antes o después.
+    const body = {
+      input: {
+        bounds: { geometry: cutPreview.geojson.geometry },
+        data: [{ type: 'sentinel-2-l2a', dataFilter: { mosaickingOrder: 'mostRecent' } }]
+      },
+      aggregation: {
+        timeRange: { from: desde.toISOString(), to: new Date(hastaLimitado.getTime()+86400000).toISOString() },
+        aggregationInterval: { of: 'P1D' },
+        evalscript: NDVI_EVALSCRIPT
+      }
+    };
+    const resp = await fetch('https://sh.dataspace.copernicus.eu/api/v1/statistics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(body)
+    });
+    if(!resp.ok){
+      const txt = await resp.text();
+      throw new Error('Sentinel Hub respondió con error ' + resp.status + ': ' + txt.slice(0,200));
+    }
+    const data = await resp.json();
+    const dias = (data?.data || [])
+      .map(d => ({ fecha: (d.interval.from||'').split('T')[0], stats: d.outputs?.ndvi?.bands?.B0?.stats }))
+      .filter(d => d.stats && d.stats.sampleCount > 0)
+      .sort((a,b) => {
+        // Más cercano a la fecha real primero (no el más "lindo" del mes)
+        const da = Math.abs(new Date(a.fecha+'T12:00:00') - fechaRef);
+        const db = Math.abs(new Date(b.fecha+'T12:00:00') - fechaRef);
+        return da - db;
+      });
+    if(!dias.length){
+      box.innerHTML = `⚠️ No se encontró ninguna imagen sin nubes en los ${VENTANA_DIAS} días antes ni después del ${fmtFechaSlash(fechaRefStr)} para esta zona. Probá de nuevo más adelante (quizás con más días despejados).`;
+      return;
+    }
+    const elegido = dias[0];
+    const elegidoDate = new Date(elegido.fecha+'T12:00:00');
+    const diffDiasNum = Math.round((elegidoDate - fechaRef)/86400000);
+    const diffDias = Math.abs(diffDiasNum);
+    const mean = Math.round(elegido.stats.mean*1000)/1000;
+    cutPreview.ndvi = mean;
+    cutPreview.ndviFecha = elegido.fecha; // la fecha REAL de la imagen usada, no la del aforo
+    const avisoDesfase = diffDiasNum===0
+      ? '✅ misma fecha de la muestra'
+      : diffDiasNum>0
+        ? `⚠️ ${diffDias} día${diffDias!==1?'s':''} DESPUÉS de la muestra (no había imagen limpia justo ese día)`
+        : `⚠️ ${diffDias} día${diffDias!==1?'s':''} ANTES de la muestra (no había imagen limpia justo ese día)`;
+    box.innerHTML = `🛰️ NDVI promedio: <b style="color:var(--gold2);font-size:15px">${mean}</b> <span class="small">— imagen del ${fmtFechaSlash(elegido.fecha)} (${avisoDesfase})</span>`;
+  }catch(e){
+    console.error(e);
+    box.innerHTML = '⚠️ No se pudo consultar el NDVI ahora (' + e.message + '). Probá de nuevo en un rato.';
+  }
+}
 let potreroActual = null; // nombre real del potrero elegido (ej. "B2")
 let modoEnlazado = false; // true cuando venimos con ?potrero=&ha= desde el registro de aforo
 let autoActualizarOficial = null; // null=no preguntado todavía · true/false=decisión del usuario para este potrero
@@ -1363,6 +1528,8 @@ function cerrarParcelaManual(){
   document.getElementById('rowFechas1').style.display = modoEnlazado ? 'none' : 'flex';
   document.getElementById('rowFechas2').style.display = modoEnlazado ? 'none' : 'flex';
   document.getElementById('btnGuardarParcela').style.display = 'block';
+  document.getElementById('ndviBox').style.display = 'block';
+  document.getElementById('ndviResultado').innerHTML = '';
   const hoy = new Date().toISOString().split('T')[0];
   if(!modoEnlazado){
     if(!document.getElementById('fFechaIng').value) document.getElementById('fFechaIng').value = hoy;
@@ -1618,6 +1785,8 @@ function applyCutPreview(geo, areaHa, t, anchoInicio, anchoFinal, setSliderPct, 
     if(!document.getElementById('fFechaSal').value) document.getElementById('fFechaSal').value = hoy;
   }
   document.getElementById('btnGuardarParcela').style.display='block';
+  document.getElementById('ndviBox').style.display='block';
+  document.getElementById('ndviResultado').innerHTML='';
 }
 
 function usarResto(){
@@ -1642,6 +1811,8 @@ function usarResto(){
     if(!document.getElementById('fFechaSal').value) document.getElementById('fFechaSal').value = hoy;
   }
   document.getElementById('btnGuardarParcela').style.display='block';
+  document.getElementById('ndviBox').style.display='block';
+  document.getElementById('ndviResultado').innerHTML='';
 }
 
 function renderMedidas(manual){
@@ -1685,6 +1856,14 @@ function clearCutOnly(){
   document.getElementById('rowFechas1').style.display='none';
   document.getElementById('rowFechas2').style.display='none';
   document.getElementById('btnGuardarParcela').style.display='none';
+  document.getElementById('ndviBox').style.display='none';
+  document.getElementById('ndviResultado').innerHTML='';
+  [1,2].forEach(n=>{
+    const inp = document.getElementById('fotoMuestra'+n+'Input');
+    const prev = document.getElementById('fotoMuestra'+n+'Preview');
+    if(inp) inp.value='';
+    if(prev){ prev.src=''; prev.style.display='none'; }
+  });
 }
 
 // ══════════════════════════════════════════════
@@ -2172,6 +2351,10 @@ function guardarParcela(){
     anchoInicio: cutPreview.anchoInicio, anchoFinal: cutPreview.anchoFinal, largo: cutPreview.largo,
     esResto: !!cutPreview.esResto,
     esManual: !!cutPreview.esManual,
+    ndvi: cutPreview.ndvi!=null ? cutPreview.ndvi : null,
+    ndviFecha: cutPreview.ndviFecha || null,
+    foto1: cutPreview.foto1 || null,
+    foto2: cutPreview.foto2 || null,
     fechaIngISO: fIng+'T'+hIng, fechaSalISO: fSal+'T'+hSal,
     colorIdx,
     descansoDias: cutPreview.descansoDias!=null ? cutPreview.descansoDias : null,
@@ -2284,7 +2467,7 @@ function renderLista(){
     <div class="list-item" style="margin-bottom:6px">
       <div class="lihead"><span><span class="dot" style="background:${COLORS[p.colorIdx]}"></span>Parcela ${p.num} · vuelta ${p.vuelta}</span><span>${p.areaHa.toFixed(2)} ha</span></div>
       <div>${fmtFecha(p.fechaIngISO)} → ${fmtFecha(p.fechaSalISO)}</div>
-      <div class="small">${p.esResto ? '🔚 Franja de cierre (forma irregular)' : p.esManual ? '✏️ Forma dibujada a mano' : `Ancho ${p.anchoInicio.toFixed(0)}→${p.anchoFinal?p.anchoFinal.toFixed(0):'—'} m · Largo ${p.largo.toFixed(0)} m`}</div>
+      <div class="small">${p.esResto ? '🔚 Franja de cierre (forma irregular)' : p.esManual ? '✏️ Forma dibujada a mano' : `Ancho ${p.anchoInicio.toFixed(0)}→${p.anchoFinal?p.anchoFinal.toFixed(0):'—'} m · Largo ${p.largo.toFixed(0)} m`}${p.ndvi!=null ? ` · 🛰️ NDVI ${p.ndvi}` : ''}</div>
       ${p.descansoDias!=null
         ? `<div style="color:var(--green-soft); margin-top:3px">🔁 Reingreso a área de Parcela ${p.refParcela} · descanso real: <b>${p.descansoDias} días</b></div>`
         : `<div class="small" style="margin-top:3px">Área nueva, sin coincidencia previa</div>`}

@@ -839,6 +839,30 @@ tr:hover td { background: rgba(255,255,255,.02); }
           </div>
         </div>
 
+        <!-- MUESTRAS DE CAMPO (para entrenar el sistema: foto + peso de cada muestra + NDVI del día) -->
+        <div class="section-label" style="margin-top:16px;">📸 Muestras de campo (opcional — para entrenar el sistema)</div>
+        <p style="font-size:11px;color:var(--text3);margin:0 0 8px;">Cargá las 2 muestras que sacaste en el potrero, con su foto — junto con el NDVI del satélite ese día, arman una base de datos para más adelante poder estimar la producción con solo una foto.</p>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Muestra 1 — Kg MV/ha</label>
+            <input type="number" id="fMuestra1MV" step="1" placeholder="0" oninput="calcularPromedioMuestras()">
+            <input type="file" id="fFotoMuestra1" accept="image/*" capture="environment" style="margin-top:4px;font-size:11px;" onchange="cargarFotoMuestra(this,1)">
+            <img id="previewFoto1" style="display:none;max-width:100%;margin-top:4px;border-radius:6px;">
+          </div>
+          <div class="form-group">
+            <label>Muestra 2 — Kg MV/ha</label>
+            <input type="number" id="fMuestra2MV" step="1" placeholder="0" oninput="calcularPromedioMuestras()">
+            <input type="file" id="fFotoMuestra2" accept="image/*" capture="environment" style="margin-top:4px;font-size:11px;" onchange="cargarFotoMuestra(this,2)">
+            <img id="previewFoto2" style="display:none;max-width:100%;margin-top:4px;border-radius:6px;">
+          </div>
+          <div class="form-group">
+            <label>🛰️ NDVI del día</label>
+            <input type="number" id="fNDVI" step="0.001" placeholder="se completa solo desde el mapa" readonly style="opacity:.85;">
+            <div id="ndviFechaInfo" style="font-size:10px;color:var(--text3);margin-top:2px;"></div>
+          </div>
+        </div>
+        <div id="avisoPromedioMuestras" style="font-size:11px;color:var(--green2);margin-top:2px;display:none;"></div>
+
         <!-- GRUPO ANIMALES -->
         <div class="section-label" style="margin-top:16px;">Grupo de Animales</div>
         <div class="form-grid">
@@ -3737,6 +3761,59 @@ let mapaParcelaCompletaPendiente = null; // {potrero, parcela} — objeto COMPLE
 // Todavía NO se escribe nada en Firebase acá — pero SÍ sincronizamos ancho, largo y área
 // con los valores REALES que salieron del dibujo (no dejamos que el aforo los recalcule
 // con la hectárea vieja que había antes de ir al mapa — el dibujo manda).
+// ── Muestras de campo: foto (comprimida) + peso de cada una, para armar dataset de entrenamiento ──
+let _fotoMuestra1 = null, _fotoMuestra2 = null; // base64 comprimido
+
+function comprimirFoto(file, maxAncho){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      const img = new Image();
+      img.onload = ()=>{
+        const escala = Math.min(1, (maxAncho||900) / img.width);
+        const w = Math.round(img.width * escala), h = Math.round(img.height * escala);
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.65)); // calidad media, liviano para RTDB
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function cargarFotoMuestra(input, num){
+  const file = input.files[0];
+  if(!file) return;
+  try{
+    const b64 = await comprimirFoto(file, 900);
+    if(num===1) _fotoMuestra1 = b64; else _fotoMuestra2 = b64;
+    const prev = document.getElementById('previewFoto'+num);
+    prev.src = b64;
+    prev.style.display = 'block';
+  }catch(e){
+    ntf && ntf('No se pudo procesar la foto', true);
+  }
+}
+
+function calcularPromedioMuestras(){
+  const m1 = parseFloat(document.getElementById('fMuestra1MV').value);
+  const m2 = parseFloat(document.getElementById('fMuestra2MV').value);
+  const aviso = document.getElementById('avisoPromedioMuestras');
+  if(!isNaN(m1) && !isNaN(m2)){
+    const prom = Math.round((m1+m2)/2);
+    document.getElementById('fMV').value = prom;
+    calcMS();
+    aviso.style.display = 'block';
+    aviso.textContent = '✅ KG Materia Verde/HA completado con el promedio de las 2 muestras: ' + prom;
+  } else {
+    aviso.style.display = 'none';
+  }
+}
+
 function recibirParcelaCompleta(parcela, potrero){
   if(!parcela.esResto && parcela.anchoInicio && parcela.largo){
     // Ancho + largo reales del corte → modo IRREGULAR (ya no hace falta que el aforo derive el largo)
@@ -3759,6 +3836,28 @@ function recibirParcelaCompleta(parcela, potrero){
     el.style.outline = '2px solid var(--green2)';
     setTimeout(()=>{ el.style.outline = ''; }, 2000);
   });
+
+  if(parcela.ndvi!=null){
+    document.getElementById('fNDVI').value = parcela.ndvi;
+    const infoEl = document.getElementById('ndviFechaInfo');
+    if(infoEl && parcela.ndviFecha){
+      const fMuestra = document.getElementById('fFechaIng').value;
+      infoEl.textContent = fMuestra && fMuestra !== parcela.ndviFecha
+        ? '⚠️ Imagen del ' + parcela.ndviFecha + ' (no de la fecha de la muestra)'
+        : '✅ Imagen del mismo día de la muestra';
+    }
+  }
+  if(parcela.foto1){
+    _fotoMuestra1 = parcela.foto1;
+    const p1 = document.getElementById('previewFoto1'); p1.src = parcela.foto1; p1.style.display='block';
+  }
+  if(parcela.foto2){
+    _fotoMuestra2 = parcela.foto2;
+    const p2 = document.getElementById('previewFoto2'); p2.src = parcela.foto2; p2.style.display='block';
+  }
+  if(parcela.muestra1MV!=null) document.getElementById('fMuestra1MV').value = parcela.muestra1MV;
+  if(parcela.muestra2MV!=null) document.getElementById('fMuestra2MV').value = parcela.muestra2MV;
+  if(parcela.muestra1MV!=null && parcela.muestra2MV!=null) calcularPromedioMuestras();
 
   mapaParcelaCompletaPendiente = { potrero, parcela };
   if(typeof notif === 'function') notif('📐 Parcela lista — ancho, largo y área ya están sincronizados con el dibujo');
@@ -3969,6 +4068,7 @@ function guardarActividad() {
       consumoPv: (cab>0&&peso>0&&ha>0)?(kgMs*ha)/(cab*peso):0,
       plantasM2: parseFloat(document.getElementById('fPlantas').value)||null,
       ndvi: parseFloat(document.getElementById('fNDVI').value)||null,
+      ndviFecha: (mapaParcelaCompletaPendiente && mapaParcelaCompletaPendiente.parcela.ndviFecha) || null,
       fechaIng: fIngMs||null, fechaSal: fSalMs||null,
       horaIng: document.getElementById('fHoraIng')?.value||null,
       horaSal: document.getElementById('fHoraSal')?.value||null,
@@ -3983,6 +4083,11 @@ function guardarActividad() {
       })(),
       consumoPorcReg: parseFloat(document.getElementById('fConsumoPorc').value)||3.0,
       mapaParcelaId: (mapaParcelaCompletaPendiente && mapaParcelaCompletaPendiente.potrero===potrero) ? mapaParcelaCompletaPendiente.parcela.id : null,
+      ndvi: parseFloat(document.getElementById('fNDVI').value) || null,
+      muestra1MV: parseFloat(document.getElementById('fMuestra1MV').value) || null,
+      muestra2MV: parseFloat(document.getElementById('fMuestra2MV').value) || null,
+      foto1: _fotoMuestra1 || null,
+      foto2: _fotoMuestra2 || null,
     });
     if(mapaParcelaCompletaPendiente && mapaParcelaCompletaPendiente.potrero===potrero){
       // Recién ahora, al guardar de verdad el registro, se confirma la geometría en el mapa.
@@ -4265,8 +4370,20 @@ function limpiarForm() {
    'fFechaIng','fFechaSal','fHAManual',
    'fLoteIng','fCabezasIng','fPesoIng','fHAIng','fFechaIngStd','fFechaSalStd',
    'fHAMaq','fFechaIngMaq','fFechaSalMaq','fNDVI','fComentario','fVariedad','fHA',
-   'fAncho','fLargoManual','fLargoCalc','fHAFija']
+   'fAncho','fLargoManual','fLargoCalc','fHAFija','fMuestra1MV','fMuestra2MV']
     .forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  // Limpiar fotos de muestra y sus vistas previas
+  _fotoMuestra1 = null; _fotoMuestra2 = null;
+  ['previewFoto1','previewFoto2'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el){ el.src=''; el.style.display='none'; }
+  });
+  ['fFotoMuestra1','fFotoMuestra2'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.value='';
+  });
+  const avisoP = document.getElementById('avisoPromedioMuestras');
+  if(avisoP) avisoP.style.display = 'none';
   // Restaurar campos que podrían haber quedado readonly por Inventario
   ['fCabezas','fPeso','fCabezasIng','fPesoIng'].forEach(id => {
     const el = document.getElementById(id);
@@ -4513,6 +4630,12 @@ function editarActividad(id) {
       document.getElementById('formComun').dataset.editDiasDescanso = r.diasDescanso != null ? r.diasDescanso : '';
       if(r.largoM) document.getElementById('fLargoManual').value = r.largoM;
       document.getElementById('fNDVI').value = r.ndvi || '';
+      document.getElementById('fMuestra1MV').value = r.muestra1MV || '';
+      document.getElementById('fMuestra2MV').value = r.muestra2MV || '';
+      _fotoMuestra1 = r.foto1 || null;
+      _fotoMuestra2 = r.foto2 || null;
+      if(r.foto1){ const p1=document.getElementById('previewFoto1'); p1.src=r.foto1; p1.style.display='block'; }
+      if(r.foto2){ const p2=document.getElementById('previewFoto2'); p2.src=r.foto2; p2.style.display='block'; }
       document.getElementById('fComentario').value = r.comentario || '';
       // Precargar lote — sin disparar onLoteChange para preservar datos históricos
       const selLote = document.getElementById('fLote');
