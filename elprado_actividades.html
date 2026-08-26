@@ -1928,9 +1928,20 @@ tr:hover td { background: rgba(255,255,255,.02); }
     <div id="infSuperficieResumen" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px;"></div>
     <div id="infSuperficieTabla" style="overflow-x:auto;"></div>
   <div class="card" style="margin-bottom:16px;">
-    <div style="font-size:14px;font-weight:700;color:var(--green2);margin-bottom:2px;">🐄 Carga potencial por mes</div>
-    <div style="font-size:11px;color:var(--text3);margin-bottom:12px;">Con la producción de materia seca real de cada aforo, cuántas UA (450 kg, a un consumo del 2.5% de su peso vivo) podría haber sostenido el campo todo el mes — comparado con lo que realmente tuviste pastoreando.</div>
-    <div id="infCargaPotencial" style="overflow-x:auto;"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+      <div>
+        <div style="font-size:14px;font-weight:700;color:var(--green2);margin-bottom:2px;">🐄 Producción y carga potencial por mes</div>
+        <div style="font-size:11px;color:var(--text3);">Hectáreas ocupadas, producción promedio de MS, y cuántos kilogramos de peso vivo podría sostener esa producción.</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <label style="font-size:11px;color:var(--text3);">Consumo:</label>
+        <select id="infPctConsumo" onchange="renderCargaPotencialMensual()" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px;">
+          <option value="0.025" selected>2.5% del peso vivo</option>
+          <option value="0.03">3.0% del peso vivo</option>
+        </select>
+      </div>
+    </div>
+    <div id="infCargaPotencial" style="overflow-x:auto;margin-top:12px;"></div>
   </div>
 </div>
 
@@ -7227,73 +7238,89 @@ function renderInformes(){
 function renderCargaPotencialMensual(){
   const box = document.getElementById('infCargaPotencial');
   try{
+    const pctConsumo = parseFloat(document.getElementById('infPctConsumo')?.value) || 0.025;
     const todasMS = getActs().filter(a => a.actividad==='MATERIA SECA');
-    const sinHa = todasMS.filter(a => !(a.ha>0)).length;
-    const sinMs = todasMS.filter(a => a.ha>0 && a.kgMsHa==null).length;
-    const sinFecha = todasMS.filter(a => a.ha>0 && a.kgMsHa!=null && !a.fechaIng).length;
-    const acts = todasMS.filter(a => a.fechaIng && a.ha>0 && a.kgMsHa!=null);
+    const validos = todasMS.filter(a => a.fechaIng && a.ha>0 && a.kgMsHa!=null);
+    const descartados = todasMS.length - validos.length;
 
     const diagnostico = `<div class="hint" style="margin-bottom:10px;">
-      🔍 Revisé ${todasMS.length} registros de Materia Seca en total · ${acts.length} tienen todo lo necesario (ha + kg MS/ha + fecha) para este cálculo
-      ${sinHa?` · ${sinHa} sin hectáreas cargadas`:''}${sinMs?` · ${sinMs} sin kg MS/ha`:''}${sinFecha?` · ${sinFecha} sin fecha de ingreso`:''}
+      🔍 ${validos.length} de ${todasMS.length} aforos tienen hectáreas + kg MS/ha + fecha (los que faltan quedaron afuera del cálculo).
     </div>`;
 
-    const CONSUMO_PCT = 0.025;
-    const PESO_UA = 450;
-    const NECESIDAD_UA_DIA = PESO_UA * CONSUMO_PCT; // 11.25 kg MS/día
-
-    const porMes = {};
-    acts.forEach(a=>{
-      const mesKey = a.fechaIng.slice(0,7);
-      if(!porMes[mesKey]) porMes[mesKey] = { kgMsTotal:0, haTotal:0, uaDiasReales:0, gestion:a.gestion||'' };
-      const m = porMes[mesKey];
-      m.kgMsTotal += (a.kgMsHa||0) * a.ha;
-      m.haTotal += a.ha;
-      if(!m.gestion && a.gestion) m.gestion = a.gestion;
-      if(a.cabezas>0 && a.pesoMedio>0){
-        const dias = a.estadia!=null ? a.estadia : (a.fechaSal ? dateDiff(a.fechaIng,a.fechaSal) : 1);
-        m.uaDiasReales += (a.cabezas * a.pesoMedio / PESO_UA) * Math.max(dias,0.5);
-      }
-    });
-
-    const mesesOrdenados = Object.keys(porMes).sort().reverse();
-    if(!mesesOrdenados.length){
-      box.innerHTML = diagnostico + '<div class="hint">Ninguno de tus registros tiene, a la vez, hectáreas + kg MS/ha + fecha — revisá los que quedaron marcados arriba para completarlos.</div>';
+    if(!validos.length){
+      box.innerHTML = diagnostico + '<div class="hint">Ningún aforo tiene, a la vez, hectáreas cargadas, kg MS/ha y fecha — completá esos datos para que este cálculo funcione.</div>';
       return;
     }
 
+    // Agrupar por mes (todo el campo junto) y también por mes+variedad
+    const porMes = {};      // 'YYYY-MM' -> {haTotal, sumaKgMsHa, n, gestion}
+    const porMesVariedad = {}; // 'YYYY-MM|VARIEDAD' -> {haTotal, sumaKgMsHa, n}
+    validos.forEach(a=>{
+      const mes = a.fechaIng.slice(0,7);
+      const variedad = getVariedad(a.potrero) || 'SIN CLASIFICAR';
+
+      if(!porMes[mes]) porMes[mes] = { haTotal:0, sumaKgMsHa:0, n:0, gestion:a.gestion||'' };
+      porMes[mes].haTotal += a.ha;
+      porMes[mes].sumaKgMsHa += a.kgMsHa;
+      porMes[mes].n++;
+      if(!porMes[mes].gestion && a.gestion) porMes[mes].gestion = a.gestion;
+
+      const key = mes+'|'+variedad;
+      if(!porMesVariedad[key]) porMesVariedad[key] = { haTotal:0, sumaKgMsHa:0, n:0 };
+      porMesVariedad[key].haTotal += a.ha;
+      porMesVariedad[key].sumaKgMsHa += a.kgMsHa;
+      porMesVariedad[key].n++;
+    });
+
     const NOMBRES_MES = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+    const mesesOrdenados = Object.keys(porMes).sort().reverse();
+
     let gestionActual = null;
     let html = diagnostico;
-    mesesOrdenados.forEach(mesKey=>{
-      const m = porMes[mesKey];
+    mesesOrdenados.forEach(mes=>{
+      const m = porMes[mes];
+      const promedio = m.sumaKgMsHa / m.n;
+      const totalMs = m.haTotal * promedio;
+      const cargaKg = totalMs / pctConsumo;
+      const [y, mm] = mes.split('-');
+
       if(m.gestion !== gestionActual){
         gestionActual = m.gestion;
         html += `<div style="font-size:13px;font-weight:700;color:var(--gold2);margin:14px 0 6px;padding-top:8px;border-top:1px solid var(--border);">📅 Gestión ${gestionActual || 'sin definir'}</div>`;
       }
-      const [y, mm] = mesKey.split('-');
-      const diasDelMes = new Date(parseInt(y), parseInt(mm), 0).getDate();
-      const uaPotencial = m.kgMsTotal / (NECESIDAD_UA_DIA * diasDelMes);
-      const uaRealProm = m.uaDiasReales / diasDelMes;
-      const pctUso = uaPotencial>0 ? (uaRealProm/uaPotencial*100) : 0;
-      const colorUso = pctUso>110 ? 'var(--red)' : pctUso<60 ? 'var(--gold2)' : 'var(--green2)';
 
-      html += `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;">
+      // Variedades de este mes puntual
+      const variedadesDelMes = Object.keys(porMesVariedad)
+        .filter(k => k.startsWith(mes+'|'))
+        .map(k => {
+          const v = porMesVariedad[k];
+          const nombreVar = k.split('|')[1];
+          const provVar = v.sumaKgMsHa / v.n;
+          return { nombreVar, ha: v.haTotal, promedio: provVar, totalMs: v.haTotal*provVar, n: v.n };
+        });
+
+      html += `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
           <div style="font-weight:700;color:var(--text);min-width:90px;">${NOMBRES_MES[parseInt(mm)-1]} ${y}</div>
-          <div style="font-size:11px;color:var(--text3);">${m.haTotal.toFixed(1)} ha ocupadas · ${Math.round(m.kgMsTotal).toLocaleString('es-BO')} kg MS producidos</div>
+          <div style="font-size:11px;color:var(--text3);">${m.n} aforo${m.n!==1?'s':''}</div>
         </div>
-        <div style="display:flex;gap:18px;margin-top:6px;flex-wrap:wrap;">
-          <div><span style="font-size:10px;color:var(--text3);">CARGA POTENCIAL</span><br><b style="font-size:16px;color:var(--text);">${uaPotencial.toFixed(0)} UA</b></div>
-          <div><span style="font-size:10px;color:var(--text3);">TUVISTE (real)</span><br><b style="font-size:16px;color:${colorUso};">${uaRealProm.toFixed(0)} UA</b></div>
-          <div><span style="font-size:10px;color:var(--text3);">% DE USO</span><br><b style="font-size:16px;color:${colorUso};">${pctUso.toFixed(0)}%</b></div>
+        <div style="display:flex;gap:18px;margin-top:8px;flex-wrap:wrap;">
+          <div><span style="font-size:10px;color:var(--text3);">HA OCUPADAS</span><br><b style="font-size:15px;color:var(--text);">${m.haTotal.toFixed(1)} ha</b></div>
+          <div><span style="font-size:10px;color:var(--text3);">PROD. MS PROMEDIO</span><br><b style="font-size:15px;color:var(--text);">${promedio.toFixed(0)} kg/ha</b></div>
+          <div><span style="font-size:10px;color:var(--text3);">TOTAL MS DISPONIBLE</span><br><b style="font-size:15px;color:var(--text);">${Math.round(totalMs).toLocaleString('es-BO')} kg</b></div>
+          <div><span style="font-size:10px;color:var(--text3);">CARGA POTENCIAL</span><br><b style="font-size:15px;color:var(--green2);">${Math.round(cargaKg).toLocaleString('es-BO')} kg PV</b></div>
         </div>
+        ${variedadesDelMes.length>1 ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);display:flex;gap:16px;flex-wrap:wrap;">
+          ${variedadesDelMes.map(v=>`<div style="font-size:11px;color:var(--text2);">
+            <b style="color:var(--gold2)">${v.nombreVar}</b>: ${v.ha.toFixed(1)} ha · prom ${v.promedio.toFixed(0)} kg/ha · carga ${Math.round(v.ha*v.promedio/pctConsumo).toLocaleString('es-BO')} kg PV
+          </div>`).join('')}
+        </div>` : ''}
       </div>`;
     });
     box.innerHTML = html;
   }catch(e){
     console.error('Error en renderCargaPotencialMensual:', e);
-    box.innerHTML = `<div class="hint" style="color:var(--red)">⚠️ Hubo un error calculando esto: ${e.message}. Contale a Claude este mensaje exacto para arreglarlo.</div>`;
+    box.innerHTML = `<div class="hint" style="color:var(--red)">⚠️ Hubo un error calculando esto: ${e.message}</div>`;
   }
 }
 
