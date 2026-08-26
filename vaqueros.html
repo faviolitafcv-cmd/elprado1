@@ -901,6 +901,7 @@ function renderArmadoresGrupo(lote, recargar=false) {
           </div>
           <div class="arm-parcela-medidas ${ejec?'ejecutado':''}">${medidas}</div>
           ${turno&&!ejec?`<div style="font-size:10px;color:var(--gold2);margin-top:2px;">${turno}</div>`:''}
+          ${a.comentario?`<div style="font-size:10.5px;color:var(--text);background:rgba(232,188,64,.12);border-left:2px solid var(--gold2);padding:3px 6px;margin-top:4px;border-radius:0 4px 4px 0;">💬 ${a.comentario}</div>`:''}
           ${ejec?`<div style="font-size:10px;color:var(--green);margin-top:2px;">✓ Ejecutado · ${new Date(ejs[key].ts).toLocaleString('es-BO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</div>`:''}
         </div>
         <button class="btn-ejecutar ${ejec?'ejecutado':'pendiente'}" onclick="toggleEjecutado('${key}')">
@@ -1234,6 +1235,7 @@ function verDetalle(lote, modo) {
         <div><div style="font-size:10px;color:var(--text3);">SALE</div><div style="font-size:14px;font-weight:700;color:var(--text);">${regHoy.fechaSal||'—'}</div></div>
         <div><div style="font-size:10px;color:var(--text3);">TURNO SAL.</div><div style="font-size:13px;font-weight:700;color:var(--gold2);">${regHoy.horaSal==='MAÑANA'?'🌅 Mañana':regHoy.horaSal==='TARDE'?'🌇 Tarde':'—'}</div></div>
       </div>
+      ${regHoy.comentario?`<div style="margin-top:10px;font-size:12px;color:var(--text);background:rgba(232,188,64,.12);border-left:2px solid var(--gold2);padding:6px 8px;border-radius:0 6px 6px 0;">💬 ${regHoy.comentario}</div>`:''}
     </div>` :
     `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;text-align:center;color:var(--text3);font-size:13px;">Sin registro para hoy</div>`;
 
@@ -1253,7 +1255,8 @@ function verDetalle(lote, modo) {
           ? `<div style="font-size:14px;font-weight:700;color:var(--text);">${reg.potrero} · Parcela ${reg.parcela}</div>
              ${turno?`<div style="font-size:11px;color:var(--gold2);font-weight:700;">${turno}</div>`:''}
              ${reg.anchoM?`<div style="font-size:11px;color:var(--blue);">↔ ${reg.anchoM}m ancho${lM?' · 📏'+lM+'m largo':''}</div>`:
-               lM?`<div style="font-size:11px;color:var(--blue);">📏 ${lM}m largo</div>`:''}`
+               lM?`<div style="font-size:11px;color:var(--blue);">📏 ${lM}m largo</div>`:''}
+             ${reg.comentario?`<div style="font-size:10.5px;color:var(--text);background:rgba(232,188,64,.12);border-left:2px solid var(--gold2);padding:3px 6px;margin-top:3px;border-radius:0 4px 4px 0;">💬 ${reg.comentario}</div>`:''}`
           : `<div style="color:var(--text3);font-size:12px;">— pendiente —</div>`}
       </div>
     </div>`;
