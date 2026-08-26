@@ -680,6 +680,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
   <div class="tab" onclick="showPage('campo')">📍 Campo</div>
   <div class="tab" onclick="showPage('ranking')">🏆 Ranking Potreros</div>
   <div class="tab" onclick="showPage('circuitos')">🔄 Circuitos</div>
+  <div class="tab" onclick="showPage('informes')">📈 Informes</div>
 </div>
 
 <!-- ════════════════ ACTIVIDADES ════════════════ -->
@@ -1913,6 +1914,19 @@ tr:hover td { background: rgba(255,255,255,.02); }
   <div id="circPanel-mensual" style="display:none;">
     <div style="font-size:12px;color:var(--text3);margin-bottom:12px;">Hectáreas usadas vs no usadas por mes — para seguimiento de capacidad de carga.</div>
     <div id="circMensualTabla"></div>
+  </div>
+</div>
+
+<!-- PÁGINA: INFORMES -->
+<div class="page" id="page-informes">
+  <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:2px;">📈 Informes</div>
+  <div style="font-size:11px;color:var(--text3);margin-bottom:16px;">Consultas generales sobre el campo — superficie, potreros y más.</div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <div style="font-size:14px;font-weight:700;color:var(--green2);margin-bottom:2px;">🌾 Superficie por variedad</div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:12px;">Foto actual del campo — no varía por gestión, solo cambia si agregás o reclasificás un potrero.</div>
+    <div id="infSuperficieResumen" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px;"></div>
+    <div id="infSuperficieTabla" style="overflow-x:auto;"></div>
   </div>
 </div>
 
@@ -7139,13 +7153,76 @@ function borrarTodo() {
 }
 
 // ═══════════════════════════════════════
+// INFORMES
+// ═══════════════════════════════════════
+function renderInformes(){
+  const potreros = getAllPotrerosList().filter(p => p.area && parseFloat(p.area) > 0);
+
+  const porVariedad = {};
+  potreros.forEach(p=>{
+    const v = p.variedad || 'SIN CLASIFICAR';
+    if(!porVariedad[v]) porVariedad[v] = { cantidad:0, totalHa:0, potreros:[] };
+    porVariedad[v].cantidad++;
+    porVariedad[v].totalHa += parseFloat(p.area);
+    porVariedad[v].potreros.push(p.nombre);
+  });
+
+  const totalHaCampo = Object.values(porVariedad).reduce((s,v)=>s+v.totalHa,0);
+  const totalPotreros = potreros.length;
+
+  // Tarjetas resumen — una por variedad + una de total
+  const colores = { BRACHIARIA:'#8a6d1f', PANICUM:'#3a7d44', 'SIN CLASIFICAR':'#777' };
+  let htmlResumen = Object.keys(porVariedad).sort().map(v=>{
+    const d = porVariedad[v];
+    const prom = d.totalHa / d.cantidad;
+    return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:4px solid ${colores[v]||'#777'};border-radius:8px;padding:12px;">
+      <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.3px;">${v}</div>
+      <div style="font-size:22px;font-weight:800;color:var(--text);margin-top:2px;">${d.totalHa.toFixed(1)} ha</div>
+      <div style="font-size:11px;color:var(--text2);margin-top:4px;">${d.cantidad} potrero${d.cantidad!==1?'s':''} · promedio ${prom.toFixed(1)} ha/potrero</div>
+    </div>`;
+  }).join('');
+  htmlResumen += `<div style="background:var(--bg2);border:1px solid var(--green2);border-radius:8px;padding:12px;">
+    <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.3px;">Total del campo</div>
+    <div style="font-size:22px;font-weight:800;color:var(--green2);margin-top:2px;">${totalHaCampo.toFixed(1)} ha</div>
+    <div style="font-size:11px;color:var(--text2);margin-top:4px;">${totalPotreros} potreros en total</div>
+  </div>`;
+  document.getElementById('infSuperficieResumen').innerHTML = htmlResumen;
+
+  // Tabla con el detalle de potreros de cada variedad
+  let htmlTabla = `<table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <thead><tr style="border-bottom:1px solid var(--border);color:var(--text3);text-align:left;">
+      <th style="padding:6px 8px;">Variedad</th>
+      <th style="padding:6px 8px;">Cant. potreros</th>
+      <th style="padding:6px 8px;">Total ha</th>
+      <th style="padding:6px 8px;">% del campo</th>
+      <th style="padding:6px 8px;">Promedio ha/potrero</th>
+      <th style="padding:6px 8px;">Potreros</th>
+    </tr></thead><tbody>`;
+  Object.keys(porVariedad).sort().forEach(v=>{
+    const d = porVariedad[v];
+    const prom = d.totalHa / d.cantidad;
+    const pct = totalHaCampo>0 ? (d.totalHa/totalHaCampo*100) : 0;
+    htmlTabla += `<tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:6px 8px;font-weight:700;color:${colores[v]||'var(--text)'}">${v}</td>
+      <td style="padding:6px 8px;">${d.cantidad}</td>
+      <td style="padding:6px 8px;">${d.totalHa.toFixed(2)} ha</td>
+      <td style="padding:6px 8px;">${pct.toFixed(1)}%</td>
+      <td style="padding:6px 8px;">${prom.toFixed(2)} ha</td>
+      <td style="padding:6px 8px;color:var(--text3);font-size:11px;">${d.potreros.sort().join(', ')}</td>
+    </tr>`;
+  });
+  htmlTabla += '</tbody></table>';
+  document.getElementById('infSuperficieTabla').innerHTML = htmlTabla;
+}
+
+// ═══════════════════════════════════════
 // NAVEGACIÓN
 // ═══════════════════════════════════════
 function showPage(id) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
-  const tabs = ['actividades','nueva','resumen','plan','pedidos','config','lluvia','analisis','campo','ranking','circuitos'];
+  const tabs = ['actividades','nueva','resumen','plan','pedidos','config','lluvia','analisis','campo','ranking','circuitos','informes'];
   const idx = tabs.indexOf(id);
   document.querySelectorAll('.tab')[idx]?.classList.add('active');
   if(id==='resumen') { actualizarGestionesDisponibles(); renderResumen(); renderMetricasHA(); }
@@ -7162,6 +7239,7 @@ function showPage(id) {
   }
   if(id==='campo') { campoIrHoy(); renderCapAlertasAdmin(); }
   if(id==='circuitos') { renderCircuitos(); }
+  if(id==='informes') { renderInformes(); }
   if(id==='lluvia') {
     renderAnalisisGestion();
     renderResumenLluvia();
