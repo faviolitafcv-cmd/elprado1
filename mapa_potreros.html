@@ -173,6 +173,8 @@ button:disabled{opacity:.35; cursor:not-allowed;}
       <p class="hint">Ubicalos una sola vez acá en el mapa — el sistema calcula solo qué potreros le corresponden a cada uno por cercanía real, y desde ahí toda lluvia que cargues se asigna sola, sin volver a marcar nada a mano.</p>
       <button class="btn-outline" id="btnAgregarPluvio" onclick="iniciarColocacionPluvio()">📍 Agregar pluviómetro acá</button>
       <button class="btn-outline" id="btnAgregarPluvioManual" onclick="iniciarColocacionPluvioManual()" style="margin-top:6px">✏️ Agregar de forma manual (elegir potreros tocando el mapa)</button>
+      <button class="btn-outline" id="btnVerCobertura" onclick="verificarCoberturaPluviometros()" style="margin-top:6px">🔍 Verificar cobertura de todos los pluviómetros</button>
+      <div id="resultadoCoberturaPluvio"></div>
       <div id="listaPluviometros" style="margin-top:8px"></div>
     </div>
 
@@ -2439,6 +2441,53 @@ async function recalcularPotrerosPluvio(idx){
   await fbSet('pluviometros', actuales);
   await renderListaPluviometros();
   alert(`✅ Recalculado — ahora tiene ${p.potreros.length} potrero(s) asignados.`);
+}
+
+// Compara TODOS los potreros contra TODOS los pluviómetros a la vez — te dice cuáles quedaron
+// sin ningún pluviómetro asignado (huecos) y cuáles tienen más de uno (superposición).
+let coberturaPluvioLayerGroup = L.layerGroup();
+
+async function verificarCoberturaPluviometros(){
+  const btn = document.getElementById('btnVerCobertura');
+  btn.textContent = '⏳ Revisando…';
+  const todosPotreros = Object.keys(_todosPotrerosCache).length ? _todosPotrerosCache : (_todosPotrerosCache = await fbGet('potreroGeo') || {});
+  const pluvios = await fbGet('pluviometros') || [];
+
+  const conteo = {}; // nombre potrero -> cuántos pluviómetros lo cubren
+  const cubrePor = {}; // nombre potrero -> [nombres de pluviómetros]
+  Object.keys(todosPotreros).forEach(n => { conteo[n] = 0; cubrePor[n] = []; });
+  pluvios.forEach(p=>{
+    (p.potreros||[]).forEach(n=>{
+      if(conteo[n]==null) return; // por si quedó un nombre viejo que ya no existe en el mapa
+      conteo[n]++;
+      cubrePor[n].push(p.nombre);
+    });
+  });
+
+  const sinCubrir = Object.keys(conteo).filter(n => conteo[n]===0).sort();
+  const conSuperposicion = Object.keys(conteo).filter(n => conteo[n]>=2).sort();
+
+  coberturaPluvioLayerGroup.clearLayers();
+  coberturaPluvioLayerGroup.addTo(map);
+  Object.keys(todosPotreros).forEach(nombre=>{
+    const data = todosPotreros[nombre];
+    if(!data || !data.potrero || !data.potrero.latlngs) return;
+    const n = conteo[nombre];
+    const color = n===0 ? '#e05a4a' : n>=2 ? '#e08a3a' : '#6dba3a';
+    const layer = L.polygon(data.potrero.latlngs, { color, weight:2, fillColor:color, fillOpacity:.3 }).addTo(coberturaPluvioLayerGroup);
+    layer.bindTooltip(nombre + (n===0?' ⚠️':n>=2?' ⚠️x'+n:''), {permanent:true, direction:'center', className:'potrero-label'});
+    layer.bindPopup(n===0
+      ? `<b>${nombre}</b><br>⚠️ Sin ningún pluviómetro asignado`
+      : `<b>${nombre}</b><br>Cubierto por: ${cubrePor[nombre].join(', ')}`);
+  });
+
+  btn.textContent = '🔍 Verificar cobertura de todos los pluviómetros';
+  const box = document.getElementById('resultadoCoberturaPluvio');
+  box.innerHTML = `<div class="banner ${sinCubrir.length?'warn':'ok'}" style="margin-top:8px">
+    ${sinCubrir.length ? `⚠️ <b>${sinCubrir.length} potrero(s) sin ningún pluviómetro asignado</b>: ${sinCubrir.join(', ')}` : '✅ Todos los potreros tienen al menos un pluviómetro asignado.'}
+    ${conSuperposicion.length ? `<br><br>🟠 <b>${conSuperposicion.length} potrero(s) cubiertos por más de un pluviómetro</b> (revisá si corresponde): ${conSuperposicion.map(n=>n+' ('+cubrePor[n].join(' + ')+')').join(', ')}` : ''}
+    <br><br><span class="small">🟢 verde = cubierto por exactamente 1 · 🟠 naranja = por 2 o más · 🔴 rojo = por ninguno</span>
+  </div>`;
 }
 
 async function renderListaPluviometros(){
