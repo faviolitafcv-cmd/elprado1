@@ -167,6 +167,33 @@ button:disabled{opacity:.35; cursor:not-allowed;}
       </div>
     </div>
 
+    <!-- PLUVIÓMETROS -->
+    <div class="card" id="cardPluviometros">
+      <div class="card-title">📡 Pluviómetros <span class="badge" id="badgePluvioCount">0</span></div>
+      <p class="hint">Ubicalos una sola vez acá en el mapa — el sistema calcula solo qué potreros le corresponden a cada uno por cercanía real, y desde ahí toda lluvia que cargues se asigna sola, sin volver a marcar nada a mano.</p>
+      <button class="btn-outline" id="btnAgregarPluvio" onclick="iniciarColocacionPluvio()">📍 Agregar pluviómetro acá</button>
+      <div id="listaPluviometros" style="margin-top:8px"></div>
+    </div>
+
+    <!-- NUEVO PLUVIÓMETRO (aparece tras tocar el mapa) -->
+    <div class="card" id="cardNuevoPluvio" style="display:none;border-color:var(--gold)">
+      <div class="card-title">📍 Nuevo pluviómetro</div>
+      <div class="fm"><label>Nombre</label><input type="text" id="nombreNuevoPluvio" placeholder="Ej: Sector Norte"></div>
+      <div class="fm">
+        <label>Radio de cobertura (km)</label>
+        <div class="row">
+          <button class="btn-outline" style="width:auto;padding:4px 10px" onclick="cambiarRadioPluvio(-0.5)">−</button>
+          <b id="radioNuevoPluvioValor" style="align-self:center;min-width:50px;text-align:center">3.0 km</b>
+          <button class="btn-outline" style="width:auto;padding:4px 10px" onclick="cambiarRadioPluvio(0.5)">+</button>
+        </div>
+      </div>
+      <div id="previewPotrerosPluvio" class="hint"></div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn-outline" onclick="cancelarNuevoPluvio()">Cancelar</button>
+        <button class="btn-green" onclick="guardarNuevoPluvio()">💾 Guardar pluviómetro</button>
+      </div>
+    </div>
+
     <!-- SINCRONIZACIÓN MASIVA -->
     <div class="card" id="cardSyncMasivo" style="border-color:var(--gold)">
       <div class="card-title">🔄 Sincronizar todos con potreroAreas</div>
@@ -690,6 +717,10 @@ async function guardarInicioCampo(){
 }
 
 function onMapClick(e){
+  if(colocandoPluvio){
+    confirmarUbicacionPluvio(e.latlng);
+    return;
+  }
   if(midiendo){
     clickRegla(e.latlng);
     return;
@@ -2172,6 +2203,155 @@ function limpiarMediciones(){
   mediciones = [];
   renderMediciones();
 }
+
+// ══════════════════════════════════════════════
+// PLUVIÓMETROS — se ubican una sola vez en el mapa, y el sistema calcula solo
+// qué potreros le corresponden a cada uno por cercanía real (no checkboxes a mano).
+// ══════════════════════════════════════════════
+let colocandoPluvio = false;
+let radioNuevoPluvio = 3.0; // km
+let latlngNuevoPluvio = null;
+let pluvioLayerGroup = L.layerGroup();
+let _pluviometrosCache = [];
+
+function distanciaKm(lat1, lng1, lat2, lng2){
+  const R = 6371;
+  const dLat = (lat2-lat1) * Math.PI/180;
+  const dLng = (lng2-lng1) * Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function centroidePotrero(latlngs){
+  const lat = latlngs.reduce((s,p)=>s+p.lat,0)/latlngs.length;
+  const lng = latlngs.reduce((s,p)=>s+p.lng,0)/latlngs.length;
+  return {lat, lng};
+}
+
+// Devuelve la lista de nombres de potrero dentro del radio dado, usando el centroide de cada uno
+async function potrerosDentroDeRadio(lat, lng, radioKm){
+  const todos = Object.keys(_todosPotrerosCache).length ? _todosPotrerosCache : (_todosPotrerosCache = await fbGet('potreroGeo') || {});
+  const dentro = [];
+  Object.keys(todos).forEach(nombre=>{
+    const data = todos[nombre];
+    if(!data || !data.potrero || !data.potrero.latlngs) return;
+    const c = centroidePotrero(data.potrero.latlngs);
+    const d = distanciaKm(lat, lng, c.lat, c.lng);
+    if(d <= radioKm) dentro.push({nombre, distKm: d});
+  });
+  return dentro.sort((a,b)=>a.distKm-b.distKm);
+}
+
+function iniciarColocacionPluvio(){
+  colocandoPluvio = true;
+  document.getElementById('btnAgregarPluvio').textContent = '📍 Tocá el mapa donde está el pluviómetro…';
+  document.getElementById('btnAgregarPluvio').classList.add('active');
+}
+
+async function confirmarUbicacionPluvio(latlng){
+  colocandoPluvio = false;
+  document.getElementById('btnAgregarPluvio').textContent = '📍 Agregar pluviómetro acá';
+  document.getElementById('btnAgregarPluvio').classList.remove('active');
+  latlngNuevoPluvio = latlng;
+  radioNuevoPluvio = 3.0;
+  document.getElementById('nombreNuevoPluvio').value = '';
+  document.getElementById('radioNuevoPluvioValor').textContent = radioNuevoPluvio.toFixed(1)+' km';
+  document.getElementById('cardNuevoPluvio').style.display = 'flex';
+  await actualizarPreviewPluvio();
+}
+
+async function cambiarRadioPluvio(delta){
+  radioNuevoPluvio = Math.max(0.5, Math.round((radioNuevoPluvio+delta)*10)/10);
+  document.getElementById('radioNuevoPluvioValor').textContent = radioNuevoPluvio.toFixed(1)+' km';
+  await actualizarPreviewPluvio();
+}
+
+async function actualizarPreviewPluvio(){
+  if(!latlngNuevoPluvio) return;
+  const box = document.getElementById('previewPotrerosPluvio');
+  box.innerHTML = '⏳ calculando…';
+  const dentro = await potrerosDentroDeRadio(latlngNuevoPluvio.lat, latlngNuevoPluvio.lng, radioNuevoPluvio);
+  box.innerHTML = dentro.length
+    ? `📍 ${dentro.length} potrero(s) dentro del radio: ` + dentro.map(p=>p.nombre+' ('+p.distKm.toFixed(1)+'km)').join(', ')
+    : '⚠️ Ningún potrero dibujado cae dentro de este radio — probá agrandarlo, o revisá si esos potreros ya están digitalizados en el mapa.';
+}
+
+function cancelarNuevoPluvio(){
+  document.getElementById('cardNuevoPluvio').style.display = 'none';
+  latlngNuevoPluvio = null;
+}
+
+async function guardarNuevoPluvio(){
+  const nombre = document.getElementById('nombreNuevoPluvio').value.trim();
+  if(!nombre){ alert('Ponele un nombre al pluviómetro.'); return; }
+  if(!latlngNuevoPluvio) return;
+  const dentro = await potrerosDentroDeRadio(latlngNuevoPluvio.lat, latlngNuevoPluvio.lng, radioNuevoPluvio);
+  const nuevo = {
+    nombre,
+    lat: latlngNuevoPluvio.lat,
+    lng: latlngNuevoPluvio.lng,
+    radioKm: radioNuevoPluvio,
+    potreros: dentro.map(p=>p.nombre)
+  };
+  const actuales = await fbGet('pluviometros') || [];
+  actuales.push(nuevo);
+  await fbSet('pluviometros', actuales);
+  cancelarNuevoPluvio();
+  await renderListaPluviometros();
+  alert(`✅ "${nombre}" guardado, con ${nuevo.potreros.length} potrero(s) asignados automáticamente.`);
+}
+
+async function eliminarPluviometro(idx){
+  if(!confirm('¿Eliminar este pluviómetro? Se perderá su ubicación y la asignación automática de potreros (los registros de lluvia ya cargados no se borran).')) return;
+  const actuales = await fbGet('pluviometros') || [];
+  actuales.splice(idx, 1);
+  await fbSet('pluviometros', actuales);
+  await renderListaPluviometros();
+}
+
+async function recalcularPotrerosPluvio(idx){
+  const actuales = await fbGet('pluviometros') || [];
+  const p = actuales[idx];
+  if(!p || p.lat==null) return;
+  const dentro = await potrerosDentroDeRadio(p.lat, p.lng, p.radioKm||3.0);
+  p.potreros = dentro.map(x=>x.nombre);
+  await fbSet('pluviometros', actuales);
+  await renderListaPluviometros();
+  alert(`✅ Recalculado — ahora tiene ${p.potreros.length} potrero(s) asignados.`);
+}
+
+async function renderListaPluviometros(){
+  const pluvios = await fbGet('pluviometros') || [];
+  _pluviometrosCache = pluvios;
+  document.getElementById('badgePluvioCount').textContent = pluvios.length;
+  pluvioLayerGroup.clearLayers();
+  pluvioLayerGroup.addTo(map);
+
+  const box = document.getElementById('listaPluviometros');
+  if(!pluvios.length){ box.innerHTML = '<div class="hint">Todavía no ubicaste ningún pluviómetro acá.</div>'; return; }
+
+  box.innerHTML = pluvios.map((p, i)=>{
+    const sinUbicar = p.lat==null;
+    return `<div class="list-item" style="margin-bottom:6px">
+      <div class="lihead"><span>📡 ${p.nombre}</span><span class="small">${sinUbicar?'sin ubicar en el mapa':(p.radioKm||3)+' km'}</span></div>
+      <div class="small">${sinUbicar ? '⚠️ Este pluviómetro es de antes del mapa — todavía no tiene ubicación ni cálculo automático.' : (p.potreros&&p.potreros.length ? p.potreros.length+' potrero(s): '+p.potreros.join(', ') : 'Sin potreros dentro del radio')}</div>
+      <div class="row" style="margin-top:4px;gap:4px">
+        ${!sinUbicar?`<button class="btn-outline" style="width:auto;padding:3px 8px;font-size:10.5px" onclick="recalcularPotrerosPluvio(${i})">🔄 Recalcular</button>`:''}
+        <button class="btn-red" style="width:auto;padding:3px 8px;font-size:10.5px" onclick="eliminarPluviometro(${i})">🗑️ Eliminar</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Pines + círculo de cobertura de cada pluviómetro ubicado
+  pluvios.forEach(p=>{
+    if(p.lat==null) return;
+    L.circle([p.lat, p.lng], {radius: (p.radioKm||3)*1000, color:'#5aa9e0', weight:1.5, dashArray:'4,4', fillOpacity:.04}).addTo(pluvioLayerGroup);
+    const marker = L.marker([p.lat, p.lng], {
+      icon: L.divIcon({className:'', html:`<div style="background:#5aa9e0;color:#0d1509;font-weight:800;font-size:16px;width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 1px 6px rgba(0,0,0,.5);"><span style="transform:rotate(45deg)">📡</span></div>`, iconSize:[26,26], iconAnchor:[13,26]})
+    }).addTo(pluvioLayerGroup);
+    marker.bindPopup(`<b>📡 ${p.nombre}</b><br>Radio: ${p.radioKm||3} km<br>${p.potreros?.length||0} potrero(s) asignados`);
+  });
+}
 function fmtFechaSlash(f){ const [y,m,d]=f.split('-'); return d+'/'+m+'/'+y; }
 
 // Mide cada lado del perímetro de una forma dibujada a mano — con su dirección aproximada
@@ -2689,6 +2869,7 @@ async function cargarListaPotreros(){
 initMap();
 actualizarUIModoMasivo();
 cargarListaPotreros();
+renderListaPluviometros();
 </script>
 </body>
 </html>
