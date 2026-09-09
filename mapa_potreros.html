@@ -172,6 +172,7 @@ button:disabled{opacity:.35; cursor:not-allowed;}
       <div class="card-title">📡 Pluviómetros <span class="badge" id="badgePluvioCount">0</span></div>
       <p class="hint">Ubicalos una sola vez acá en el mapa — el sistema calcula solo qué potreros le corresponden a cada uno por cercanía real, y desde ahí toda lluvia que cargues se asigna sola, sin volver a marcar nada a mano.</p>
       <button class="btn-outline" id="btnAgregarPluvio" onclick="iniciarColocacionPluvio()">📍 Agregar pluviómetro acá</button>
+      <button class="btn-outline" id="btnAgregarPluvioManual" onclick="iniciarColocacionPluvioManual()" style="margin-top:6px">✏️ Agregar de forma manual (elegir potreros tocando el mapa)</button>
       <div id="listaPluviometros" style="margin-top:8px"></div>
     </div>
 
@@ -191,6 +192,18 @@ button:disabled{opacity:.35; cursor:not-allowed;}
       <div class="row" style="margin-top:8px">
         <button class="btn-outline" onclick="cancelarNuevoPluvio()">Cancelar</button>
         <button class="btn-green" onclick="guardarNuevoPluvio()">💾 Guardar pluviómetro</button>
+      </div>
+    </div>
+
+    <!-- NUEVO PLUVIÓMETRO MANUAL (ubicación en el mapa + selección de potreros tocando el mapa) -->
+    <div class="card" id="cardPluvioManual" style="display:none;border-color:var(--gold)">
+      <div class="card-title" id="tituloPluvioManual">✏️ Nuevo pluviómetro (manual)</div>
+      <div class="fm"><label>Nombre</label><input type="text" id="nombrePluvioManual" placeholder="Ej: Sector Norte"></div>
+      <div id="instruccionPluvioManual" class="hint" style="color:var(--gold2)"></div>
+      <div id="listaSeleccionPluvioManual" class="hint" style="margin-top:6px"></div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn-outline" onclick="cancelarPluvioManual()">Cancelar</button>
+        <button class="btn-green" onclick="guardarPluvioManual()">💾 Guardar pluviómetro</button>
       </div>
     </div>
 
@@ -717,6 +730,10 @@ async function guardarInicioCampo(){
 }
 
 function onMapClick(e){
+  if(colocandoPluvioManual){
+    confirmarUbicacionPluvioManual(e.latlng);
+    return;
+  }
   if(colocandoPluvio){
     confirmarUbicacionPluvio(e.latlng);
     return;
@@ -2281,6 +2298,110 @@ function cancelarNuevoPluvio(){
   latlngNuevoPluvio = null;
 }
 
+// ── Modo manual: ubicás el pluviómetro en el mapa, y elegís los potreros tocándolos
+// directamente en el mapa, uno por uno — sin ningún cálculo de por medio. ──
+let colocandoPluvioManual = false;
+let seleccionandoPotrerosPluvio = false;
+let latlngPluvioManual = null;
+let potrerosSeleccionadosManual = new Set();
+let seleccionPluvioLayerGroup = L.layerGroup();
+let _editandoPluvioIdx = null;
+
+function iniciarColocacionPluvioManual(idx){
+  _editandoPluvioIdx = (idx!=null) ? idx : null;
+  const existente = (idx!=null) ? _pluviometrosCache[idx] : null;
+  potrerosSeleccionadosManual = new Set(existente?.potreros || []);
+  document.getElementById('nombrePluvioManual').value = existente ? existente.nombre : '';
+  document.getElementById('tituloPluvioManual').textContent = existente ? '✏️ Editando "'+existente.nombre+'"' : '✏️ Nuevo pluviómetro (manual)';
+
+  if(existente && existente.lat!=null){
+    // Ya tiene ubicación guardada — vamos directo a elegir/ajustar los potreros
+    latlngPluvioManual = L.latLng(existente.lat, existente.lng);
+    iniciarSeleccionPotrerosPluvio();
+  } else {
+    colocandoPluvioManual = true;
+    latlngPluvioManual = null;
+    document.getElementById('btnAgregarPluvioManual').textContent = '✏️ Tocá el mapa donde está el pluviómetro…';
+    document.getElementById('btnAgregarPluvioManual').classList.add('active');
+  }
+}
+
+async function confirmarUbicacionPluvioManual(latlng){
+  colocandoPluvioManual = false;
+  latlngPluvioManual = latlng;
+  document.getElementById('btnAgregarPluvioManual').textContent = '✏️ Agregar de forma manual (elegir potreros tocando el mapa)';
+  document.getElementById('btnAgregarPluvioManual').classList.remove('active');
+  await iniciarSeleccionPotrerosPluvio();
+}
+
+async function iniciarSeleccionPotrerosPluvio(){
+  seleccionandoPotrerosPluvio = true;
+  document.getElementById('cardPluvioManual').style.display = 'flex';
+  document.getElementById('instruccionPluvioManual').textContent = '👉 Tocá cada potrero en el mapa para sumarlo o sacarlo (queda resaltado en dorado el que ya elegiste)';
+
+  const todos = Object.keys(_todosPotrerosCache).length ? _todosPotrerosCache : (_todosPotrerosCache = await fbGet('potreroGeo') || {});
+  seleccionPluvioLayerGroup.clearLayers();
+  seleccionPluvioLayerGroup.addTo(map);
+
+  Object.keys(todos).sort().forEach(nombre=>{
+    const data = todos[nombre];
+    if(!data || !data.potrero || !data.potrero.latlngs) return;
+    const seleccionado = potrerosSeleccionadosManual.has(nombre);
+    const layer = L.polygon(data.potrero.latlngs, {
+      color: seleccionado ? '#e8bc40' : '#5aa9e0',
+      weight: seleccionado ? 3 : 1.5,
+      fillColor: seleccionado ? '#e8bc40' : '#5aa9e0',
+      fillOpacity: seleccionado ? .35 : .05
+    });
+    layer.bindTooltip(nombre, {permanent:true, direction:'center', className:'potrero-label'});
+    layer.on('click', () => toggleSeleccionPotreroPluvio(nombre));
+    layer.addTo(seleccionPluvioLayerGroup);
+  });
+
+  renderListaSeleccionPluvio();
+}
+
+function toggleSeleccionPotreroPluvio(nombre){
+  if(potrerosSeleccionadosManual.has(nombre)) potrerosSeleccionadosManual.delete(nombre);
+  else potrerosSeleccionadosManual.add(nombre);
+  iniciarSeleccionPotrerosPluvio(); // redibuja con los colores actualizados
+}
+
+function renderListaSeleccionPluvio(){
+  const box = document.getElementById('listaSeleccionPluvioManual');
+  const arr = [...potrerosSeleccionadosManual].sort();
+  box.innerHTML = arr.length
+    ? `<b style="color:var(--gold2)">${arr.length} elegido(s):</b> ${arr.join(', ')}`
+    : 'Todavía no elegiste ningún potrero.';
+}
+
+function cancelarPluvioManual(){
+  document.getElementById('cardPluvioManual').style.display = 'none';
+  colocandoPluvioManual = false;
+  seleccionandoPotrerosPluvio = false;
+  seleccionPluvioLayerGroup.clearLayers();
+  seleccionPluvioLayerGroup.remove();
+  document.getElementById('btnAgregarPluvioManual').textContent = '✏️ Agregar de forma manual (elegir potreros tocando el mapa)';
+  document.getElementById('btnAgregarPluvioManual').classList.remove('active');
+  _editandoPluvioIdx = null;
+}
+
+async function guardarPluvioManual(){
+  const nombre = document.getElementById('nombrePluvioManual').value.trim();
+  if(!nombre){ alert('Ponele un nombre al pluviómetro.'); return; }
+  const potreros = [...potrerosSeleccionadosManual];
+  const actuales = await fbGet('pluviometros') || [];
+  if(_editandoPluvioIdx!=null && actuales[_editandoPluvioIdx]){
+    actuales[_editandoPluvioIdx] = { ...actuales[_editandoPluvioIdx], nombre, lat: latlngPluvioManual?.lat ?? null, lng: latlngPluvioManual?.lng ?? null, potreros };
+  } else {
+    actuales.push({ nombre, lat: latlngPluvioManual?.lat ?? null, lng: latlngPluvioManual?.lng ?? null, radioKm: null, potreros });
+  }
+  await fbSet('pluviometros', actuales);
+  cancelarPluvioManual();
+  await renderListaPluviometros();
+  alert(`✅ "${nombre}" guardado con ${potreros.length} potrero(s) elegidos a mano.`);
+}
+
 async function guardarNuevoPluvio(){
   const nombre = document.getElementById('nombreNuevoPluvio').value.trim();
   if(!nombre){ alert('Ponele un nombre al pluviómetro.'); return; }
@@ -2337,6 +2458,7 @@ async function renderListaPluviometros(){
       <div class="small">${sinUbicar ? '⚠️ Este pluviómetro es de antes del mapa — todavía no tiene ubicación ni cálculo automático.' : (p.potreros&&p.potreros.length ? p.potreros.length+' potrero(s): '+p.potreros.join(', ') : 'Sin potreros dentro del radio')}</div>
       <div class="row" style="margin-top:4px;gap:4px">
         ${!sinUbicar?`<button class="btn-outline" style="width:auto;padding:3px 8px;font-size:10.5px" onclick="recalcularPotrerosPluvio(${i})">🔄 Recalcular</button>`:''}
+        <button class="btn-outline" style="width:auto;padding:3px 8px;font-size:10.5px" onclick="iniciarColocacionPluvioManual(${i})">✏️ Editar potreros a mano</button>
         <button class="btn-red" style="width:auto;padding:3px 8px;font-size:10.5px" onclick="eliminarPluviometro(${i})">🗑️ Eliminar</button>
       </div>
     </div>`;
