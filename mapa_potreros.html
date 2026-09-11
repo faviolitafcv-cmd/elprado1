@@ -2503,10 +2503,10 @@ async function renderListaPluviometros(){
   box.innerHTML = pluvios.map((p, i)=>{
     const sinUbicar = p.lat==null;
     return `<div class="list-item" style="margin-bottom:6px">
-      <div class="lihead"><span>📡 ${p.nombre}</span><span class="small">${sinUbicar?'sin ubicar en el mapa':(p.radioKm||3)+' km'}</span></div>
-      <div class="small">${sinUbicar ? '⚠️ Este pluviómetro es de antes del mapa — todavía no tiene ubicación ni cálculo automático.' : (p.potreros&&p.potreros.length ? p.potreros.length+' potrero(s): '+p.potreros.join(', ') : 'Sin potreros dentro del radio')}</div>
+      <div class="lihead"><span>📡 ${p.nombre}</span><span class="small">${sinUbicar?'sin ubicar en el mapa':(p.radioKm!=null?p.radioKm+' km':'manual')}</span></div>
+      <div class="small">${sinUbicar ? '⚠️ Este pluviómetro es de antes del mapa — todavía no tiene ubicación ni cálculo automático.' : (p.potreros&&p.potreros.length ? p.potreros.length+' potrero(s): '+p.potreros.join(', ') : 'Sin potreros asignados')}</div>
       <div class="row" style="margin-top:4px;gap:4px">
-        ${!sinUbicar?`<button class="btn-outline" style="width:auto;padding:3px 8px;font-size:10.5px" onclick="recalcularPotrerosPluvio(${i})">🔄 Recalcular</button>`:''}
+        ${(!sinUbicar && p.radioKm!=null)?`<button class="btn-outline" style="width:auto;padding:3px 8px;font-size:10.5px" onclick="recalcularPotrerosPluvio(${i})">🔄 Recalcular</button>`:''}
         <button class="btn-outline" style="width:auto;padding:3px 8px;font-size:10.5px" onclick="iniciarColocacionPluvioManual(${i})">✏️ Editar potreros a mano</button>
         <button class="btn-red" style="width:auto;padding:3px 8px;font-size:10.5px" onclick="eliminarPluviometro(${i})">🗑️ Eliminar</button>
       </div>
@@ -2516,11 +2516,13 @@ async function renderListaPluviometros(){
   // Pines + círculo de cobertura de cada pluviómetro ubicado
   pluvios.forEach(p=>{
     if(p.lat==null) return;
-    L.circle([p.lat, p.lng], {radius: (p.radioKm||3)*1000, color:'#5aa9e0', weight:1.5, dashArray:'4,4', fillOpacity:.04}).addTo(pluvioLayerGroup);
+    if(p.radioKm != null){
+      L.circle([p.lat, p.lng], {radius: p.radioKm*1000, color:'#5aa9e0', weight:1.5, dashArray:'4,4', fillOpacity:.04}).addTo(pluvioLayerGroup);
+    }
     const marker = L.marker([p.lat, p.lng], {
       icon: L.divIcon({className:'', html:`<div style="background:#5aa9e0;color:#0d1509;font-weight:800;font-size:16px;width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 1px 6px rgba(0,0,0,.5);"><span style="transform:rotate(45deg)">📡</span></div>`, iconSize:[26,26], iconAnchor:[13,26]})
     }).addTo(pluvioLayerGroup);
-    marker.bindPopup(`<b>📡 ${p.nombre}</b><br>Radio: ${p.radioKm||3} km<br>${p.potreros?.length||0} potrero(s) asignados`);
+    marker.bindPopup(`<b>📡 ${p.nombre}</b><br>${p.radioKm!=null ? 'Radio: '+p.radioKm+' km' : 'Asignación manual'}<br>${p.potreros?.length||0} potrero(s) asignados`);
   });
 }
 function fmtFechaSlash(f){ const [y,m,d]=f.split('-'); return d+'/'+m+'/'+y; }
