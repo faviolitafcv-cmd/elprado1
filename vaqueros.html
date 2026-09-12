@@ -1039,7 +1039,8 @@ function renderMapaGrupoParcelas(lote, containerId){
   const hoy = new Date().toISOString().split('T')[0];
   const acts = filtrarActsPorLote(getActs(), lote).sort((a,b)=> (a.fechaIng||'').localeCompare(b.fechaIng||''));
 
-  const actual = acts.find(a => a.fechaIng<=hoy && (a.fechaSal? a.fechaSal>=hoy : a.fechaIng===hoy)) || null;
+  const candidatosActual = acts.filter(a => a.fechaIng<=hoy && (a.fechaSal? a.fechaSal>=hoy : a.fechaIng===hoy));
+  const actual = candidatosActual.length ? candidatosActual.reduce((b,a)=>a.fechaIng>=b.fechaIng?a:b) : null;
   const pasadas = acts.filter(a => a!==actual && (a.fechaSal ? a.fechaSal<hoy : a.fechaIng<hoy));
   const anterior = pasadas.length ? pasadas[pasadas.length-1] : null; // ya ordenadas asc → la última es la más reciente
   const proximas = acts.filter(a => a.fechaIng>hoy);
