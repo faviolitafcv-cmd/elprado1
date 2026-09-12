@@ -333,21 +333,41 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
     <div class="sec-titulo" id="armGrupoTitulo">🔧 Parcelas</div>
     <button class="btn-refresh" onclick="refrescarGrupoActual()">↻</button>
   </div>
-  <div id="filtroArmadores" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-    <button onclick="setFiltroArm('todos')" id="filtroTodos"
-      style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;background:var(--green2);color:white;border:none;">
-      Todos
+  <div style="display:flex;gap:8px;margin-bottom:12px;">
+    <button onclick="setVistaArmGrupo('lista')" id="armVistaListaBtn"
+      style="flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;background:var(--green2);color:white;border:none;">
+      📋 Lista
     </button>
-    <button onclick="setFiltroArm('pendientes')" id="filtroPendientes"
-      style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;background:var(--card2);color:var(--text2);border:1px solid var(--border);">
-      Pendientes
-    </button>
-    <button onclick="setFiltroArm('ejecutados')" id="filtroEjecutados"
-      style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;background:var(--card2);color:var(--text2);border:1px solid var(--border);">
-      Ejecutados
+    <button onclick="setVistaArmGrupo('mapa')" id="armVistaMapaBtn"
+      style="flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;background:var(--card2);color:var(--text2);border:1px solid var(--border);">
+      🗺️ Mapa
     </button>
   </div>
-  <div id="listaArmadoresGrupo"></div>
+  <div id="armGrupoVistaLista">
+    <div id="filtroArmadores" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+      <button onclick="setFiltroArm('todos')" id="filtroTodos"
+        style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;background:var(--green2);color:white;border:none;">
+        Todos
+      </button>
+      <button onclick="setFiltroArm('pendientes')" id="filtroPendientes"
+        style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;background:var(--card2);color:var(--text2);border:1px solid var(--border);">
+        Pendientes
+      </button>
+      <button onclick="setFiltroArm('ejecutados')" id="filtroEjecutados"
+        style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;background:var(--card2);color:var(--text2);border:1px solid var(--border);">
+        Ejecutados
+      </button>
+    </div>
+    <div id="listaArmadoresGrupo"></div>
+  </div>
+  <div id="armGrupoVistaMapa" style="display:none;">
+    <div id="mapaArmadorGrupo" style="height:60vh;min-height:360px;border-radius:12px;overflow:hidden;border:1px solid var(--border);"></div>
+    <div style="display:flex;gap:14px;margin-top:8px;font-size:10.5px;color:var(--text2);flex-wrap:wrap;">
+      <span>⬤ <span style="color:#8a8a8a">Anterior</span></span>
+      <span>⬤ <span style="color:#e05a4a">Actual</span></span>
+      <span>⬤ <span style="color:#e8bc40">Próximas</span></span>
+    </div>
+  </div>
 </div>
 
 <!-- ══════════════════════════════════
@@ -737,6 +757,7 @@ function toggleEjecutado(key) {
 
 // ── Grupo actual en armadores ──
 let _armGrupoActual = null;
+let _vaqueroGrupoActual = null;
 let _armFiltro = 'todos';
 const ARM_ULTIMA_VISITA_KEY = 'arm_ultima_visita';
 
@@ -761,6 +782,16 @@ function refrescarGrupoActual() {
 }
 
 // ── RENDER ARMADORES: lista de grupos ──
+function setVistaArmGrupo(vista){
+  document.getElementById('armGrupoVistaLista').style.display = vista==='lista' ? 'block':'none';
+  document.getElementById('armGrupoVistaMapa').style.display  = vista==='mapa'  ? 'block':'none';
+  document.getElementById('armVistaListaBtn').style.background = vista==='lista' ? 'var(--green2)' : 'var(--card2)';
+  document.getElementById('armVistaListaBtn').style.color      = vista==='lista' ? 'white' : 'var(--text2)';
+  document.getElementById('armVistaMapaBtn').style.background  = vista==='mapa' ? 'var(--green2)' : 'var(--card2)';
+  document.getElementById('armVistaMapaBtn').style.color       = vista==='mapa' ? 'white' : 'var(--text2)';
+  if(vista==='mapa' && _armGrupoActual) renderMapaGrupoParcelas(_armGrupoActual, 'mapaArmadorGrupo');
+}
+
 function renderArmadores(checkNuevas=true) {
   const hoy    = new Date().toISOString().split('T')[0];
   const fin    = sumarDias(hoy, 21);
@@ -833,6 +864,7 @@ function abrirGrupoArmadores(lote) {
   _armGrupoActual = lote;
   _armFiltro = 'todos';
   setFiltroArm('todos');
+  setVistaArmGrupo('lista');
   const grupos = getGrupos();
   const g = grupos.find(x => getLoteKey(x)===lote);
   const nombre = g ? getNombreGrupo(g) : lote.split('|')[2]||lote;
@@ -990,6 +1022,79 @@ function geoJSONToLLv(gj){
   return ring.map(c=>[c[1], c[0]]);
 }
 function fmtSlashV(f){ if(!f) return '—'; const [y,m,d]=f.split('-'); return d+'/'+m+'/'+y; }
+
+// ══════════════════════════════════════════════
+// MAPA POR GRUPO — anterior / actual / próximas (todas las ya dibujadas)
+// Compartido entre Vaqueros y Armadores.
+// ══════════════════════════════════════════════
+let _mapasGrupo = {}; // containerId -> instancia de Leaflet, para destruir y recrear al reabrir
+
+function filtrarActsPorLote(acts, lote){
+  const parts = lote.split('|');
+  const loteNombre = parts.length>=3 ? parts[2] : lote;
+  return acts.filter(a => a.actividad==='MATERIA SECA' && a.fechaIng && (a.lote===lote || a.lote===loteNombre));
+}
+
+function renderMapaGrupoParcelas(lote, containerId){
+  const hoy = new Date().toISOString().split('T')[0];
+  const acts = filtrarActsPorLote(getActs(), lote).sort((a,b)=> (a.fechaIng||'').localeCompare(b.fechaIng||''));
+
+  const actual = acts.find(a => a.fechaIng<=hoy && (a.fechaSal? a.fechaSal>=hoy : a.fechaIng===hoy)) || null;
+  const pasadas = acts.filter(a => a!==actual && (a.fechaSal ? a.fechaSal<hoy : a.fechaIng<hoy));
+  const anterior = pasadas.length ? pasadas[pasadas.length-1] : null; // ya ordenadas asc → la última es la más reciente
+  const proximas = acts.filter(a => a.fechaIng>hoy);
+
+  const potreroGeoObj = getPotreroGeo() || {};
+  function buscarGeo(a){
+    const data = potreroGeoObj[a.potrero];
+    if(!data || !data.parcelas || !data.parcelas.length) return null;
+    let p = null;
+    if(a.mapaParcelaId) p = data.parcelas.find(x=>x.id===a.mapaParcelaId);
+    if(!p && a.parcela){
+      const cand = data.parcelas.filter(x=>String(x.num)===String(a.parcela));
+      if(cand.length) p = cand[cand.length-1];
+    }
+    return p ? p.geojson : null;
+  }
+
+  if(_mapasGrupo[containerId]){ _mapasGrupo[containerId].remove(); delete _mapasGrupo[containerId]; }
+  const contDiv = document.getElementById(containerId);
+  if(!contDiv) return;
+  contDiv.innerHTML = '';
+
+  const mapa = L.map(containerId, {zoomControl:true});
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 20, attribution: 'Esri World Imagery'
+  }).addTo(mapa);
+  _mapasGrupo[containerId] = mapa;
+
+  let boundsAcum = null, huboAlgo = false;
+
+  function dibujar(a, color, etiqueta){
+    const gj = buscarGeo(a);
+    if(!gj) return;
+    const ll = geoJSONToLLv(gj);
+    const layer = L.polygon(ll, {color, weight:2.5, fillColor:color, fillOpacity:.5}).addTo(mapa);
+    layer.bindTooltip(etiqueta, {permanent:true, direction:'center', className:'ocup-label-v'});
+    layer.bindPopup(`<b>${etiqueta}</b><br>${a.potrero} · Parcela ${a.parcela}<br>${fmtSlashV(a.fechaIng)}${a.fechaSal?' → '+fmtSlashV(a.fechaSal):''}`);
+    const b = layer.getBounds();
+    boundsAcum = boundsAcum ? boundsAcum.extend(b) : L.latLngBounds(b.getSouthWest(), b.getNorthEast());
+    huboAlgo = true;
+  }
+
+  if(anterior) dibujar(anterior, '#8a8a8a', '⏮ Anterior');
+  if(actual) dibujar(actual, '#e05a4a', '🐄 Actual');
+  proximas.forEach((a,i)=> dibujar(a, '#e8bc40', '▶ Próxima '+(i+1)));
+
+  if(!huboAlgo){
+    contDiv.innerHTML = '<div style="padding:24px 12px;text-align:center;color:var(--text3);font-size:12px;">Ninguna de las parcelas de este grupo (anterior, actual o próximas) tiene todavía un dibujo en el mapa.</div>';
+    mapa.remove();
+    delete _mapasGrupo[containerId];
+    return;
+  }
+  mapa.fitBounds(boundsAcum, {padding:[24,24]});
+  setTimeout(()=>mapa.invalidateSize(), 150);
+}
 
 function initVisitasMap(){
   _visitasMap = L.map('visitasMap', {zoomControl:true}).setView([-16.3700, -60.9700], 15);
@@ -1262,16 +1367,46 @@ function verDetalle(lote, modo) {
     </div>`;
   }).join('');
 
+  _vaqueroGrupoActual = lote;
   document.getElementById('detalleContenido').innerHTML = `
     <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;">
       <div style="font-size:18px;font-weight:800;color:var(--white);">${nombre}</div>
       ${tipo?`<div style="font-size:11px;color:var(--text3);margin-top:2px;">${tipo}</div>`:''}
     </div>
-    ${secHoy}
-    <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--text3);text-transform:uppercase;margin:14px 0 8px;">📅 Ayer — Hoy — Mañana — Pasado</div>
-    ${diasItems}`;
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <button onclick="setVistaVaqueroGrupo('lista')" id="vaqVistaListaBtn"
+        style="flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;background:var(--green2);color:white;border:none;">
+        📋 Lista
+      </button>
+      <button onclick="setVistaVaqueroGrupo('mapa')" id="vaqVistaMapaBtn"
+        style="flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;background:var(--card2);color:var(--text2);border:1px solid var(--border);">
+        🗺️ Mapa
+      </button>
+    </div>
+    <div id="vaqGrupoVistaLista">
+      ${secHoy}
+      <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--text3);text-transform:uppercase;margin:14px 0 8px;">📅 Ayer — Hoy — Mañana — Pasado</div>
+      ${diasItems}
+    </div>
+    <div id="vaqGrupoVistaMapa" style="display:none;">
+      <div id="mapaVaqueroDetalle" style="height:55vh;min-height:320px;border-radius:12px;overflow:hidden;border:1px solid var(--border);"></div>
+      <div style="display:flex;gap:14px;margin-top:8px;font-size:10.5px;color:var(--text2);flex-wrap:wrap;">
+        <span>⬤ <span style="color:#8a8a8a">Anterior</span></span>
+        <span>⬤ <span style="color:#e05a4a">Actual</span></span>
+        <span>⬤ <span style="color:#e8bc40">Próximas</span></span>
+      </div>
+    </div>`;
 
   document.getElementById('overlayDetalle').classList.add('open');
+}
+function setVistaVaqueroGrupo(vista){
+  document.getElementById('vaqGrupoVistaLista').style.display = vista==='lista' ? 'block':'none';
+  document.getElementById('vaqGrupoVistaMapa').style.display  = vista==='mapa'  ? 'block':'none';
+  document.getElementById('vaqVistaListaBtn').style.background = vista==='lista' ? 'var(--green2)' : 'var(--card2)';
+  document.getElementById('vaqVistaListaBtn').style.color      = vista==='lista' ? 'white' : 'var(--text2)';
+  document.getElementById('vaqVistaMapaBtn').style.background  = vista==='mapa' ? 'var(--green2)' : 'var(--card2)';
+  document.getElementById('vaqVistaMapaBtn').style.color       = vista==='mapa' ? 'white' : 'var(--text2)';
+  if(vista==='mapa' && _vaqueroGrupoActual) renderMapaGrupoParcelas(_vaqueroGrupoActual, 'mapaVaqueroDetalle');
 }
 function cerrarDetalle() { document.getElementById('overlayDetalle').classList.remove('open'); }
 
