@@ -1082,9 +1082,9 @@ function renderMapaGrupoParcelas(lote, containerId){
     huboAlgo = true;
   }
 
-  if(anterior) dibujar(anterior, '#8a8a8a', '⏮ Anterior');
-  if(actual) dibujar(actual, '#e05a4a', '🐄 Actual');
-  proximas.forEach((a,i)=> dibujar(a, '#e8bc40', '▶ Próxima '+(i+1)));
+  if(anterior) dibujar(anterior, '#8a8a8a', '⏮ Anterior · P'+anterior.parcela);
+  if(actual) dibujar(actual, '#e05a4a', '🐄 Actual · P'+actual.parcela);
+  proximas.forEach((a,i)=> dibujar(a, '#e8bc40', '▶ Próxima '+(i+1)+' · P'+a.parcela));
 
   if(!huboAlgo){
     contDiv.innerHTML = '<div style="padding:24px 12px;text-align:center;color:var(--text3);font-size:12px;">Ninguna de las parcelas de este grupo (anterior, actual o próximas) tiene todavía un dibujo en el mapa.</div>';
