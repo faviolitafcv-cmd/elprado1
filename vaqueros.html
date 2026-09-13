@@ -1093,6 +1093,26 @@ function renderMapaGrupoParcelas(lote, containerId){
 
         let boundsAcum = null, huboAlgo = false;
 
+        // Contorno del/los POTRERO(S) completos, de fondo — para ver visualmente cuánto
+        // "sobra" del potrero más allá de las parcelas ya cortadas.
+        const potreroAreasObj = getData('potreroAreas', {});
+        const potrerosInvolucrados = new Set([anterior, actual, ...proximas].filter(Boolean).map(a=>a.potrero));
+        potrerosInvolucrados.forEach(nombrePot=>{
+          const dataPot = potreroGeoObj[nombrePot];
+          if(!dataPot || !dataPot.potrero || !dataPot.potrero.latlngs) return;
+          const ha = potreroAreasObj[nombrePot];
+          const perimPot = perimetroPotrero(dataPot.potrero.latlngs);
+          const fondo = L.polygon(dataPot.potrero.latlngs, {
+            color:'#5aa9e0', weight:2, opacity:.7, fillOpacity:.04, dashArray:'6,4'
+          }).addTo(mapa);
+          fondo.bindTooltip(
+            `${nombrePot}${ha!=null?' · '+fmt2(ha)+' ha':''}${perimPot!=null?' · '+perimPot.toLocaleString('es-BO')+'m':''}`,
+            {permanent:true, direction:'top', className:'potrero-label-v'}
+          );
+          const bP = fondo.getBounds();
+          boundsAcum = boundsAcum ? boundsAcum.extend(bP) : L.latLngBounds(bP.getSouthWest(), bP.getNorthEast());
+        });
+
         function dibujar(a, color, etiqueta){
           const gj = buscarGeo(a);
           if(!gj) return;
