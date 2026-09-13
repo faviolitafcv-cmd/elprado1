@@ -324,6 +324,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
       <div class="notif-nuevas-sub">Nuevas parcelas agregadas desde tu última visita</div>
     </div>
   </div>
+  <div id="diagArmadores"></div>
   <div id="listaArmadores"></div>
 </div>
 
@@ -809,6 +810,21 @@ function renderArmadores(checkNuevas=true) {
   );
   const grupos = getGrupos();
   const ejs    = getEjecutados();
+
+  // 🔍 DIAGNÓSTICO TEMPORAL — muestra qué nombres de lote no coinciden con ningún grupo
+  // configurado, para encontrar el mismatch exacto (mayúsculas, espacios, nombre distinto, etc.)
+  const clavesValidas = new Set();
+  grupos.forEach(g => { clavesValidas.add(getLoteKey(g)); clavesValidas.add(g.grupo||g.nombre||''); });
+  const lotesSinMatch = [...new Set(acts.map(a=>a.lote))].filter(l => l && !clavesValidas.has(l));
+  const diagBox = document.getElementById('diagArmadores');
+  if(diagBox){
+    diagBox.innerHTML = lotesSinMatch.length
+      ? `<div class="hint" style="color:var(--gold2);border:1px solid var(--gold);border-radius:8px;padding:8px;margin-bottom:10px;">
+          🔍 Estos nombres de lote aparecen en aforos pero NO coinciden con ningún grupo configurado:<br>
+          ${lotesSinMatch.map(l=>'"'+l+'"').join(', ')}
+        </div>`
+      : '';
+  }
 
   // Notificacion de parcelas nuevas desde ultima visita
   if(checkNuevas) {
