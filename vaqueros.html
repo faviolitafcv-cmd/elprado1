@@ -488,6 +488,14 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 // ══════════════════════════════════════════════
 const FB_URL = 'https://elprado1-153ef-default-rtdb.firebaseio.com/elprado1';
 
+// "Hoy" usando la fecha LOCAL del dispositivo, no UTC — new Date().toISOString() usa UTC,
+// que en Bolivia (UTC-4) puede saltar al día siguiente entre las 20:00 y medianoche,
+// haciendo que "hoy" quede mal calculado justo en ese rango horario.
+function hoyLocal(){
+  const d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
 function getData(key, def) {
   try { const v = localStorage.getItem('elprado_' + key); return v ? JSON.parse(v) : def; }
   catch(e) { return def; }
@@ -684,7 +692,7 @@ function volverHome() { irA('pagHome'); }
 // RENDER VAQUEROS
 // ══════════════════════════════════════════════
 function renderVaqueros() {
-  const hoy   = new Date().toISOString().split('T')[0];
+  const hoy   = hoyLocal();
   const dias  = [sumarDias(hoy,-1), hoy, sumarDias(hoy,1), sumarDias(hoy,2)];
   const lbls  = ['Ayer','Hoy','Mañana','Pasado'];
   const acts  = getActs();
@@ -793,7 +801,7 @@ function setVistaArmGrupo(vista){
 }
 
 function renderArmadores(checkNuevas=true) {
-  const hoy    = new Date().toISOString().split('T')[0];
+  const hoy    = hoyLocal();
   const fin    = sumarDias(hoy, 21);
   const acts   = getActs().filter(a =>
     a.actividad==='MATERIA SECA' && a.fechaIng &&
@@ -875,7 +883,7 @@ function abrirGrupoArmadores(lote) {
 
 function renderArmadoresGrupo(lote, recargar=false) {
   if(!lote) return;
-  const hoy  = new Date().toISOString().split('T')[0];
+  const hoy  = hoyLocal();
   const fin  = sumarDias(hoy, 21);
   const ejs  = getEjecutados();
   const ultimaVisita = localStorage.getItem(ARM_ULTIMA_VISITA_KEY) || '0000-00-00';
@@ -950,7 +958,7 @@ function renderArmadoresGrupo(lote, recargar=false) {
 // RENDER PÚBLICA (3 días)
 // ══════════════════════════════════════════════
 function renderPublica() {
-  const hoy    = new Date().toISOString().split('T')[0];
+  const hoy    = hoyLocal();
   const dias   = [sumarDias(hoy,-1), hoy, sumarDias(hoy,1)];
   const lbls   = ['Ayer','Hoy','Mañana'];
   const acts   = getActs();
@@ -1047,7 +1055,7 @@ function renderMapaGrupoParcelas(lote, containerId){
   }
 
   try{
-    const hoy = new Date().toISOString().split('T')[0];
+    const hoy = hoyLocal();
     const acts = filtrarActsPorLote(getActs(), lote).sort((a,b)=> (a.fechaIng||'').localeCompare(b.fechaIng||''));
 
     const candidatosActual = acts.filter(a => a.fechaIng<=hoy && (a.fechaSal? a.fechaSal>=hoy : a.fechaIng===hoy));
@@ -1135,7 +1143,7 @@ function initVisitasMap(){
 // Pinta el fondo de todos los potreros + resalta en rojo dónde hay animales HOY
 function renderVisitasOcupacion(){
   if(!_visitasMap) return;
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = hoyLocal();
   const potreroGeoObj = getPotreroGeo() || {};
   const acts = getActs().filter(a => a.actividad==='MATERIA SECA' && a.fechaIng && a.fechaIng<=hoy && (a.fechaSal ? a.fechaSal>=hoy : a.fechaIng===hoy));
 
@@ -1250,7 +1258,7 @@ function perimetroPotrero(latlngs){
 
 function abrirFichaPotrero(nombre){
   const hoy = new Date();
-  const hoyStr = hoy.toISOString().split('T')[0];
+  const hoyStr = hoyLocal();
   const acts = getActs();
   const potreroAreas = getData('potreroAreas', {});
 
@@ -1364,7 +1372,7 @@ function fmt2(n){ return (n==null||isNaN(n)) ? '—' : Number(n).toLocaleString(
 // DETALLE GRUPO (overlay)
 // ══════════════════════════════════════════════
 function verDetalle(lote, modo) {
-  const hoy   = new Date().toISOString().split('T')[0];
+  const hoy   = hoyLocal();
   const dias  = [sumarDias(hoy,-1), hoy, sumarDias(hoy,1), sumarDias(hoy,2)];
   const lbls  = ['Ayer','Hoy','Mañana','Pasado'];
   const acts  = getActs();
@@ -1484,13 +1492,13 @@ async function verificarPIN() {
     document.getElementById('pinInput').value = '';
   }
 }
-function capIrHoy() { capFechaBase = new Date().toISOString().split('T')[0]; renderCapataz(); }
+function capIrHoy() { capFechaBase = hoyLocal(); renderCapataz(); }
 function capNavegar(d) {
-  if(!capFechaBase) capFechaBase = new Date().toISOString().split('T')[0];
+  if(!capFechaBase) capFechaBase = hoyLocal();
   capFechaBase = sumarDias(capFechaBase, d); renderCapataz();
 }
 function renderCapataz() {
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = hoyLocal();
   if(!capFechaBase) capFechaBase = hoy;
   const dias = []; for(let i=-3;i<=3;i++) dias.push(sumarDias(capFechaBase,i));
   const d0=new Date(dias[0]+'T12:00:00'), d6=new Date(dias[6]+'T12:00:00');
