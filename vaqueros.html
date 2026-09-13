@@ -526,7 +526,23 @@ async function syncFB() {
   } catch(e) { return false; }
 }
 const getActs    = () => asArr(getData('actividades', []));
-const getGrupos  = () => asArr(getData('grupos', []));
+// Grupos "en vivo", calculados por Inventario de Hacienda a partir de los animales reales
+// (misma fuente que ya usa el formulario de aforo — no una lista aparte para mantener a mano).
+function getGruposInventario(){
+  const hac = getData('hacienda', {}) || {};
+  const gr = hac.grupos_resumen;
+  if(!gr) return [];
+  const arr = Array.isArray(gr) ? gr : Object.values(gr);
+  return arr.filter(g => g && g.nombre && g.cabezas > 0);
+}
+// Combina los grupos en vivo (prioridad, siempre actualizados) con la lista vieja estática
+// (por las dudas quede algún grupo histórico que ya no tenga animales pero sí aforos programados).
+const getGrupos = () => {
+  const inventario = getGruposInventario();
+  const nombresInventario = new Set(inventario.map(g => g.nombre));
+  const viejos = asArr(getData('grupos', [])).filter(g => !nombresInventario.has(g.grupo||g.nombre||''));
+  return [...inventario, ...viejos];
+};
 const getPedidos = () => asArr(getData('pedidos', []));
 const setPedidos = p  => setData('pedidos', p);
 const getPotreroGeo = () => getData('potreroGeo', {});
