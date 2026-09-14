@@ -54,6 +54,7 @@ function puedeEliminar(fechaRegistro) {
 <title>El Prado 1 — Gestión de Pasturas</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
 <script>if(typeof pdfjsLib !== 'undefined') pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -860,6 +861,13 @@ tr:hover td { background: rgba(255,255,255,.02); }
             <label>🛰️ NDVI del día</label>
             <input type="number" id="fNDVI" step="0.001" placeholder="se completa solo desde el mapa" readonly style="opacity:.85;">
             <div id="ndviFechaInfo" style="font-size:10px;color:var(--text3);margin-top:2px;"></div>
+          </div>
+          <div class="form-group">
+            <label>📍 Punto de muestreo (opcional)</label>
+            <select id="fPuntoMuestreo" disabled>
+              <option value="">— ninguno —</option>
+            </select>
+            <div style="font-size:10px;color:var(--text3);margin-top:2px;">Solo aparecen los puntos ya habilitados de la campaña activa de este potrero.</div>
           </div>
         </div>
         <div id="avisoPromedioMuestras" style="font-size:11px;color:var(--green2);margin-top:2px;display:none;"></div>
@@ -3189,6 +3197,7 @@ function onPotreroChange() {
     sugerirProximaParcela();
     actualizarSaldoHA();
     calcMS();
+    cargarPuntosMuestreo(p);
   }
 }
 
@@ -3902,7 +3911,87 @@ async function comitParcelaAlMapa(potrero, parcela){
     const limpia = Object.assign({}, parcela); delete limpia.pendiente;
     parcelasActuales.push(limpia);
     await fbSet('potreroGeo/' + potrero + '/parcelas', parcelasActuales);
+    mstHabilitarPuntosParaParcela(potrero, limpia); // no bloquea el guardado — se hace en segundo plano
   }catch(e){ console.warn('No se pudo confirmar la parcela en el mapa', e); }
+}
+
+// ══════════════════════════════════════════════
+// MUESTREO — habilitar puntos de la campaña activa cuando se confirma una parcela real
+// (mismo mecanismo que en mapa_potreros.html, para cuando el corte llega enlazado desde acá).
+// Si ningún punto de la bolsa cae dentro de esta parcela, se generan 2 nuevos ahí mismo.
+// ══════════════════════════════════════════════
+async function mstHabilitarPuntosParaParcela(potrero, parcelaRec){
+  if(!potrero || !parcelaRec || !parcelaRec.geojson) return;
+  try{
+    const campanas = await fbGet('muestreoCampanas/' + potrero);
+    if(!campanas) return;
+    const fechaActiva = Object.keys(campanas).find(f => campanas[f] && campanas[f].activa);
+    if(!fechaActiva) return;
+    const camp = campanas[fechaActiva];
+    camp.puntos = camp.puntos || [];
+    let sigNumero = camp.puntos.reduce((m,p)=>Math.max(m,p.numero||0), 0) + 1;
+    let cambios = false;
+    const habilitadosAhora = [];
+    camp.puntos.forEach(p=>{
+      if(p.habilitado) return;
+      let dentro = false;
+      try{ dentro = turf.booleanPointInPolygon([p.lng, p.lat], parcelaRec.geojson); }catch(e){}
+      if(dentro){
+        p.habilitado = true;
+        p.parcelaId = parcelaRec.id;
+        p.parcelaNum = parcelaRec.num;
+        p.fechaHabilitado = new Date().toISOString().slice(0,10);
+        habilitadosAhora.push(p);
+        cambios = true;
+      }
+    });
+    if(!habilitadosAhora.length){
+      const bbox = turf.bbox(parcelaRec.geojson);
+      let generados = 0, intentos = 0;
+      while(generados < 2 && intentos < 2000){
+        intentos++;
+        const lng = bbox[0] + Math.random()*(bbox[2]-bbox[0]);
+        const lat = bbox[1] + Math.random()*(bbox[3]-bbox[1]);
+        let dentro = false;
+        try{ dentro = turf.booleanPointInPolygon([lng,lat], parcelaRec.geojson); }catch(e){}
+        if(!dentro) continue;
+        camp.puntos.push({
+          numero: sigNumero++, lat, lng, habilitado:true, llegado:false,
+          parcelaId: parcelaRec.id, parcelaNum: parcelaRec.num,
+          fechaHabilitado: new Date().toISOString().slice(0,10), generadoDeRespaldo:true
+        });
+        generados++;
+        cambios = true;
+      }
+    }
+    if(cambios){
+      campanas[fechaActiva] = camp;
+      await fbSet('muestreoCampanas/' + potrero, campanas);
+    }
+  }catch(e){ console.warn('No se pudo habilitar puntos de muestreo', e); }
+}
+
+// Trae los puntos YA HABILITADOS de la campaña activa de un potrero, para poblar el
+// desplegable de "Punto de muestreo" del formulario de aforo (MATERIA SECA).
+async function cargarPuntosMuestreo(potrero){
+  const sel = document.getElementById('fPuntoMuestreo');
+  if(!sel) return;
+  sel.innerHTML = '<option value="">— ninguno —</option>';
+  sel.disabled = true;
+  if(!potrero) return;
+  try{
+    const campanas = await fbGet('muestreoCampanas/' + potrero);
+    if(!campanas) return;
+    const fechaActiva = Object.keys(campanas).find(f => campanas[f] && campanas[f].activa);
+    if(!fechaActiva) return;
+    const camp = campanas[fechaActiva];
+    const habilitados = (camp.puntos||[]).filter(p=>p.habilitado);
+    if(!habilitados.length) return;
+    sel.innerHTML = '<option value="">— ninguno —</option>' + habilitados.map(p=>
+      `<option value="${p.numero}|${fechaActiva}">Punto ${p.numero}${p.parcelaNum?' (parcela '+p.parcelaNum+')':''}${p.llegado?' ✅':''}</option>`
+    ).join('');
+    sel.disabled = false;
+  }catch(e){ console.warn('No se pudieron cargar los puntos de muestreo', e); }
 }
 
 async function eliminarParcelaDelMapaFirebase(potrero, parcelaId){
@@ -4117,6 +4206,16 @@ function guardarActividad() {
       muestra2MV: parseFloat(document.getElementById('fMuestra2MV').value) || null,
       foto1: _fotoMuestra1 || null,
       foto2: _fotoMuestra2 || null,
+      puntoMuestreoNum: (function(){
+        const v = document.getElementById('fPuntoMuestreo')?.value || '';
+        const [num] = v.split('|');
+        return num ? parseInt(num) : null;
+      })(),
+      puntoMuestreoCampana: (function(){
+        const v = document.getElementById('fPuntoMuestreo')?.value || '';
+        const partes = v.split('|');
+        return partes.length>1 ? partes[1] : null;
+      })(),
     });
     if(mapaParcelaCompletaPendiente && mapaParcelaCompletaPendiente.potrero===potrero){
       // Recién ahora, al guardar de verdad el registro, se confirma la geometría en el mapa.
@@ -4399,7 +4498,7 @@ function limpiarForm() {
    'fFechaIng','fFechaSal','fHAManual',
    'fLoteIng','fCabezasIng','fPesoIng','fHAIng','fFechaIngStd','fFechaSalStd',
    'fHAMaq','fFechaIngMaq','fFechaSalMaq','fNDVI','fComentario','fVariedad','fHA',
-   'fAncho','fLargoManual','fLargoCalc','fHAFija','fMuestra1MV','fMuestra2MV']
+   'fAncho','fLargoManual','fLargoCalc','fHAFija','fMuestra1MV','fMuestra2MV','fPuntoMuestreo']
     .forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
   // Limpiar fotos de muestra y sus vistas previas
   _fotoMuestra1 = null; _fotoMuestra2 = null;

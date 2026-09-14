@@ -2767,7 +2767,65 @@ function guardarParcela(){
     }catch(e){ console.warn('No se pudo enviar la parcela al aforo', e); }
   } else {
     guardarEnFirebase();
+    mstHabilitarPuntosParaParcela(potreroActual, rec); // no bloquea el guardado — se hace en segundo plano
   }
+}
+
+// ══════════════════════════════════════════════
+// MUESTREO — habilitar puntos de la campaña activa cuando se corta una parcela real.
+// Si ningún punto de la bolsa cae dentro de esta parcela, se generan 2 nuevos ahí mismo
+// (con el número correlativo que sigue), para que nunca falten puntos para ir a muestrear.
+// ══════════════════════════════════════════════
+async function mstHabilitarPuntosParaParcela(potrero, parcelaRec){
+  if(!potrero || !parcelaRec || !parcelaRec.geojson) return;
+  try{
+    const campanas = await fbGet('muestreoCampanas/' + potrero);
+    if(!campanas) return;
+    const fechaActiva = Object.keys(campanas).find(f => campanas[f] && campanas[f].activa);
+    if(!fechaActiva) return;
+    const camp = campanas[fechaActiva];
+    camp.puntos = camp.puntos || [];
+    let sigNumero = camp.puntos.reduce((m,p)=>Math.max(m,p.numero||0), 0) + 1;
+    let cambios = false;
+    const habilitadosAhora = [];
+    camp.puntos.forEach(p=>{
+      if(p.habilitado) return;
+      let dentro = false;
+      try{ dentro = turf.booleanPointInPolygon([p.lng, p.lat], parcelaRec.geojson); }catch(e){}
+      if(dentro){
+        p.habilitado = true;
+        p.parcelaId = parcelaRec.id;
+        p.parcelaNum = parcelaRec.num;
+        p.fechaHabilitado = new Date().toISOString().slice(0,10);
+        habilitadosAhora.push(p);
+        cambios = true;
+      }
+    });
+    if(!habilitadosAhora.length){
+      // Respaldo: ningún punto de la bolsa cayó en esta parcela — generamos 2 nuevos adentro.
+      const bbox = turf.bbox(parcelaRec.geojson);
+      let generados = 0, intentos = 0;
+      while(generados < 2 && intentos < 2000){
+        intentos++;
+        const lng = bbox[0] + Math.random()*(bbox[2]-bbox[0]);
+        const lat = bbox[1] + Math.random()*(bbox[3]-bbox[1]);
+        let dentro = false;
+        try{ dentro = turf.booleanPointInPolygon([lng,lat], parcelaRec.geojson); }catch(e){}
+        if(!dentro) continue;
+        camp.puntos.push({
+          numero: sigNumero++, lat, lng, habilitado:true, llegado:false,
+          parcelaId: parcelaRec.id, parcelaNum: parcelaRec.num,
+          fechaHabilitado: new Date().toISOString().slice(0,10), generadoDeRespaldo:true
+        });
+        generados++;
+        cambios = true;
+      }
+    }
+    if(cambios){
+      campanas[fechaActiva] = camp;
+      await fbSet('muestreoCampanas/' + potrero, campanas);
+    }
+  }catch(e){ console.warn('No se pudo habilitar puntos de muestreo', e); }
 }
 
 function nuevaVuelta(){

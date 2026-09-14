@@ -463,28 +463,18 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
 
   <div class="mst-card">
     <div class="mst-card-t">1. Elegí el potrero</div>
-    <div class="mst-hint">Se calcula el sobrante (lo que todavía queda libre, más allá de las parcelas ya cortadas) con la misma matemática del mapa de potreros.</div>
+    <div class="mst-hint">Cada potrero puede tener una campaña de muestreo activa: una bolsa de puntos numerados que se van habilitando solos a medida que se cortan las parcelas reales en el mapa.</div>
     <select class="mst-select" id="mstSelectPotrero" onchange="mstSeleccionarPotrero(this.value)">
       <option value="">Seleccioná un potrero…</option>
     </select>
   </div>
 
   <div id="mstSobranteWrap" style="display:none;">
-    <div class="mst-card">
-      <div class="mst-card-t">2. Sobrante disponible</div>
-      <div class="mst-stats">
-        <div class="mst-stat"><div class="v" id="mstStatTotal">—</div><div class="l">Ha totales</div></div>
-        <div class="mst-stat"><div class="v" id="mstStatSobrante">—</div><div class="l">Ha sobrante</div></div>
-      </div>
-      <button class="mst-btn primary" id="mstBtnGenerar" onclick="mstGenerarPuntos()">🎲 Generar puntos de muestreo</button>
-    </div>
+    <div class="mst-card" id="mstCardCampana"></div>
 
     <div class="mst-card" id="mstCardMapa" style="display:none;">
-      <div class="mst-card-t">
-        <span>3. Mapa y navegación</span>
-        <button class="mst-btn red" style="width:auto;margin:0;padding:5px 10px;font-size:10.5px;" onclick="mstReiniciar()">🔄 Nuevos puntos</button>
-      </div>
-      <div class="mst-hint">Tocá 2 puntos (en el mapa o en la lista) para elegir adónde ir a muestrear. Cuando te acerques físicamente, el punto elegido se pone verde solo.</div>
+      <div class="mst-card-t"><span>Mapa y navegación</span></div>
+      <div class="mst-hint">Los puntos dorados ya están habilitados (la parcela real ya se cortó ahí) — andá marcándolos a medida que tomás la muestra. Se ponen verdes solos cuando el GPS detecta que llegaste. Los grises todavía esperan a que se corte esa parcela.</div>
       <button class="mst-btn outline" id="mstBtnOffline" onclick="mstDescargarOffline()">📥 Descargar mapa offline (hacelo acá, con señal)</button>
       <div id="mstOfflineEstado" class="mst-hint" style="margin:6px 0 0;"></div>
       <div class="mst-map-wrap">
@@ -492,11 +482,10 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
         <div class="mst-overlay mst-gps-badge" id="mstGpsEstado">📡 activando GPS…</div>
         <div class="mst-overlay mst-offline-badge" id="mstOfflineBadge" style="display:none;"></div>
       </div>
-      <div class="mst-puntos-grid" id="mstPuntosGrid"></div>
     </div>
 
     <div class="mst-card" id="mstCardElegidos" style="display:none;">
-      <div class="mst-card-t">Puntos a muestrear</div>
+      <div class="mst-card-t">Puntos habilitados</div>
       <div id="mstListaElegidos"></div>
     </div>
   </div>
@@ -1399,20 +1388,23 @@ function iniciarGpsEnVivo(){
 }
 
 // ══════════════════════════════════════════════
-// MUESTREO — puntos de muestra de materia seca en el sobrante del potrero.
-// Reusa la misma matemática de "sobrante" del motor de corte (mapa_potreros.html):
-// potrero útil (contorno menos exclusiones) menos la unión de las parcelas ya
-// cortadas en la vuelta actual = lo que todavía queda libre para ir a muestrear.
+// MUESTREO — campañas de muestreo de materia seca.
+// Una "campaña" = potrero + fecha de inicio → una bolsa de N puntos numerados
+// (1, 2, 3…) repartidos al azar por el sobrante del potrero en ese momento
+// (reusa la misma matemática del motor de corte de mapa_potreros.html).
+// Los puntos empiezan todos "sin habilitar". Cada vez que se corta una parcela
+// real en el mapa (mapa_potreros.html o desde el aforo en elprado_actividades.html),
+// se revisa cuáles puntos de la bolsa caen dentro de esa parcela y esos quedan
+// "habilitados" — ahí es cuando aparecen para ir a muestrear. El aforo de esa
+// parcela después se puede vincular a un número de punto puntual, para trazabilidad.
 // ══════════════════════════════════════════════
-const MST_CANT_PUNTOS = 6;
 const MST_UMBRAL_LLEGADA_M = 15; // metros — a esta distancia el punto se marca "llegado"
-const MST_ZOOMS = [14,15,16,17,18,19];
-const MST_SESION_KEY = 'elprado_mst_sesion_local'; // local a este celular, no se sube a Firebase
 
 let mst = {
-  potrero: null, sobranteGeo: null, areaTotalHa: null, areaSobranteHa: null,
-  puntos: [], elegidos: [], llegados: {},
-  map: null, markers: {}, contornoLayer: null, sobranteLayer: null,
+  potrero: null,
+  campanas: {},       // todas las campañas de este potrero, por fecha de inicio
+  fechaActiva: null,  // clave (fecha) de la campaña activa, si hay una
+  map: null, markers: {}, contornoLayer: null,
   gpsMarker: null, gpsCirculo: null, gpsWatchId: null, _ultimaPos: null,
   tileLayer: null, descargando: false
 };
@@ -1421,7 +1413,10 @@ function abrirMuestreo(){
   irA('pagMuestreo');
   mstCargarListaPotreros();
 }
-function mstRefrescar(){ refrescar('muestreo'); }
+function mstRefrescar(){
+  refrescar('muestreo');
+  if(mst.potrero) mstSeleccionarPotrero(mst.potrero);
+}
 
 function mstCargarListaPotreros(){
   const todos = getPotreroGeo() || {};
@@ -1430,15 +1425,12 @@ function mstCargarListaPotreros(){
     return d && d.potrero && d.potrero.latlngs && d.potrero.latlngs.length >= 3;
   }).sort();
   const sel = document.getElementById('mstSelectPotrero');
-  const valorActual = sel.value;
+  const valorActual = sel.value || mst.potrero;
   sel.innerHTML = '<option value="">Seleccioná un potrero…</option>' +
     nombres.map(n=>`<option value="${n}">${n}</option>`).join('');
-  const sesion = mstLeerSesionLocal();
-  if(sesion && nombres.includes(sesion.potrero)){
-    sel.value = sesion.potrero;
-    mstSeleccionarPotrero(sesion.potrero, sesion);
-  } else if(valorActual && nombres.includes(valorActual)){
+  if(valorActual && nombres.includes(valorActual)){
     sel.value = valorActual;
+    mstSeleccionarPotrero(valorActual);
   }
 }
 
@@ -1471,76 +1463,153 @@ function mstCalcularSobrante(nombre){
   };
 }
 
-function mstSeleccionarPotrero(nombre, sesionPrevia){
+// ── Lectura / escritura de campañas — acotado a UN potrero (no pisa a los demás),
+// con caché local para que se pueda seguir viendo la campaña activa sin señal. ──
+function mstLocalKey(potrero){ return 'elprado_mst_campanas_' + potrero; }
+async function mstCargarCampanas(potrero){
+  try{
+    const r = await fetch(FB_URL + '/muestreoCampanas/' + encodeURIComponent(potrero) + '.json');
+    const data = await r.json();
+    if(data){ localStorage.setItem(mstLocalKey(potrero), JSON.stringify(data)); return data; }
+  }catch(e){}
+  try{ const v = localStorage.getItem(mstLocalKey(potrero)); return v ? JSON.parse(v) : {}; }
+  catch(e){ return {}; }
+}
+async function mstGuardarCampanas(potrero, data){
+  localStorage.setItem(mstLocalKey(potrero), JSON.stringify(data));
+  try{
+    await fetch(FB_URL + '/muestreoCampanas/' + encodeURIComponent(potrero) + '.json', {
+      method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data)
+    });
+  }catch(e){}
+}
+
+async function mstSeleccionarPotrero(nombre){
   mstDetenerGps();
   if(mst.map){ mst.map.remove(); mst.map = null; }
   mst.markers = {};
   document.getElementById('mstSobranteWrap').style.display = nombre ? 'block' : 'none';
   document.getElementById('mstCardMapa').style.display = 'none';
   document.getElementById('mstCardElegidos').style.display = 'none';
+  mst.potrero = nombre || null;
   if(!nombre) return;
 
-  const calc = mstCalcularSobrante(nombre);
-  if(!calc){
-    notifV('⚠️ Ese potrero todavía no tiene contorno dibujado en el mapa', true);
-    document.getElementById('mstSobranteWrap').style.display = 'none';
-    return;
-  }
-  mst.potrero = nombre;
-  mst.sobranteGeo = calc.sobranteGeo;
-  mst.areaTotalHa = calc.areaTotalHa;
-  mst.areaSobranteHa = calc.areaSobranteHa;
-  mst.puntos = []; mst.elegidos = []; mst.llegados = {};
-
-  document.getElementById('mstStatTotal').textContent = calc.areaTotalHa!=null ? calc.areaTotalHa.toFixed(1)+' ha' : '—';
-  document.getElementById('mstStatSobrante').textContent = calc.areaSobranteHa.toFixed(1)+' ha';
-  document.getElementById('mstBtnGenerar').disabled = calc.areaSobranteHa < 0.01;
-
-  if(sesionPrevia && sesionPrevia.puntos && sesionPrevia.puntos.length){
-    mst.puntos = sesionPrevia.puntos;
-    mst.elegidos = sesionPrevia.elegidos || [];
-    mst.llegados = sesionPrevia.llegados || {};
-    mstMostrarMapa();
-  } else {
-    mstGuardarSesionLocal();
-  }
+  document.getElementById('mstCardCampana').innerHTML = '<div class="mst-hint">Cargando campaña…</div>';
+  mst.campanas = await mstCargarCampanas(nombre);
+  mst.fechaActiva = Object.keys(mst.campanas).find(f => mst.campanas[f] && mst.campanas[f].activa) || null;
+  mstRenderCardCampana();
+  if(mst.fechaActiva) mstMostrarMapaCampana();
 }
 
-function mstGenerarPuntos(){
-  if(!mst.sobranteGeo) return;
-  const bbox = turf.bbox(mst.sobranteGeo); // [minLng,minLat,maxLng,maxLat]
+function mstCampanaActiva(){
+  return mst.fechaActiva ? mst.campanas[mst.fechaActiva] : null;
+}
+
+function mstRenderCardCampana(){
+  const cont = document.getElementById('mstCardCampana');
+  const camp = mstCampanaActiva();
+  const hoy = hoyLocal();
+  if(!camp){
+    cont.innerHTML = `
+      <div class="mst-card-t">Nueva campaña de muestreo</div>
+      <div class="mst-hint">Se reparten los puntos por lo que hoy queda libre en este potrero (todo el potrero si todavía no se cortó ninguna parcela). Se numeran desde el 1.</div>
+      <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div>
+          <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:3px;">Fecha de inicio</label>
+          <input class="mst-select" type="date" id="mstFechaInicio" value="${hoy}">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:3px;">Cantidad de puntos</label>
+          <input class="mst-select" type="number" id="mstCantPuntos" min="2" max="200" placeholder="ej: 20">
+        </div>
+      </div>
+      <button class="mst-btn primary" onclick="mstCrearCampana()">🎲 Generar campaña de muestreo</button>
+    `;
+    return;
+  }
+  const puntos = camp.puntos || [];
+  const habilitados = puntos.filter(p=>p.habilitado);
+  const llegados = puntos.filter(p=>p.llegado);
+  cont.innerHTML = `
+    <div class="mst-card-t">
+      <span>Campaña activa — desde ${fmtSlashV(camp.fechaInicio)}</span>
+      <button class="mst-btn red" style="width:auto;margin:0;padding:5px 10px;font-size:10.5px;" onclick="mstArchivarYNueva()">🗑️ Nueva campaña</button>
+    </div>
+    <div class="mst-stats">
+      <div class="mst-stat"><div class="v">${puntos.length}</div><div class="l">Puntos totales</div></div>
+      <div class="mst-stat"><div class="v">${habilitados.length}</div><div class="l">Habilitados</div></div>
+      <div class="mst-stat"><div class="v">${llegados.length}</div><div class="l">Ya visitados</div></div>
+      <div class="mst-stat"><div class="v">${puntos.length-habilitados.length}</div><div class="l">Esperando corte</div></div>
+    </div>
+    <div class="mst-hint" style="margin-top:8px;">Los puntos se habilitan solos a medida que se van cortando las parcelas reales en el mapa. Podés vincular el número de punto al cargar el aforo en Actividades.</div>
+  `;
+}
+
+async function mstCrearCampana(){
+  const fecha = document.getElementById('mstFechaInicio').value;
+  const cantidad = parseInt(document.getElementById('mstCantPuntos').value);
+  if(!fecha){ notifV('⚠️ Poné la fecha de inicio', true); return; }
+  if(!cantidad || cantidad < 2){ notifV('⚠️ Poné una cantidad de puntos (mínimo 2)', true); return; }
+  const calc = mstCalcularSobrante(mst.potrero);
+  if(!calc || calc.areaSobranteHa < 0.01){
+    notifV('⚠️ Ese potrero todavía no tiene contorno dibujado, o no le queda sobrante', true);
+    return;
+  }
+  const puntos = mstGenerarPuntosAleatorios(calc.sobranteGeo, cantidad);
+  if(puntos.length < 2){
+    notifV('⚠️ El sobrante es muy chico o angosto para esa cantidad de puntos', true);
+    return;
+  }
+  if(mst.fechaActiva && !confirm('Ya hay una campaña activa desde el ' + fmtSlashV(mst.campanas[mst.fechaActiva].fechaInicio) + '. ¿Archivarla y crear esta nueva?')) return;
+  if(mst.fechaActiva) mst.campanas[mst.fechaActiva].activa = false;
+
+  mst.campanas[fecha] = {
+    fechaInicio: fecha,
+    cantidadSolicitada: cantidad,
+    creada: new Date().toISOString(),
+    activa: true,
+    puntos: puntos.map(p=>({ numero:p.numero, lat:p.lat, lng:p.lng, habilitado:false, llegado:false, parcelaId:null, parcelaNum:null, fechaHabilitado:null }))
+  };
+  mst.fechaActiva = fecha;
+  await mstGuardarCampanas(mst.potrero, mst.campanas);
+  mstRenderCardCampana();
+  mstMostrarMapaCampana();
+  notifV('✓ Campaña creada con ' + puntos.length + ' puntos');
+}
+
+async function mstArchivarYNueva(){
+  if(!confirm('¿Archivar la campaña activa y armar una nueva? El historial de la anterior queda guardado, solo deja de estar activa.')) return;
+  if(mst.fechaActiva) mst.campanas[mst.fechaActiva].activa = false;
+  await mstGuardarCampanas(mst.potrero, mst.campanas);
+  mst.fechaActiva = null;
+  document.getElementById('mstCardMapa').style.display = 'none';
+  document.getElementById('mstCardElegidos').style.display = 'none';
+  mstRenderCardCampana();
+}
+
+function mstGenerarPuntosAleatorios(sobranteGeo, cantidad){
+  const bbox = turf.bbox(sobranteGeo); // [minLng,minLat,maxLng,maxLat]
   const anchoBbox = turf.distance([bbox[0],bbox[1]],[bbox[2],bbox[1]],{units:'meters'});
   const altoBbox   = turf.distance([bbox[0],bbox[1]],[bbox[0],bbox[3]],{units:'meters'});
-  const distMinima = Math.max(15, Math.min(anchoBbox, altoBbox) * 0.12); // que no queden pegados entre sí
+  const distMinima = Math.max(8, Math.min(anchoBbox, altoBbox) / Math.max(3, Math.sqrt(cantidad)*1.3));
   const puntos = [];
   let intentos = 0;
-  while(puntos.length < MST_CANT_PUNTOS && intentos < 4000){
+  while(puntos.length < cantidad && intentos < 8000){
     intentos++;
     const lng = bbox[0] + Math.random()*(bbox[2]-bbox[0]);
     const lat = bbox[1] + Math.random()*(bbox[3]-bbox[1]);
     let dentro = false;
-    try{ dentro = turf.booleanPointInPolygon([lng,lat], mst.sobranteGeo); }catch(e){ dentro=false; }
+    try{ dentro = turf.booleanPointInPolygon([lng,lat], sobranteGeo); }catch(e){ dentro=false; }
     if(!dentro) continue;
     const muyCerca = puntos.some(p => turf.distance([p.lng,p.lat],[lng,lat],{units:'meters'}) < distMinima);
     if(muyCerca) continue;
-    puntos.push({ id:'p'+puntos.length, lat, lng });
+    puntos.push({ numero: puntos.length+1, lat, lng });
   }
-  if(puntos.length < 2){
-    notifV('⚠️ El sobrante es muy chico o angosto para generar puntos separados', true);
-    return;
-  }
-  mst.puntos = puntos; mst.elegidos = []; mst.llegados = {};
-  mstMostrarMapa();
-  mstGuardarSesionLocal();
-}
-
-function mstReiniciar(){
-  if(!confirm('¿Generar puntos nuevos? Se pierde la selección actual.')) return;
-  mstGenerarPuntos();
+  return puntos;
 }
 
 // ── Mapa ──
-function mstMostrarMapa(){
+function mstMostrarMapaCampana(){
   document.getElementById('mstCardMapa').style.display = 'block';
   document.getElementById('mstCardElegidos').style.display = 'block';
   setTimeout(()=>{
@@ -1553,84 +1622,54 @@ function mstMostrarMapa(){
     const calc = mstCalcularSobrante(mst.potrero);
     if(mst.contornoLayer) mst.map.removeLayer(mst.contornoLayer);
     mst.contornoLayer = L.polygon(calc.latlngsPotrero, {color:'#6dba3a', weight:2, fillOpacity:.04}).addTo(mst.map);
-    if(mst.sobranteLayer) mst.map.removeLayer(mst.sobranteLayer);
-    const ringsSobrante = mstAnillosExteriores(mst.sobranteGeo);
-    if(ringsSobrante.length){
-      mst.sobranteLayer = L.polygon(ringsSobrante, {color:'#5aa9e0', weight:2, dashArray:'3,6', fill:false}).addTo(mst.map);
-    }
     mst.map.fitBounds(mst.contornoLayer.getBounds(), {padding:[24,24]});
     setTimeout(()=>mst.map.invalidateSize(), 80);
     mstRenderMarcadores();
-    mstRenderGrid();
     mstRenderElegidos();
   }, 30);
 }
 
-function mstAnillosExteriores(geo){
-  if(!geo) return [];
-  let polys;
-  if(geo.geometry.type==='Polygon') polys=[geo.geometry.coordinates];
-  else if(geo.geometry.type==='MultiPolygon') polys=geo.geometry.coordinates;
-  else return [];
-  return polys.map(coords => coords[0].slice(0,-1).map(c=>[c[1],c[0]]));
-}
-
 function mstIconoPunto(numero, estado){
-  const cls = estado==='llegado' ? 'mst-marker-num llegado' : (estado==='elegido' ? 'mst-marker-num elegido' : 'mst-marker-num');
-  const tam = estado ? 30 : 24;
-  return L.divIcon({ html:`<div class="${cls}">${numero}</div>`, className:'', iconSize:[tam,tam] });
+  const cls = estado==='llegado' ? 'mst-marker-num llegado' : (estado==='habilitado' ? 'mst-marker-num elegido' : 'mst-marker-num');
+  const tam = estado ? 30 : 20;
+  const opacidad = estado ? 1 : .45;
+  return L.divIcon({ html:`<div class="${cls}" style="opacity:${opacidad}">${numero}</div>`, className:'', iconSize:[tam,tam] });
 }
-function mstEstadoPunto(id){
-  if(mst.llegados[id]) return 'llegado';
-  if(mst.elegidos.includes(id)) return 'elegido';
+function mstEstadoPunto(p){
+  if(p.llegado) return 'llegado';
+  if(p.habilitado) return 'habilitado';
   return null;
 }
 function mstRenderMarcadores(){
   Object.values(mst.markers).forEach(m=>mst.map.removeLayer(m));
   mst.markers = {};
-  mst.puntos.forEach((p, i)=>{
-    const marker = L.marker([p.lat, p.lng], { icon: mstIconoPunto(i+1, mstEstadoPunto(p.id)) }).addTo(mst.map);
-    marker.on('click', ()=>mstTogglePunto(p.id));
-    mst.markers[p.id] = marker;
+  const camp = mstCampanaActiva();
+  if(!camp) return;
+  (camp.puntos||[]).forEach(p=>{
+    const marker = L.marker([p.lat, p.lng], { icon: mstIconoPunto(p.numero, mstEstadoPunto(p)) }).addTo(mst.map);
+    const estado = mstEstadoPunto(p);
+    const texto = estado==='llegado' ? '✅ Visitado' : (estado==='habilitado' ? '🟡 Habilitado — andá a muestrear' : '⏳ Todavía no se cortó la parcela acá');
+    marker.bindPopup(`<b>Punto ${p.numero}</b><br>${texto}${p.parcelaNum?'<br>Parcela '+p.parcelaNum:''}`);
+    mst.markers[p.numero] = marker;
   });
-}
-function mstTogglePunto(id){
-  if(mst.llegados[id]) return; // ya llegado, no se puede deseleccionar
-  const idx = mst.elegidos.indexOf(id);
-  if(idx>=0){
-    mst.elegidos.splice(idx,1);
-  } else {
-    if(mst.elegidos.length >= 2){ notifV('Ya elegiste 2 puntos — sacá uno antes de agregar otro', true); return; }
-    mst.elegidos.push(id);
-  }
-  mstRenderMarcadores(); mstRenderGrid(); mstRenderElegidos(); mstGuardarSesionLocal();
-}
-function mstRenderGrid(){
-  const grid = document.getElementById('mstPuntosGrid');
-  grid.innerHTML = mst.puntos.map((p,i)=>{
-    const estado = mstEstadoPunto(p.id);
-    const cls = estado==='llegado' ? 'mst-punto-chip llegado' : (estado==='elegido' ? 'mst-punto-chip elegido' : 'mst-punto-chip');
-    const etiqueta = estado==='llegado' ? '✅ Llegaste' : (estado==='elegido' ? 'Elegido' : 'Tocar');
-    return `<div class="${cls}" onclick="mstTogglePunto('${p.id}')"><div class="n">📍 ${i+1}</div><div class="s">${etiqueta}</div></div>`;
-  }).join('');
 }
 function mstRenderElegidos(){
   const cont = document.getElementById('mstListaElegidos');
-  if(!mst.elegidos.length){
-    cont.innerHTML = '<div style="color:var(--text3);font-size:12px;">Todavía no elegiste ningún punto — tocá 2 en el mapa o en la lista de arriba.</div>';
+  const camp = mstCampanaActiva();
+  const habilitados = camp ? (camp.puntos||[]).filter(p=>p.habilitado) : [];
+  if(!habilitados.length){
+    cont.innerHTML = '<div style="color:var(--text3);font-size:12px;">Todavía ningún punto está habilitado — se van a ir activando a medida que se corten las parcelas reales en el mapa.</div>';
     return;
   }
-  cont.innerHTML = mst.elegidos.map(id=>{
-    const i = mst.puntos.findIndex(p=>p.id===id);
-    const p = mst.puntos[i];
-    const llegado = !!mst.llegados[id];
+  cont.innerHTML = habilitados.map(p=>{
+    const llegado = !!p.llegado;
     let distTxt;
     if(llegado) distTxt = '¡Llegaste! Podés tomar la muestra acá.';
     else if(mst._ultimaPos) distTxt = 'A ' + Math.round(distanciaMetros(mst._ultimaPos.lat, mst._ultimaPos.lng, p.lat, p.lng)) + ' m de tu posición';
     else distTxt = 'Esperando señal de GPS…';
     return `<div class="mst-elegido-row ${llegado?'llegado':''}">
-      <div><div class="nom">📍 Punto ${i+1}</div><div class="dist">${distTxt}</div></div>
-      <div class="estado">${llegado?'LLEGADO':'PENDIENTE'}</div>
+      <div><div class="nom">📍 Punto ${p.numero}${p.parcelaNum?' · Parcela '+p.parcelaNum:''}</div><div class="dist">${distTxt}</div></div>
+      <div class="estado">${llegado?'VISITADO':'PENDIENTE'}</div>
     </div>`;
   }).join('');
 }
@@ -1672,36 +1711,25 @@ function mstDetenerGps(){
   mst.gpsMarker = null; mst.gpsCirculo = null; mst._ultimaPos = null;
 }
 function mstVerificarLlegada(lat, lng){
+  const camp = mstCampanaActiva();
+  if(!camp) return;
   let cambio = false;
-  mst.elegidos.forEach(id=>{
-    if(mst.llegados[id]) return;
-    const p = mst.puntos.find(pt=>pt.id===id);
-    if(!p) return;
+  (camp.puntos||[]).forEach(p=>{
+    if(!p.habilitado || p.llegado) return;
     const d = distanciaMetros(lat, lng, p.lat, p.lng);
     if(d <= MST_UMBRAL_LLEGADA_M){
-      mst.llegados[id] = true;
+      p.llegado = true;
       cambio = true;
       if(navigator.vibrate) try{ navigator.vibrate([120,60,120]); }catch(e){}
-      const i = mst.puntos.findIndex(pt=>pt.id===id);
-      notifV('✅ Llegaste al punto ' + (i+1) + ' — podés tomar la muestra');
+      notifV('✅ Llegaste al punto ' + p.numero + ' — podés tomar la muestra');
     }
   });
-  if(cambio){ mstRenderMarcadores(); mstRenderGrid(); mstGuardarSesionLocal(); }
+  if(cambio){
+    mstRenderMarcadores();
+    mstRenderCardCampana();
+    mstGuardarCampanas(mst.potrero, mst.campanas);
+  }
   mstRenderElegidos();
-}
-
-// ── Sesión local (solo en este celular — a propósito NO se sube a Firebase) ──
-function mstGuardarSesionLocal(){
-  if(!mst.potrero) return;
-  try{
-    localStorage.setItem(MST_SESION_KEY, JSON.stringify({
-      potrero: mst.potrero, puntos: mst.puntos, elegidos: mst.elegidos, llegados: mst.llegados
-    }));
-  }catch(e){}
-}
-function mstLeerSesionLocal(){
-  try{ const v = localStorage.getItem(MST_SESION_KEY); return v ? JSON.parse(v) : null; }
-  catch(e){ return null; }
 }
 
 // ══════════════════════════════════════════════
@@ -1710,6 +1738,7 @@ function mstLeerSesionLocal(){
 // sin señal es la imagen de fondo, así que la precargamos acá mientras hay señal
 // (oficina / campamento), y el mapa la sigue mostrando después aunque se corte la señal.
 // ══════════════════════════════════════════════
+const MST_ZOOMS = [14,15,16,17,18,19];
 const MST_SAT_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 let _mstDB = null;
 function mstAbrirDB(){
@@ -1847,6 +1876,7 @@ async function mstDescargarOffline(){
   setTimeout(()=>{ badge.style.display='none'; }, 4000);
   if(mst.tileLayer) mst.tileLayer.redraw();
 }
+
 
 // ══════════════════════════════════════════════
 // FICHA DE POTRERO (al tocar en el mapa de Visitas)
