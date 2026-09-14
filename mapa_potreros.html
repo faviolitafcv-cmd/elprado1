@@ -242,6 +242,12 @@ button:disabled{opacity:.35; cursor:not-allowed;}
       <div class="stat"><span>Área útil (pastoreable)</span><b id="stAreaUtil">—</b></div>
     </div>
 
+    <!-- MUESTREO DE MATERIA SECA -->
+    <div class="card" id="cardMuestreo" style="display:none">
+      <div class="card-title">🧪 Muestreo de materia seca</div>
+      <div id="mstPanelBody"><p class="hint">Cargando…</p></div>
+    </div>
+
     <!-- ZONAS DE EXCLUSIÓN -->
     <div class="card" id="cardExclusion" style="display:none">
       <div class="card-title">Zonas internas <span class="badge" id="badgeExclCount">0</span></div>
@@ -872,6 +878,7 @@ function finishPotrero(){
   recomputeUtil();
   guardarEnFirebase().then(refrescarOverviewSiCorresponde);
   actualizarSugerenciaParcela();
+  mstPanelCargar();
 }
 function resetPotrero(){
   if(!confirm('¿Reiniciar el contorno de "' + potreroActual + '"? Se van a borrar TAMBIÉN de Firebase las parcelas y exclusiones ya guardadas para este potrero.')) return;
@@ -897,6 +904,7 @@ function resetPotrero(){
   document.getElementById('stAreaUtil').textContent = '—';
   document.getElementById('cardExclusion').style.display = 'none';
   document.getElementById('cardParcela').style.display = 'none';
+  document.getElementById('cardMuestreo').style.display = 'none';
   renderLista(); renderExclusionList();
   guardarEnFirebase();
 }
@@ -2772,6 +2780,112 @@ function guardarParcela(){
 }
 
 // ══════════════════════════════════════════════
+// MUESTREO — activar / finalizar la campaña de muestreo del potrero actual.
+// A propósito el trabajo pesado (turf.js, generar la bolsa de puntos) vive acá, en la
+// base — la app liviana que se abre por QR (vaqueros.html) solo consume el resultado.
+// ══════════════════════════════════════════════
+let mstCampanasPotreroActual = {};
+let mstFechaActivaActual = null;
+
+async function mstPanelCargar(){
+  const card = document.getElementById('cardMuestreo');
+  if(!potreroClosed || !potreroUtilGeo){ card.style.display = 'none'; return; }
+  card.style.display = 'flex';
+  document.getElementById('mstPanelBody').innerHTML = '<p class="hint">Cargando…</p>';
+  mstCampanasPotreroActual = await fbGet('muestreoCampanas/' + potreroActual) || {};
+  mstFechaActivaActual = Object.keys(mstCampanasPotreroActual).find(f => mstCampanasPotreroActual[f] && mstCampanasPotreroActual[f].activa) || null;
+  mstPanelRender();
+}
+
+function mstPanelRender(){
+  const body = document.getElementById('mstPanelBody');
+  if(!mstFechaActivaActual){
+    body.innerHTML = `
+      <p class="hint">Genera una bolsa de puntos repartidos por el sobrante actual del potrero. Se van a ir habilitando solos a medida que se corten las parcelas reales, y se cierra sola cuando marqués "Fin de Vuelta" para este potrero en Actividades.</p>
+      <div class="row">
+        <div>
+          <label>Cantidad de puntos</label>
+          <input type="number" id="mstCantPuntos" min="2" max="200" placeholder="ej: 20">
+        </div>
+      </div>
+      <button class="btn-green" onclick="mstActivarCampana()">▶️ Activar muestreo en este potrero</button>
+    `;
+    return;
+  }
+  const camp = mstCampanasPotreroActual[mstFechaActivaActual];
+  const puntos = camp.puntos || [];
+  const habilitados = puntos.filter(p=>p.habilitado).length;
+  const llegados = puntos.filter(p=>p.llegado).length;
+  body.innerHTML = `
+    <div class="stat"><span>Activa desde</span><b>${fmtFecha(camp.fechaInicio)}</b></div>
+    <div class="stat"><span>Puntos totales</span><b>${puntos.length}</b></div>
+    <div class="stat"><span>Habilitados</span><b>${habilitados}</b></div>
+    <div class="stat"><span>Ya visitados</span><b>${llegados}</b></div>
+    <p class="hint">Se desactiva sola cuando marqués "Fin de Vuelta" en Actividades para este potrero. Si necesitás cortarla antes de tiempo:</p>
+    <button class="btn-red" onclick="mstFinalizarManual()">⏹️ Finalizar antes de tiempo</button>
+  `;
+}
+
+function mstGenerarPuntosAleatorios(sobranteGeo, cantidad){
+  const bbox = turf.bbox(sobranteGeo); // [minLng,minLat,maxLng,maxLat]
+  const anchoBbox = turf.distance([bbox[0],bbox[1]],[bbox[2],bbox[1]],{units:'meters'});
+  const altoBbox   = turf.distance([bbox[0],bbox[1]],[bbox[0],bbox[3]],{units:'meters'});
+  const distMinima = Math.max(8, Math.min(anchoBbox, altoBbox) / Math.max(3, Math.sqrt(cantidad)*1.3));
+  const puntos = [];
+  let intentos = 0;
+  while(puntos.length < cantidad && intentos < 8000){
+    intentos++;
+    const lng = bbox[0] + Math.random()*(bbox[2]-bbox[0]);
+    const lat = bbox[1] + Math.random()*(bbox[3]-bbox[1]);
+    let dentro = false;
+    try{ dentro = turf.booleanPointInPolygon([lng,lat], sobranteGeo); }catch(e){ dentro=false; }
+    if(!dentro) continue;
+    const muyCerca = puntos.some(p => turf.distance([p.lng,p.lat],[lng,lat],{units:'meters'}) < distMinima);
+    if(muyCerca) continue;
+    puntos.push({ numero: puntos.length+1, lat, lng });
+  }
+  return puntos;
+}
+
+async function mstActivarCampana(){
+  const cantidad = parseInt(document.getElementById('mstCantPuntos').value);
+  if(!cantidad || cantidad < 2){ alert('Poné una cantidad de puntos (mínimo 2).'); return; }
+  const sobrante = computeRestanteVuelta() || potreroUtilGeo;
+  if(!sobrante){ alert('Este potrero todavía no tiene contorno cerrado.'); return; }
+  let areaSobranteHa = 0;
+  try{ areaSobranteHa = turf.area(sobrante)/10000; }catch(e){}
+  if(areaSobranteHa < 0.01){ alert('No queda sobrante en este potrero para repartir puntos.'); return; }
+
+  const puntos = mstGenerarPuntosAleatorios(sobrante, cantidad);
+  if(puntos.length < 2){ alert('El sobrante es muy chico o angosto para esa cantidad de puntos.'); return; }
+
+  const hoy = new Date().toISOString().slice(0,10);
+  if(mstFechaActivaActual){
+    if(!confirm('Ya hay una campaña activa desde el ' + fmtFecha(mstCampanasPotreroActual[mstFechaActivaActual].fechaInicio) + '. ¿Archivarla y activar esta nueva?')) return;
+    mstCampanasPotreroActual[mstFechaActivaActual].activa = false;
+  }
+  mstCampanasPotreroActual[hoy] = {
+    fechaInicio: hoy, cantidadSolicitada: cantidad, creada: new Date().toISOString(), activa: true,
+    puntos: puntos.map(p=>({ numero:p.numero, lat:p.lat, lng:p.lng, habilitado:false, llegado:false, parcelaId:null, parcelaNum:null, fechaHabilitado:null }))
+  };
+  mstFechaActivaActual = hoy;
+  await fbSet('muestreoCampanas/' + potreroActual, mstCampanasPotreroActual);
+  await fbSet('muestreoActivos/' + potreroActual, hoy); // índice liviano para vaqueros.html (QR)
+  mstPanelRender();
+  alert('✅ Campaña de muestreo activada con ' + puntos.length + ' puntos.');
+}
+
+async function mstFinalizarManual(){
+  if(!mstFechaActivaActual) return;
+  if(!confirm('¿Finalizar el muestreo de este potrero antes de tiempo?')) return;
+  mstCampanasPotreroActual[mstFechaActivaActual].activa = false;
+  await fbSet('muestreoCampanas/' + potreroActual, mstCampanasPotreroActual);
+  await fbSet('muestreoActivos/' + potreroActual, null); // lo saca del índice liviano
+  mstFechaActivaActual = null;
+  mstPanelRender();
+}
+
+// ══════════════════════════════════════════════
 // MUESTREO — habilitar puntos de la campaña activa cuando se corta una parcela real.
 // Si ningún punto de la bolsa cae dentro de esta parcela, se generan 2 nuevos ahí mismo
 // (con el número correlativo que sigue), para que nunca falten puntos para ir a muestrear.
@@ -2954,6 +3068,7 @@ function limpiarEstadoEnPantalla(){
   document.getElementById('stAreaUtil').textContent = '—';
   document.getElementById('cardExclusion').style.display = 'none';
   document.getElementById('cardParcela').style.display = 'none';
+  document.getElementById('cardMuestreo').style.display = 'none';
   clearCutOnly();
   renderLista(); renderExclusionList();
   updateAnchoFijoInfo();
@@ -3034,6 +3149,7 @@ async function cambiarPotrero(){
   renderLista(); renderExclusionList();
   renderRestante();
   updateAnchoFijoInfo();
+  mstPanelCargar();
 }
 
 async function cargarListaPotreros(){

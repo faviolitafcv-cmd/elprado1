@@ -6,7 +6,6 @@
 <title>El Prado 1 — Campo</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
 <style>
 :root {
   --bg:#0f1a0b; --bg2:#162010; --card:#1c2916; --card2:#223218;
@@ -461,18 +460,16 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
     <button class="btn-refresh" onclick="mstRefrescar()">↻</button>
   </div>
 
-  <div class="mst-card">
-    <div class="mst-card-t">1. Elegí el potrero</div>
-    <div class="mst-hint">Cada potrero puede tener una campaña de muestreo activa: una bolsa de puntos numerados que se van habilitando solos a medida que se cortan las parcelas reales en el mapa.</div>
-    <select class="mst-select" id="mstSelectPotrero" onchange="mstSeleccionarPotrero(this.value)">
-      <option value="">Seleccioná un potrero…</option>
-    </select>
+  <div id="mstVistaLista">
+    <div class="mst-hint" style="margin-bottom:10px;">Estos son los potreros con muestreo activo hoy. Se activan y se cierran solos desde la base — acá solo aparecen mientras están en juego.</div>
+    <div id="mstListaActivos"></div>
   </div>
 
-  <div id="mstSobranteWrap" style="display:none;">
+  <div id="mstVistaPotrero" style="display:none;">
+    <button class="mst-btn outline" style="margin-bottom:10px;" onclick="mstVolverALista()">← Volver a la lista</button>
     <div class="mst-card" id="mstCardCampana"></div>
 
-    <div class="mst-card" id="mstCardMapa" style="display:none;">
+    <div class="mst-card" id="mstCardMapa">
       <div class="mst-card-t"><span>Mapa y navegación</span></div>
       <div class="mst-hint">Los puntos dorados ya están habilitados (la parcela real ya se cortó ahí) — andá marcándolos a medida que tomás la muestra. Se ponen verdes solos cuando el GPS detecta que llegaste. Los grises todavía esperan a que se corte esa parcela.</div>
       <button class="mst-btn outline" id="mstBtnOffline" onclick="mstDescargarOffline()">📥 Descargar mapa offline (hacelo acá, con señal)</button>
@@ -484,7 +481,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--te
       </div>
     </div>
 
-    <div class="mst-card" id="mstCardElegidos" style="display:none;">
+    <div class="mst-card" id="mstCardElegidos">
       <div class="mst-card-t">Puntos habilitados</div>
       <div id="mstListaElegidos"></div>
     </div>
@@ -1388,22 +1385,19 @@ function iniciarGpsEnVivo(){
 }
 
 // ══════════════════════════════════════════════
-// MUESTREO — campañas de muestreo de materia seca.
-// Una "campaña" = potrero + fecha de inicio → una bolsa de N puntos numerados
-// (1, 2, 3…) repartidos al azar por el sobrante del potrero en ese momento
-// (reusa la misma matemática del motor de corte de mapa_potreros.html).
-// Los puntos empiezan todos "sin habilitar". Cada vez que se corta una parcela
-// real en el mapa (mapa_potreros.html o desde el aforo en elprado_actividades.html),
-// se revisa cuáles puntos de la bolsa caen dentro de esa parcela y esos quedan
-// "habilitados" — ahí es cuando aparecen para ir a muestrear. El aforo de esa
-// parcela después se puede vincular a un número de punto puntual, para trazabilidad.
+// MUESTREO — vista liviana para el QR de campo. Acá NO se elige potrero ni se genera
+// nada (eso pasa en mapa_potreros.html, la base) — esta pantalla solo muestra los
+// potreros con muestreo activo HOY, leyendo un índice chico (muestreoActivos) para
+// que abrir por QR sea rápido, y dentro de cada uno los puntos ya habilitados con
+// GPS en vivo y detección de llegada.
 // ══════════════════════════════════════════════
 const MST_UMBRAL_LLEGADA_M = 15; // metros — a esta distancia el punto se marca "llegado"
+const MST_ACTIVOS_LOCAL_KEY = 'elprado_mst_activos';
 
 let mst = {
   potrero: null,
-  campanas: {},       // todas las campañas de este potrero, por fecha de inicio
-  fechaActiva: null,  // clave (fecha) de la campaña activa, si hay una
+  campanas: {},       // campañas de ESTE potrero, por fecha de inicio
+  fechaActiva: null,
   map: null, markers: {}, contornoLayer: null,
   gpsMarker: null, gpsCirculo: null, gpsWatchId: null, _ultimaPos: null,
   tileLayer: null, descargando: false
@@ -1411,57 +1405,44 @@ let mst = {
 
 function abrirMuestreo(){
   irA('pagMuestreo');
-  mstCargarListaPotreros();
+  mstCargarActivos();
 }
 function mstRefrescar(){
   refrescar('muestreo');
-  if(mst.potrero) mstSeleccionarPotrero(mst.potrero);
+  if(mst.potrero) mstAbrirPotrero(mst.potrero);
+  else mstCargarActivos();
 }
 
-function mstCargarListaPotreros(){
-  const todos = getPotreroGeo() || {};
-  const nombres = Object.keys(todos).filter(n=>{
-    const d = todos[n];
-    return d && d.potrero && d.potrero.latlngs && d.potrero.latlngs.length >= 3;
-  }).sort();
-  const sel = document.getElementById('mstSelectPotrero');
-  const valorActual = sel.value || mst.potrero;
-  sel.innerHTML = '<option value="">Seleccioná un potrero…</option>' +
-    nombres.map(n=>`<option value="${n}">${n}</option>`).join('');
-  if(valorActual && nombres.includes(valorActual)){
-    sel.value = valorActual;
-    mstSeleccionarPotrero(valorActual);
-  }
-}
+// ── Lista de potreros activos (índice liviano — una sola lectura chica) ──
+async function mstCargarActivos(){
+  document.getElementById('mstVistaLista').style.display = 'block';
+  document.getElementById('mstVistaPotrero').style.display = 'none';
+  mstDetenerGps();
+  if(mst.map){ mst.map.remove(); mst.map = null; }
+  mst.potrero = null;
 
-// ── Sobrante: exactamente la misma matemática del motor de corte ──
-function mstCalcularSobrante(nombre){
-  const todos = getPotreroGeo() || {};
-  const data = todos[nombre];
-  if(!data || !data.potrero || !data.potrero.geojson) return null;
-  let util = data.potrero.geojson;
-  (data.exclusiones||[]).forEach(z=>{
-    try{ const diff = turf.difference(util, z.geojson); if(diff) util = diff; }
-    catch(e){}
-  });
-  const vuelta = data.vueltaActual || 1;
-  const enVuelta = (data.parcelas||[]).filter(p=>p.vuelta===vuelta && p.geojson);
-  let sobrante = util;
-  if(enVuelta.length){
-    let usado = enVuelta[0].geojson;
-    for(let i=1;i<enVuelta.length;i++){
-      try{ const r = turf.union(usado, enVuelta[i].geojson); if(r) usado = r; }catch(e){}
-    }
-    try{ sobrante = turf.difference(util, usado) || util; }catch(e){ sobrante = util; }
+  const cont = document.getElementById('mstListaActivos');
+  cont.innerHTML = '<div class="mst-card"><div class="mst-hint">Cargando…</div></div>';
+  let activos = {};
+  try{
+    const r = await fetch(FB_URL + '/muestreoActivos.json');
+    const data = await r.json();
+    if(data){ activos = data; localStorage.setItem(MST_ACTIVOS_LOCAL_KEY, JSON.stringify(activos)); }
+  }catch(e){
+    try{ const v = localStorage.getItem(MST_ACTIVOS_LOCAL_KEY); activos = v ? JSON.parse(v) : {}; }catch(e2){ activos = {}; }
   }
-  return {
-    latlngsPotrero: data.potrero.latlngs,
-    utilGeo: util,
-    sobranteGeo: sobrante,
-    areaTotalHa: data.potrero.areaHa,
-    areaSobranteHa: turf.area(sobrante)/10000
-  };
+  const nombres = Object.keys(activos||{}).filter(n => activos[n]).sort();
+  if(!nombres.length){
+    cont.innerHTML = '<div class="mst-card"><div class="mst-hint">No hay ningún potrero con muestreo activo en este momento. Se activan desde la base (mapa de potreros).</div></div>';
+    return;
+  }
+  cont.innerHTML = nombres.map(n => `
+    <div class="mst-card" style="cursor:pointer;" onclick="mstAbrirPotrero('${n}')">
+      <div class="mst-card-t"><span>📍 ${n}</span><span style="color:var(--text3);font-size:11px;font-weight:400;text-transform:none;letter-spacing:0;">desde ${fmtSlashV(activos[n])}</span></div>
+    </div>
+  `).join('');
 }
+function mstVolverALista(){ mstCargarActivos(); }
 
 // ── Lectura / escritura de campañas — acotado a UN potrero (no pisa a los demás),
 // con caché local para que se pueda seguir viendo la campaña activa sin señal. ──
@@ -1484,134 +1465,46 @@ async function mstGuardarCampanas(potrero, data){
   }catch(e){}
 }
 
-async function mstSeleccionarPotrero(nombre){
+async function mstAbrirPotrero(potrero){
+  document.getElementById('mstVistaLista').style.display = 'none';
+  document.getElementById('mstVistaPotrero').style.display = 'block';
   mstDetenerGps();
   if(mst.map){ mst.map.remove(); mst.map = null; }
   mst.markers = {};
-  document.getElementById('mstSobranteWrap').style.display = nombre ? 'block' : 'none';
-  document.getElementById('mstCardMapa').style.display = 'none';
-  document.getElementById('mstCardElegidos').style.display = 'none';
-  mst.potrero = nombre || null;
-  if(!nombre) return;
+  mst.potrero = potrero;
 
-  document.getElementById('mstCardCampana').innerHTML = '<div class="mst-hint">Cargando campaña…</div>';
-  mst.campanas = await mstCargarCampanas(nombre);
+  document.getElementById('mstCardCampana').innerHTML = '<div class="mst-hint">Cargando…</div>';
+  mst.campanas = await mstCargarCampanas(potrero);
   mst.fechaActiva = Object.keys(mst.campanas).find(f => mst.campanas[f] && mst.campanas[f].activa) || null;
   mstRenderCardCampana();
   if(mst.fechaActiva) mstMostrarMapaCampana();
 }
-
 function mstCampanaActiva(){
   return mst.fechaActiva ? mst.campanas[mst.fechaActiva] : null;
 }
-
 function mstRenderCardCampana(){
   const cont = document.getElementById('mstCardCampana');
   const camp = mstCampanaActiva();
-  const hoy = hoyLocal();
   if(!camp){
-    cont.innerHTML = `
-      <div class="mst-card-t">Nueva campaña de muestreo</div>
-      <div class="mst-hint">Se reparten los puntos por lo que hoy queda libre en este potrero (todo el potrero si todavía no se cortó ninguna parcela). Se numeran desde el 1.</div>
-      <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-        <div>
-          <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:3px;">Fecha de inicio</label>
-          <input class="mst-select" type="date" id="mstFechaInicio" value="${hoy}">
-        </div>
-        <div>
-          <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:3px;">Cantidad de puntos</label>
-          <input class="mst-select" type="number" id="mstCantPuntos" min="2" max="200" placeholder="ej: 20">
-        </div>
-      </div>
-      <button class="mst-btn primary" onclick="mstCrearCampana()">🎲 Generar campaña de muestreo</button>
-    `;
+    cont.innerHTML = '<div class="mst-hint">Esta campaña ya no está activa (puede que se haya cerrado recién desde la base). Volvé a la lista y actualizá.</div>';
     return;
   }
   const puntos = camp.puntos || [];
   const habilitados = puntos.filter(p=>p.habilitado);
   const llegados = puntos.filter(p=>p.llegado);
   cont.innerHTML = `
-    <div class="mst-card-t">
-      <span>Campaña activa — desde ${fmtSlashV(camp.fechaInicio)}</span>
-      <button class="mst-btn red" style="width:auto;margin:0;padding:5px 10px;font-size:10.5px;" onclick="mstArchivarYNueva()">🗑️ Nueva campaña</button>
-    </div>
+    <div class="mst-card-t"><span>Campaña activa — desde ${fmtSlashV(camp.fechaInicio)}</span></div>
     <div class="mst-stats">
       <div class="mst-stat"><div class="v">${puntos.length}</div><div class="l">Puntos totales</div></div>
       <div class="mst-stat"><div class="v">${habilitados.length}</div><div class="l">Habilitados</div></div>
       <div class="mst-stat"><div class="v">${llegados.length}</div><div class="l">Ya visitados</div></div>
       <div class="mst-stat"><div class="v">${puntos.length-habilitados.length}</div><div class="l">Esperando corte</div></div>
     </div>
-    <div class="mst-hint" style="margin-top:8px;">Los puntos se habilitan solos a medida que se van cortando las parcelas reales en el mapa. Podés vincular el número de punto al cargar el aforo en Actividades.</div>
   `;
-}
-
-async function mstCrearCampana(){
-  const fecha = document.getElementById('mstFechaInicio').value;
-  const cantidad = parseInt(document.getElementById('mstCantPuntos').value);
-  if(!fecha){ notifV('⚠️ Poné la fecha de inicio', true); return; }
-  if(!cantidad || cantidad < 2){ notifV('⚠️ Poné una cantidad de puntos (mínimo 2)', true); return; }
-  const calc = mstCalcularSobrante(mst.potrero);
-  if(!calc || calc.areaSobranteHa < 0.01){
-    notifV('⚠️ Ese potrero todavía no tiene contorno dibujado, o no le queda sobrante', true);
-    return;
-  }
-  const puntos = mstGenerarPuntosAleatorios(calc.sobranteGeo, cantidad);
-  if(puntos.length < 2){
-    notifV('⚠️ El sobrante es muy chico o angosto para esa cantidad de puntos', true);
-    return;
-  }
-  if(mst.fechaActiva && !confirm('Ya hay una campaña activa desde el ' + fmtSlashV(mst.campanas[mst.fechaActiva].fechaInicio) + '. ¿Archivarla y crear esta nueva?')) return;
-  if(mst.fechaActiva) mst.campanas[mst.fechaActiva].activa = false;
-
-  mst.campanas[fecha] = {
-    fechaInicio: fecha,
-    cantidadSolicitada: cantidad,
-    creada: new Date().toISOString(),
-    activa: true,
-    puntos: puntos.map(p=>({ numero:p.numero, lat:p.lat, lng:p.lng, habilitado:false, llegado:false, parcelaId:null, parcelaNum:null, fechaHabilitado:null }))
-  };
-  mst.fechaActiva = fecha;
-  await mstGuardarCampanas(mst.potrero, mst.campanas);
-  mstRenderCardCampana();
-  mstMostrarMapaCampana();
-  notifV('✓ Campaña creada con ' + puntos.length + ' puntos');
-}
-
-async function mstArchivarYNueva(){
-  if(!confirm('¿Archivar la campaña activa y armar una nueva? El historial de la anterior queda guardado, solo deja de estar activa.')) return;
-  if(mst.fechaActiva) mst.campanas[mst.fechaActiva].activa = false;
-  await mstGuardarCampanas(mst.potrero, mst.campanas);
-  mst.fechaActiva = null;
-  document.getElementById('mstCardMapa').style.display = 'none';
-  document.getElementById('mstCardElegidos').style.display = 'none';
-  mstRenderCardCampana();
-}
-
-function mstGenerarPuntosAleatorios(sobranteGeo, cantidad){
-  const bbox = turf.bbox(sobranteGeo); // [minLng,minLat,maxLng,maxLat]
-  const anchoBbox = turf.distance([bbox[0],bbox[1]],[bbox[2],bbox[1]],{units:'meters'});
-  const altoBbox   = turf.distance([bbox[0],bbox[1]],[bbox[0],bbox[3]],{units:'meters'});
-  const distMinima = Math.max(8, Math.min(anchoBbox, altoBbox) / Math.max(3, Math.sqrt(cantidad)*1.3));
-  const puntos = [];
-  let intentos = 0;
-  while(puntos.length < cantidad && intentos < 8000){
-    intentos++;
-    const lng = bbox[0] + Math.random()*(bbox[2]-bbox[0]);
-    const lat = bbox[1] + Math.random()*(bbox[3]-bbox[1]);
-    let dentro = false;
-    try{ dentro = turf.booleanPointInPolygon([lng,lat], sobranteGeo); }catch(e){ dentro=false; }
-    if(!dentro) continue;
-    const muyCerca = puntos.some(p => turf.distance([p.lng,p.lat],[lng,lat],{units:'meters'}) < distMinima);
-    if(muyCerca) continue;
-    puntos.push({ numero: puntos.length+1, lat, lng });
-  }
-  return puntos;
 }
 
 // ── Mapa ──
 function mstMostrarMapaCampana(){
-  document.getElementById('mstCardMapa').style.display = 'block';
-  document.getElementById('mstCardElegidos').style.display = 'block';
   setTimeout(()=>{
     if(!mst.map){
       mst.map = L.map('mstMap', {zoomControl:true});
@@ -1619,10 +1512,12 @@ function mstMostrarMapaCampana(){
       mst.tileLayer.addTo(mst.map);
       mstIniciarGps();
     }
-    const calc = mstCalcularSobrante(mst.potrero);
-    if(mst.contornoLayer) mst.map.removeLayer(mst.contornoLayer);
-    mst.contornoLayer = L.polygon(calc.latlngsPotrero, {color:'#6dba3a', weight:2, fillOpacity:.04}).addTo(mst.map);
-    mst.map.fitBounds(mst.contornoLayer.getBounds(), {padding:[24,24]});
+    const camp = mstCampanaActiva();
+    const puntos = camp ? (camp.puntos||[]) : [];
+    if(puntos.length){
+      const bounds = L.latLngBounds(puntos.map(p=>[p.lat,p.lng]));
+      mst.map.fitBounds(bounds, {padding:[30,30]});
+    }
     setTimeout(()=>mst.map.invalidateSize(), 80);
     mstRenderMarcadores();
     mstRenderElegidos();
@@ -1731,6 +1626,7 @@ function mstVerificarLlegada(lat, lng){
   }
   mstRenderElegidos();
 }
+
 
 // ══════════════════════════════════════════════
 // MUESTREO — mapa offline. Guarda cada imagen satelital (tile) en IndexedDB, en el
