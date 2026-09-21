@@ -2147,7 +2147,7 @@ function migrarGruposYRegistros() {
     if(nuevo !== a.lote) cambios++;
     return {...a, lote: nuevo};
   });
-  setData('actividades', actsNuevas);
+  guardarActividades(actsNuevas);
 
   // 3. Migrar plan (campo lote)
   const plan = getData('plan', []);
@@ -2317,10 +2317,12 @@ async function syncFromFirebase() {
           }
           // actividades: MERGE real por id — nunca perder registros de ningún lado, sin
           // depender de comparar cantidades (esa comparación fue la causa de que una pantalla
-          // quedara desincronizada en silencio, sin traer nada nuevo nunca más).
+          // quedara desincronizada en silencio, sin traer nada nuevo nunca más). Vive en
+          // IndexedDB, no en localStorage (ver más arriba, junto a getData/setData) — por
+          // eso acá el "local" es _actividadesCache, no lo que diga esta clave en localStorage.
           if(key === 'actividades') {
             if(!fbArr) return;
-            const localArr = Array.isArray(localVal) ? localVal : [];
+            const localArr = Array.isArray(_actividadesCache) ? _actividadesCache : [];
             const mapa = {};
             // Primero Firebase, después local encima — pero si el mismo id tiene fechaMod
             // más vieja en local que en Firebase, se queda la de Firebase (la más nueva gana).
@@ -2331,7 +2333,8 @@ async function syncFromFirebase() {
               if(!enFb || (rec.fechaMod||'') >= (enFb.fechaMod||'')) mapa[rec.id] = rec;
             });
             const merged = Object.values(mapa);
-            _set.call(localStorage, lsKey, JSON.stringify(merged));
+            _actividadesCache = merged;
+            idbSetActividades(merged);
             // Si el merge sumó algo que Firebase todavía no tenía, subirlo (mismo mecanismo
             // que ya usa lluvia — así ninguna pantalla se queda con datos que el resto no ve).
             if(merged.length > fbArr.length) {
@@ -2495,6 +2498,71 @@ function cargarLluviaHistoricaSilencioso() {
 // ═══════════════════════════════════════
 // STORAGE
 // ═══════════════════════════════════════
+// ══════════════════════════════════════════════
+// ACTIVIDADES EN INDEXEDDB — localStorage tiene un techo fijo (~5 MB) igual en todos los
+// navegadores, sin importar cuánto espacio libre haya en el disco. El historial de aforos
+// ya se acerca solo a ese techo (9745 registros ≈ 4-5 MB), dejando sin margen a lo demás
+// que la app también necesita guardar ahí. IndexedDB no tiene ese límite tan bajo (cientos
+// de MB, pensado justo para volúmenes así), así que 'actividades' vive ahí — el resto de
+// los datos (lluvia, grupos, plan, etc — todos mucho más chicos) se queda igual, en
+// localStorage, sin cambios.
+// ══════════════════════════════════════════════
+let _actividadesCache = [];
+let _actividadesDB = null;
+
+function idbAbrir() {
+  return new Promise((resolve, reject) => {
+    if(_actividadesDB) return resolve(_actividadesDB);
+    const req = indexedDB.open('elprado_db', 1);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if(!db.objectStoreNames.contains('actividades')) db.createObjectStore('actividades');
+    };
+    req.onsuccess = e => { _actividadesDB = e.target.result; resolve(_actividadesDB); };
+    req.onerror = e => reject(e);
+  });
+}
+function idbGetActividades() {
+  return idbAbrir().then(db => new Promise((resolve) => {
+    try {
+      const tx = db.transaction('actividades', 'readonly');
+      const req = tx.objectStore('actividades').get('lista');
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => resolve([]);
+    } catch(e) { resolve([]); }
+  })).catch(() => []);
+}
+function idbSetActividades(arr) {
+  return idbAbrir().then(db => new Promise((resolve) => {
+    try {
+      const tx = db.transaction('actividades', 'readwrite');
+      tx.objectStore('actividades').put(arr, 'lista');
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+    } catch(e) { resolve(false); }
+  })).catch(() => false);
+}
+
+// Carga inicial: trae lo que este dispositivo ya tenía guardado en IndexedDB hacia la
+// memoria. Se llama una sola vez, al arrancar la página, antes de sincronizar con Firebase.
+async function cargarActividadesDesdeIndexedDB() {
+  try { _actividadesCache = await idbGetActividades(); }
+  catch(e) { _actividadesCache = []; }
+}
+
+// Reemplaza a setData('actividades', ...) en todo el archivo: guarda en memoria + IndexedDB
+// (nunca en localStorage, para no chocar con su límite fijo) y sube a Firebase igual que
+// siempre hizo setData.
+function guardarActividades(arr) {
+  _actividadesCache = Array.isArray(arr) ? arr : [];
+  idbSetActividades(_actividadesCache);
+  try {
+    if(typeof FB_URL !== 'undefined') {
+      fbSet('actividades', _actividadesCache).catch(e => console.log('FB error:', e));
+    }
+  } catch(e) {}
+}
+
 function getData(key, def) {
   try {
     const val = JSON.parse(localStorage.getItem('elprado_' + key));
@@ -2516,7 +2584,7 @@ function setData(key, val) {
     }
   } catch(e) {}
 }
-function getActividades() { return getData('actividades', []); }
+function getActividades() { return _actividadesCache; }
 function getGrupos() { return getData('grupos', GRUPOS_BASE); }
 
 // ═══════════════════════════════════════
@@ -4157,7 +4225,7 @@ function guardarActividad() {
     const regViejo = actsPrev.find(a => a.id === editId);
     if(regViejo) mapaParcelaIdVieja = regViejo.mapaParcelaId || null;
     let acts = actsPrev.filter(a => a.id !== editId);
-    setData('actividades', acts);
+    guardarActividades(acts);
     // Limpiar el plan generado por ese registro
     let plan = getPlan().filter(p => p.autoDesdeMS && p.id !== editId);
     setPlan(plan);
@@ -4295,7 +4363,7 @@ function guardarActividad() {
 
   // Una sola fila — no se genera duplicado de INGRESO HDA
 
-  setData('actividades', acts);
+  guardarActividades(acts);
   // setData ya llama fbSet internamente — no duplicar
 
   // ── FIN DE VUELTA: si el checkbox está marcado, guardar registro especial ──
@@ -4321,7 +4389,7 @@ function guardarActividad() {
     // Reemplazar FIN_VUELTA anterior del mismo potrero si existe
     const actsFiltered = actsPost.filter(a => !(a.actividad === 'FIN_VUELTA' && a.potrero === potrero));
     actsFiltered.unshift(recFV);
-    setData('actividades', actsFiltered);
+    guardarActividades(actsFiltered);
     chkFV.checked = false;
     notif('🔚 Fin de vuelta registrado para ' + potrero);
     mstFinalizarCampanaSiFinVuelta(potrero);
@@ -4352,7 +4420,7 @@ function guardarActividad() {
             const _actsPost = getActividades();
             const _actsFiltered = _actsPost.filter(a => !(a.actividad === 'FIN_VUELTA' && a.potrero === potrero));
             _actsFiltered.unshift(_recFV);
-            setData('actividades', _actsFiltered);
+            guardarActividades(_actsFiltered);
             notif('🔚 Fin de vuelta registrado para ' + potrero);
             mstFinalizarCampanaSiFinVuelta(potrero);
           }
@@ -4362,6 +4430,51 @@ function guardarActividad() {
   }
   // Recalcular retornos de registros posteriores del mismo potrero
   recalcularRetornoPotrero(potrero, rec.fechaSal || rec.fechaSalMaq || rec.fecha);
+
+// Auto-generar entrada en Planificación desde Materia Seca con fechas
+  if(actActual === 'MATERIA SECA' && rec.fechaIng) {
+    const plan = getPlan();
+    // Evitar duplicados: misma fecha+potrero+parcela+lote
+    const existe = plan.some(p => p.fi===rec.fechaIng && p.potrero===rec.potrero && p.parcela===rec.parcela && p.lote===rec.lote);
+    if(!existe) {
+      const diasEst = rec.estadia || 1;
+      plan.unshift({
+        id: uuid(),
+        fi: rec.fechaIng,
+        fs: rec.fechaSal || '',
+        potrero: rec.potrero,
+        parcela: rec.parcela,
+        lote: rec.lote,
+        dias: diasEst,
+        anchoM: rec.anchoM || null,
+        largoM: rec.largoM || null,
+        obs: rec.comentario || '',
+        ts: Date.now(),
+        autoDesdeMS: true
+      });
+      setPlan(plan);
+    }
+  }
+
+  // Guardar datos persistentes para el próximo registro
+  window._ultimoReg = {
+    potrero: rec.potrero,
+    variedad: rec.variedad,
+    lote: rec.lote,
+    cabezas: rec.cabezas,
+    pesoMedio: rec.pesoMedio,
+    consumoPorcReg: rec.consumoPorcReg,
+    anchoM: rec.anchoM,
+    fechaSal: rec.fechaSal || null
+  };
+
+  notif('✓ Registro guardado correctamente');
+  limpiarForm();
+  showPage('actividades');
+  renderTabla();
+  renderStats();
+}
+
 // ═══════════════════════════════════════
 function recalcularRetornoPotrero(potrero, fechaRefSalida) {
   // Cuando se guarda una actividad, recalcular el retorno de todos los
@@ -4414,7 +4527,7 @@ function limpiarDuplicados() {
   });
 
   const eliminados = total_antes - acts.length;
-  setData('actividades', acts);
+  guardarActividades(acts);
   
   // También limpiar el plan de duplicados
   let plan = getPlan();
@@ -4462,50 +4575,6 @@ function sincronizarPlanDesdeMS() {
   setPlan(plan);
   renderPlan();
   notif(nuevos > 0 ? '✓ ' + nuevos + ' entrada' + (nuevos>1?'s':'') + ' sincronizada' + (nuevos>1?'s':'') : 'Ya estaba todo sincronizado');
-}
-
-// Auto-generar entrada en Planificación desde Materia Seca con fechas
-  if(actActual === 'MATERIA SECA' && rec.fechaIng) {
-    const plan = getPlan();
-    // Evitar duplicados: misma fecha+potrero+parcela+lote
-    const existe = plan.some(p => p.fi===rec.fechaIng && p.potrero===rec.potrero && p.parcela===rec.parcela && p.lote===rec.lote);
-    if(!existe) {
-      const diasEst = rec.estadia || 1;
-      plan.unshift({
-        id: uuid(),
-        fi: rec.fechaIng,
-        fs: rec.fechaSal || '',
-        potrero: rec.potrero,
-        parcela: rec.parcela,
-        lote: rec.lote,
-        dias: diasEst,
-        anchoM: rec.anchoM || null,
-        largoM: rec.largoM || null,
-        obs: rec.comentario || '',
-        ts: Date.now(),
-        autoDesdeMS: true
-      });
-      setPlan(plan);
-    }
-  }
-
-  // Guardar datos persistentes para el próximo registro
-  window._ultimoReg = {
-    potrero: rec.potrero,
-    variedad: rec.variedad,
-    lote: rec.lote,
-    cabezas: rec.cabezas,
-    pesoMedio: rec.pesoMedio,
-    consumoPorcReg: rec.consumoPorcReg,
-    anchoM: rec.anchoM,
-    fechaSal: rec.fechaSal || null
-  };
-
-  notif('✓ Registro guardado correctamente');
-  limpiarForm();
-  showPage('actividades');
-  renderTabla();
-  renderStats();
 }
 
 // ── Limpieza de registros corruptos — scope global ──
@@ -4699,7 +4768,7 @@ function borrarActividad(id) {
   }
   if(!confirm('¿Eliminar este registro?')) return;
   const nuevas = acts.filter(a => a.id !== id);
-  setData('actividades', nuevas);
+  guardarActividades(nuevas);
 
   // Si este registro tenía una parcela dibujada en el Mapa de Potreros, la borramos también ahí
   // (si no, queda una franja pintada en el mapa sin ningún aforo real detrás).
@@ -6410,7 +6479,7 @@ function confirmarCambioSalida() {
     }
   });
 
-  setData('actividades', acts);
+  guardarActividades(acts);
   // setData ya llama fbSet — no duplicar
   let plan = getPlan();
   _cambioActual.cambios.forEach(c => {
@@ -7320,7 +7389,7 @@ function importarJSON() {
             );
             if(!ok2) return;
           }
-          setData('actividades', d.actividades);
+          guardarActividades(d.actividades);
         }
         if(d.grupos) setData('grupos',d.grupos);
         renderTabla(); renderStats(); renderGrupos(); poblarSelectGrupos();
@@ -7335,7 +7404,7 @@ function importarJSON() {
 function borrarTodo() {
   if(!confirm('⚠ ¿Borrar TODOS los datos? Esta acción no se puede deshacer.')) return;
   if(!confirm('¿Estás segura? Se perderán todos los registros.')) return;
-  localStorage.removeItem('elprado_actividades');
+  guardarActividades([]);
   localStorage.removeItem('elprado_grupos');
   renderTabla(); renderStats(); renderGrupos();
   notif('Datos eliminados');
@@ -7695,7 +7764,7 @@ function procesarExcelHistorico(arrayBuffer) {
   const todos = [...nuevos, ...existentes];
   // Ordenar por fecha desc
   todos.sort((a,b) => (b.fecha||'').localeCompare(a.fecha||''));
-  setData('actividades', todos);
+  guardarActividades(todos);
 
   bar.style.width = '100%';
   prog.style.display = 'none';
@@ -7959,6 +8028,7 @@ window.onload = async () => {
   document.body.insertAdjacentHTML('beforeend', '<div id="fb-loading" style="position:fixed;inset:0;background:rgba(15,26,11,.92);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;"><div style="font-size:14px;color:#6dba3a;font-weight:600;letter-spacing:2px;">SINCRONIZANDO CON FIREBASE...</div><div style="width:200px;height:4px;background:#2e4020;border-radius:2px;overflow:hidden;"><div id="fb-bar" style="height:100%;background:#6dba3a;width:0%;transition:width 1s;"></div></div></div>');
   setTimeout(()=>{ const b=document.getElementById('fb-bar'); if(b) b.style.width='80%'; }, 100);
   
+  await cargarActividadesDesdeIndexedDB();
   await syncFromFirebase();
 
   // Cargar lluvia histórica sin activar el override de localStorage
@@ -8377,7 +8447,7 @@ function borrarSeleccionados() {
   if(!confirm('¿Eliminar ' + checks.length + ' registro' + (checks.length>1?'s':'') + '?')) return;
   const ids = [...checks].map(c => c.value);
   let acts = getActividades().filter(a => !ids.includes(a.id));
-  setData('actividades', acts);
+  guardarActividades(acts);
   renderTabla();
   renderStats();
   notif('✓ ' + ids.length + ' registro' + (ids.length>1?'s':'') + ' eliminado' + (ids.length>1?'s':''));
@@ -8910,8 +8980,12 @@ function eliminarCircuito(id) {
 
   // Al cargar: sincronizar datos PASTURAS desde Firebase con protección
   window.addEventListener('load', function() {
-    // Solo potreroAreas y potreroConfig son intocables (configuración física de la estancia)
-    var PROTEGIDAS = ['potreroAreas', 'potreroConfig'];
+    // Solo potreroAreas y potreroConfig son intocables (configuración física de la estancia).
+    // 'actividades' también queda afuera de este mecanismo: ya no vive en localStorage (pesa
+    // demasiado, tiene su propio manejo en IndexedDB vía syncFromFirebase/cargarActividadesDesdeIndexedDB),
+    // así que si este bloque la tocara, la volvería a intentar meter en localStorage y
+    // reventaría el mismo límite de espacio que acabamos de resolver.
+    var PROTEGIDAS = ['potreroAreas', 'potreroConfig', 'actividades'];
     // Claves donde Firebase siempre gana si tiene MÁS datos
     var MERGE_MAS_REGISTROS = ['lluvia'];
     // Claves de configuración: Firebase gana si tiene más potreros asignados
