@@ -1558,7 +1558,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
     <div class="card-title">
       <span>📍</span> Estado del Campo
       <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
-        <a href="mapa_ocupacion.html" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px;">📍 Ver en el Mapa</a>
+        <button onclick="abrirMapaOcupacion()" class="btn btn-secondary btn-sm" style="display:inline-flex;align-items:center;gap:4px;">📍 Ver en el Mapa</button>
         <button onclick="exportarCampoExcel()" class="btn btn-secondary btn-sm">⬇ Excel</button>
         <button onclick="imprimirCampo()" class="btn btn-secondary btn-sm">🖨️ Imprimir</button>
         <button onclick="campoNavegar(-1)" style="background:var(--card2);border:1px solid var(--border);color:var(--text2);padding:4px 14px;border-radius:4px;cursor:pointer;font-size:18px;">‹</button>
@@ -2315,12 +2315,31 @@ async function syncFromFirebase() {
             _set.call(localStorage, lsKey, JSON.stringify(merged));
             return;
           }
-          // actividades: conservar local si tiene MÁS registros (proteger datos de campo)
+          // actividades: MERGE real por id — nunca perder registros de ningún lado, sin
+          // depender de comparar cantidades (esa comparación fue la causa de que una pantalla
+          // quedara desincronizada en silencio, sin traer nada nuevo nunca más).
           if(key === 'actividades') {
-            if(fbArr && Array.isArray(localVal) && localVal.length > fbArr.length) {
-              console.log('[sync] actividades: conservando local (' + localVal.length + ' > fb ' + fbArr.length + ')');
-              return;
+            if(!fbArr) return;
+            const localArr = Array.isArray(localVal) ? localVal : [];
+            const mapa = {};
+            // Primero Firebase, después local encima — pero si el mismo id tiene fechaMod
+            // más vieja en local que en Firebase, se queda la de Firebase (la más nueva gana).
+            fbArr.forEach(rec => { if(rec && rec.id) mapa[rec.id] = rec; });
+            localArr.forEach(rec => {
+              if(!rec || !rec.id) return;
+              const enFb = mapa[rec.id];
+              if(!enFb || (rec.fechaMod||'') >= (enFb.fechaMod||'')) mapa[rec.id] = rec;
+            });
+            const merged = Object.values(mapa);
+            _set.call(localStorage, lsKey, JSON.stringify(merged));
+            // Si el merge sumó algo que Firebase todavía no tenía, subirlo (mismo mecanismo
+            // que ya usa lluvia — así ninguna pantalla se queda con datos que el resto no ve).
+            if(merged.length > fbArr.length) {
+              fetch(FB_URL + '/actividades.json', {
+                method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(merged)
+              }).catch(()=>{});
             }
+            return;
           }
           // lluvia y todo lo demás: Firebase SIEMPRE gana
           _set.call(localStorage, lsKey, JSON.stringify(fbArr || val));
@@ -6108,6 +6127,14 @@ function campoIrHoy() {
   renderCampo();
 }
 
+// Abre la vista "dónde están los animales" dentro de mapa_potreros.html, en la misma
+// fecha que se está mirando acá en Estado del Campo — todo vive en un solo módulo,
+// ya no en un archivo aparte (mapa_ocupacion.html quedó sin uso, se puede borrar).
+function abrirMapaOcupacion() {
+  const fecha = campoFechaBase || new Date().toISOString().split('T')[0];
+  window.open('mapa_potreros.html?vista=animales&fecha=' + encodeURIComponent(fecha), '_blank');
+}
+
 function campoNavegar(dir) {
   if(!campoFechaBase) campoFechaBase = new Date().toISOString().split('T')[0];
   const d = new Date(campoFechaBase + 'T12:00:00');
@@ -7260,10 +7287,41 @@ function importarJSON() {
   inp.onchange = e => {
     const f = e.target.files[0]; if(!f) return;
     const r = new FileReader();
-    r.onload = ev => {
+    r.onload = async ev => {
       try {
         const d = JSON.parse(ev.target.result);
-        if(d.actividades) setData('actividades',d.actividades);
+        if(d.actividades) {
+          // Misma protección que "Subir todos mis datos a Firebase": si este archivo trae
+          // MENOS registros que los que ya hay en Firebase ahora mismo, avisar fuerte antes
+          // de dejar que lo pise — un backup viejo nunca debería poder borrar algo más nuevo
+          // sin que alguien lo confirme a propósito, dos veces.
+          const nImport = d.actividades.length;
+          let nFirebase = 0;
+          try {
+            const rF = await fetch(FB_URL + '/actividades.json?shallow=true');
+            const dataF = await rF.json();
+            if(dataF) nFirebase = Array.isArray(dataF) ? dataF.length : Object.keys(dataF).length;
+          } catch(e2) {}
+          if(nImport < nFirebase) {
+            const ok = confirm(
+              '⚠️ ADVERTENCIA IMPORTANTE ⚠️\n\n' +
+              'Este archivo trae:\n' +
+              '  📄 Archivo: ' + nImport + ' registros\n' +
+              '  ☁️ Firebase tiene ahora: ' + nFirebase + ' registros\n\n' +
+              '⛔ Si continuás, Firebase va a quedar con MENOS datos.\n' +
+              'Esto puede borrar registros que se cargaron después de este backup.\n\n' +
+              '¿Estás SEGURA de que querés continuar?'
+            );
+            if(!ok) return;
+            const ok2 = confirm(
+              '🔴 SEGUNDA CONFIRMACIÓN 🔴\n\n' +
+              'Se van a perder ' + (nFirebase - nImport) + ' registros de Firebase.\n\n' +
+              '¿Confirmás que querés sobreescribir Firebase con los ' + nImport + ' registros de este archivo?'
+            );
+            if(!ok2) return;
+          }
+          setData('actividades', d.actividades);
+        }
         if(d.grupos) setData('grupos',d.grupos);
         renderTabla(); renderStats(); renderGrupos(); poblarSelectGrupos();
         notif(`✓ Importado: ${(d.actividades||[]).length} registros`);
@@ -7917,20 +7975,25 @@ window.onload = async () => {
   await cargarGruposDesdeInventario();
   poblarSelectGrupos();
   poblarSelectPlan();
-  cargarHistoricoInicial();
   renderTabla();
   renderStats();
   // Iniciar auto-sync silencioso cada 5 minutos
   iniciarAutoSync();
 };
 
+// ⚠️ Ya NO se llama sola al abrir la página (ver window.onload) — quedó demostrado que si
+// local está vacío justo cuando falla el pedido a Firebase, esto pisaba la base compartida
+// con un historial viejo, congelado en marzo. Si alguna vez hace falta usarla a mano, ahora
+// escribe SOLO en este celular/PC (con window._lsOrig, saltando el interceptor que auto-sube
+// a Firebase) — nunca más escribe en la base compartida por su cuenta.
 function cargarHistoricoInicial() {
   const existing = getActividades();
   if(existing.length > 0) return; // Ya tiene datos, no sobreescribir
   try {
     const historico = HISTORICO_ELPRADO;
-    setData('actividades', historico);
-    console.log('Historial cargado:', historico.length, 'registros');
+    const _setLocal = window._lsOrig || Storage.prototype.setItem;
+    _setLocal.call(localStorage, 'elprado_actividades', JSON.stringify(historico));
+    console.log('Historial cargado SOLO localmente (no se subió a Firebase):', historico.length, 'registros');
   } catch(e) {
     console.log('Sin historial precargado');
   }
