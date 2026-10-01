@@ -172,6 +172,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     <button class="btn" style="background:#2e7d32;" onclick="abrirLiquidacion()">Ver Liquidacion</button>
     <button id="btn-guardar-asist" class="btn" style="background:#e65100;font-weight:bold;" onclick="guardarAsistencia()">💾 Guardar Asistencia</button>
     <button id="btn-cerrar-q" class="btn" style="background:#1565c0;" onclick="cerrarQuincena()">🔒 Cerrar Quincena</button>
+    <button id="btn-reabrir-q" class="btn" style="background:#c62828;display:none;" onclick="reabrirQuincena()">🔓 Reabrir Quincena</button>
 </div>
 
 <header>
@@ -315,13 +316,16 @@ function actualizarEstadoBarra() {
     btnQ2.innerHTML = (c2 ? '🔒 ' : '') + '2 Quincena (16-fin)';
     // Botón cerrar
     var btnC = document.getElementById('btn-cerrar-q');
+    var btnR = document.getElementById('btn-reabrir-q');
     if(cerrada) {
         btnC.textContent = '🔒 Quincena Cerrada';
         btnC.style.background = '#546e7a';
         btnC.disabled = true;
+        if(btnR) { btnR.style.display = ''; }
     } else {
         btnC.textContent = '🔒 Cerrar Quincena';
         btnC.style.background = '#1565c0';
+        if(btnR) { btnR.style.display = 'none'; }
         btnC.disabled = false;
     }
 }
@@ -545,6 +549,19 @@ function elegir(sel, ci, anio, mes, d) {
     var dg = getDias();
     renderTabla(dg.inicio,dg.fin,mes,anio);
     renderResumen(mes,anio,dg.inicio,dg.fin);
+}
+
+function reabrirQuincena() {
+    var d = getDias();
+    var qTxt = quincenaActual===1 ? '1ª Quincena (1–15)' : '2ª Quincena (16–fin)';
+    if(!confirm('⚠️ ¿Reabrir ' + qTxt + ' de ' + meses[d.mes] + ' ' + d.anio + '?\n\nEsto te permitirá volver a editar la quincena.\n\n¿Confirmar?')) return;
+    var cierres = JSON.parse(localStorage.getItem('quinEvCierres')||'{}');
+    delete cierres[qKey(d.anio, d.mes, quincenaActual)];
+    localStorage.setItem('quinEvCierres', JSON.stringify(cierres));
+    fbRrhhSet('quinEvCierres', cierres);
+    actualizarEstadoBarra();
+    renderTodo();
+    alert('✅ Quincena reabierta. Ahora podés hacer modificaciones.');
 }
 
 function guardarOtra(inp, ci, anio, mes, d) {
