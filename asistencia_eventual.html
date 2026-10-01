@@ -129,9 +129,15 @@ localStorage.setItem = function(key, value) {
   }
 };
 
-// NOTA: removeItem NO se sincroniza a Firebase intencionalmente.
-// Los removes siempre van seguidos de setItem para la misma clave,
-// y un DELETE async puede llegar DESPUÉS del SET y borrar el dato.
+// removeItem sincroniza a Firebase para claves de asistencia eventual
+const _origRemoveItem = localStorage.removeItem.bind(localStorage);
+localStorage.removeItem = function(key) {
+  _origRemoveItem(key);
+  const prefijos = ['evAsist_','evAct_','evRol_','evMoto_'];
+  if(prefijos.some(function(p){ return key.startsWith(p); })) {
+    fbRrhhDelete(key);
+  }
+};
 
 // Sincronizar al cargar — con indicador visible
 document.addEventListener('DOMContentLoaded', async function() {
@@ -1466,15 +1472,23 @@ async function guardarAsistencia() {
         var personal = getPersonal();
         var pares = [];
 
+        var clavesABorrarEnFB = [];
         personal.forEach(function(p) {
             for(var dia = d.inicio; dia <= d.fin; dia++) {
                 prefijos.forEach(function(pref) {
                     var key = pref + p.ci + '_' + d.anio + '_' + d.mes + '_' + dia;
                     var raw = localStorage.getItem(key);
-                    if(raw !== null) pares.push({ key: key, val: raw });
+                    if(raw !== null) {
+                        pares.push({ key: key, val: raw });
+                    } else {
+                        // Si no está en localStorage, aseguramos que tampoco quede en Firebase
+                        clavesABorrarEnFB.push(key);
+                    }
                 });
             }
         });
+        // Borrar de Firebase las claves que ya no existen en localStorage
+        clavesABorrarEnFB.forEach(function(k) { fbRrhhDelete(k); });
 
         // ── Claves estándar (personal, actividades, préstamos, cierres) ─
         FB_RRHH_KEYS.forEach(function(k) {
